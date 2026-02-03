@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from enum import Enum
 
@@ -19,7 +19,7 @@ class Portfolio(SQLModel, table=True):
     """Portfolio model"""
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationship
     transactions: List["Transaction"] = Relationship(back_populates="portfolio")
