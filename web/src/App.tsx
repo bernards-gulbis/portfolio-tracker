@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { PortfolioProvider } from './context/PortfolioContext';
 import PortfolioList from './components/PortfolioList';
+import TransactionView from './components/TransactionView';
 import './App.css';
 
 // Create a client
@@ -24,7 +25,14 @@ function App() {
           </header>
 
           <main className="app-main">
-            <PortfolioList />
+            <div className="app-layout">
+              <aside className="app-sidebar">
+                <PortfolioList />
+              </aside>
+              <section className="app-content">
+                <TransactionView />
+              </section>
+            </div>
           </main>
         </div>
       </PortfolioProvider>
