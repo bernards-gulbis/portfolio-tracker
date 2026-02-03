@@ -8,8 +8,20 @@ DATABASE_URL = "sqlite:///./portfolio_tracker.db"
 engine = create_engine(
     DATABASE_URL,
     echo=True,  # Set to False in production
-    connect_args={"check_same_thread": False}  # Needed for SQLite
+    connect_args={
+        "check_same_thread": False,  # Needed for SQLite
+        "timeout": 30  # Set timeout for SQLite
+    }
 )
+
+# Enable foreign key support for SQLite
+from sqlalchemy import event
+
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def create_db_and_tables():

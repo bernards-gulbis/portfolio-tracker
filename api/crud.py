@@ -44,6 +44,12 @@ def delete_portfolio(session: Session, portfolio_id: int) -> bool:
     """Delete a portfolio and all its transactions"""
     portfolio = session.get(Portfolio, portfolio_id)
     if portfolio:
+        # Manually delete all transactions first (since CASCADE might not work in all scenarios)
+        statement = select(Transaction).where(Transaction.portfolio_id == portfolio_id)
+        transactions = session.exec(statement).all()
+        for transaction in transactions:
+            session.delete(transaction)
+        
         session.delete(portfolio)
         session.commit()
         return True

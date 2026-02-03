@@ -22,13 +22,13 @@ class Portfolio(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationship
-    transactions: List["Transaction"] = Relationship(back_populates="portfolio")
+    transactions: List["Transaction"] = Relationship(back_populates="portfolio", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 
 class Transaction(SQLModel, table=True):
     """Transaction model"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    portfolio_id: int = Field(foreign_key="portfolio.id", index=True)
+    portfolio_id: int = Field(foreign_key="portfolio.id", index=True, ondelete="CASCADE")
     date_time: datetime
     type: TransactionType
     ticker: Optional[str] = Field(default=None)
