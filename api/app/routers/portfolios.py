@@ -7,6 +7,7 @@ from app.core import get_session
 from app.schemas import (
     PortfolioCreate,
     PortfolioUpdate,
+    PortfolioCopy,
     PortfolioResponse,
     PortfolioWithTransactions,
 )
@@ -51,6 +52,17 @@ def update_portfolio(
     """Update a portfolio"""
     service = PortfolioService(session)
     return service.update_portfolio(portfolio_id, portfolio.name)
+
+
+@router.post("/{portfolio_id}/copy", response_model=PortfolioResponse, status_code=201)
+def copy_portfolio(
+    portfolio_id: int,
+    copy_request: PortfolioCopy,
+    session: Session = Depends(get_session)
+):
+    """Copy a portfolio with all its transactions"""
+    service = PortfolioService(session)
+    return service.copy_portfolio(portfolio_id, copy_request.new_name)
 
 
 @router.delete("/{portfolio_id}", status_code=204)

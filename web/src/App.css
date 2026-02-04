@@ -129,6 +129,11 @@ body {
   margin-bottom: 0.25rem;
 }
 
+.portfolio-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .portfolio-date {
   font-size: 0.875rem;
   color: var(--text-secondary);

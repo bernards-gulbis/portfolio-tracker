@@ -63,3 +63,22 @@ class PortfolioService:
     def portfolio_exists(self, portfolio_id: int) -> bool:
         """Check if a portfolio exists"""
         return self.portfolio_repo.exists(portfolio_id)
+    
+    def copy_portfolio(self, portfolio_id: int, new_name: str) -> Portfolio:
+        """Copy a portfolio with all its transactions"""
+        # Validate new name
+        if not new_name or len(new_name.strip()) == 0:
+            raise InvalidPortfolioNameException("Portfolio name cannot be empty")
+        
+        if len(new_name) > 255:
+            raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
+        
+        # Copy the portfolio
+        copied_portfolio = self.portfolio_repo.copy_with_transactions(
+            portfolio_id, new_name.strip()
+        )
+        
+        if not copied_portfolio:
+            raise PortfolioNotFoundException(portfolio_id)
+        
+        return copied_portfolio

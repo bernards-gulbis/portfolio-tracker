@@ -21,6 +21,11 @@ class PortfolioUpdate(PortfolioBase):
     pass
 
 
+class PortfolioCopy(BaseModel):
+    """Schema for copying a portfolio"""
+    new_name: str
+
+
 class PortfolioResponse(PortfolioBase):
     """Schema for portfolio response"""
     id: int

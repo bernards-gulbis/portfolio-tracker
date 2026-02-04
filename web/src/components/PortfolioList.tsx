@@ -3,12 +3,17 @@ import { usePortfolios, useDeletePortfolio } from '../hooks/usePortfolios';
 import { usePortfolioContext } from '../context/PortfolioContext';
 import { Portfolio } from '../api';
 import CreatePortfolioModal from './CreatePortfolioModal';
+import CopyPortfolioModal from './CopyPortfolioModal';
 
 const PortfolioList = () => {
   const { data: portfolios, isLoading, error } = usePortfolios();
   const { activePortfolioId, setActivePortfolioId } = usePortfolioContext();
   const deletePortfolio = useDeletePortfolio();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [copyModalState, setCopyModalState] = useState<{ isOpen: boolean; portfolio: Portfolio | null }>({
+    isOpen: false,
+    portfolio: null,
+  });
 
   const handleDelete = async (portfolioId: number, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the portfolio when deleting
@@ -24,6 +29,11 @@ const PortfolioList = () => {
         console.error('Error deleting portfolio:', error);
       }
     }
+  };
+
+  const handleCopy = (portfolio: Portfolio, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the portfolio when copying
+    setCopyModalState({ isOpen: true, portfolio });
   };
 
   const handlePortfolioClick = (portfolio: Portfolio) => {
@@ -83,13 +93,22 @@ const PortfolioList = () => {
                   Created: {new Date(portfolio.created_at).toLocaleDateString()}
                 </p>
               </div>
-              <button
-                className="btn btn-danger btn-sm"
-                onClick={(e) => handleDelete(portfolio.id, e)}
-                disabled={deletePortfolio.isPending}
-              >
-                Delete
-              </button>
+              <div className="portfolio-card-actions">
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={(e) => handleCopy(portfolio, e)}
+                  title="Copy portfolio with all transactions"
+                >
+                  Copy
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={(e) => handleDelete(portfolio.id, e)}
+                  disabled={deletePortfolio.isPending}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -99,6 +118,15 @@ const PortfolioList = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {copyModalState.portfolio && (
+        <CopyPortfolioModal
+          isOpen={copyModalState.isOpen}
+          onClose={() => setCopyModalState({ isOpen: false, portfolio: null })}
+          portfolioId={copyModalState.portfolio.id}
+          portfolioName={copyModalState.portfolio.name}
+        />
+      )}
     </div>
   );
 };

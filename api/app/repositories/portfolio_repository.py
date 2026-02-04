@@ -57,3 +57,35 @@ class PortfolioRepository:
     def exists(self, portfolio_id: int) -> bool:
         """Check if a portfolio exists"""
         return self.get_by_id(portfolio_id) is not None
+    
+    def copy_with_transactions(self, portfolio_id: int, new_name: str) -> Optional[Portfolio]:
+        """Copy a portfolio with all its transactions"""
+        # Get the original portfolio with transactions
+        original = self.get_by_id(portfolio_id)
+        if not original:
+            return None
+        
+        # Create new portfolio
+        new_portfolio = Portfolio(name=new_name)
+        self.session.add(new_portfolio)
+        self.session.flush()  # Get the new portfolio ID without committing
+        
+        # Copy all transactions
+        for original_transaction in original.transactions:
+            new_transaction = Transaction(
+                portfolio_id=new_portfolio.id,
+                date_time=original_transaction.date_time,
+                type=original_transaction.type,
+                ticker=original_transaction.ticker,
+                units=original_transaction.units,
+                price=original_transaction.price,
+                fee=original_transaction.fee,
+                value=original_transaction.value,
+                value_eur=original_transaction.value_eur,
+                split_ratio=original_transaction.split_ratio,
+            )
+            self.session.add(new_transaction)
+        
+        self.session.commit()
+        self.session.refresh(new_portfolio)
+        return new_portfolio

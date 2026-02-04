@@ -472,6 +472,97 @@ def test_csv_with_complex_transactions(client: TestClient):
     assert transactions[6]["type"] == "Withdraw"
 
 
+def test_copy_portfolio_with_transactions(client: TestClient):
+    """Test copying a portfolio with all its transactions"""
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Original Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Add multiple transactions
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2023-01-15T10:00:00",
+            "type": "Deposit",
+            "value": 5000.00,
+            "value_eur": 5000.00
+        }
+    )
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2023-01-16T11:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "units": 10,
+            "price": 150.00,
+            "value": 1500.00,
+            "value_eur": 1500.00
+        }
+    )
+    
+    # Copy the portfolio
+    copy_response = client.post(
+        f"/portfolios/{portfolio_id}/copy",
+        json={"new_name": "Copied Portfolio"}
+    )
+    assert copy_response.status_code == 201
+    copied_data = copy_response.json()
+    assert copied_data["name"] == "Copied Portfolio"
+    copied_portfolio_id = copied_data["id"]
+    assert copied_portfolio_id != portfolio_id
+    
+    # Verify original portfolio still has transactions
+    original_response = client.get(f"/portfolios/{portfolio_id}")
+    original_data = original_response.json()
+    assert len(original_data["transactions"]) == 2
+    
+    # Verify copied portfolio has all transactions
+    copied_response = client.get(f"/portfolios/{copied_portfolio_id}")
+    copied_full_data = copied_response.json()
+    assert len(copied_full_data["transactions"]) == 2
+    
+    # Verify transaction data matches (but with different IDs and portfolio_id)
+    original_transactions = sorted(original_data["transactions"], key=lambda x: x["date_time"])
+    copied_transactions = sorted(copied_full_data["transactions"], key=lambda x: x["date_time"])
+    
+    assert original_transactions[0]["type"] == copied_transactions[0]["type"]
+    assert original_transactions[0]["value"] == copied_transactions[0]["value"]
+    assert original_transactions[1]["ticker"] == copied_transactions[1]["ticker"]
+    assert original_transactions[1]["units"] == copied_transactions[1]["units"]
+    assert copied_transactions[0]["portfolio_id"] == copied_portfolio_id
+    assert copied_transactions[1]["portfolio_id"] == copied_portfolio_id
+
+
+def test_copy_portfolio_not_found(client: TestClient):
+    """Test copying a non-existent portfolio"""
+    response = client.post(
+        "/portfolios/999/copy",
+        json={"new_name": "Copy of Missing"}
+    )
+    assert response.status_code == 404
+
+
+def test_copy_portfolio_invalid_name(client: TestClient):
+    """Test copying with invalid name"""
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Original"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Try to copy with empty name
+    response = client.post(
+        f"/portfolios/{portfolio_id}/copy",
+        json={"new_name": "   "}
+    )
+    assert response.status_code == 400
+
+
 # ================== Health Check Test ==================
 
 def test_root_endpoint(client: TestClient):

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPortfolios, createPortfolio, deletePortfolio, Portfolio, PortfolioCreate } from '../api';
+import { getPortfolios, createPortfolio, deletePortfolio, copyPortfolio, PortfolioCreate } from '../api';
 
 /**
  * Hook to fetch all portfolios
@@ -34,6 +34,22 @@ export const useDeletePortfolio = () => {
 
   return useMutation({
     mutationFn: (portfolioId: number) => deletePortfolio(portfolioId),
+    onSuccess: () => {
+      // Invalidate and refetch portfolios list
+      queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+    },
+  });
+};
+
+/**
+ * Hook to copy a portfolio with all its transactions
+ */
+export const useCopyPortfolio = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ portfolioId, newName }: { portfolioId: number; newName: string }) =>
+      copyPortfolio(portfolioId, newName),
     onSuccess: () => {
       // Invalidate and refetch portfolios list
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });

@@ -44,6 +44,10 @@ export interface PortfolioUpdate {
   name: string;
 }
 
+export interface PortfolioCopy {
+  new_name: string;
+}
+
 export interface TransactionCreate {
   date_time: string;
   type: TransactionType;
@@ -126,6 +130,20 @@ export const updatePortfolio = async (
  */
 export const deletePortfolio = async (portfolioId: number): Promise<void> => {
   await api.delete(`/portfolios/${portfolioId}`);
+};
+
+/**
+ * Copy a portfolio with all its transactions
+ */
+export const copyPortfolio = async (
+  portfolioId: number,
+  newName: string
+): Promise<Portfolio> => {
+  const response = await api.post<Portfolio>(
+    `/portfolios/${portfolioId}/copy`,
+    { new_name: newName }
+  );
+  return response.data;
 };
 
 // ================== Transaction API Functions ==================

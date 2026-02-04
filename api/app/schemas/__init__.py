@@ -3,6 +3,7 @@
 from .schemas import (
     PortfolioCreate,
     PortfolioUpdate,
+    PortfolioCopy,
     PortfolioResponse,
     PortfolioWithTransactions,
     TransactionCreate,
@@ -14,6 +15,7 @@ from .schemas import (
 __all__ = [
     "PortfolioCreate",
     "PortfolioUpdate",
+    "PortfolioCopy",
     "PortfolioResponse",
     "PortfolioWithTransactions",
     "TransactionCreate",
