@@ -78,6 +78,47 @@ class TransactionService:
         
         return self.transaction_repo.get_by_portfolio_id(portfolio_id)
     
+    def export_transactions_to_csv(self, portfolio_id: int) -> str:
+        """Export all transactions for a portfolio to CSV format"""
+        # Verify portfolio exists
+        if not self.portfolio_repo.exists(portfolio_id):
+            raise PortfolioNotFoundException(portfolio_id)
+        
+        transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
+        
+        # Create CSV in memory
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Write header - must match import format
+        writer.writerow([
+            'date_time',
+            'type',
+            'ticker',
+            'units',
+            'price',
+            'fee',
+            'value',
+            'value_eur',
+            'split_ratio'
+        ])
+        
+        # Write transaction data
+        for transaction in transactions:
+            writer.writerow([
+                transaction.date_time.strftime('%m/%d/%Y %H:%M:%S'),
+                transaction.type.value,
+                transaction.ticker or '',
+                transaction.units if transaction.units is not None else '',
+                transaction.price if transaction.price is not None else '',
+                transaction.fee,
+                transaction.value,
+                transaction.value_eur if transaction.value_eur is not None else '',
+                transaction.split_ratio if transaction.split_ratio is not None else '',
+            ])
+        
+        return output.getvalue()
+    
     def update_transaction(
         self,
         transaction_id: int,

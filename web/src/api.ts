@@ -188,12 +188,22 @@ export const deleteTransaction = async (transactionId: number): Promise<void> =>
   await api.delete(`/transactions/${transactionId}`);
 };
 
+/**
+ * Export transactions to CSV
+ */
+export const exportTransactionsCSV = async (portfolioId: number): Promise<Blob> => {
+  const response = await api.get(`/portfolios/${portfolioId}/transactions/export`, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
 // ================== CSV Upload ==================
 
 /**
- * Upload a CSV file to import transactions for a portfolio
+ * Import a CSV file to add transactions to a portfolio
  */
-export const uploadTransactionsCSV = async (
+export const importTransactionsCSV = async (
   portfolioId: number,
   file: File
 ): Promise<BulkImportResponse> => {
@@ -201,7 +211,7 @@ export const uploadTransactionsCSV = async (
   formData.append('file', file);
 
   const response = await api.post<BulkImportResponse>(
-    `/portfolios/${portfolioId}/upload`,
+    `/portfolios/${portfolioId}/import`,
     formData,
     {
       headers: {

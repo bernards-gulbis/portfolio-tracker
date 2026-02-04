@@ -5,7 +5,7 @@ import {
   createTransaction,
   updateTransaction,
   deleteTransaction,
-  uploadTransactionsCSV,
+  importTransactionsCSV,
   TransactionCreate,
   TransactionUpdate,
 } from '../api';
@@ -88,14 +88,14 @@ export const useDeleteTransaction = () => {
 };
 
 /**
- * Hook to upload CSV transactions
+ * Hook to import CSV transactions
  */
-export const useUploadTransactionsCSV = () => {
+export const useImportTransactionsCSV = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ portfolioId, file }: { portfolioId: number; file: File }) =>
-      uploadTransactionsCSV(portfolioId, file),
+      importTransactionsCSV(portfolioId, file),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });

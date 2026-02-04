@@ -308,6 +308,163 @@ def test_delete_transaction(client: TestClient):
     assert len(data["transactions"]) == 0
 
 
+def test_export_transactions_csv(client: TestClient):
+    """Test exporting transactions to CSV"""
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Export Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Add multiple transactions
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2023-01-15T10:00:00",
+            "type": "Deposit",
+            "value": 5000.00,
+            "value_eur": 5000.00
+        }
+    )
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2023-01-16T11:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "units": 10,
+            "price": 150.00,
+            "value": 1500.00,
+            "value_eur": 1400.00,
+            "fee": 2.50
+        }
+    )
+    
+    # Export to CSV
+    response = client.get(f"/portfolios/{portfolio_id}/transactions/export")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert "attachment" in response.headers["content-disposition"]
+    
+    # Verify CSV content
+    csv_content = response.text
+    lines = csv_content.strip().split('\n')
+    assert len(lines) == 3  # Header + 2 transactions
+    
+    # Check header - must match import format
+    header = lines[0]
+    assert "date_time" in header
+    assert "type" in header
+    assert "ticker" in header
+    assert "units" in header
+    assert "price" in header
+    assert "value" in header
+    
+    # Check first transaction (Deposit)
+    assert "Deposit" in lines[1]
+    assert "5000" in lines[1]
+    
+    # Check second transaction (Buy)
+    assert "Buy" in lines[2]
+    assert "AAPL" in lines[2]
+    assert "10" in lines[2]
+    assert "150" in lines[2]
+
+
+def test_export_and_reimport_csv(client: TestClient):
+    """Test that exported CSV can be re-imported"""
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Export-Import Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Add transactions
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2023-01-15T10:00:00",
+            "type": "Deposit",
+            "value": 5000.00,
+            "value_eur": 5000.00
+        }
+    )
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2023-01-16T11:30:45",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "units": 10,
+            "price": 150.00,
+            "value": 1500.00,
+            "value_eur": 1400.00,
+            "fee": 2.50
+        }
+    )
+    
+    # Export CSV
+    export_response = client.get(f"/portfolios/{portfolio_id}/transactions/export")
+    assert export_response.status_code == 200
+    csv_content = export_response.text
+    
+    # Create new portfolio for import
+    portfolio2_response = client.post(
+        "/portfolios/",
+        json={"name": "Imported Portfolio"}
+    )
+    portfolio2_id = portfolio2_response.json()["id"]
+    
+    # Re-import the CSV
+    from io import BytesIO
+    csv_file = BytesIO(csv_content.encode('utf-8'))
+    files = {"file": ("transactions.csv", csv_file, "text/csv")}
+    import_response = client.post(
+        f"/portfolios/{portfolio2_id}/import",
+        files=files
+    )
+    
+    assert import_response.status_code == 201
+    import_data = import_response.json()
+    assert import_data["imported_count"] == 2
+    
+    # Verify imported transactions match originals
+    transactions = client.get(f"/portfolios/{portfolio2_id}/transactions").json()
+    assert len(transactions) == 2
+    assert transactions[0]["type"] == "Deposit"
+    assert transactions[0]["value"] == 5000.00
+    assert transactions[1]["type"] == "Buy"
+    assert transactions[1]["ticker"] == "AAPL"
+    assert transactions[1]["units"] == 10
+
+
+def test_export_transactions_csv_empty(client: TestClient):
+    """Test exporting transactions when portfolio has no transactions"""
+    # Create portfolio without transactions
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Empty Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Export to CSV
+    response = client.get(f"/portfolios/{portfolio_id}/transactions/export")
+    assert response.status_code == 200
+    
+    # Should have header only
+    csv_content = response.text
+    lines = csv_content.strip().split('\n')
+    assert len(lines) == 1  # Header only
+
+
+def test_export_transactions_csv_nonexistent_portfolio(client: TestClient):
+    """Test exporting transactions for non-existent portfolio"""
+    response = client.get("/portfolios/999/transactions/export")
+    assert response.status_code == 404
+
+
 def test_delete_portfolio_cascades_transactions(client: TestClient):
     """Test that deleting a portfolio also deletes its transactions"""
     # Create portfolio
@@ -371,7 +528,7 @@ def test_csv_upload(client: TestClient):
     # Upload CSV
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/upload",
+        f"/portfolios/{portfolio_id}/import",
         files=files
     )
     
@@ -407,7 +564,7 @@ def test_csv_upload_invalid_file_type(client: TestClient):
     # Try to upload a .txt file
     files = {"file": ("transactions.txt", BytesIO(b"test"), "text/plain")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/upload",
+        f"/portfolios/{portfolio_id}/import",
         files=files
     )
     
@@ -423,7 +580,7 @@ def test_csv_upload_nonexistent_portfolio(client: TestClient):
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        "/portfolios/999/upload",
+        "/portfolios/999/import",
         files=files
     )
     
@@ -452,7 +609,7 @@ def test_csv_with_complex_transactions(client: TestClient):
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/upload",
+        f"/portfolios/{portfolio_id}/import",
         files=files
     )
     

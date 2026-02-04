@@ -1,17 +1,17 @@
 import { useState, FormEvent, ChangeEvent } from 'react';
-import { useUploadTransactionsCSV } from '../hooks/useTransactions';
+import { useImportTransactionsCSV } from '../hooks/useTransactions';
 import { getErrorMessage } from '../api';
 
-interface UploadCSVModalProps {
+interface ImportCSVModalProps {
   isOpen: boolean;
   onClose: () => void;
   portfolioId: number;
 }
 
-const UploadCSVModal = ({ isOpen, onClose, portfolioId }: UploadCSVModalProps) => {
+const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const uploadCSV = useUploadTransactionsCSV();
+  const importCSV = useImportTransactionsCSV();
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -36,7 +36,7 @@ const UploadCSVModal = ({ isOpen, onClose, portfolioId }: UploadCSVModalProps) =
     }
 
     try {
-      const result = await uploadCSV.mutateAsync({ portfolioId, file });
+      const result = await importCSV.mutateAsync({ portfolioId, file });
       alert(`Successfully imported ${result.imported_count} transactions!`);
       setFile(null);
       onClose();
@@ -93,16 +93,16 @@ const UploadCSVModal = ({ isOpen, onClose, portfolioId }: UploadCSVModalProps) =
               type="button"
               className="btn btn-secondary"
               onClick={handleClose}
-              disabled={uploadCSV.isPending}
+              disabled={importCSV.isPending}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={uploadCSV.isPending || !file}
+              disabled={importCSV.isPending || !file}
             >
-              {uploadCSV.isPending ? 'Uploading...' : 'Upload'}
+              {importCSV.isPending ? 'Importing...' : 'Import'}
             </button>
           </div>
         </form>
@@ -111,4 +111,4 @@ const UploadCSVModal = ({ isOpen, onClose, portfolioId }: UploadCSVModalProps) =
   );
 };
 
-export default UploadCSVModal;
+export default ImportCSVModal;

@@ -1,7 +1,9 @@
 """Transaction API routes"""
 from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 from typing import List
+from io import BytesIO
 
 from app.core import get_session
 from app.core.exceptions import FileUploadException
@@ -47,15 +49,34 @@ def list_transactions(
     service = TransactionService(session)
     return service.get_transactions_by_portfolio(portfolio_id)
 
+@router.get("/transactions/export")
+def export_transactions(
+    portfolio_id: int,
+    session: Session = Depends(get_session)
+):
+    """Export all transactions for a portfolio as CSV"""
+    service = TransactionService(session)
+    csv_content = service.export_transactions_to_csv(portfolio_id)
+    
+    # Create a file-like object from the CSV string
+    csv_bytes = BytesIO(csv_content.encode('utf-8'))
+    
+    return StreamingResponse(
+        csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=portfolio_{portfolio_id}_transactions.csv"
+        }
+    )
 
-@router.post("/upload", response_model=BulkImportResponse, status_code=201)
-async def upload_transactions_csv(
+@router.post("/import", response_model=BulkImportResponse, status_code=201)
+async def import_transactions_csv(
     portfolio_id: int,
     file: UploadFile = File(...),
     session: Session = Depends(get_session)
 ):
     """
-    Upload a CSV file to bulk import transactions.
+    Import a CSV file to bulk import transactions.
     
     Expected CSV format:
     date_time,type,ticker,units,price,fee,value,EUR,split_ratio
