@@ -8,9 +8,9 @@ from sqlmodel.pool import StaticPool
 from datetime import datetime
 from io import BytesIO
 
-from database import get_session
+from app.core import get_session
 from main import app
-from models import Portfolio, Transaction, TransactionType
+from app.models import Portfolio, Transaction, TransactionType
 
 
 @pytest.fixture(name="session")

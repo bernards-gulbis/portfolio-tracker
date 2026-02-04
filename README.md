@@ -33,13 +33,16 @@ A full-stack portfolio tracking application built with FastAPI and React. Track 
 ```
 portfolio-tracker-v4/
 ├── api/                    # Backend API
-│   ├── database.py         # Database configuration
-│   ├── models.py           # SQLModel database models
-│   ├── schemas.py          # Pydantic request/response schemas
-│   ├── crud.py             # CRUD operations & CSV parser
-│   ├── main.py             # FastAPI application
-│   └── tests/
-│       └── test_api.py     # Backend tests
+│   ├── app/                # Application package
+│   │   ├── core/           # Core functionality (database, exceptions)
+│   │   ├── models/         # SQLModel database models
+│   │   ├── schemas/        # Pydantic request/response schemas
+│   │   ├── repositories/   # Data access layer (Repository pattern)
+│   │   ├── services/       # Business logic layer (Service pattern)
+│   │   └── routers/        # API route handlers
+│   ├── tests/              # Backend tests
+│   ├── main.py             # FastAPI application entry point
+│   └── README.md           # API documentation
 │
 ├── web/                    # Frontend application
 │   ├── src/
@@ -191,6 +194,10 @@ Supported formats:
 ### Backend Development
 
 The backend uses:
+- **Clean Architecture** with layered design (routers → services → repositories)
+- **Repository Pattern** for data access abstraction
+- **Service Pattern** for business logic encapsulation
+- **Custom Exceptions** with centralized error handling
 - FastAPI's lifespan events for startup/shutdown
 - SQLModel for ORM with relationships
 - Foreign key constraints enabled via PRAGMA
