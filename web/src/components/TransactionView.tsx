@@ -4,17 +4,29 @@ import { usePortfolioContext } from '../context/PortfolioContext';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
 import TransactionTable from './TransactionTable';
 import ImportCSVModal from './UploadCSVModal';
+import TransactionModal from './TransactionModal';
 
 const TransactionView = () => {
   const { activePortfolioId } = usePortfolioContext();
   const { data: transactions, isLoading, error } = useTransactions(activePortfolioId);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
   const [isExporting, setIsExporting] = useState(false);
 
   const handleEdit = (transaction: Transaction) => {
-    // TODO: Implement edit modal
-    console.log('Edit transaction:', transaction);
-    alert('Edit functionality coming soon!');
+    setEditingTransaction(transaction);
+    setIsTransactionModalOpen(true);
+  };
+
+  const handleAddTransaction = () => {
+    setEditingTransaction(undefined);
+    setIsTransactionModalOpen(true);
+  };
+
+  const handleCloseTransactionModal = () => {
+    setIsTransactionModalOpen(false);
+    setEditingTransaction(undefined);
   };
 
   const handleExport = async () => {
@@ -81,6 +93,12 @@ const TransactionView = () => {
         <h2>Transactions</h2>
         <div className="transaction-actions">
           <button
+            className="btn btn-success"
+            onClick={handleAddTransaction}
+          >
+            ➕ Add Transaction
+          </button>
+          <button
             className="btn btn-secondary"
             onClick={handleExport}
             disabled={isExporting || !transactions || transactions.length === 0}
@@ -109,6 +127,13 @@ const TransactionView = () => {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         portfolioId={activePortfolioId}
+      />
+
+      <TransactionModal
+        isOpen={isTransactionModalOpen}
+        onClose={handleCloseTransactionModal}
+        portfolioId={activePortfolioId}
+        transaction={editingTransaction}
       />
     </div>
   );
