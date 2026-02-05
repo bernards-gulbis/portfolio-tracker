@@ -78,6 +78,16 @@ class TransactionService:
         
         return self.transaction_repo.get_by_portfolio_id(portfolio_id)
     
+    def get_transactions_by_portfolio_paginated(
+        self, portfolio_id: int, page: int = 1, page_size: int = 20
+    ) -> tuple[List[Transaction], int]:
+        """Get paginated transactions for a portfolio"""
+        # Verify portfolio exists
+        if not self.portfolio_repo.exists(portfolio_id):
+            raise PortfolioNotFoundException(portfolio_id)
+        
+        return self.transaction_repo.get_by_portfolio_id_paginated(portfolio_id, page, page_size)
+    
     def export_transactions_to_csv(self, portfolio_id: int) -> str:
         """Export all transactions for a portfolio to CSV format"""
         # Verify portfolio exists

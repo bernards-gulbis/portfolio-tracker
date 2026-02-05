@@ -1,18 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTransactions } from '../hooks/useTransactions';
 import { usePortfolioContext } from '../context/PortfolioContext';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
 import TransactionTable from './TransactionTable';
 import ImportCSVModal from './UploadCSVModal';
 import TransactionModal from './TransactionModal';
+import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 
 const TransactionView = () => {
   const { activePortfolioId } = usePortfolioContext();
-  const { data: transactions, isLoading, error } = useTransactions(activePortfolioId);
+  const [currentPage, setCurrentPage] = useState(1);
+  const { data: paginatedData, isLoading, error } = useTransactions(activePortfolioId, currentPage, DEFAULT_PAGE_SIZE);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
   const [isExporting, setIsExporting] = useState(false);
+
+  const transactions = paginatedData?.transactions || [];
+  const totalPages = paginatedData?.total_pages || 1;
+  const total = paginatedData?.total || 0;
+
+  // Reset to page 1 when portfolio changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activePortfolioId]);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -120,6 +131,11 @@ const TransactionView = () => {
           transactions={transactions}
           portfolioId={activePortfolioId}
           onEdit={handleEdit}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          total={total}
+          onPageChange={setCurrentPage}
+          isLoading={isLoading}
         />
       )}
 

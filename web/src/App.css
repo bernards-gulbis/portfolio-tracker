@@ -466,6 +466,34 @@ body {
   justify-content: center;
 }
 
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.pagination-numbers {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.pagination-ellipsis {
+  padding: 0.375rem 0.5rem;
+  color: var(--text-secondary);
+}
+
+.table-info {
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
 /* File upload */
 .form-text {
   display: block;

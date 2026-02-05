@@ -77,6 +77,14 @@ export interface BulkImportResponse {
   transactions: Transaction[];
 }
 
+export interface PaginatedTransactionResponse {
+  transactions: Transaction[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 // ================== API Configuration ==================
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -149,10 +157,19 @@ export const copyPortfolio = async (
 // ================== Transaction API Functions ==================
 
 /**
- * Get all transactions for a portfolio
+ * Get paginated transactions for a portfolio
  */
-export const getTransactions = async (portfolioId: number): Promise<Transaction[]> => {
-  const response = await api.get<Transaction[]>(`/portfolios/${portfolioId}/transactions`);
+export const getTransactions = async (
+  portfolioId: number,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedTransactionResponse> => {
+  const response = await api.get<PaginatedTransactionResponse>(
+    `/portfolios/${portfolioId}/transactions`,
+    {
+      params: { page, page_size: pageSize }
+    }
+  );
   return response.data;
 };
 
