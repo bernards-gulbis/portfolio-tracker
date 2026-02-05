@@ -102,10 +102,15 @@ async def import_transactions_csv(
     if not file.filename.endswith('.csv'):
         raise FileUploadException("File must be a CSV file")
     
-    # Read file content
+    # Read file content with size limit (5MB)
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
     try:
-        content = await file.read()
+        content = await file.read(MAX_FILE_SIZE + 1)
+        if len(content) > MAX_FILE_SIZE:
+            raise FileUploadException(f"File size exceeds maximum allowed size of {MAX_FILE_SIZE // (1024*1024)}MB")
         csv_content = content.decode('utf-8')
+    except UnicodeDecodeError:
+        raise FileUploadException("File must be a valid UTF-8 encoded CSV file")
     except Exception as e:
         raise FileUploadException(f"Error reading file: {str(e)}")
     

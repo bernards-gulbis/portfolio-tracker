@@ -229,6 +229,8 @@ def test_list_transactions(client: TestClient):
             "date_time": "2020-12-02T20:16:10",
             "type": "Buy",
             "ticker": "MSFT",
+            "units": 15.0,
+            "price": 183.69,
             "value": -2755.35,
             "fee": 0.0
         }
@@ -494,6 +496,8 @@ def test_delete_portfolio_cascades_transactions(client: TestClient):
             "date_time": "2020-12-02T20:16:10",
             "type": "Buy",
             "ticker": "MSFT",
+            "units": 15.0,
+            "price": 183.69,
             "value": -2755.35,
             "fee": 0.0
         }

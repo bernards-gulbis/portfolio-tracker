@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import datetime
 from typing import Optional, List
 from app.models import TransactionType
@@ -47,13 +47,34 @@ class TransactionBase(BaseModel):
     """Base transaction schema"""
     date_time: datetime
     type: TransactionType
-    ticker: Optional[str] = None
+    ticker: Optional[str] = Field(None, max_length=20)
     units: Optional[float] = None
     price: Optional[float] = None
     fee: float = 0.0
     value: float
     value_eur: Optional[float] = None
     split_ratio: Optional[float] = None
+    
+    @field_validator('ticker')
+    @classmethod
+    def validate_ticker(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and normalize ticker symbol"""
+        if v is not None:
+            v = v.strip().upper()
+            if not v:
+                return None
+            # Basic ticker validation: alphanumeric and common symbols
+            if not all(c.isalnum() or c in '.-' for c in v):
+                raise ValueError('Ticker must contain only alphanumeric characters, dots, or hyphens')
+        return v
+    
+    @field_validator('split_ratio')
+    @classmethod
+    def validate_split_ratio(cls, v: Optional[float]) -> Optional[float]:
+        """Validate split ratio is positive"""
+        if v is not None and v <= 0:
+            raise ValueError('Split ratio must be greater than 0')
+        return v
 
 
 class TransactionCreate(TransactionBase):

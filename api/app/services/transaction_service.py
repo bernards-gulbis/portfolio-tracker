@@ -109,7 +109,7 @@ class TransactionService:
             'price',
             'fee',
             'value',
-            'value_eur',
+            'EUR',
             'split_ratio'
         ])
         
@@ -147,7 +147,25 @@ class TransactionService:
         if not transaction:
             raise TransactionNotFoundException(transaction_id)
         
-        # Update fields
+        # Create a copy of current values for validation
+        val_type = transaction_type if transaction_type is not None else transaction.type
+        val_ticker = ticker if ticker is not None else transaction.ticker
+        val_units = units if units is not None else transaction.units
+        val_price = price if price is not None else transaction.price
+        val_value = value if value is not None else transaction.value
+        val_fee = fee if fee is not None else transaction.fee
+        
+        # Validate before applying changes
+        self._validate_transaction_data(
+            val_type,
+            val_ticker,
+            val_units,
+            val_price,
+            val_value,
+            val_fee
+        )
+        
+        # Update fields after validation passes
         if date_time is not None:
             transaction.date_time = date_time
         if transaction_type is not None:
@@ -166,16 +184,6 @@ class TransactionService:
             transaction.value_eur = value_eur
         if split_ratio is not None:
             transaction.split_ratio = split_ratio
-        
-        # Validate updated transaction
-        self._validate_transaction_data(
-            transaction.type,
-            transaction.ticker,
-            transaction.units,
-            transaction.price,
-            transaction.value,
-            transaction.fee
-        )
         
         return self.transaction_repo.update(transaction)
     
@@ -207,19 +215,60 @@ class TransactionService:
     ) -> None:
         """Validate transaction data based on business rules"""
         # Validate units
-        if units is not None and units < 0:
-            raise InvalidTransactionDataException("Units cannot be negative")
+        if units is not None and units <= 0:
+            raise InvalidTransactionDataException("Units must be greater than 0")
         
         # Validate price
-        if price is not None and price < 0:
-            raise InvalidTransactionDataException("Price cannot be negative")
+        if price is not None and price <= 0:
+            raise InvalidTransactionDataException("Price must be greater than 0")
         
         # Validate fee
         if fee < 0:
             raise InvalidTransactionDataException("Fee cannot be negative")
         
-        # Note: We don't enforce strict validation for Buy/Sell to allow flexibility
-        # Some systems may track buy/sell without full details initially
+        # Transaction type-specific validation
+        if transaction_type in (TransactionType.BUY, TransactionType.SELL):
+            # Buy and Sell require ticker, units, and price
+            if not ticker:
+                raise InvalidTransactionDataException(
+                    f"{transaction_type.value} transactions require a ticker symbol"
+                )
+            if units is None:
+                raise InvalidTransactionDataException(
+                    f"{transaction_type.value} transactions require units"
+                )
+            if price is None:
+                raise InvalidTransactionDataException(
+                    f"{transaction_type.value} transactions require a price"
+                )
+            
+            # Validate value consistency (allowing 1% margin for rounding)
+            expected_value = abs(units * price + fee)
+            if abs(abs(value) - expected_value) > expected_value * 0.01:
+                raise InvalidTransactionDataException(
+                    f"Value inconsistency: expected ~{expected_value:.2f} based on units * price + fee, got {value}"
+                )
+        
+        elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):
+            # Deposit and Withdraw should not have trading details
+            if ticker or units is not None or price is not None:
+                raise InvalidTransactionDataException(
+                    f"{transaction_type.value} transactions should not have ticker, units, or price"
+                )
+        
+        elif transaction_type == TransactionType.SPLIT:
+            # Split requires ticker (units and split_ratio validated elsewhere)
+            if not ticker:
+                raise InvalidTransactionDataException(
+                    "Split transactions require a ticker symbol"
+                )
+        
+        elif transaction_type == TransactionType.DIVIDEND:
+            # Dividend requires ticker
+            if not ticker:
+                raise InvalidTransactionDataException(
+                    "Dividend transactions require a ticker symbol"
+                )
     
     def _parse_csv(self, csv_content: str, portfolio_id: int) -> List[Transaction]:
         """Parse CSV content and create Transaction objects"""
@@ -266,24 +315,24 @@ class TransactionService:
             raise ValueError(f"Invalid transaction type: {row['type']}. Must be one of: {', '.join([t.value for t in TransactionType])}")
         
         # Parse optional fields
-        ticker = row.get("ticker", "").strip() or None
-        units = self._clean_csv_number(row.get("units"))
-        price = self._clean_csv_number(row.get("price"))
-        fee = self._clean_csv_number(row.get("fee")) or 0.0
+        ticker = row.get("ticker", "").strip().upper() or None
+        units = self._clean_csv_number(row.get("units", ""), "units")
+        price = self._clean_csv_number(row.get("price", ""), "price")
+        fee = self._clean_csv_number(row.get("fee", ""), "fee") or 0.0
         
         # Parse required value field
         value_str = row.get("value", "").strip()
         if not value_str:
             raise ValueError("Value field is required")
-        value = self._clean_csv_number(value_str)
+        value = self._clean_csv_number(value_str, "value")
         if value is None:
             raise ValueError(f"Invalid value: {value_str}")
         
         # Parse optional EUR value field
-        value_eur = self._clean_csv_number(row.get("EUR"))
+        value_eur = self._clean_csv_number(row.get("EUR", ""), "EUR")
         
         # Parse optional split_ratio field
-        split_ratio = self._clean_csv_number(row.get("split_ratio"))
+        split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
         
         return Transaction(
             portfolio_id=portfolio_id,
@@ -299,7 +348,7 @@ class TransactionService:
         )
     
     @staticmethod
-    def _clean_csv_number(value: str) -> Optional[float]:
+    def _clean_csv_number(value: str, field_name: str = "field") -> Optional[float]:
         """Clean CSV number by removing thousand separators and converting to float"""
         if not value or value.strip() == "":
             return None
@@ -308,4 +357,4 @@ class TransactionService:
         try:
             return float(cleaned)
         except ValueError:
-            raise ValueError(f"Invalid number format: {value}")
+            raise ValueError(f"Invalid number format for {field_name}: {value}")
