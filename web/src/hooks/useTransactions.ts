@@ -24,10 +24,14 @@ export const usePortfolio = (portfolioId: number | null) => {
 /**
  * Hook to fetch transactions for a portfolio
  */
-export const useTransactions = (portfolioId: number | null) => {
+export const useTransactions = (
+  portfolioId: number | null,
+  page: number = 1,
+  pageSize: number = 20
+) => {
   return useQuery({
-    queryKey: ['transactions', portfolioId],
-    queryFn: () => getTransactions(portfolioId!),
+    queryKey: ['transactions', portfolioId, page, pageSize],
+    queryFn: () => getTransactions(portfolioId!, page, pageSize),
     enabled: portfolioId !== null,
   });
 };
@@ -65,7 +69,11 @@ export const useUpdateTransaction = () => {
       portfolioId: number;
     }) => updateTransaction(transactionId, data),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
+      // Invalidate all paginated transaction queries for this portfolio
+      queryClient.invalidateQueries({ 
+        queryKey: ['transactions', variables.portfolioId],
+        exact: false 
+      });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
     },
   });
@@ -81,7 +89,11 @@ export const useDeleteTransaction = () => {
     mutationFn: ({ transactionId, portfolioId }: { transactionId: number; portfolioId: number }) =>
       deleteTransaction(transactionId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
+      // Invalidate all paginated transaction queries for this portfolio
+      queryClient.invalidateQueries({ 
+        queryKey: ['transactions', variables.portfolioId],
+        exact: false 
+      });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
     },
   });
@@ -97,7 +109,11 @@ export const useImportTransactionsCSV = () => {
     mutationFn: ({ portfolioId, file }: { portfolioId: number; file: File }) =>
       importTransactionsCSV(portfolioId, file),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
+      // Invalidate all paginated transaction queries for this portfolio
+      queryClient.invalidateQueries({ 
+        queryKey: ['transactions', variables.portfolioId],
+        exact: false 
+      });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
     },
   });

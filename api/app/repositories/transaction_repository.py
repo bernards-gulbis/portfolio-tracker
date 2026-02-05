@@ -1,7 +1,7 @@
 """
 Transaction repository for data access
 """
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from typing import List, Optional
 from app.models import Transaction
 
@@ -36,6 +36,24 @@ class TransactionRepository:
         """Get all transactions for a specific portfolio"""
         statement = select(Transaction).where(Transaction.portfolio_id == portfolio_id)
         return list(self.session.exec(statement).all())
+    
+    def get_by_portfolio_id_paginated(self, portfolio_id: int, page: int = 1, page_size: int = 20) -> tuple[List[Transaction], int]:
+        """Get paginated transactions for a specific portfolio"""
+        # Get total count efficiently using SQL COUNT
+        count_statement = select(func.count()).select_from(Transaction).where(Transaction.portfolio_id == portfolio_id)
+        total = self.session.exec(count_statement).one()
+        
+        # Get paginated results with consistent ordering
+        offset = (page - 1) * page_size
+        statement = (
+            select(Transaction)
+            .where(Transaction.portfolio_id == portfolio_id)
+            .order_by(Transaction.date_time.desc(), Transaction.id.desc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        transactions = list(self.session.exec(statement).all())
+        return transactions, total
     
     def update(self, transaction: Transaction) -> Transaction:
         """Update a transaction"""

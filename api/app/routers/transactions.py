@@ -1,9 +1,10 @@
 """Transaction API routes"""
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 from typing import List
 from io import BytesIO
+import math
 
 from app.core import get_session
 from app.core.exceptions import FileUploadException
@@ -12,6 +13,7 @@ from app.schemas import (
     TransactionUpdate,
     TransactionResponse,
     BulkImportResponse,
+    PaginatedTransactionResponse,
 )
 from app.services import TransactionService
 
@@ -40,14 +42,27 @@ def create_transaction(
     )
 
 
-@router.get("/transactions", response_model=List[TransactionResponse])
+@router.get("/transactions", response_model=PaginatedTransactionResponse)
 def list_transactions(
     portfolio_id: int,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     session: Session = Depends(get_session)
 ):
-    """Get all transactions for a specific portfolio"""
+    """Get paginated transactions for a specific portfolio"""
     service = TransactionService(session)
-    return service.get_transactions_by_portfolio(portfolio_id)
+    transactions, total = service.get_transactions_by_portfolio_paginated(
+        portfolio_id, page, page_size
+    )
+    total_pages = math.ceil(total / page_size) if total > 0 else 1
+    
+    return PaginatedTransactionResponse(
+        transactions=transactions,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
 
 @router.get("/transactions/export")
 def export_transactions(

@@ -2,14 +2,29 @@ import { useState } from 'react';
 import { Transaction } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
 import { formatCurrency, formatDate, getTransactionColor, formatTransactionType } from '../utils/formatters';
+import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
 
 interface TransactionTableProps {
   transactions: Transaction[];
   portfolioId: number;
   onEdit: (transaction: Transaction) => void;
+  currentPage: number;
+  totalPages: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  isLoading: boolean;
 }
 
-const TransactionTable = ({ transactions, portfolioId, onEdit }: TransactionTableProps) => {
+const TransactionTable = ({ 
+  transactions, 
+  portfolioId, 
+  onEdit,
+  currentPage,
+  totalPages,
+  total,
+  onPageChange,
+  isLoading
+}: TransactionTableProps) => {
   const deleteTransaction = useDeleteTransaction();
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -18,12 +33,58 @@ const TransactionTable = ({ transactions, portfolioId, onEdit }: TransactionTabl
       setDeletingId(transactionId);
       try {
         await deleteTransaction.mutateAsync({ transactionId, portfolioId });
+        // If we just deleted the last item on this page and we're not on page 1, go back
+        if (transactions.length === 1 && currentPage > 1) {
+          onPageChange(currentPage - 1);
+        }
       } catch (error) {
         console.error('Error deleting transaction:', error);
+        alert('Failed to delete transaction. Please try again.');
       } finally {
         setDeletingId(null);
       }
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    onPageChange(page);
+    // Scroll to top of table
+    document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const getPageNumbers = (): (number | string)[] => {
+    const pages: (number | string)[] = [];
+
+    if (totalPages <= MAX_VISIBLE_PAGES) {
+      // Show all pages if total is small
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+
+      if (currentPage > 3) {
+        pages.push('...');
+      }
+
+      // Show pages around current page
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (currentPage < totalPages - 2) {
+        pages.push('...');
+      }
+
+      // Always show last page
+      pages.push(totalPages);
+    }
+
+    return pages;
   };
 
   if (transactions.length === 0) {
@@ -35,72 +96,121 @@ const TransactionTable = ({ transactions, portfolioId, onEdit }: TransactionTabl
     );
   }
 
+  const startIndex = (currentPage - 1) * DEFAULT_PAGE_SIZE;
+  const endIndex = Math.min(startIndex + transactions.length, total);
+
   return (
-    <div className="table-container">
-      <table className="transaction-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Ticker</th>
-            <th className="text-right">Units</th>
-            <th className="text-right">Price</th>
-            <th className="text-right">Fee</th>
-            <th className="text-right">Value</th>
-            <th className="text-right">EUR Value</th>
-            <th className="text-right">Split Ratio</th>
-            <th className="text-center">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {transactions.map((transaction) => (
-            <tr key={transaction.id} data-testid="transaction-row">
-              <td>{formatDate(transaction.date_time)}</td>
-              <td>
-                <span className={`badge badge-${transaction.type.toLowerCase()}`}>
-                  {formatTransactionType(transaction.type)}
-                </span>
-              </td>
-              <td>{transaction.ticker || '-'}</td>
-              <td className="text-right">
-                {transaction.units !== null ? transaction.units.toFixed(8) : '-'}
-              </td>
-              <td className="text-right">
-                {transaction.price !== null ? formatCurrency(transaction.price) : '-'}
-              </td>
-              <td className="text-right">{formatCurrency(transaction.fee)}</td>
-              <td className={`text-right value-${getTransactionColor(transaction)}`}>
-                {formatCurrency(transaction.value)}
-              </td>
-              <td className="text-right">
-                {transaction.value_eur !== null ? formatCurrency(transaction.value_eur, 'EUR') : '-'}
-              </td>
-              <td className="text-right">
-                {transaction.split_ratio !== null ? transaction.split_ratio.toFixed(2) : '-'}
-              </td>
-              <td className="text-center">
-                <div className="action-buttons">
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => onEdit(transaction)}
-                    disabled={deletingId === transaction.id}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="btn btn-sm btn-danger"
-                    onClick={() => handleDelete(transaction.id)}
-                    disabled={deletingId === transaction.id}
-                  >
-                    {deletingId === transaction.id ? 'Deleting...' : 'Delete'}
-                  </button>
-                </div>
-              </td>
+    <>
+      <div className="table-info">
+        <p>
+          Showing {startIndex + 1}-{endIndex} of {total} transactions
+        </p>
+      </div>
+      <div className="table-container">
+        <table className="transaction-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Ticker</th>
+              <th className="text-right">Units</th>
+              <th className="text-right">Price</th>
+              <th className="text-right">Fee</th>
+              <th className="text-right">Value</th>
+              <th className="text-right">EUR Value</th>
+              <th className="text-right">Split Ratio</th>
+              <th className="text-center">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {transactions.map((transaction) => (
+              <tr key={transaction.id} data-testid="transaction-row">
+                <td>{formatDate(transaction.date_time)}</td>
+                <td>
+                  <span className={`badge badge-${transaction.type.toLowerCase()}`}>
+                    {formatTransactionType(transaction.type)}
+                  </span>
+                </td>
+                <td>{transaction.ticker || '-'}</td>
+                <td className="text-right">
+                  {transaction.units !== null && transaction.units !== undefined ? transaction.units.toFixed(8) : '-'}
+                </td>
+                <td className="text-right">
+                  {transaction.price !== null && transaction.price !== undefined ? formatCurrency(transaction.price) : '-'}
+                </td>
+                <td className="text-right">{formatCurrency(transaction.fee)}</td>
+                <td className={`text-right value-${getTransactionColor(transaction)}`}>
+                  {formatCurrency(transaction.value)}
+                </td>
+                <td className="text-right">
+                  {transaction.value_eur !== null && transaction.value_eur !== undefined ? formatCurrency(transaction.value_eur, 'EUR') : '-'}
+                </td>
+                <td className="text-right">
+                  {transaction.split_ratio !== null && transaction.split_ratio !== undefined ? transaction.split_ratio.toFixed(2) : '-'}
+                </td>
+                <td className="text-center">
+                  <div className="action-buttons">
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => onEdit(transaction)}
+                      disabled={deletingId === transaction.id}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleDelete(transaction.id)}
+                      disabled={deletingId === transaction.id}
+                    >
+                      {deletingId === transaction.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1 || isLoading}
+          >
+            Previous
+          </button>
+
+          <div className="pagination-numbers">
+            {getPageNumbers().map((page, index) =>
+              typeof page === 'number' ? (
+                <button
+                  key={page}
+                  className={`btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => handlePageChange(page)}
+                  disabled={isLoading}
+                >
+                  {page}
+                </button>
+              ) : (
+                <span key={`ellipsis-${index}`} className="pagination-ellipsis">
+                  {page}
+                </span>
+              )
+            )}
+          </div>
+
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages || isLoading}
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </>
   );
 };
 

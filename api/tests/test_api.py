@@ -238,9 +238,11 @@ def test_list_transactions(client: TestClient):
     response = client.get(f"/portfolios/{portfolio_id}/transactions")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
-    assert data[0]["type"] == "Deposit"
-    assert data[1]["type"] == "Buy"
+    assert data["total"] == 2
+    assert len(data["transactions"]) == 2
+    # Transactions are ordered by date_time DESC, so Buy (20:16:10) comes before Deposit (20:14:40)
+    assert data["transactions"][0]["type"] == "Buy"
+    assert data["transactions"][1]["type"] == "Deposit"
 
 
 def test_update_transaction(client: TestClient):
@@ -431,13 +433,15 @@ def test_export_and_reimport_csv(client: TestClient):
     assert import_data["imported_count"] == 2
     
     # Verify imported transactions match originals
-    transactions = client.get(f"/portfolios/{portfolio2_id}/transactions").json()
+    transactions_response = client.get(f"/portfolios/{portfolio2_id}/transactions").json()
+    transactions = transactions_response["transactions"]
     assert len(transactions) == 2
-    assert transactions[0]["type"] == "Deposit"
-    assert transactions[0]["value"] == 5000.00
-    assert transactions[1]["type"] == "Buy"
-    assert transactions[1]["ticker"] == "AAPL"
-    assert transactions[1]["units"] == 10
+    # Transactions are ordered by date_time DESC, so Buy (2023-01-16) comes before Deposit (2023-01-15)
+    assert transactions[0]["type"] == "Buy"
+    assert transactions[0]["ticker"] == "AAPL"
+    assert transactions[0]["units"] == 10
+    assert transactions[1]["type"] == "Deposit"
+    assert transactions[1]["value"] == 5000.00
 
 
 def test_export_transactions_csv_empty(client: TestClient):
@@ -497,7 +501,7 @@ def test_delete_portfolio_cascades_transactions(client: TestClient):
     
     # Verify transactions exist
     response = client.get(f"/portfolios/{portfolio_id}/transactions")
-    assert len(response.json()) == 2
+    assert response.json()["total"] == 2
     
     # Delete portfolio
     response = client.delete(f"/portfolios/{portfolio_id}")
