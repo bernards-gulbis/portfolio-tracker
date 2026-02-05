@@ -85,6 +85,25 @@ export interface PaginatedTransactionResponse {
   total_pages: number;
 }
 
+export interface Holding {
+  ticker: string;
+  units: number;
+  average_cost: number;
+  total_cost: number;
+}
+
+export interface PortfolioStatus {
+  portfolio_id: number;
+  portfolio_name: string;
+  cash_balance: number;
+  total_invested: number;
+  dividends_received: number;
+  realized_gains: number;
+  total_value_eur: number;
+  holdings: Holding[];
+  total_holdings_cost: number;
+}
+
 // ================== API Configuration ==================
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -151,6 +170,14 @@ export const copyPortfolio = async (
     `/portfolios/${portfolioId}/copy`,
     { new_name: newName }
   );
+  return response.data;
+};
+
+/**
+ * Get portfolio status with holdings, cash balance, and performance metrics
+ */
+export const getPortfolioStatus = async (portfolioId: number): Promise<PortfolioStatus> => {
+  const response = await api.get<PortfolioStatus>(`/portfolios/${portfolioId}/status`);
   return response.data;
 };
 

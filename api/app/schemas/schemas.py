@@ -116,3 +116,30 @@ class PaginatedTransactionResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+# ================== Portfolio Status Schemas ==================
+
+class HoldingResponse(BaseModel):
+    """Schema for a single holding"""
+    ticker: str
+    units: float
+    average_cost: float
+    total_cost: float
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PortfolioStatusResponse(BaseModel):
+    """Schema for portfolio status with calculated metrics"""
+    portfolio_id: int
+    portfolio_name: str
+    cash_balance: float
+    total_invested: float  # Deposits - Withdrawals
+    dividends_received: float
+    realized_gains: float  # Gains/losses from sells
+    total_value_eur: float  # Sum of all value_eur fields
+    holdings: List[HoldingResponse]
+    total_holdings_cost: float  # Sum of all holdings cost basis
+    
+    model_config = ConfigDict(from_attributes=True)

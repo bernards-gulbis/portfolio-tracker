@@ -48,6 +48,7 @@ export const useCreateTransaction = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };
@@ -75,6 +76,7 @@ export const useUpdateTransaction = () => {
         exact: false 
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };
@@ -95,6 +97,7 @@ export const useDeleteTransaction = () => {
         exact: false 
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };
@@ -115,6 +118,7 @@ export const useImportTransactionsCSV = () => {
         exact: false 
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };
