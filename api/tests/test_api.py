@@ -190,7 +190,7 @@ def test_create_transaction_with_all_fields(client: TestClient):
             "units": 15.00000001,
             "price": 183.69,
             "fee": 0.0,
-            "value": -2755.35,
+            "value": 2755.35,
             "value_eur": None,
             "split_ratio": None
         }
@@ -201,7 +201,7 @@ def test_create_transaction_with_all_fields(client: TestClient):
     assert data["ticker"] == "MSFT"
     assert data["units"] == 15.00000001
     assert data["price"] == 183.69
-    assert data["value"] == -2755.35
+    assert data["value"] == 2755.35
 
 
 def test_list_transactions(client: TestClient):
@@ -231,7 +231,7 @@ def test_list_transactions(client: TestClient):
             "ticker": "MSFT",
             "units": 15.0,
             "price": 183.69,
-            "value": -2755.35,
+            "value": 2755.35,
             "fee": 0.0
         }
     )
@@ -498,7 +498,7 @@ def test_delete_portfolio_cascades_transactions(client: TestClient):
             "ticker": "MSFT",
             "units": 15.0,
             "price": 183.69,
-            "value": -2755.35,
+            "value": 2755.35,
             "fee": 0.0
         }
     )
@@ -530,7 +530,7 @@ def test_csv_upload(client: TestClient):
     # Create CSV content
     csv_content = """date_time,type,ticker,units,price,fee,value,EUR,split_ratio
 2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
-2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,
+2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"2,755.35",,
 """
     
     # Upload CSV
@@ -557,7 +557,7 @@ def test_csv_upload(client: TestClient):
     assert transaction2["ticker"] == "MSFT"
     assert transaction2["units"] == 15.00000001
     assert transaction2["price"] == 183.69
-    assert transaction2["value"] == -2755.35
+    assert transaction2["value"] == 2755.35
 
 
 def test_csv_upload_invalid_file_type(client: TestClient):
@@ -607,12 +607,12 @@ def test_csv_with_complex_transactions(client: TestClient):
     # Create CSV with multiple transaction types (M/D/YYYY format required)
     csv_content = """date_time,type,ticker,units,price,fee,value,EUR,split_ratio
 1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,
-1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,-1580.00,,
+1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,1580.00,,
 2/20/2020 14:00:00,Dividend,AAPL,,,0.00,50.00,46.00,
 3/10/2020 09:00:00,Split,AAPL,,,,0.00,,2.0
 4/15/2020 16:00:00,Sell,AAPL,5.0,200.00,5.00,995.00,,
 5/20/2020 10:00:00,Fee,,,,,10.00,9.20,
-6/30/2020 17:00:00,Withdraw,,,,,"-1,000.00",-920.00,
+6/30/2020 17:00:00,Withdraw,,,,,1000.00,920.00,
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
@@ -813,7 +813,7 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
             "ticker": "AAPL",
             "units": 10.0,
             "price": 150.0,
-            "value": -1500.0,
+            "value": 1500.0,
             "fee": 1.0
         }
     )
@@ -827,7 +827,7 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
             "ticker": "MSFT",
             "units": 5.0,
             "price": 300.0,
-            "value": -1500.0,
+            "value": 1500.0,
             "fee": 1.0
         }
     )
@@ -884,7 +884,7 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
             "ticker": "AAPL",
             "units": 20.0,
             "price": 100.0,
-            "value": -2000.0,
+            "value": 2000.0,
             "fee": 1.0
         }
     )
@@ -951,7 +951,7 @@ def test_portfolio_status_with_dividends(client: TestClient):
             "ticker": "AAPL",
             "units": 10.0,
             "price": 150.0,
-            "value": -1500.0,
+            "value": 1500.0,
             "fee": 1.0
         }
     )
@@ -1017,7 +1017,7 @@ def test_portfolio_status_with_stock_split(client: TestClient):
             "ticker": "AAPL",
             "units": 10.0,
             "price": 400.0,
-            "value": -4000.0,
+            "value": 4000.0,
             "fee": 1.0
         }
     )
@@ -1075,7 +1075,7 @@ def test_portfolio_status_with_withdrawal(client: TestClient):
         json={
             "date_time": "2024-02-01T10:00:00",
             "type": "Withdraw",
-            "value": -2000.0,
+            "value": 2000.0,
             "fee": 0.0
         }
     )
@@ -1163,7 +1163,7 @@ def test_portfolio_status_overselling(client: TestClient):
             "ticker": "AAPL",
             "units": 10.0,
             "price": 150.0,
-            "value": -1500.0,
+            "value": 1500.0,
             "fee": 1.0
         }
     )
@@ -1216,7 +1216,7 @@ def test_portfolio_status_floating_point_precision(client: TestClient):
             "ticker": "GOOGL",
             "units": 3.3,
             "price": 150.0,
-            "value": -495.0,
+            "value": 495.0,
             "fee": 0.0
         }
     )
@@ -1230,7 +1230,7 @@ def test_portfolio_status_floating_point_precision(client: TestClient):
             "ticker": "GOOGL",
             "units": 3.4,
             "price": 150.0,
-            "value": -510.0,
+            "value": 510.0,
             "fee": 0.0
         }
     )
@@ -1284,7 +1284,7 @@ def test_portfolio_status_invalid_split_ratio(client: TestClient):
             "ticker": "AAPL",
             "units": 10.0,
             "price": 150.0,
-            "value": -1500.0,
+            "value": 1500.0,
             "fee": 1.0
         }
     )

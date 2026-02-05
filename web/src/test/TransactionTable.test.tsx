@@ -14,7 +14,7 @@ const mockTransactions: Transaction[] = [
     units: null,
     price: null,
     fee: 0,
-    value: 3000.0,
+    value: 3000.0,  // Stored as positive
     value_eur: 2760.27,
     split_ratio: null,
   },
@@ -27,7 +27,7 @@ const mockTransactions: Transaction[] = [
     units: 15.00000001,
     price: 183.69,
     fee: 0,
-    value: -2755.35,
+    value: 2755.35,  // Now stored as positive (displayed as negative)
     value_eur: null,
     split_ratio: null,
   },
@@ -40,7 +40,7 @@ const mockTransactions: Transaction[] = [
     units: null,
     price: null,
     fee: 0,
-    value: 50.0,
+    value: 50.0,  // Stored as positive
     value_eur: 46.0,
     split_ratio: null,
   },
@@ -56,13 +56,26 @@ const createTestQueryClient = () =>
 
 describe('TransactionTable', () => {
   const mockOnEdit = vi.fn();
+  const mockOnPageChange = vi.fn();
+  const defaultProps = {
+    currentPage: 1,
+    totalPages: 1,
+    total: mockTransactions.length,
+    onPageChange: mockOnPageChange,
+    isLoading: false,
+  };
 
   it('renders the correct number of transaction rows', () => {
     const queryClient = createTestQueryClient();
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable transactions={mockTransactions} portfolioId={1} onEdit={mockOnEdit} />
+        <TransactionTable 
+          transactions={mockTransactions} 
+          portfolioId={1} 
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
       </QueryClientProvider>
     );
 
@@ -75,7 +88,12 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable transactions={mockTransactions} portfolioId={1} onEdit={mockOnEdit} />
+        <TransactionTable 
+          transactions={mockTransactions} 
+          portfolioId={1} 
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
       </QueryClientProvider>
     );
 
@@ -99,7 +117,13 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable transactions={[]} portfolioId={1} onEdit={mockOnEdit} />
+        <TransactionTable 
+          transactions={[]} 
+          portfolioId={1} 
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          total={0}
+        />
       </QueryClientProvider>
     );
 
@@ -112,7 +136,12 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable transactions={mockTransactions} portfolioId={1} onEdit={mockOnEdit} />
+        <TransactionTable 
+          transactions={mockTransactions} 
+          portfolioId={1} 
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
       </QueryClientProvider>
     );
 
@@ -128,7 +157,12 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable transactions={mockTransactions} portfolioId={1} onEdit={mockOnEdit} />
+        <TransactionTable 
+          transactions={mockTransactions} 
+          portfolioId={1} 
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
       </QueryClientProvider>
     );
 
@@ -147,7 +181,12 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable transactions={mockTransactions} portfolioId={1} onEdit={mockOnEdit} />
+        <TransactionTable 
+          transactions={mockTransactions} 
+          portfolioId={1} 
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
       </QueryClientProvider>
     );
 

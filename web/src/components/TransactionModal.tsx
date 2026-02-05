@@ -79,16 +79,17 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       };
 
       // Add fields based on transaction type
+      // Note: All values are stored as positive in the database
       switch (type) {
         case TransactionType.DEPOSIT:
         case TransactionType.WITHDRAW:
-          data.value = parseFloat(value);
-          if (valueEur) data.value_eur = parseFloat(valueEur);
+          data.value = Math.abs(parseFloat(value));
+          if (valueEur) data.value_eur = Math.abs(parseFloat(valueEur));
           break;
 
         case TransactionType.FEE:
-          data.fee = parseFloat(fee);
-          data.value = parseFloat(value);
+          data.fee = Math.abs(parseFloat(fee));
+          data.value = Math.abs(parseFloat(value));
           break;
 
         case TransactionType.BUY:
@@ -96,15 +97,15 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
           data.ticker = ticker;
           data.units = parseFloat(units);
           data.price = parseFloat(price);
-          data.fee = parseFloat(fee || '0');
-          data.value = parseFloat(value);
+          data.fee = Math.abs(parseFloat(fee || '0'));
+          data.value = Math.abs(parseFloat(value));
           break;
 
         case TransactionType.DIVIDEND:
           data.ticker = ticker;
           data.price = parseFloat(price); // Amount without fees
-          data.fee = parseFloat(fee || '0');
-          data.value = parseFloat(value);
+          data.fee = Math.abs(parseFloat(fee || '0'));
+          data.value = Math.abs(parseFloat(value));
           break;
 
         case TransactionType.SPLIT:
@@ -267,8 +268,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
             {showValue && (
               <div className="form-group">
                 <label htmlFor="value">
-                  Total Value *
-                  {type === TransactionType.WITHDRAW && ' (will be saved as negative)'}
+                  Total Value * (enter as positive)
                 </label>
                 <input
                   id="value"

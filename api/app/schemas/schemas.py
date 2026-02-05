@@ -75,6 +75,22 @@ class TransactionBase(BaseModel):
         if v is not None and v <= 0:
             raise ValueError('Split ratio must be greater than 0')
         return v
+    
+    @field_validator('value')
+    @classmethod
+    def validate_value(cls, v: float) -> float:
+        """Validate value is positive (stored as positive, signed on display)"""
+        if v < 0:
+            raise ValueError('Value must be stored as positive (sign applied on display)')
+        return v
+    
+    @field_validator('fee')
+    @classmethod
+    def validate_fee(cls, v: float) -> float:
+        """Validate fee is positive"""
+        if v < 0:
+            raise ValueError('Fee must be positive')
+        return v
 
 
 class TransactionCreate(TransactionBase):

@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
+import { formatCurrency, formatNumber } from '../utils/formatters';
 
 interface PortfolioStatusProps {
   portfolioId: number | null;
@@ -40,18 +41,6 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
     );
   }
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(value);
-  };
-
-  const formatNumber = (value: number, decimals: number = 2) => {
-    return value.toFixed(decimals);
-  };
-
   return (
     <div className="portfolio-status">
       <h2>Portfolio Status: {status.portfolio_name}</h2>
@@ -82,13 +71,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
 
         <div className="status-card">
           <h3>Total Value EUR</h3>
-          <p className="status-value">
-            {new Intl.NumberFormat('en-US', {
-              style: 'currency',
-              currency: 'EUR',
-              minimumFractionDigits: 2,
-            }).format(status.total_value_eur)}
-          </p>
+          <p className="status-value">{formatCurrency(status.total_value_eur, 'EUR')}</p>
         </div>
 
         <div className="status-card">

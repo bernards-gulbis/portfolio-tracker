@@ -13,6 +13,29 @@ export const formatCurrency = (value: number, currency: string = 'USD'): string 
 };
 
 /**
+ * Format number with specified decimal places
+ */
+export const formatNumber = (value: number, decimals: number = 2): string => {
+  return value.toFixed(decimals);
+};
+
+/**
+ * Get display value with appropriate sign based on transaction type
+ * Values are stored as positive in DB, but displayed as negative for certain types
+ */
+export const getDisplayValue = (transaction: Transaction): number => {
+  // Negative display types: FEE, WITHDRAW, BUY (spending money)
+  if (transaction.type === TransactionType.FEE || 
+      transaction.type === TransactionType.WITHDRAW || 
+      transaction.type === TransactionType.BUY) {
+    return -transaction.value;
+  }
+
+  // Positive display types: DEPOSIT, SELL, DIVIDEND, SPLIT (receiving money)
+  return transaction.value;
+};
+
+/**
  * Format date
  */
 export const formatDate = (date: string): string => {
@@ -30,7 +53,6 @@ export const formatDate = (date: string): string => {
  */
 export const getTransactionColor = (transaction: Transaction): string => {
   const type = transaction.type;
-  const value = transaction.value;
 
   // Positive value types (income)
   if (type === TransactionType.DEPOSIT || type === TransactionType.SELL || type === TransactionType.DIVIDEND) {
@@ -42,13 +64,8 @@ export const getTransactionColor = (transaction: Transaction): string => {
     return 'negative';
   }
 
-  // Neutral types
-  if (type === TransactionType.SPLIT) {
-    return 'neutral';
-  }
-
-  // Fallback to value sign
-  return value >= 0 ? 'positive' : 'negative';
+  // Neutral types (SPLIT)
+  return 'neutral';
 };
 
 /**

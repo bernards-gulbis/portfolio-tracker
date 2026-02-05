@@ -222,9 +222,13 @@ class TransactionService:
         if price is not None and price <= 0:
             raise InvalidTransactionDataException("Price must be greater than 0")
         
-        # Validate fee
+        # Validate fee is positive (stored as positive, displayed as negative)
         if fee < 0:
-            raise InvalidTransactionDataException("Fee cannot be negative")
+            raise InvalidTransactionDataException("Fee must be positive (stored as positive, displayed as negative)")
+        
+        # Validate value is positive (stored as positive, signed on display)
+        if value < 0:
+            raise InvalidTransactionDataException("Value must be positive (stored as positive, signed on display)")
         
         # Transaction type-specific validation
         if transaction_type in (TransactionType.BUY, TransactionType.SELL):
@@ -243,8 +247,8 @@ class TransactionService:
                 )
             
             # Validate value consistency (allowing 1% margin for rounding)
-            expected_value = abs(units * price + fee)
-            if abs(abs(value) - expected_value) > expected_value * 0.01:
+            expected_value = units * price + fee
+            if abs(value - expected_value) > expected_value * 0.01:
                 raise InvalidTransactionDataException(
                     f"Value inconsistency: expected ~{expected_value:.2f} based on units * price + fee, got {value}"
                 )
@@ -328,8 +332,13 @@ class TransactionService:
         if value is None:
             raise ValueError(f"Invalid value: {value_str}")
         
+        # Convert to positive (values stored as positive, signed on display)
+        value = abs(value)
+        
         # Parse optional EUR value field
         value_eur = self._clean_csv_number(row.get("EUR", ""), "EUR")
+        if value_eur is not None:
+            value_eur = abs(value_eur)  # Also store EUR as positive
         
         # Parse optional split_ratio field
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")

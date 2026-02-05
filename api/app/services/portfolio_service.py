@@ -112,8 +112,8 @@ class PortfolioService:
         # Process each transaction
         for transaction in transactions:
             tx_type = transaction.type
-            value = transaction.value
-            fee = transaction.fee
+            value = transaction.value  # Stored as positive, apply sign as needed
+            fee = transaction.fee  # Stored as positive
             
             if tx_type == TransactionType.DEPOSIT:
                 # Deposit adds cash and increases invested amount
@@ -123,20 +123,20 @@ class PortfolioService:
                     total_value_eur += transaction.value_eur
                 
             elif tx_type == TransactionType.WITHDRAW:
-                # Withdraw removes cash and decreases invested amount
-                cash_balance -= abs(value)  # value is negative for withdrawals
-                total_invested -= abs(value)  # subtracts from invested (value is negative)
+                # Withdraw removes cash and decreases invested amount (value stored as positive)
+                cash_balance -= value
+                total_invested -= value
                 if transaction.value_eur is not None:
                     total_value_eur -= transaction.value_eur
                 
             elif tx_type == TransactionType.BUY:
-                # Buy decreases cash and adds to holdings
-                cash_balance -= abs(value)  # value is negative for buys
+                # Buy decreases cash and adds to holdings (value stored as positive)
+                cash_balance -= value
                 
                 ticker = transaction.ticker
                 units = transaction.units or 0
                 price = transaction.price or 0
-                cost = abs(value)  # Cost basis for these units
+                cost = value  # Cost basis for these units
                 
                 if ticker:
                     if ticker not in holdings:
@@ -145,8 +145,8 @@ class PortfolioService:
                     holdings[ticker]['total_cost'] += cost
                     
             elif tx_type == TransactionType.SELL:
-                # Sell increases cash, removes from holdings, and calculates gain
-                cash_balance += value  # value is positive for sells (already includes fees)
+                # Sell increases cash, removes from holdings, and calculates gain (value stored as positive, includes fees)
+                cash_balance += value
                 
                 ticker = transaction.ticker
                 units = transaction.units or 0
@@ -181,13 +181,13 @@ class PortfolioService:
                         del holdings[ticker]
                         
             elif tx_type == TransactionType.DIVIDEND:
-                # Dividend adds cash and tracks dividend income
+                # Dividend adds cash and tracks dividend income (value stored as positive)
                 cash_balance += value
                 dividends_received += value
                 
             elif tx_type == TransactionType.FEE:
-                # Fee reduces cash (value is negative for fees)
-                cash_balance += value
+                # Fee reduces cash (value stored as positive, apply negative)
+                cash_balance -= value
                 
             elif tx_type == TransactionType.SPLIT:
                 # Split adjusts the number of units
