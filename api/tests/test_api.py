@@ -7,6 +7,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 from datetime import datetime
 from io import BytesIO
+from unittest.mock import patch, Mock
 
 from app.core import get_session
 from main import app
@@ -426,7 +427,7 @@ def test_export_and_reimport_csv(client: TestClient):
     csv_file = BytesIO(csv_content.encode('utf-8'))
     files = {"file": ("transactions.csv", csv_file, "text/csv")}
     import_response = client.post(
-        f"/portfolios/{portfolio2_id}/import",
+        f"/portfolios/{portfolio2_id}/transactions/import",
         files=files
     )
     
@@ -536,7 +537,7 @@ def test_csv_upload(client: TestClient):
     # Upload CSV
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/import",
+        f"/portfolios/{portfolio_id}/transactions/import",
         files=files
     )
     
@@ -572,7 +573,7 @@ def test_csv_upload_invalid_file_type(client: TestClient):
     # Try to upload a .txt file
     files = {"file": ("transactions.txt", BytesIO(b"test"), "text/plain")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/import",
+        f"/portfolios/{portfolio_id}/transactions/import",
         files=files
     )
     
@@ -588,7 +589,7 @@ def test_csv_upload_nonexistent_portfolio(client: TestClient):
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        "/portfolios/999/import",
+        "/portfolios/999/transactions/import",
         files=files
     )
     
@@ -617,7 +618,7 @@ def test_csv_with_complex_transactions(client: TestClient):
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/import",
+        f"/portfolios/{portfolio_id}/transactions/import",
         files=files
     )
     
@@ -1305,6 +1306,363 @@ def test_portfolio_status_invalid_split_ratio(client: TestClient):
     # Transaction creation should fail with validation error
     assert split_response.status_code == 422  # Unprocessable Entity (Pydantic validation error)
     assert "Split ratio must be greater than 0" in split_response.text
+
+
+# ================== Portfolio Status with Prices Tests ==================
+
+def test_portfolio_status_with_current_prices(client: TestClient):
+    """Test portfolio status with current prices from Yahoo Finance"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit money
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "value": 10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL at $150
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "units": 10.0,
+            "price": 150.0,
+            "value": 1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Buy MSFT at $300
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "MSFT",
+            "units": 5.0,
+            "price": 300.0,
+            "value": 1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Mock current prices: AAPL at $180 (+20%), MSFT at $270 (-10%)
+    mock_prices = {
+        'AAPL': 180.0,
+        'MSFT': 270.0
+    }
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Check cash balance
+    assert data["cash_balance"] == 7000.0  # 10000 - 1500 - 1500
+    
+    # Check AAPL holding with price data
+    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
+    assert aapl_holding["units"] == 10.0
+    assert aapl_holding["average_cost"] == 150.0
+    assert aapl_holding["total_cost"] == 1500.0
+    assert aapl_holding["current_price"] == 180.0
+    assert aapl_holding["current_value"] == 1800.0  # 10 * 180
+    assert aapl_holding["unrealized_gain_loss"] == 300.0  # 1800 - 1500
+    assert abs(aapl_holding["unrealized_gain_loss_percent"] - 20.0) < 0.01
+    
+    # Check MSFT holding with price data
+    msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
+    assert msft_holding["units"] == 5.0
+    assert msft_holding["average_cost"] == 300.0
+    assert msft_holding["total_cost"] == 1500.0
+    assert msft_holding["current_price"] == 270.0
+    assert msft_holding["current_value"] == 1350.0  # 5 * 270
+    assert msft_holding["unrealized_gain_loss"] == -150.0  # 1350 - 1500
+    assert abs(msft_holding["unrealized_gain_loss_percent"] - (-10.0)) < 0.01
+    
+    # Check portfolio totals
+    assert data["total_holdings_cost"] == 3000.0
+    assert data["total_current_value"] == 3150.0  # 1800 + 1350
+    assert data["unrealized_gains"] == 150.0  # 300 - 150
+    assert data["total_portfolio_value"] == 10150.0  # 7000 cash + 3150 holdings
+
+
+def test_portfolio_status_with_missing_prices(client: TestClient):
+    """Test portfolio status when some prices are unavailable"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit and buy stocks
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "value": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "units": 10.0,
+            "price": 150.0,
+            "value": 1500.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "UNKNOWN",
+            "units": 5.0,
+            "price": 100.0,
+            "value": 500.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock prices: AAPL available, UNKNOWN not available
+    mock_prices = {
+        'AAPL': 180.0,
+        'UNKNOWN': None
+    }
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # AAPL should have price data
+    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
+    assert aapl_holding["current_price"] == 180.0
+    assert aapl_holding["current_value"] == 1800.0
+    assert aapl_holding["unrealized_gain_loss"] == 300.0
+    
+    # UNKNOWN should have None for price fields
+    unknown_holding = next(h for h in data["holdings"] if h["ticker"] == "UNKNOWN")
+    assert unknown_holding["current_price"] is None
+    assert unknown_holding["current_value"] is None
+    assert unknown_holding["unrealized_gain_loss"] is None
+    assert unknown_holding["unrealized_gain_loss_percent"] is None
+    
+    # Totals should only include holdings with prices
+    assert data["total_current_value"] == 1800.0  # Only AAPL
+    assert data["unrealized_gains"] == 300.0  # Only AAPL gain
+
+
+def test_portfolio_status_with_zero_price(client: TestClient):
+    """Test portfolio status when price is zero (edge case)"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "value": 1000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "PENNY",
+            "units": 1000.0,
+            "price": 0.50,
+            "value": 500.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock price as zero
+    mock_prices = {'PENNY': 0.0}
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Zero price should not calculate gains
+    penny_holding = next(h for h in data["holdings"] if h["ticker"] == "PENNY")
+    assert penny_holding["current_price"] == 0.0
+    assert penny_holding["current_value"] is None
+    assert penny_holding["unrealized_gain_loss"] is None
+
+
+def test_portfolio_status_price_service_exception(client: TestClient):
+    """Test portfolio status when PriceService throws an exception"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "value": 1000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "units": 10.0,
+            "price": 150.0,
+            "value": 1500.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock PriceService to raise exception
+    with patch('app.services.price_service.PriceService.get_current_prices', side_effect=Exception("API Error")):
+        # Should not crash, should return 200 with no prices
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    # Should succeed with no prices (graceful degradation)
+    assert response.status_code == 200
+    data = response.json()
+    
+    # AAPL holding should have None for all price fields
+    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
+    assert aapl_holding["current_price"] is None
+    assert aapl_holding["current_value"] is None
+    assert aapl_holding["unrealized_gain_loss"] is None
+    assert aapl_holding["unrealized_gain_loss_percent"] is None
+
+
+def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
+    """Test portfolio status with multiple stocks having different gain/loss scenarios"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Diverse Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "value": 20000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy WINNER (will gain 50%)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "WINNER",
+            "units": 100.0,
+            "price": 50.0,
+            "value": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy LOSER (will lose 30%)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "LOSER",
+            "units": 50.0,
+            "price": 100.0,
+            "value": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy FLAT (no change)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date_time": "2024-01-04T10:00:00",
+            "type": "Buy",
+            "ticker": "FLAT",
+            "units": 200.0,
+            "price": 25.0,
+            "value": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current prices
+    mock_prices = {
+        'WINNER': 75.0,   # +50%
+        'LOSER': 70.0,    # -30%
+        'FLAT': 25.0      # 0%
+    }
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Check individual holdings
+    winner = next(h for h in data["holdings"] if h["ticker"] == "WINNER")
+    assert winner["unrealized_gain_loss"] == 2500.0  # +2500
+    assert abs(winner["unrealized_gain_loss_percent"] - 50.0) < 0.01
+    
+    loser = next(h for h in data["holdings"] if h["ticker"] == "LOSER")
+    assert loser["unrealized_gain_loss"] == -1500.0  # -1500
+    assert abs(loser["unrealized_gain_loss_percent"] - (-30.0)) < 0.01
+    
+    flat = next(h for h in data["holdings"] if h["ticker"] == "FLAT")
+    assert flat["unrealized_gain_loss"] == 0.0  # 0
+    assert abs(flat["unrealized_gain_loss_percent"]) < 0.01
+    
+    # Total unrealized gains: 2500 - 1500 + 0 = 1000
+    assert data["unrealized_gains"] == 1000.0
+    
+    # Total portfolio value: 5000 cash + (7500 + 3500 + 5000) holdings = 21000
+    assert data["cash_balance"] == 5000.0
+    assert data["total_current_value"] == 16000.0
+    assert data["total_portfolio_value"] == 21000.0
 
 
 # ================== Health Check Test ==================

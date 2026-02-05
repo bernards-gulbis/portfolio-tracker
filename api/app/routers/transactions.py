@@ -84,7 +84,7 @@ def export_transactions(
         }
     )
 
-@router.post("/import", response_model=BulkImportResponse, status_code=201)
+@router.post("/transactions/import", response_model=BulkImportResponse, status_code=201)
 async def import_transactions_csv(
     portfolio_id: int,
     file: UploadFile = File(...),

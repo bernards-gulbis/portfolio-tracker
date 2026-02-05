@@ -53,13 +53,20 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
         </div>
 
         <div className="status-card">
+          <h3>Total Portfolio Value</h3>
+          <p className="status-value">{formatCurrency(status.total_portfolio_value)}</p>
+        </div>
+
+        <div className="status-card">
           <h3>Total Invested</h3>
           <p className="status-value">{formatCurrency(status.total_invested)}</p>
         </div>
 
         <div className="status-card">
-          <h3>Dividends Received</h3>
-          <p className="status-value">{formatCurrency(status.dividends_received)}</p>
+          <h3>Unrealized Gains</h3>
+          <p className={`status-value ${status.unrealized_gains >= 0 ? 'positive' : 'negative'}`}>
+            {formatCurrency(status.unrealized_gains)}
+          </p>
         </div>
 
         <div className="status-card">
@@ -70,13 +77,18 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
         </div>
 
         <div className="status-card">
-          <h3>Total Value EUR</h3>
-          <p className="status-value">{formatCurrency(status.total_value_eur, 'EUR')}</p>
+          <h3>Dividends Received</h3>
+          <p className="status-value">{formatCurrency(status.dividends_received)}</p>
         </div>
 
         <div className="status-card">
-          <h3>Holdings Value</h3>
+          <h3>Holdings Cost Basis</h3>
           <p className="status-value">{formatCurrency(status.total_holdings_cost)}</p>
+        </div>
+
+        <div className="status-card">
+          <h3>Holdings Market Value</h3>
+          <p className="status-value">{formatCurrency(status.total_current_value)}</p>
         </div>
       </div>
 
@@ -89,8 +101,12 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               <tr>
                 <th>Ticker</th>
                 <th>Units</th>
-                <th>Average Cost</th>
+                <th>Avg Cost</th>
                 <th>Total Cost</th>
+                <th>Current Price</th>
+                <th>Market Value</th>
+                <th>Unrealized G/L</th>
+                <th>G/L %</th>
               </tr>
             </thead>
             <tbody>
@@ -100,6 +116,34 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
                   <td>{formatNumber(holding.units, 8)}</td>
                   <td>{formatCurrency(holding.average_cost)}</td>
                   <td>{formatCurrency(holding.total_cost)}</td>
+                  <td>
+                    {holding.current_price !== null && holding.current_price !== undefined
+                      ? formatCurrency(holding.current_price)
+                      : '-'}
+                  </td>
+                  <td>
+                    {holding.current_value !== null && holding.current_value !== undefined
+                      ? formatCurrency(holding.current_value)
+                      : '-'}
+                  </td>
+                  <td className={
+                    holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
+                      ? holding.unrealized_gain_loss >= 0 ? 'positive' : 'negative'
+                      : ''
+                  }>
+                    {holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
+                      ? formatCurrency(holding.unrealized_gain_loss)
+                      : '-'}
+                  </td>
+                  <td className={
+                    holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
+                      ? holding.unrealized_gain_loss_percent >= 0 ? 'positive' : 'negative'
+                      : ''
+                  }>
+                    {holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
+                      ? `${holding.unrealized_gain_loss_percent.toFixed(2)}%`
+                      : '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>

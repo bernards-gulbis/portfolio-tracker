@@ -142,6 +142,10 @@ class HoldingResponse(BaseModel):
     units: float
     average_cost: float
     total_cost: float
+    current_price: Optional[float] = None
+    current_value: Optional[float] = None
+    unrealized_gain_loss: Optional[float] = None
+    unrealized_gain_loss_percent: Optional[float] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -157,5 +161,8 @@ class PortfolioStatusResponse(BaseModel):
     total_value_eur: float  # Sum of all value_eur fields
     holdings: List[HoldingResponse]
     total_holdings_cost: float  # Sum of all holdings cost basis
+    total_current_value: float  # Sum of current market value of all holdings
+    unrealized_gains: float  # Total unrealized gains/losses
+    total_portfolio_value: float  # Cash + Holdings current value
     
     model_config = ConfigDict(from_attributes=True)

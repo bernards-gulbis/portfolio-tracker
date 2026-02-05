@@ -90,6 +90,10 @@ export interface Holding {
   units: number;
   average_cost: number;
   total_cost: number;
+  current_price?: number | null;
+  current_value?: number | null;
+  unrealized_gain_loss?: number | null;
+  unrealized_gain_loss_percent?: number | null;
 }
 
 export interface PortfolioStatus {
@@ -102,6 +106,9 @@ export interface PortfolioStatus {
   total_value_eur: number;
   holdings: Holding[];
   total_holdings_cost: number;
+  total_current_value: number;
+  unrealized_gains: number;
+  total_portfolio_value: number;
 }
 
 // ================== API Configuration ==================
@@ -255,7 +262,7 @@ export const importTransactionsCSV = async (
   formData.append('file', file);
 
   const response = await api.post<BulkImportResponse>(
-    `/portfolios/${portfolioId}/import`,
+    `/portfolios/${portfolioId}/transactions/import`,
     formData,
     {
       headers: {

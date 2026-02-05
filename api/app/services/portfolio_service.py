@@ -12,6 +12,7 @@ from app.core.exceptions import (
     InvalidPortfolioNameException,
 )
 from app.schemas import HoldingResponse, PortfolioStatusResponse
+from app.services.price_service import PriceService
 
 # Precision threshold for holdings units (8 decimal places)
 HOLDINGS_EPSILON = 1e-8
@@ -206,21 +207,56 @@ class PortfolioService:
         holdings_list = []
         total_holdings_cost = 0.0
         
+        # Get current prices for all tickers
+        tickers = list(holdings.keys())
+        try:
+            current_prices = PriceService.get_current_prices(tickers) if tickers else {}
+        except Exception as e:
+            # If price service fails, continue without prices
+            print(f"Error fetching prices: {e}")
+            current_prices = {ticker: None for ticker in tickers}
+        
+        # Calculate holdings with current prices and unrealized gains
+        total_current_value = 0.0
+        total_unrealized_gains = 0.0
+        
         for ticker, holding_data in holdings.items():
             units = holding_data['units']
             total_cost = holding_data['total_cost']
             avg_cost = total_cost / units if units > 0 else 0
             
+            # Get current price and calculate current value
+            current_price = current_prices.get(ticker)
+            current_value = None
+            unrealized_gain_loss = None
+            unrealized_gain_loss_percent = None
+            
+            if current_price is not None and current_price > 0:
+                current_value = units * current_price
+                unrealized_gain_loss = current_value - total_cost
+                if total_cost > 0:
+                    unrealized_gain_loss_percent = (unrealized_gain_loss / total_cost) * 100
+                
+                total_current_value += current_value
+                total_unrealized_gains += unrealized_gain_loss
+            
             holdings_list.append(HoldingResponse(
                 ticker=ticker,
                 units=units,
                 average_cost=avg_cost,
-                total_cost=total_cost
+                total_cost=total_cost,
+                current_price=current_price,
+                current_value=current_value,
+                unrealized_gain_loss=unrealized_gain_loss,
+                unrealized_gain_loss_percent=unrealized_gain_loss_percent
             ))
             total_holdings_cost += total_cost
         
         # Sort holdings by ticker
         holdings_list.sort(key=lambda h: h.ticker)
+        
+        # Calculate total portfolio value
+        total_portfolio_value = cash_balance + total_current_value
         
         # Normalize negative zero values for display
         def normalize_zero(value: float) -> float:
@@ -236,5 +272,8 @@ class PortfolioService:
             realized_gains=normalize_zero(realized_gains),
             total_value_eur=normalize_zero(total_value_eur),
             holdings=holdings_list,
-            total_holdings_cost=normalize_zero(total_holdings_cost)
+            total_holdings_cost=normalize_zero(total_holdings_cost),
+            total_current_value=normalize_zero(total_current_value),
+            unrealized_gains=normalize_zero(total_unrealized_gains),
+            total_portfolio_value=normalize_zero(total_portfolio_value)
         )
