@@ -7,6 +7,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 from datetime import datetime
 from io import BytesIO
+from unittest.mock import patch, Mock
 
 from app.core import get_session
 from main import app
@@ -155,18 +156,18 @@ def test_create_transaction(client: TestClient):
     response = client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:14:40",
+            "date": "2020-12-02T20:14:40",
             "type": "Deposit",
-            "value": 3000.00,
+            "total_amount": 3000.00,
             "fee": 0.0,
-            "value_eur": 2760.27
+            "eur_amount": 2760.27
         }
     )
     assert response.status_code == 201
     data = response.json()
     assert data["type"] == "Deposit"
-    assert data["value"] == 3000.00
-    assert data["value_eur"] == 2760.27
+    assert data["total_amount"] == 3000.00
+    assert data["eur_amount"] == 2760.27
     assert data["portfolio_id"] == portfolio_id
     assert "id" in data
 
@@ -184,14 +185,14 @@ def test_create_transaction_with_all_fields(client: TestClient):
     response = client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:16:10",
+            "date": "2020-12-02T20:16:10",
             "type": "Buy",
             "ticker": "MSFT",
-            "units": 15.00000001,
-            "price": 183.69,
+            "quantity": 15.00000001,
+            "price_per_share": 183.69,
             "fee": 0.0,
-            "value": -2755.35,
-            "value_eur": None,
+            "total_amount": -2755.35,
+            "eur_amount": None,
             "split_ratio": None
         }
     )
@@ -199,9 +200,9 @@ def test_create_transaction_with_all_fields(client: TestClient):
     data = response.json()
     assert data["type"] == "Buy"
     assert data["ticker"] == "MSFT"
-    assert data["units"] == 15.00000001
-    assert data["price"] == 183.69
-    assert data["value"] == -2755.35
+    assert data["quantity"] == 15.00000001
+    assert data["price_per_share"] == 183.69
+    assert data["total_amount"] == -2755.35
 
 
 def test_list_transactions(client: TestClient):
@@ -217,21 +218,21 @@ def test_list_transactions(client: TestClient):
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:14:40",
+            "date": "2020-12-02T20:14:40",
             "type": "Deposit",
-            "value": 3000.00,
+            "total_amount": 3000.00,
             "fee": 0.0
         }
     )
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:16:10",
+            "date": "2020-12-02T20:16:10",
             "type": "Buy",
             "ticker": "MSFT",
-            "units": 15.0,
-            "price": 183.69,
-            "value": -2755.35,
+            "quantity": 15.0,
+            "price_per_share": 183.69,
+            "total_amount": -2755.35,
             "fee": 0.0
         }
     )
@@ -242,7 +243,7 @@ def test_list_transactions(client: TestClient):
     data = response.json()
     assert data["total"] == 2
     assert len(data["transactions"]) == 2
-    # Transactions are ordered by date_time DESC, so Buy (20:16:10) comes before Deposit (20:14:40)
+    # Transactions are ordered by date DESC, so Buy (20:16:10) comes before Deposit (20:14:40)
     assert data["transactions"][0]["type"] == "Buy"
     assert data["transactions"][1]["type"] == "Deposit"
 
@@ -259,9 +260,9 @@ def test_update_transaction(client: TestClient):
     transaction_response = client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:14:40",
+            "date": "2020-12-02T20:14:40",
             "type": "Deposit",
-            "value": 3000.00,
+            "total_amount": 3000.00,
             "fee": 0.0
         }
     )
@@ -271,13 +272,13 @@ def test_update_transaction(client: TestClient):
     response = client.put(
         f"/transactions/{transaction_id}",
         json={
-            "value": 3500.00,
+            "total_amount": 3500.00,
             "fee": 10.0
         }
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["value"] == 3500.00
+    assert data["total_amount"] == 3500.00
     assert data["fee"] == 10.0
 
 
@@ -293,9 +294,9 @@ def test_delete_transaction(client: TestClient):
     transaction_response = client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:14:40",
+            "date": "2020-12-02T20:14:40",
             "type": "Deposit",
-            "value": 3000.00,
+            "total_amount": 3000.00,
             "fee": 0.0
         }
     )
@@ -325,22 +326,22 @@ def test_export_transactions_csv(client: TestClient):
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2023-01-15T10:00:00",
+            "date": "2023-01-15T10:00:00",
             "type": "Deposit",
-            "value": 5000.00,
-            "value_eur": 5000.00
+            "total_amount": 5000.00,
+            "eur_amount": 5000.00
         }
     )
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2023-01-16T11:00:00",
+            "date": "2023-01-16T11:00:00",
             "type": "Buy",
             "ticker": "AAPL",
-            "units": 10,
-            "price": 150.00,
-            "value": 1500.00,
-            "value_eur": 1400.00,
+            "quantity": 10,
+            "price_per_share": 150.00,
+            "total_amount": -1500.00,
+            "eur_amount": -1400.00,
             "fee": 2.50
         }
     )
@@ -358,12 +359,12 @@ def test_export_transactions_csv(client: TestClient):
     
     # Check header - must match import format
     header = lines[0]
-    assert "date_time" in header
+    assert "date" in header
     assert "type" in header
     assert "ticker" in header
-    assert "units" in header
-    assert "price" in header
-    assert "value" in header
+    assert "quantity" in header
+    assert "price_per_share" in header
+    assert "total_amount" in header
     
     # Check first transaction (Deposit)
     assert "Deposit" in lines[1]
@@ -389,22 +390,22 @@ def test_export_and_reimport_csv(client: TestClient):
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2023-01-15T10:00:00",
+            "date": "2023-01-15T10:00:00",
             "type": "Deposit",
-            "value": 5000.00,
-            "value_eur": 5000.00
+            "total_amount": 5000.00,
+            "eur_amount": 5000.00
         }
     )
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2023-01-16T11:30:45",
+            "date": "2023-01-16T11:30:45",
             "type": "Buy",
             "ticker": "AAPL",
-            "units": 10,
-            "price": 150.00,
-            "value": 1500.00,
-            "value_eur": 1400.00,
+            "quantity": 10,
+            "price_per_share": 150.00,
+            "total_amount": -1500.00,
+            "eur_amount": -1400.00,
             "fee": 2.50
         }
     )
@@ -426,7 +427,7 @@ def test_export_and_reimport_csv(client: TestClient):
     csv_file = BytesIO(csv_content.encode('utf-8'))
     files = {"file": ("transactions.csv", csv_file, "text/csv")}
     import_response = client.post(
-        f"/portfolios/{portfolio2_id}/import",
+        f"/portfolios/{portfolio2_id}/transactions/import",
         files=files
     )
     
@@ -438,12 +439,12 @@ def test_export_and_reimport_csv(client: TestClient):
     transactions_response = client.get(f"/portfolios/{portfolio2_id}/transactions").json()
     transactions = transactions_response["transactions"]
     assert len(transactions) == 2
-    # Transactions are ordered by date_time DESC, so Buy (2023-01-16) comes before Deposit (2023-01-15)
+    # Transactions are ordered by date DESC, so Buy (2023-01-16) comes before Deposit (2023-01-15)
     assert transactions[0]["type"] == "Buy"
     assert transactions[0]["ticker"] == "AAPL"
-    assert transactions[0]["units"] == 10
+    assert transactions[0]["quantity"] == 10
     assert transactions[1]["type"] == "Deposit"
-    assert transactions[1]["value"] == 5000.00
+    assert transactions[1]["total_amount"] == 5000.00
 
 
 def test_export_transactions_csv_empty(client: TestClient):
@@ -484,21 +485,21 @@ def test_delete_portfolio_cascades_transactions(client: TestClient):
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:14:40",
+            "date": "2020-12-02T20:14:40",
             "type": "Deposit",
-            "value": 3000.00,
+            "total_amount": 3000.00,
             "fee": 0.0
         }
     )
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2020-12-02T20:16:10",
+            "date": "2020-12-02T20:16:10",
             "type": "Buy",
             "ticker": "MSFT",
-            "units": 15.0,
-            "price": 183.69,
-            "value": -2755.35,
+            "quantity": 15.0,
+            "price_per_share": 183.69,
+            "total_amount": -2755.35,
             "fee": 0.0
         }
     )
@@ -528,7 +529,7 @@ def test_csv_upload(client: TestClient):
     portfolio_id = portfolio_response.json()["id"]
     
     # Create CSV content
-    csv_content = """date_time,type,ticker,units,price,fee,value,EUR,split_ratio
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
 2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
 2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,
 """
@@ -536,7 +537,7 @@ def test_csv_upload(client: TestClient):
     # Upload CSV
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/import",
+        f"/portfolios/{portfolio_id}/transactions/import",
         files=files
     )
     
@@ -548,16 +549,16 @@ def test_csv_upload(client: TestClient):
     # Verify first transaction (Deposit)
     transaction1 = data["transactions"][0]
     assert transaction1["type"] == "Deposit"
-    assert transaction1["value"] == 3000.00
-    assert transaction1["value_eur"] == 2760.27
+    assert transaction1["total_amount"] == 3000.00
+    assert transaction1["eur_amount"] == 2760.27
     
     # Verify second transaction (Buy)
     transaction2 = data["transactions"][1]
     assert transaction2["type"] == "Buy"
     assert transaction2["ticker"] == "MSFT"
-    assert transaction2["units"] == 15.00000001
-    assert transaction2["price"] == 183.69
-    assert transaction2["value"] == -2755.35
+    assert transaction2["quantity"] == 15.00000001
+    assert transaction2["price_per_share"] == 183.69
+    assert transaction2["total_amount"] == -2755.35
 
 
 def test_csv_upload_invalid_file_type(client: TestClient):
@@ -572,7 +573,7 @@ def test_csv_upload_invalid_file_type(client: TestClient):
     # Try to upload a .txt file
     files = {"file": ("transactions.txt", BytesIO(b"test"), "text/plain")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/import",
+        f"/portfolios/{portfolio_id}/transactions/import",
         files=files
     )
     
@@ -582,13 +583,13 @@ def test_csv_upload_invalid_file_type(client: TestClient):
 
 def test_csv_upload_nonexistent_portfolio(client: TestClient):
     """Test uploading CSV to a portfolio that doesn't exist"""
-    csv_content = """date_time,type,ticker,units,price,fee,value,EUR,split_ratio
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
 2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        "/portfolios/999/import",
+        "/portfolios/999/transactions/import",
         files=files
     )
     
@@ -605,19 +606,19 @@ def test_csv_with_complex_transactions(client: TestClient):
     portfolio_id = portfolio_response.json()["id"]
     
     # Create CSV with multiple transaction types (M/D/YYYY format required)
-    csv_content = """date_time,type,ticker,units,price,fee,value,EUR,split_ratio
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
 1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,
 1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,-1580.00,,
 2/20/2020 14:00:00,Dividend,AAPL,,,0.00,50.00,46.00,
 3/10/2020 09:00:00,Split,AAPL,,,,0.00,,2.0
 4/15/2020 16:00:00,Sell,AAPL,5.0,200.00,5.00,995.00,,
-5/20/2020 10:00:00,Fee,,,,,10.00,9.20,
-6/30/2020 17:00:00,Withdraw,,,,,"-1,000.00",-920.00,
+5/20/2020 10:00:00,Fee,,,,,-10.00,-9.20,
+6/30/2020 17:00:00,Withdraw,,,,,-1000.00,-920.00,
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
     response = client.post(
-        f"/portfolios/{portfolio_id}/import",
+        f"/portfolios/{portfolio_id}/transactions/import",
         files=files
     )
     
@@ -650,22 +651,22 @@ def test_copy_portfolio_with_transactions(client: TestClient):
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2023-01-15T10:00:00",
+            "date": "2023-01-15T10:00:00",
             "type": "Deposit",
-            "value": 5000.00,
-            "value_eur": 5000.00
+            "total_amount": 5000.00,
+            "eur_amount": 5000.00
         }
     )
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
-            "date_time": "2023-01-16T11:00:00",
+            "date": "2023-01-16T11:00:00",
             "type": "Buy",
             "ticker": "AAPL",
-            "units": 10,
-            "price": 150.00,
-            "value": 1500.00,
-            "value_eur": 1500.00
+            "quantity": 10,
+            "price_per_share": 150.00,
+            "total_amount": -1500.00,
+            "eur_amount": -1500.00
         }
     )
     
@@ -691,13 +692,13 @@ def test_copy_portfolio_with_transactions(client: TestClient):
     assert len(copied_full_data["transactions"]) == 2
     
     # Verify transaction data matches (but with different IDs and portfolio_id)
-    original_transactions = sorted(original_data["transactions"], key=lambda x: x["date_time"])
-    copied_transactions = sorted(copied_full_data["transactions"], key=lambda x: x["date_time"])
+    original_transactions = sorted(original_data["transactions"], key=lambda x: x["date"])
+    copied_transactions = sorted(copied_full_data["transactions"], key=lambda x: x["date"])
     
     assert original_transactions[0]["type"] == copied_transactions[0]["type"]
-    assert original_transactions[0]["value"] == copied_transactions[0]["value"]
+    assert original_transactions[0]["total_amount"] == copied_transactions[0]["total_amount"]
     assert original_transactions[1]["ticker"] == copied_transactions[1]["ticker"]
-    assert original_transactions[1]["units"] == copied_transactions[1]["units"]
+    assert original_transactions[1]["quantity"] == copied_transactions[1]["quantity"]
     assert copied_transactions[0]["portfolio_id"] == copied_portfolio_id
     assert copied_transactions[1]["portfolio_id"] == copied_portfolio_id
 
@@ -726,6 +727,940 @@ def test_copy_portfolio_invalid_name(client: TestClient):
         json={"new_name": "   "}
     )
     assert response.status_code == 400
+
+
+# ================== Portfolio Status Tests ==================
+
+def test_portfolio_status_empty_portfolio(client: TestClient):
+    """Test portfolio status with no transactions"""
+    # Create empty portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Empty Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Get portfolio status
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["portfolio_id"] == portfolio_id
+    assert data["portfolio_name"] == "Empty Portfolio"
+    assert data["cash_balance"] == 0.0
+    assert data["total_invested"] == 0.0
+    assert data["dividends_received"] == 0.0
+    assert data["realized_gains"] == 0.0
+    assert data["total_eur_amount"] == 0.0
+    assert data["holdings"] == []
+    assert data["total_holdings_cost"] == 0.0
+
+
+def test_portfolio_status_with_deposit(client: TestClient):
+    """Test portfolio status with deposit"""
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Add deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Get status
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["cash_balance"] == 1000.0
+    assert data["total_invested"] == 1000.0
+    assert data["holdings"] == []
+
+
+def test_portfolio_status_with_buy_transactions(client: TestClient):
+    """Test portfolio status with stock purchases"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit money
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Buy MSFT
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "MSFT",
+            "quantity": 5.0,
+            "price_per_share": 300.0,
+            "total_amount": -1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Get status
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["cash_balance"] == 2000.0  # 5000 - 1500 - 1500 (fees included in values)
+    assert data["total_invested"] == 5000.0
+    assert len(data["holdings"]) == 2
+    
+    # Check AAPL holding
+    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
+    assert aapl_holding["quantity"] == 10.0
+    assert aapl_holding["average_cost"] == 150.0
+    assert aapl_holding["total_cost"] == 1500.0
+    
+    # Check MSFT holding
+    msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
+    assert msft_holding["quantity"] == 5.0
+    assert msft_holding["average_cost"] == 300.0
+    assert msft_holding["total_cost"] == 1500.0
+    
+    assert data["total_holdings_cost"] == 3000.0
+
+
+def test_portfolio_status_with_sell_transactions(client: TestClient):
+    """Test portfolio status with stock sales and realized gains"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Trading Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 20.0,
+            "price_per_share": 100.0,
+            "total_amount": -2000.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Sell half at a profit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-10T10:00:00",
+            "type": "Sell",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": 1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Get status
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["cash_balance"] == 9500.0  # 10000 - 2000 + 1500 (fees included in values)
+    assert data["total_invested"] == 10000.0
+    
+    # Should have 10 AAPL left
+    assert len(data["holdings"]) == 1
+    aapl_holding = data["holdings"][0]
+    assert aapl_holding["ticker"] == "AAPL"
+    assert aapl_holding["quantity"] == 10.0
+    assert aapl_holding["average_cost"] == 100.0
+    assert aapl_holding["total_cost"] == 1000.0
+    
+    # Realized gains: sold 10 shares at 1500 (includes -1 fee) - cost basis 10*100 (1000) = 500
+    assert data["realized_gains"] == 500.0
+
+
+def test_portfolio_status_with_dividends(client: TestClient):
+    """Test portfolio status with dividend income"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Dividend Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy stock
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Receive dividends
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-02-01T10:00:00",
+            "type": "Dividend",
+            "ticker": "AAPL",
+            "total_amount": 50.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-03-01T10:00:00",
+            "type": "Dividend",
+            "ticker": "AAPL",
+            "total_amount": 50.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Get status
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["cash_balance"] == 3600.0  # 5000 - 1500 + 50 + 50 (fees included in values)
+    assert data["dividends_received"] == 100.0
+    assert len(data["holdings"]) == 1
+
+
+def test_portfolio_status_with_stock_split(client: TestClient):
+    """Test portfolio status with stock split"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Split Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy stock
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 400.0,
+            "total_amount": -4000.0,
+            "fee": 1.0
+        }
+    )
+    
+    # 2:1 stock split
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-02-01T10:00:00",
+            "type": "Split",
+            "ticker": "AAPL",
+            "split_ratio": 2.0,
+            "total_amount": 0.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Get status
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # After 2:1 split, should have 20 shares
+    assert len(data["holdings"]) == 1
+    aapl_holding = data["holdings"][0]
+    assert aapl_holding["ticker"] == "AAPL"
+    assert aapl_holding["quantity"] == 20.0
+    # Average cost per share after split: original cost basis $4000 / 20 shares = $200/share
+    assert aapl_holding["average_cost"] == 200.0
+    assert aapl_holding["total_cost"] == 4000.0
+
+
+def test_portfolio_status_with_withdrawal(client: TestClient):
+    """Test portfolio status with withdrawal"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Withdrawal Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Withdraw some cash
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-02-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -2000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Get status
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["cash_balance"] == 3000.0  # 5000 - 2000
+    assert data["total_invested"] == 3000.0  # 5000 - 2000
+
+
+def test_portfolio_status_nonexistent_portfolio(client: TestClient):
+    """Test portfolio status for a non-existent portfolio"""
+    response = client.get("/portfolios/999/status")
+    assert response.status_code == 404
+
+
+# ================== Portfolio Status Validation Tests ==================
+
+def test_portfolio_status_sell_without_holdings(client: TestClient):
+    """Test portfolio status validation: cannot sell ticker not in holdings"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Try to sell AAPL without owning it
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Sell",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": 1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Get status - should return 400 for validation error
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 400  # Bad Request due to validation
+    assert "not in holdings" in response.json()["detail"]
+
+
+def test_portfolio_status_overselling(client: TestClient):
+    """Test portfolio status validation: cannot sell more units than owned"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit and buy
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": -1501.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Try to sell more than owned
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Sell",
+            "ticker": "AAPL",
+            "quantity": 20.0,
+            "price_per_share": 150.0,
+            "total_amount": 3000.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Get status - should return 400 for validation error
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 400  # Bad Request due to validation
+    assert "available" in response.json()["detail"]
+
+
+def test_portfolio_status_floating_point_precision(client: TestClient):
+    """Test portfolio status handles floating-point precision errors in sell validation"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy 3.3 units
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "GOOGL",
+            "quantity": 3.3,
+            "price_per_share": 150.0,
+            "total_amount": -495.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy another 3.4 units (total should be 6.7, but may be 6.699999999999999 due to float)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "GOOGL",
+            "quantity": 3.4,
+            "price_per_share": 150.0,
+            "total_amount": -510.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Sell exactly 6.7 units - should NOT fail due to floating-point precision
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-04T10:00:00",
+            "type": "Sell",
+            "ticker": "GOOGL",
+            "quantity": 6.7,
+            "price_per_share": 160.0,
+            "total_amount": 1072.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Get status - should succeed without validation error
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+    # Should have no holdings after selling all
+    assert len(data["holdings"]) == 0 or data["holdings"][0]["quantity"] < 1e-8
+
+
+def test_portfolio_status_invalid_split_ratio(client: TestClient):
+    """Test portfolio status validation: split ratio must be positive"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit and buy
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Try split with invalid ratio - should fail at creation
+    split_response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Split",
+            "ticker": "AAPL",
+            "split_ratio": -2.0,
+            "total_amount": 0.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Transaction creation should fail with validation error
+    assert split_response.status_code == 422  # Unprocessable Entity (Pydantic validation error)
+    assert "Split ratio must be greater than 0" in split_response.text
+
+
+# ================== Portfolio Status with Prices Tests ==================
+
+def test_portfolio_status_with_current_prices(client: TestClient):
+    """Test portfolio status with current prices from Yahoo Finance"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit money
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL at $150
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Buy MSFT at $300
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "MSFT",
+            "quantity": 5.0,
+            "price_per_share": 300.0,
+            "total_amount": -1500.0,
+            "fee": 1.0
+        }
+    )
+    
+    # Mock current prices: AAPL at $180 (+20%), MSFT at $270 (-10%)
+    mock_prices = {
+        'AAPL': 180.0,
+        'MSFT': 270.0
+    }
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Check cash balance
+    assert data["cash_balance"] == 7000.0  # 10000 - 1500 - 1500
+    
+    # Check AAPL holding with price data
+    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
+    assert aapl_holding["quantity"] == 10.0
+    assert aapl_holding["average_cost"] == 150.0
+    assert aapl_holding["total_cost"] == 1500.0
+    assert aapl_holding["current_price"] == 180.0
+    assert aapl_holding["current_value"] == 1800.0  # 10 * 180
+    assert aapl_holding["unrealized_gain_loss"] == 300.0  # 1800 - 1500
+    assert abs(aapl_holding["unrealized_gain_loss_percent"] - 20.0) < 0.01
+    
+    # Check MSFT holding with price data
+    msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
+    assert msft_holding["quantity"] == 5.0
+    assert msft_holding["average_cost"] == 300.0
+    assert msft_holding["total_cost"] == 1500.0
+    assert msft_holding["current_price"] == 270.0
+    assert msft_holding["current_value"] == 1350.0  # 5 * 270
+    assert msft_holding["unrealized_gain_loss"] == -150.0  # 1350 - 1500
+    assert abs(msft_holding["unrealized_gain_loss_percent"] - (-10.0)) < 0.01
+    
+    # Check portfolio totals
+    assert data["total_holdings_cost"] == 3000.0
+    assert data["total_current_value"] == 3150.0  # 1800 + 1350
+    assert data["unrealized_gains"] == 150.0  # 300 - 150
+    assert data["total_portfolio_value"] == 10150.0  # 7000 cash + 3150 holdings
+
+
+def test_portfolio_status_with_missing_prices(client: TestClient):
+    """Test portfolio status when some prices are unavailable"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit and buy stocks
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "UNKNOWN",
+            "quantity": 5.0,
+            "price_per_share": 100.0,
+            "total_amount": -500.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock prices: AAPL available, UNKNOWN not available
+    mock_prices = {
+        'AAPL': 180.0,
+        'UNKNOWN': None
+    }
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # AAPL should have price data
+    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
+    assert aapl_holding["current_price"] == 180.0
+    assert aapl_holding["current_value"] == 1800.0
+    assert aapl_holding["unrealized_gain_loss"] == 300.0
+    
+    # UNKNOWN should have None for price fields
+    unknown_holding = next(h for h in data["holdings"] if h["ticker"] == "UNKNOWN")
+    assert unknown_holding["current_price"] is None
+    assert unknown_holding["current_value"] is None
+    assert unknown_holding["unrealized_gain_loss"] is None
+    assert unknown_holding["unrealized_gain_loss_percent"] is None
+    
+    # Totals should only include holdings with prices
+    assert data["total_current_value"] == 1800.0  # Only AAPL
+    assert data["unrealized_gains"] == 300.0  # Only AAPL gain
+
+
+def test_portfolio_status_with_zero_price(client: TestClient):
+    """Test portfolio status when price is zero (edge case)"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "PENNY",
+            "quantity": 1000.0,
+            "price_per_share": 0.50,
+            "total_amount": -500.0,
+            "fee": 0.0
+        }
+    )
+    mock_prices = {'PENNY': 0.0}
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Zero price should not calculate gains
+    penny_holding = next(h for h in data["holdings"] if h["ticker"] == "PENNY")
+    assert penny_holding["current_price"] == 0.0
+    assert penny_holding["current_value"] is None
+    assert penny_holding["unrealized_gain_loss"] is None
+
+
+def test_portfolio_status_price_service_exception(client: TestClient):
+    """Test portfolio status when PriceService throws an exception"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Investment Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+            "fee": 0.0
+        }
+    )
+    
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock PriceService to raise exception
+    with patch('app.services.price_service.PriceService.get_current_prices', side_effect=Exception("API Error")):
+        # Should not crash, should return 200 with no prices
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    # Should succeed with no prices (graceful degradation)
+    assert response.status_code == 200
+    data = response.json()
+    
+    # AAPL holding should have None for all price fields
+    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
+    assert aapl_holding["current_price"] is None
+    assert aapl_holding["current_value"] is None
+    assert aapl_holding["unrealized_gain_loss"] is None
+    assert aapl_holding["unrealized_gain_loss_percent"] is None
+
+
+def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
+    """Test portfolio status with multiple stocks having different gain/loss scenarios"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Diverse Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 20000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy WINNER (will gain 50%)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "WINNER",
+            "quantity": 100.0,
+            "price_per_share": 50.0,
+            "total_amount": -5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy LOSER (will lose 30%)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "LOSER",
+            "quantity": 50.0,
+            "price_per_share": 100.0,
+            "total_amount": -5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy FLAT (no change)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-04T10:00:00",
+            "type": "Buy",
+            "ticker": "FLAT",
+            "quantity": 200.0,
+            "price_per_share": 25.0,
+            "total_amount": -5000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current prices
+    mock_prices = {
+        'WINNER': 75.0,   # +50%
+        'LOSER': 70.0,    # -30%
+        'FLAT': 25.0      # 0%
+    }
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Check individual holdings
+    winner = next(h for h in data["holdings"] if h["ticker"] == "WINNER")
+    assert winner["unrealized_gain_loss"] == 2500.0  # +2500
+    assert abs(winner["unrealized_gain_loss_percent"] - 50.0) < 0.01
+    
+    loser = next(h for h in data["holdings"] if h["ticker"] == "LOSER")
+    assert loser["unrealized_gain_loss"] == -1500.0  # -1500
+    assert abs(loser["unrealized_gain_loss_percent"] - (-30.0)) < 0.01
+    
+    flat = next(h for h in data["holdings"] if h["ticker"] == "FLAT")
+    assert flat["unrealized_gain_loss"] == 0.0  # 0
+    assert abs(flat["unrealized_gain_loss_percent"]) < 0.01
+    
+    # Total unrealized gains: 2500 - 1500 + 0 = 1000
+    assert data["unrealized_gains"] == 1000.0
+    
+    # Total portfolio value: 5000 cash + (7500 + 3500 + 5000) holdings = 21000
+    assert data["cash_balance"] == 5000.0
+    assert data["total_current_value"] == 16000.0
+    assert data["total_portfolio_value"] == 21000.0
 
 
 # ================== Health Check Test ==================

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Transaction } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate, getTransactionColor, formatTransactionType } from '../utils/formatters';
+import { formatCurrency, formatDate, getValueColor, formatTransactionType, getDisplayValue } from '../utils/formatters';
 import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
 
 interface TransactionTableProps {
@@ -38,8 +38,8 @@ const TransactionTable = ({
           onPageChange(currentPage - 1);
         }
       } catch (error) {
-        console.error('Error deleting transaction:', error);
-        alert('Failed to delete transaction. Please try again.');
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        alert(`Failed to delete transaction: ${errorMsg}`);
       } finally {
         setDeletingId(null);
       }
@@ -113,11 +113,11 @@ const TransactionTable = ({
               <th>Date</th>
               <th>Type</th>
               <th>Ticker</th>
-              <th className="text-right">Units</th>
-              <th className="text-right">Price</th>
+              <th className="text-right">Quantity</th>
+              <th className="text-right">Price per Share</th>
               <th className="text-right">Fee</th>
-              <th className="text-right">Value</th>
-              <th className="text-right">EUR Value</th>
+              <th className="text-right">Total Amount</th>
+              <th className="text-right">EUR Amount</th>
               <th className="text-right">Split Ratio</th>
               <th className="text-center">Actions</th>
             </tr>
@@ -125,7 +125,7 @@ const TransactionTable = ({
           <tbody>
             {transactions.map((transaction) => (
               <tr key={transaction.id} data-testid="transaction-row">
-                <td>{formatDate(transaction.date_time)}</td>
+                <td>{formatDate(transaction.date)}</td>
                 <td>
                   <span className={`badge badge-${transaction.type.toLowerCase()}`}>
                     {formatTransactionType(transaction.type)}
@@ -133,17 +133,19 @@ const TransactionTable = ({
                 </td>
                 <td>{transaction.ticker || '-'}</td>
                 <td className="text-right">
-                  {transaction.units !== null && transaction.units !== undefined ? transaction.units.toFixed(8) : '-'}
+                  {transaction.quantity !== null && transaction.quantity !== undefined ? transaction.quantity.toFixed(8) : '-'}
                 </td>
                 <td className="text-right">
-                  {transaction.price !== null && transaction.price !== undefined ? formatCurrency(transaction.price) : '-'}
-                </td>
-                <td className="text-right">{formatCurrency(transaction.fee)}</td>
-                <td className={`text-right value-${getTransactionColor(transaction)}`}>
-                  {formatCurrency(transaction.value)}
+                  {transaction.price_per_share !== null && transaction.price_per_share !== undefined ? formatCurrency(transaction.price_per_share) : '-'}
                 </td>
                 <td className="text-right">
-                  {transaction.value_eur !== null && transaction.value_eur !== undefined ? formatCurrency(transaction.value_eur, 'EUR') : '-'}
+                  {transaction.fee !== null && transaction.fee !== undefined ? formatCurrency(transaction.fee) : '-'}
+                </td>
+                <td className={`text-right value-${getValueColor(transaction.total_amount)}`}>
+                  {formatCurrency(getDisplayValue(transaction))}
+                </td>
+                <td className={`text-right value-${getValueColor(transaction.eur_amount)}`}>
+                  {transaction.eur_amount !== null && transaction.eur_amount !== undefined ? formatCurrency(transaction.eur_amount, 'EUR') : '-'}
                 </td>
                 <td className="text-right">
                   {transaction.split_ratio !== null && transaction.split_ratio !== undefined ? transaction.split_ratio.toFixed(2) : '-'}

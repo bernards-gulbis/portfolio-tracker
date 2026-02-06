@@ -9,6 +9,7 @@ import {
   TransactionCreate,
   TransactionUpdate,
 } from '../api';
+import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 
 /**
  * Hook to fetch a portfolio with transactions
@@ -27,7 +28,7 @@ export const usePortfolio = (portfolioId: number | null) => {
 export const useTransactions = (
   portfolioId: number | null,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = DEFAULT_PAGE_SIZE
 ) => {
   return useQuery({
     queryKey: ['transactions', portfolioId, page, pageSize],
@@ -48,6 +49,7 @@ export const useCreateTransaction = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };
@@ -62,7 +64,7 @@ export const useUpdateTransaction = () => {
     mutationFn: ({
       transactionId,
       data,
-      portfolioId,
+      portfolioId: _portfolioId,
     }: {
       transactionId: number;
       data: TransactionUpdate;
@@ -75,6 +77,7 @@ export const useUpdateTransaction = () => {
         exact: false 
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };
@@ -86,7 +89,7 @@ export const useDeleteTransaction = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ transactionId, portfolioId }: { transactionId: number; portfolioId: number }) =>
+    mutationFn: ({ transactionId, portfolioId: _portfolioId }: { transactionId: number; portfolioId: number }) =>
       deleteTransaction(transactionId),
     onSuccess: (_, variables) => {
       // Invalidate all paginated transaction queries for this portfolio
@@ -95,6 +98,7 @@ export const useDeleteTransaction = () => {
         exact: false 
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };
@@ -115,6 +119,7 @@ export const useImportTransactionsCSV = () => {
         exact: false 
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
     },
   });
 };

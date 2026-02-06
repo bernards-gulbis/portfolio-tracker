@@ -11,6 +11,8 @@ from .schemas import (
     TransactionResponse,
     BulkImportResponse,
     PaginatedTransactionResponse,
+    HoldingResponse,
+    PortfolioStatusResponse,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "TransactionResponse",
     "BulkImportResponse",
     "PaginatedTransactionResponse",
+    "HoldingResponse",
+    "PortfolioStatusResponse",
 ]

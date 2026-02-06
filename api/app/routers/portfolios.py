@@ -1,5 +1,5 @@
 """Portfolio API routes"""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from typing import List
 
@@ -10,6 +10,7 @@ from app.schemas import (
     PortfolioCopy,
     PortfolioResponse,
     PortfolioWithTransactions,
+    PortfolioStatusResponse,
 )
 from app.services import PortfolioService
 
@@ -41,6 +42,19 @@ def get_portfolio(
     """Get a specific portfolio with its transactions"""
     service = PortfolioService(session)
     return service.get_portfolio(portfolio_id)
+
+
+@router.get("/{portfolio_id}/status", response_model=PortfolioStatusResponse)
+def get_portfolio_status(
+    portfolio_id: int,
+    session: Session = Depends(get_session)
+):
+    """Get portfolio status with holdings, cash balance, and performance metrics"""
+    service = PortfolioService(session)
+    try:
+        return service.calculate_portfolio_status(portfolio_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/{portfolio_id}", response_model=PortfolioResponse)

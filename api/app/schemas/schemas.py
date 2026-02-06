@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from datetime import datetime
 from typing import Optional, List
 from app.models import TransactionType
@@ -8,7 +8,15 @@ from app.models import TransactionType
 
 class PortfolioBase(BaseModel):
     """Base portfolio schema"""
-    name: str
+    name: str = Field(min_length=1, max_length=100)
+    
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate portfolio name is not empty or whitespace"""
+        if not v or not v.strip():
+            raise ValueError('Portfolio name cannot be empty or whitespace')
+        return v.strip()
 
 
 class PortfolioCreate(PortfolioBase):
@@ -45,14 +53,14 @@ class PortfolioWithTransactions(PortfolioResponse):
 
 class TransactionBase(BaseModel):
     """Base transaction schema"""
-    date_time: datetime
+    date: datetime
     type: TransactionType
     ticker: Optional[str] = Field(None, max_length=20)
-    units: Optional[float] = None
-    price: Optional[float] = None
-    fee: float = 0.0
-    value: float
-    value_eur: Optional[float] = None
+    quantity: Optional[float] = None
+    price_per_share: Optional[float] = None
+    fee: Optional[float] = None
+    total_amount: float
+    eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
     
     @field_validator('ticker')
@@ -75,23 +83,53 @@ class TransactionBase(BaseModel):
         if v is not None and v <= 0:
             raise ValueError('Split ratio must be greater than 0')
         return v
+    
+    @field_validator('fee')
+    @classmethod
+    def validate_fee(cls, v: Optional[float]) -> Optional[float]:
+        """Validate fee is positive"""
+        if v is not None and v < 0:
+            raise ValueError('Fee must be positive')
+        return v
 
 
 class TransactionCreate(TransactionBase):
     """Schema for creating a transaction"""
-    pass
+    
+    @model_validator(mode='after')
+    def validate_total_amount_sign(self):
+        """Validate total_amount has correct sign based on transaction type"""
+        tx_type = self.type
+        amount = self.total_amount
+        
+        # Split must have exactly 0 amount
+        if tx_type == TransactionType.SPLIT:
+            if amount != 0:
+                raise ValueError('Split transactions must have total_amount of 0')
+        
+        # Buy, Withdraw, Fee must be negative (money leaving account)
+        elif tx_type in [TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE]:
+            if amount >= 0:
+                raise ValueError(f'{tx_type.value} transactions must have negative total_amount (money leaving account)')
+        
+        # Deposit, Sell, Dividend must be positive (money entering account)
+        elif tx_type in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]:
+            if amount <= 0:
+                raise ValueError(f'{tx_type.value} transactions must have positive total_amount (money entering account)')
+        
+        return self
 
 
 class TransactionUpdate(BaseModel):
     """Schema for updating a transaction (all fields optional)"""
-    date_time: Optional[datetime] = None
+    date: Optional[datetime] = None
     type: Optional[TransactionType] = None
     ticker: Optional[str] = None
-    units: Optional[float] = None
-    price: Optional[float] = None
+    quantity: Optional[float] = None
+    price_per_share: Optional[float] = None
     fee: Optional[float] = None
-    value: Optional[float] = None
-    value_eur: Optional[float] = None
+    total_amount: Optional[float] = None
+    eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
 
 
@@ -116,3 +154,37 @@ class PaginatedTransactionResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+# ================== Portfolio Status Schemas ==================
+
+class HoldingResponse(BaseModel):
+    """Schema for a single holding"""
+    ticker: str
+    quantity: float
+    average_cost: float
+    total_cost: float
+    current_price: Optional[float] = None
+    current_value: Optional[float] = None
+    unrealized_gain_loss: Optional[float] = None
+    unrealized_gain_loss_percent: Optional[float] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PortfolioStatusResponse(BaseModel):
+    """Schema for portfolio status with calculated metrics"""
+    portfolio_id: int
+    portfolio_name: str
+    cash_balance: float
+    total_invested: float  # Deposits - Withdrawals
+    dividends_received: float
+    realized_gains: float  # Gains/losses from sells
+    total_eur_amount: float  # Sum of all eur_amount fields
+    holdings: List[HoldingResponse]
+    total_holdings_cost: float  # Sum of all holdings cost basis
+    total_current_value: float  # Sum of current market value of all holdings
+    unrealized_gains: float  # Total unrealized gains/losses
+    total_portfolio_value: float  # Cash + Holdings current value
+    
+    model_config = ConfigDict(from_attributes=True)

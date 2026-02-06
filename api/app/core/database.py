@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, create_engine, Session
 from typing import Generator
+import os
 
 # SQLite database URL
 DATABASE_URL = "sqlite:///./portfolio_tracker.db"
@@ -7,7 +8,7 @@ DATABASE_URL = "sqlite:///./portfolio_tracker.db"
 # Create engine
 engine = create_engine(
     DATABASE_URL,
-    echo=True,  # Set to False in production
+    echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
     connect_args={
         "check_same_thread": False,  # Needed for SQLite
         "timeout": 30  # Set timeout for SQLite

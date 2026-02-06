@@ -43,12 +43,7 @@ class PortfolioRepository:
         """Delete a portfolio and all its transactions"""
         portfolio = self.get_by_id(portfolio_id)
         if portfolio:
-            # Delete all associated transactions first
-            statement = select(Transaction).where(Transaction.portfolio_id == portfolio_id)
-            transactions = self.session.exec(statement).all()
-            for transaction in transactions:
-                self.session.delete(transaction)
-            
+            # Cascade delete will handle associated transactions
             self.session.delete(portfolio)
             self.session.commit()
             return True
@@ -74,14 +69,14 @@ class PortfolioRepository:
         for original_transaction in original.transactions:
             new_transaction = Transaction(
                 portfolio_id=new_portfolio.id,
-                date_time=original_transaction.date_time,
+                date=original_transaction.date,
                 type=original_transaction.type,
                 ticker=original_transaction.ticker,
-                units=original_transaction.units,
-                price=original_transaction.price,
+                quantity=original_transaction.quantity,
+                price_per_share=original_transaction.price_per_share,
                 fee=original_transaction.fee,
-                value=original_transaction.value,
-                value_eur=original_transaction.value_eur,
+                total_amount=original_transaction.total_amount,
+                eur_amount=original_transaction.eur_amount,
                 split_ratio=original_transaction.split_ratio,
             )
             self.session.add(new_transaction)

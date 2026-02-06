@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatDate, getTransactionColor } from '../utils/formatters';
+import { formatCurrency, formatDate, getValueColor, getDisplayValue } from '../utils/formatters';
 import { Transaction, TransactionType } from '../api';
 
 describe('Formatters', () => {
@@ -25,56 +25,112 @@ describe('Formatters', () => {
     });
   });
 
-  describe('getTransactionColor', () => {
-    it('returns positive for deposit', () => {
+  describe('getValueColor', () => {
+    it('returns positive for positive value', () => {
+      expect(getValueColor(3000)).toBe('positive');
+    });
+
+    it('returns negative for negative value', () => {
+      expect(getValueColor(-2755.35)).toBe('negative');
+    });
+
+    it('returns neutral for zero', () => {
+      expect(getValueColor(0)).toBe('neutral');
+    });
+
+    it('returns neutral for null', () => {
+      expect(getValueColor(null)).toBe('neutral');
+    });
+
+    it('returns neutral for undefined', () => {
+      expect(getValueColor(undefined)).toBe('neutral');
+    });
+  });
+
+  describe('getDisplayValue', () => {
+    it('returns positive value for deposit', () => {
       const transaction: Transaction = {
         id: 1,
         portfolio_id: 1,
-        date_time: '2020-12-02T20:14:40',
+        date: '2020-12-02T20:14:40',
         type: TransactionType.DEPOSIT,
         ticker: null,
-        units: null,
-        price: null,
+        quantity: null,
+        price_per_share: null,
         fee: 0,
-        value: 3000,
-        value_eur: null,
+        total_amount: 3000,  // Stored as positive
+        eur_amount: null,
         split_ratio: null,
       };
-      expect(getTransactionColor(transaction)).toBe('positive');
+      expect(getDisplayValue(transaction)).toBe(3000);
     });
 
-    it('returns negative for buy', () => {
+    it('returns negative value for buy', () => {
       const transaction: Transaction = {
         id: 2,
         portfolio_id: 1,
-        date_time: '2020-12-02T20:16:10',
+        date: '2020-12-02T20:16:10',
         type: TransactionType.BUY,
         ticker: 'MSFT',
-        units: 15,
-        price: 183.69,
+        quantity: 15,
+        price_per_share: 183.69,
         fee: 0,
-        value: -2755.35,
-        value_eur: null,
+        total_amount: -2755.35,  // Now stored as negative
+        eur_amount: null,
         split_ratio: null,
       };
-      expect(getTransactionColor(transaction)).toBe('negative');
+      expect(getDisplayValue(transaction)).toBe(-2755.35);
     });
 
-    it('returns neutral for split', () => {
+    it('returns negative value for withdraw', () => {
       const transaction: Transaction = {
         id: 3,
         portfolio_id: 1,
-        date_time: '2021-03-10T09:00:00',
-        type: TransactionType.SPLIT,
-        ticker: 'AAPL',
-        units: null,
-        price: null,
+        date: '2021-01-10T10:00:00',
+        type: TransactionType.WITHDRAW,
+        ticker: null,
+        quantity: null,
+        price_per_share: null,
         fee: 0,
-        value: 0,
-        value_eur: null,
-        split_ratio: 2.0,
+        total_amount: -500,  // Now stored as negative
+        eur_amount: null,
+        split_ratio: null,
       };
-      expect(getTransactionColor(transaction)).toBe('neutral');
+      expect(getDisplayValue(transaction)).toBe(-500);
+    });
+
+    it('returns negative value for fee', () => {
+      const transaction: Transaction = {
+        id: 4,
+        portfolio_id: 1,
+        date: '2021-02-05T14:30:00',
+        type: TransactionType.FEE,
+        ticker: null,
+        quantity: null,
+        price_per_share: null,
+        fee: 0,
+        total_amount: -10,  // Now stored as negative
+        eur_amount: null,
+        split_ratio: null,
+      };
+      expect(getDisplayValue(transaction)).toBe(-10);
+    });
+
+    it('returns positive value for sell', () => {
+      const transaction: Transaction = {
+        id: 5,
+        portfolio_id: 1,
+        date: '2021-03-15T11:20:00',
+        type: TransactionType.SELL,
+        ticker: 'AAPL',
+        quantity: 10,
+        price_per_share: 125.50,
+        fee: 5,
+        total_amount: 1250,  // Stored as positive
+        eur_amount: null,
+        split_ratio: null,
+      };
+      expect(getDisplayValue(transaction)).toBe(1250);
     });
   });
 });

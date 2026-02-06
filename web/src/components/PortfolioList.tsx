@@ -3,6 +3,7 @@ import { usePortfolios, useDeletePortfolio } from '../hooks/usePortfolios';
 import { usePortfolioContext } from '../context/PortfolioContext';
 import { Portfolio } from '../api';
 import CreatePortfolioModal from './CreatePortfolioModal';
+import EditPortfolioModal from './EditPortfolioModal';
 import CopyPortfolioModal from './CopyPortfolioModal';
 
 const PortfolioList = () => {
@@ -10,6 +11,10 @@ const PortfolioList = () => {
   const { activePortfolioId, setActivePortfolioId } = usePortfolioContext();
   const deletePortfolio = useDeletePortfolio();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editModalState, setEditModalState] = useState<{ isOpen: boolean; portfolio: Portfolio | null }>({
+    isOpen: false,
+    portfolio: null,
+  });
   const [copyModalState, setCopyModalState] = useState<{ isOpen: boolean; portfolio: Portfolio | null }>({
     isOpen: false,
     portfolio: null,
@@ -26,9 +31,15 @@ const PortfolioList = () => {
           setActivePortfolioId(null);
         }
       } catch (error) {
-        console.error('Error deleting portfolio:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        alert(`Failed to delete portfolio: ${errorMsg}`);
       }
     }
+  };
+
+  const handleEdit = (portfolio: Portfolio, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the portfolio when editing
+    setEditModalState({ isOpen: true, portfolio });
   };
 
   const handleCopy = (portfolio: Portfolio, e: React.MouseEvent) => {
@@ -96,6 +107,13 @@ const PortfolioList = () => {
               <div className="portfolio-card-actions">
                 <button
                   className="btn btn-secondary btn-sm"
+                  onClick={(e) => handleEdit(portfolio, e)}
+                  title="Rename portfolio"
+                >
+                  Edit
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
                   onClick={(e) => handleCopy(portfolio, e)}
                   title="Copy portfolio with all transactions"
                 >
@@ -118,6 +136,15 @@ const PortfolioList = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {editModalState.portfolio && (
+        <EditPortfolioModal
+          isOpen={editModalState.isOpen}
+          onClose={() => setEditModalState({ isOpen: false, portfolio: null })}
+          portfolioId={editModalState.portfolio.id}
+          currentName={editModalState.portfolio.name}
+        />
+      )}
 
       {copyModalState.portfolio && (
         <CopyPortfolioModal
