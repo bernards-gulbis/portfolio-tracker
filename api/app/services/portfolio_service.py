@@ -117,7 +117,6 @@ class PortfolioService:
         for transaction in transactions:
             tx_type = transaction.type
             total_amount = transaction.total_amount  # Now stored with correct sign
-            fee = transaction.fee  # Stored as positive (when present)
             
             if tx_type == TransactionType.DEPOSIT:
                 # Deposit adds cash and increases invested amount (stored as positive)

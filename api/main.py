@@ -146,7 +146,7 @@ def health_check():
         health_status["database"] = "connected"
     except Exception as e:
         health_status["status"] = "unhealthy"
-        health_status["database"] = f"error: {str(e)}"
+        health_status["database"] = "error"
         logger.error(f"Health check failed - database error: {e}", exc_info=True)
         return JSONResponse(status_code=503, content=health_status)
     

@@ -531,7 +531,7 @@ def test_csv_upload(client: TestClient):
     # Create CSV content
     csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
 2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
-2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"2,755.35",,
+2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,
 """
     
     # Upload CSV

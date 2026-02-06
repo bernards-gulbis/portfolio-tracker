@@ -2,13 +2,17 @@
 Unit tests for PriceService
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from app.services.price_service import PriceService
 import requests
 
 
 class TestPriceService:
     """Test suite for PriceService"""
+    
+    def setup_method(self):
+        """Clear the price cache before each test"""
+        PriceService._price_cache.clear()
     
     def test_get_current_price_success(self):
         """Test successful price fetch for a single ticker"""
@@ -25,7 +29,7 @@ class TestPriceService:
         }
         mock_response.raise_for_status = Mock()
         
-        with patch('requests.get', return_value=mock_response):
+        with patch('app.services.price_service.requests.get', return_value=mock_response):
             price = PriceService.get_current_price('AAPL')
             
         assert price == 150.25
@@ -42,7 +46,7 @@ class TestPriceService:
         }
         mock_response.raise_for_status = Mock()
         
-        with patch('requests.get', return_value=mock_response):
+        with patch('app.services.price_service.requests.get', return_value=mock_response):
             price = PriceService.get_current_price('INVALID')
             
         assert price is None
@@ -57,21 +61,21 @@ class TestPriceService:
         }
         mock_response.raise_for_status = Mock()
         
-        with patch('requests.get', return_value=mock_response):
+        with patch('app.services.price_service.requests.get', return_value=mock_response):
             price = PriceService.get_current_price('INVALID')
             
         assert price is None
     
     def test_get_current_price_network_error(self):
         """Test price fetch with network error"""
-        with patch('requests.get', side_effect=requests.exceptions.ConnectionError("Network error")):
+        with patch('app.services.price_service.requests.get', side_effect=requests.exceptions.ConnectionError("Network error")):
             price = PriceService.get_current_price('AAPL')
             
         assert price is None
     
     def test_get_current_price_timeout(self):
         """Test price fetch with timeout"""
-        with patch('requests.get', side_effect=requests.exceptions.Timeout("Timeout")):
+        with patch('app.services.price_service.requests.get', side_effect=requests.exceptions.Timeout("Timeout")):
             price = PriceService.get_current_price('AAPL')
             
         assert price is None
@@ -81,7 +85,7 @@ class TestPriceService:
         mock_response = Mock()
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
         
-        with patch('requests.get', return_value=mock_response):
+        with patch('app.services.price_service.requests.get', return_value=mock_response):
             price = PriceService.get_current_price('INVALID')
             
         assert price is None
@@ -92,7 +96,7 @@ class TestPriceService:
         mock_response.json.side_effect = ValueError("Invalid JSON")
         mock_response.raise_for_status = Mock()
         
-        with patch('requests.get', return_value=mock_response):
+        with patch('app.services.price_service.requests.get', return_value=mock_response):
             price = PriceService.get_current_price('AAPL')
             
         assert price is None
@@ -178,7 +182,7 @@ class TestPriceService:
         }
         mock_response.raise_for_status = Mock()
         
-        with patch('requests.get', return_value=mock_response) as mock_get:
+        with patch('app.services.price_service.requests.get', return_value=mock_response) as mock_get:
             PriceService.get_current_price('AAPL')
             
             # Verify the request was made with correct parameters
