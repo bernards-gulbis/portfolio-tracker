@@ -66,7 +66,7 @@ export interface TransactionUpdate {
   ticker?: string | null;
   quantity?: number | null;
   price_per_share?: number | null;
-  fee?: number;
+  fee?: number | null;
   total_amount?: number;
   eur_amount?: number | null;
   split_ratio?: number | null;

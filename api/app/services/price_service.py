@@ -6,6 +6,7 @@ from typing import Dict, Optional, Tuple
 import requests
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class PriceService:
     # Class-level cache: ticker -> (price, timestamp)
     _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
     _cache_ttl: timedelta = timedelta(minutes=15)
+    _cache_lock = Lock()  # Thread-safe cache access
     
     @staticmethod
     def get_current_prices(tickers: list[str], max_workers: int = 5) -> Dict[str, Optional[float]]:
@@ -65,13 +67,14 @@ class PriceService:
         Returns:
             Current price or None if not found
         """
-        # Check cache first
+        # Check cache first (thread-safe)
         now = datetime.now()
-        if ticker in PriceService._price_cache:
-            cached_price, cached_time = PriceService._price_cache[ticker]
-            if now - cached_time < PriceService._cache_ttl:
-                logger.debug(f"Cache hit for {ticker}: {cached_price}")
-                return cached_price
+        with PriceService._cache_lock:
+            if ticker in PriceService._price_cache:
+                cached_price, cached_time = PriceService._price_cache[ticker]
+                if now - cached_time < PriceService._cache_ttl:
+                    logger.debug(f"Cache hit for {ticker}: {cached_price}")
+                    return cached_price
         
         # Fetch from API
         try:
@@ -100,12 +103,14 @@ class PriceService:
                 
                 if current_price is not None:
                     price = float(current_price)
-                    # Cache the result
-                    PriceService._price_cache[ticker] = (price, now)
+                    # Cache the result (thread-safe)
+                    with PriceService._cache_lock:
+                        PriceService._price_cache[ticker] = (price, now)
                     return price
             
-            # Cache None result to avoid repeated failed requests
-            PriceService._price_cache[ticker] = (None, now)
+            # Cache None result to avoid repeated failed requests (thread-safe)
+            with PriceService._cache_lock:
+                PriceService._price_cache[ticker] = (None, now)
             return None
             
         except requests.exceptions.RequestException as e:

@@ -8,7 +8,15 @@ from app.models import TransactionType
 
 class PortfolioBase(BaseModel):
     """Base portfolio schema"""
-    name: str
+    name: str = Field(min_length=1, max_length=100)
+    
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate portfolio name is not empty or whitespace"""
+        if not v or not v.strip():
+            raise ValueError('Portfolio name cannot be empty or whitespace')
+        return v.strip()
 
 
 class PortfolioCreate(PortfolioBase):

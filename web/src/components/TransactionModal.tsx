@@ -1,6 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
-import { Transaction, TransactionType, getErrorMessage } from '../api';
+import { Transaction, TransactionType, TransactionCreate, TransactionUpdate, getErrorMessage } from '../api';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -73,9 +73,11 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
     setError(null);
 
     try {
-      const data: any = {
+      // Build transaction data dynamically based on type
+      const data: TransactionCreate = {
         date: new Date(date).toISOString(),
         type,
+        total_amount: 0, // Will be set in switch below
       };
 
       // Add fields based on transaction type
