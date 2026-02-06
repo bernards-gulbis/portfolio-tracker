@@ -1,6 +1,6 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useCallback } from 'react';
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
-import { Transaction, TransactionType, TransactionCreate, TransactionUpdate, getErrorMessage } from '../api';
+import { Transaction, TransactionType, TransactionCreate, getErrorMessage } from '../api';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -27,6 +27,24 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
 
+  const resetForm = useCallback(() => {
+    const now = new Date();
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+    
+    setDate(localDateTime);
+    setType(TransactionType.DEPOSIT);
+    setTicker('');
+    setQuantity('');
+    setPricePerShare('');
+    setFee('');
+    setTotalAmount('');
+    setValueEur('');
+    setSplitRatio('');
+    setError(null);
+  }, []);
+
   // Initialize form with transaction data if editing
   useEffect(() => {
     if (transaction) {
@@ -48,40 +66,64 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
     } else {
       resetForm();
     }
-  }, [transaction]);
+  }, [transaction, resetForm]);
 
-  const resetForm = () => {
-    const now = new Date();
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    
-    setDate(localDateTime);
-    setType(TransactionType.DEPOSIT);
-    setTicker('');
-    setQuantity('');
-    setPricePerShare('');
-    setFee('');
-    setTotalAmount('');
-    setValueEur('');
-    setSplitRatio('');
-    setError(null);
+  /**
+   * Validates form inputs based on transaction type
+   * @returns Error message if validation fails, null if valid
+   */
+  const validateInputs = (): string | null => {
+    // Validate quantity is positive for BUY/SELL
+    if ([TransactionType.BUY, TransactionType.SELL].includes(type)) {
+      const qty = parseFloat(quantity || '0');
+      if (qty <= 0) {
+        return 'Quantity must be greater than 0';
+      }
+      const price = parseFloat(pricePerShare || '0');
+      if (price <= 0) {
+        return 'Price per share must be greater than 0';
+      }
+    }
+
+    // Validate split ratio is positive
+    if (type === TransactionType.SPLIT) {
+      const ratio = parseFloat(splitRatio || '0');
+      if (ratio <= 0) {
+        return 'Split ratio must be greater than 0';
+      }
+    }
+
+    // Validate total amount for most types
+    if (type !== TransactionType.SPLIT) {
+      const amount = parseFloat(totalAmount || '0');
+      if (amount <= 0) {
+        return 'Total amount must be greater than 0';
+      }
+    }
+
+    // Validate ticker is provided when required
+    if ([TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND, TransactionType.SPLIT].includes(type)) {
+      if (!ticker || ticker.trim() === '') {
+        return 'Ticker symbol is required';
+      }
+    }
+
+    return null;
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  /**
+   * Builds transaction data object based on transaction type
+   * @param transactionType - Type of transaction
+   * @returns TransactionCreate object with appropriate fields populated
+   */
+  const buildTransactionData = (transactionType: TransactionType): TransactionCreate => {
+    const data: TransactionCreate = {
+      date: new Date(date).toISOString(),
+      type: transactionType,
+      total_amount: 0,
+    };
 
-    try {
-      // Build transaction data dynamically based on type
-      const data: TransactionCreate = {
-        date: new Date(date).toISOString(),
-        type,
-        total_amount: 0, // Will be set in switch below
-      };
-
-      // Add fields based on transaction type
-      switch (type) {
+    switch (transactionType) {
         case TransactionType.DEPOSIT:
           data.total_amount = Math.abs(parseFloat(totalAmount || '0'));
           if (valueEur && valueEur.trim()) data.eur_amount = Math.abs(parseFloat(valueEur));
@@ -124,8 +166,26 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
           break;
 
         default:
-          throw new Error(`Unknown transaction type: ${type}`);
+          throw new Error(`Unknown transaction type: ${transactionType}`);
       }
+
+    return data;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    try {
+      // Validate inputs first
+      const validationError = validateInputs();
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      // Build transaction data
+      const data = buildTransactionData(type);
 
       if (isEdit && transaction) {
         await updateTransaction.mutateAsync({
@@ -231,6 +291,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
                   id="quantity"
                   type="number"
                   step="0.00000001"
+                  min="0.00000001"
                   className="form-control"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
@@ -250,6 +311,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
                   id="price-per-share"
                   type="number"
                   step="0.01"
+                  min="0.01"
                   className="form-control"
                   value={pricePerShare}
                   onChange={(e) => setPricePerShare(e.target.value)}
@@ -286,6 +348,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
                   id="total-amount"
                   type="number"
                   step="0.01"
+                  min="0.01"
                   className="form-control"
                   value={totalAmount}
                   onChange={(e) => setTotalAmount(e.target.value)}
@@ -319,6 +382,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
                   id="split-ratio"
                   type="number"
                   step="0.01"
+                  min="0.01"
                   className="form-control"
                   value={splitRatio}
                   onChange={(e) => setSplitRatio(e.target.value)}
