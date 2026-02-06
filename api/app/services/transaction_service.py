@@ -193,7 +193,7 @@ class TransactionService:
             raise TransactionNotFoundException(transaction_id)
     
     def import_from_csv(self, csv_content: str, portfolio_id: int) -> List[Transaction]:
-        """Import transactions from CSV"""
+        """Import transactions from CSV with transaction atomicity"""
         # Verify portfolio exists
         if not self.portfolio_repo.exists(portfolio_id):
             raise PortfolioNotFoundException(portfolio_id)
@@ -201,8 +201,14 @@ class TransactionService:
         # Parse CSV
         transactions = self._parse_csv(csv_content, portfolio_id)
         
-        # Bulk create transactions
-        return self.transaction_repo.bulk_create(transactions)
+        # Bulk create transactions with atomicity
+        try:
+            return self.transaction_repo.bulk_create(transactions)
+        except Exception as e:
+            # Log the error with context
+            raise InvalidCSVFormatException(
+                f"Failed to import {len(transactions)} transactions: {str(e)}"
+            )
     
     def _validate_transaction_data(
         self,

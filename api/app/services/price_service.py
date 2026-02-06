@@ -2,7 +2,7 @@
 Service for fetching current stock prices
 """
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import requests
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 
 class PriceService:
     """Service for fetching current stock prices from Yahoo Finance"""
+    
+    # Class-level cache: ticker -> (price, timestamp)
+    _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
+    _cache_ttl: timedelta = timedelta(minutes=15)
     
     @staticmethod
     def get_current_prices(tickers: list[str], max_workers: int = 5) -> Dict[str, Optional[float]]:
@@ -53,7 +57,7 @@ class PriceService:
     @staticmethod
     def get_current_price(ticker: str) -> Optional[float]:
         """
-        Fetch current price for a single ticker from Yahoo Finance API
+        Fetch current price for a single ticker from Yahoo Finance API with caching
         
         Args:
             ticker: Ticker symbol
@@ -61,6 +65,15 @@ class PriceService:
         Returns:
             Current price or None if not found
         """
+        # Check cache first
+        now = datetime.now()
+        if ticker in PriceService._price_cache:
+            cached_price, cached_time = PriceService._price_cache[ticker]
+            if now - cached_time < PriceService._cache_ttl:
+                logger.debug(f"Cache hit for {ticker}: {cached_price}")
+                return cached_price
+        
+        # Fetch from API
         try:
             # Use Yahoo Finance v8 API (free, no API key needed)
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
@@ -86,8 +99,13 @@ class PriceService:
                 current_price = meta.get('regularMarketPrice')
                 
                 if current_price is not None:
-                    return float(current_price)
+                    price = float(current_price)
+                    # Cache the result
+                    PriceService._price_cache[ticker] = (price, now)
+                    return price
             
+            # Cache None result to avoid repeated failed requests
+            PriceService._price_cache[ticker] = (None, now)
             return None
             
         except requests.exceptions.RequestException as e:

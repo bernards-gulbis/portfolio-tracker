@@ -20,13 +20,24 @@ class TransactionRepository:
         return transaction
     
     def bulk_create(self, transactions: List[Transaction]) -> List[Transaction]:
-        """Create multiple transactions"""
-        for transaction in transactions:
-            self.session.add(transaction)
-        self.session.commit()
-        for transaction in transactions:
-            self.session.refresh(transaction)
-        return transactions
+        """Create multiple transactions atomically"""
+        try:
+            # Add all transactions to session
+            for transaction in transactions:
+                self.session.add(transaction)
+            
+            # Commit all at once (atomic operation)
+            self.session.commit()
+            
+            # Refresh all transactions to get generated IDs
+            for transaction in transactions:
+                self.session.refresh(transaction)
+            
+            return transactions
+        except Exception:
+            # Rollback on any error to maintain atomicity
+            self.session.rollback()
+            raise
     
     def get_by_id(self, transaction_id: int) -> Optional[Transaction]:
         """Get a transaction by ID"""

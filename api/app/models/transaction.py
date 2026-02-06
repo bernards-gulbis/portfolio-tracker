@@ -17,10 +17,10 @@ class Transaction(SQLModel, table=True):
     type: TransactionType
     ticker: Optional[str] = Field(default=None)
     quantity: Optional[float] = Field(default=None, decimal_places=8)
-    price_per_share: Optional[float] = Field(default=None)
-    fee: Optional[float] = Field(default=None)
-    total_amount: float = Field(default=0.0)
-    eur_amount: Optional[float] = Field(default=None)
+    price_per_share: Optional[float] = Field(default=None, decimal_places=2)
+    fee: Optional[float] = Field(default=None, decimal_places=2)
+    total_amount: float = Field(default=0.0, decimal_places=2)
+    eur_amount: Optional[float] = Field(default=None, decimal_places=2)
     split_ratio: Optional[float] = Field(default=None)
     
     # Relationship

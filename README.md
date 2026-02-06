@@ -111,6 +111,8 @@ The API will be available at `http://localhost:8000`
 
 API documentation is available at `http://localhost:8000/docs`
 
+**Note:** All API endpoints are versioned under `/api/v1` prefix.
+
 ### Frontend Setup
 
 1. Navigate to the web directory:
@@ -155,25 +157,32 @@ npm test -- --watch
 
 ## API Endpoints
 
+**Base URL:** `/api/v1`
+
+### Health Checks
+
+- `GET /` - Basic health check
+- `GET /health` - Comprehensive health check with database connectivity test
+
 ### Portfolios
 
-- `GET /portfolios/` - List all portfolios
-- `GET /portfolios/{id}` - Get portfolio by ID with transactions
-- `POST /portfolios/` - Create new portfolio
-- `PUT /portfolios/{id}` - Update portfolio name
-- `DELETE /portfolios/{id}` - Delete portfolio (cascades to transactions)
-- `POST /portfolios/{id}/copy` - Copy portfolio with all transactions
-- `GET /portfolios/{id}/status` - Get portfolio status (holdings, cash balance, gains/losses)
+- `GET /api/v1/portfolios/` - List all portfolios
+- `GET /api/v1/portfolios/{id}` - Get portfolio by ID with transactions
+- `POST /api/v1/portfolios/` - Create new portfolio
+- `PUT /api/v1/portfolios/{id}` - Update portfolio name
+- `DELETE /api/v1/portfolios/{id}` - Delete portfolio (cascades to transactions)
+- `POST /api/v1/portfolios/{id}/copy` - Copy portfolio with all transactions
+- `GET /api/v1/portfolios/{id}/status` - Get portfolio status (holdings, cash balance, gains/losses)
 
 ### Transactions
 
-- `GET /portfolios/{portfolio_id}/transactions/` - List transactions for a portfolio (paginated)
-- `GET /transactions/{id}` - Get transaction by ID
-- `POST /portfolios/{portfolio_id}/transactions/` - Create new transaction
-- `PUT /transactions/{id}` - Update transaction
-- `DELETE /transactions/{id}` - Delete transaction
-- `POST /portfolios/{portfolio_id}/transactions/upload-csv` - Bulk upload via CSV
-- `GET /portfolios/{portfolio_id}/transactions/export-csv` - Export transactions to CSV
+- `GET /api/v1/portfolios/{portfolio_id}/transactions/` - List transactions for a portfolio (paginated)
+- `GET /api/v1/transactions/{id}` - Get transaction by ID
+- `POST /api/v1/portfolios/{portfolio_id}/transactions/` - Create new transaction
+- `PUT /api/v1/transactions/{id}` - Update transaction
+- `DELETE /api/v1/transactions/{id}` - Delete transaction
+- `POST /api/v1/portfolios/{portfolio_id}/transactions/upload-csv` - Bulk upload via CSV
+- `GET /api/v1/portfolios/{portfolio_id}/transactions/export-csv` - Export transactions to CSV
 
 ### CSV Upload Format
 

@@ -3,6 +3,7 @@ Portfolio Tracker API - Main Application
 """
 import logging
 import sys
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,6 +19,8 @@ from app.core import (
     FileUploadException,
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
+from app.core.database import engine
+from sqlalchemy import text
 
 # Configure logging
 logging.basicConfig(
@@ -47,6 +50,7 @@ app = FastAPI(
     description="API for tracking investment portfolios and transactions",
     version="1.0.0",
     lifespan=lifespan,
+    root_path="/api/v1"
 )
 
 # Configure CORS
@@ -102,5 +106,32 @@ app.include_router(transaction_router)
 
 @app.get("/", tags=["health"])
 def root():
-    """Health check endpoint"""
-    return {"message": "Portfolio Tracker API", "status": "running"}
+    """Basic health check endpoint"""
+    return {"message": "Portfolio Tracker API", "status": "running", "version": "1.0.0"}
+
+
+@app.get("/health", tags=["health"])
+def health_check():
+    """
+    Comprehensive health check endpoint
+    Checks database connectivity
+    """
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0",
+        "database": "unknown"
+    }
+    
+    # Check database connectivity
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        health_status["database"] = "connected"
+    except Exception as e:
+        health_status["status"] = "unhealthy"
+        health_status["database"] = f"error: {str(e)}"
+        logger.error(f"Health check failed - database error: {e}", exc_info=True)
+        return JSONResponse(status_code=503, content=health_status)
+    
+    return health_status

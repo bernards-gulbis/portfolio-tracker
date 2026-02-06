@@ -9,6 +9,7 @@ import {
   TransactionCreate,
   TransactionUpdate,
 } from '../api';
+import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 
 /**
  * Hook to fetch a portfolio with transactions
@@ -27,7 +28,7 @@ export const usePortfolio = (portfolioId: number | null) => {
 export const useTransactions = (
   portfolioId: number | null,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = DEFAULT_PAGE_SIZE
 ) => {
   return useQuery({
     queryKey: ['transactions', portfolioId, page, pageSize],
@@ -63,11 +64,10 @@ export const useUpdateTransaction = () => {
     mutationFn: ({
       transactionId,
       data,
-      portfolioId,
     }: {
       transactionId: number;
       data: TransactionUpdate;
-      portfolioId: number;
+      portfolioId: number; // Used in onSuccess callback
     }) => updateTransaction(transactionId, data),
     onSuccess: (_, variables) => {
       // Invalidate all paginated transaction queries for this portfolio
@@ -88,7 +88,7 @@ export const useDeleteTransaction = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ transactionId, portfolioId }: { transactionId: number; portfolioId: number }) =>
+    mutationFn: ({ transactionId }: { transactionId: number; portfolioId: number }) => // portfolioId used in onSuccess
       deleteTransaction(transactionId),
     onSuccess: (_, variables) => {
       // Invalidate all paginated transaction queries for this portfolio
