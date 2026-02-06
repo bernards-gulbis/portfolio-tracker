@@ -4,12 +4,16 @@ A full-stack portfolio tracking application built with FastAPI and React. Track 
 
 ## Features
 
-- **Portfolio Management**: Create, view, and delete multiple investment portfolios
-- **Transaction Tracking**: Record buy/sell transactions with symbol, quantity, price, and type
-- **CSV Import**: Bulk upload transactions via CSV file
+- **Portfolio Management**: Create, view, update, delete, and copy multiple investment portfolios
+- **Multi-Type Transactions**: Support for Deposits, Withdrawals, Buy/Sell stocks, Dividends, Fees, and Stock Splits
+- **CSV Import/Export**: Bulk upload and download transactions via CSV format
+- **Portfolio Status**: Real-time portfolio valuation with current holdings, cash balance, and realized/unrealized gains
+- **Multi-Currency Support**: Track EUR amounts alongside primary currency
+- **Transaction History**: Paginated view with filtering and search capabilities
 - **Real-time Updates**: Automatic UI updates using TanStack Query
 - **Responsive Design**: Mobile-friendly interface with modern UI
 - **Data Validation**: Comprehensive input validation on both frontend and backend
+- **Signed Value Display**: Color-coded positive/negative amounts for easy tracking
 
 ## Tech Stack
 
@@ -144,50 +148,79 @@ npm test -- --watch
 ### Portfolios
 
 - `GET /portfolios/` - List all portfolios
-- `GET /portfolios/{id}` - Get portfolio by ID
+- `GET /portfolios/{id}` - Get portfolio by ID with transactions
 - `POST /portfolios/` - Create new portfolio
-- `PUT /portfolios/{id}` - Update portfolio
+- `PUT /portfolios/{id}` - Update portfolio name
 - `DELETE /portfolios/{id}` - Delete portfolio (cascades to transactions)
+- `POST /portfolios/{id}/copy` - Copy portfolio with all transactions
+- `GET /portfolios/{id}/status` - Get portfolio status (holdings, cash balance, gains/losses)
 
 ### Transactions
 
-- `GET /portfolios/{portfolio_id}/transactions/` - List transactions for a portfolio
+- `GET /portfolios/{portfolio_id}/transactions/` - List transactions for a portfolio (paginated)
 - `GET /transactions/{id}` - Get transaction by ID
-- `POST /transactions/` - Create new transaction
+- `POST /portfolios/{portfolio_id}/transactions/` - Create new transaction
 - `PUT /transactions/{id}` - Update transaction
 - `DELETE /transactions/{id}` - Delete transaction
 - `POST /portfolios/{portfolio_id}/transactions/upload-csv` - Bulk upload via CSV
+- `GET /portfolios/{portfolio_id}/transactions/export-csv` - Export transactions to CSV
 
 ### CSV Upload Format
 
+The CSV file must include the following headers:
+
 ```csv
-symbol,quantity,price,type,date
-AAPL,100,150.50,buy,2024-01-15
-MSFT,50,380.25,sell,2024-01-20
+date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
+01/15/2024 10:00:00,Deposit,,,,,5000.00,4600.00,
+01/16/2024 14:30:00,Buy,AAPL,10,150.00,1.00,-1501.00,,
+01/17/2024 09:00:00,Sell,MSFT,5,380.25,0.50,1900.75,,
+01/18/2024 11:00:00,Dividend,AAPL,,,0.00,50.00,,
+01/19/2024 16:00:00,Withdraw,,,,,,-1000.00,-920.00,
+01/20/2024 10:00:00,Fee,,,,,,-10.00,,
+02/01/2024 09:30:00,Split,AAPL,,,,,0.00,,2.0
 ```
 
-Supported formats:
-- Price can include commas (e.g., 1,500.00)
-- Type: `buy` or `sell`
-- Date: YYYY-MM-DD format
+**Field Descriptions:**
+- `date`: Transaction date and time (MM/DD/YYYY HH:MM:SS format)
+- `type`: Transaction type - `Deposit`, `Buy`, `Sell`, `Withdraw`, `Dividend`, `Fee`, or `Split`
+- `ticker`: Stock symbol (required for Buy, Sell, Dividend, Split)
+- `quantity`: Number of shares (required for Buy, Sell)
+- `price_per_share`: Price per share (required for Buy, Sell)
+- `fee`: Transaction fee (optional, defaults to 0)
+- `total_amount`: Total transaction amount with sign:
+  - **Negative** for: Buy, Withdraw, Fee (money leaving account)
+  - **Positive** for: Deposit, Sell, Dividend (money entering account)
+  - Zero for: Split (no cash impact)
+- `EUR`: EUR equivalent amount (optional, follows same sign convention as total_amount)
+- `split_ratio`: Stock split ratio (required for Split transactions, e.g., 2.0 for 2-for-1 split)
+
+**Notes:**
+- Leave fields blank (empty) if not applicable for that transaction type
+- Fees are always stored as positive values
+- Total amounts use signed values to indicate cash flow direction
+- Date format must match: MM/DD/YYYY HH:MM:SS
 
 ## Database Schema
 
 ### Portfolio
-- `id`: Primary key
-- `name`: Portfolio name
-- `description`: Optional description
+- `id`: Primary key (auto-increment)
+- `name`: Portfolio name (required)
 - `created_at`: Timestamp
 
 ### Transaction
-- `id`: Primary key
+- `id`: Primary key (auto-increment)
 - `portfolio_id`: Foreign key to Portfolio (CASCADE delete)
-- `symbol`: Stock symbol
-- `quantity`: Number of shares
-- `price`: Price per share
-- `type`: "buy" or "sell"
-- `date`: Transaction date
-- `created_at`: Timestamp
+- `date`: Transaction date and time (required)
+- `type`: Transaction type - Deposit, Buy, Sell, Withdraw, Dividend, Fee, or Split (required)
+- `ticker`: Stock symbol (optional, required for Buy/Sell/Dividend/Split)
+- `quantity`: Number of shares (optional, required for Buy/Sell)
+- `price_per_share`: Price per share (optional, required for Buy/Sell)
+- `fee`: Transaction fee (optional, defaults to None)
+- `total_amount`: Total transaction amount with sign (required, defaults to 0)
+  - Negative for costs (Buy, Withdraw, Fee)
+  - Positive for income (Deposit, Sell, Dividend)
+- `eur_amount`: EUR equivalent amount (optional, follows same sign convention)
+- `split_ratio`: Stock split ratio (optional, required for Split transactions)
 
 ## Development
 

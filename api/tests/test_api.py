@@ -191,7 +191,7 @@ def test_create_transaction_with_all_fields(client: TestClient):
             "quantity": 15.00000001,
             "price_per_share": 183.69,
             "fee": 0.0,
-            "total_amount": 2755.35,
+            "total_amount": -2755.35,
             "eur_amount": None,
             "split_ratio": None
         }
@@ -202,7 +202,7 @@ def test_create_transaction_with_all_fields(client: TestClient):
     assert data["ticker"] == "MSFT"
     assert data["quantity"] == 15.00000001
     assert data["price_per_share"] == 183.69
-    assert data["total_amount"] == 2755.35
+    assert data["total_amount"] == -2755.35
 
 
 def test_list_transactions(client: TestClient):
@@ -232,7 +232,7 @@ def test_list_transactions(client: TestClient):
             "ticker": "MSFT",
             "quantity": 15.0,
             "price_per_share": 183.69,
-            "total_amount": 2755.35,
+            "total_amount": -2755.35,
             "fee": 0.0
         }
     )
@@ -340,8 +340,8 @@ def test_export_transactions_csv(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10,
             "price_per_share": 150.00,
-            "total_amount": 1500.00,
-            "eur_amount": 1400.00,
+            "total_amount": -1500.00,
+            "eur_amount": -1400.00,
             "fee": 2.50
         }
     )
@@ -404,8 +404,8 @@ def test_export_and_reimport_csv(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10,
             "price_per_share": 150.00,
-            "total_amount": 1500.00,
-            "eur_amount": 1400.00,
+            "total_amount": -1500.00,
+            "eur_amount": -1400.00,
             "fee": 2.50
         }
     )
@@ -499,7 +499,7 @@ def test_delete_portfolio_cascades_transactions(client: TestClient):
             "ticker": "MSFT",
             "quantity": 15.0,
             "price_per_share": 183.69,
-            "total_amount": 2755.35,
+            "total_amount": -2755.35,
             "fee": 0.0
         }
     )
@@ -558,7 +558,7 @@ def test_csv_upload(client: TestClient):
     assert transaction2["ticker"] == "MSFT"
     assert transaction2["quantity"] == 15.00000001
     assert transaction2["price_per_share"] == 183.69
-    assert transaction2["total_amount"] == 2755.35
+    assert transaction2["total_amount"] == -2755.35
 
 
 def test_csv_upload_invalid_file_type(client: TestClient):
@@ -608,12 +608,12 @@ def test_csv_with_complex_transactions(client: TestClient):
     # Create CSV with multiple transaction types (M/D/YYYY format required)
     csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
 1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,
-1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,1580.00,,
+1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,-1580.00,,
 2/20/2020 14:00:00,Dividend,AAPL,,,0.00,50.00,46.00,
 3/10/2020 09:00:00,Split,AAPL,,,,0.00,,2.0
 4/15/2020 16:00:00,Sell,AAPL,5.0,200.00,5.00,995.00,,
-5/20/2020 10:00:00,Fee,,,,,10.00,9.20,
-6/30/2020 17:00:00,Withdraw,,,,,1000.00,920.00,
+5/20/2020 10:00:00,Fee,,,,,-10.00,-9.20,
+6/30/2020 17:00:00,Withdraw,,,,,-1000.00,-920.00,
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
@@ -665,8 +665,8 @@ def test_copy_portfolio_with_transactions(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10,
             "price_per_share": 150.00,
-            "total_amount": 1500.00,
-            "eur_amount": 1500.00
+            "total_amount": -1500.00,
+            "eur_amount": -1500.00
         }
     )
     
@@ -814,7 +814,7 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 150.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 1.0
         }
     )
@@ -828,7 +828,7 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
             "ticker": "MSFT",
             "quantity": 5.0,
             "price_per_share": 300.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 1.0
         }
     )
@@ -885,7 +885,7 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
             "ticker": "AAPL",
             "quantity": 20.0,
             "price_per_share": 100.0,
-            "total_amount": 2000.0,
+            "total_amount": -2000.0,
             "fee": 1.0
         }
     )
@@ -952,7 +952,7 @@ def test_portfolio_status_with_dividends(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 150.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 1.0
         }
     )
@@ -1018,7 +1018,7 @@ def test_portfolio_status_with_stock_split(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 400.0,
-            "total_amount": 4000.0,
+            "total_amount": -4000.0,
             "fee": 1.0
         }
     )
@@ -1076,7 +1076,7 @@ def test_portfolio_status_with_withdrawal(client: TestClient):
         json={
             "date": "2024-02-01T10:00:00",
             "type": "Withdraw",
-            "total_amount": 2000.0,
+            "total_amount": -2000.0,
             "fee": 0.0
         }
     )
@@ -1217,7 +1217,7 @@ def test_portfolio_status_floating_point_precision(client: TestClient):
             "ticker": "GOOGL",
             "quantity": 3.3,
             "price_per_share": 150.0,
-            "total_amount": 495.0,
+            "total_amount": -495.0,
             "fee": 0.0
         }
     )
@@ -1231,7 +1231,7 @@ def test_portfolio_status_floating_point_precision(client: TestClient):
             "ticker": "GOOGL",
             "quantity": 3.4,
             "price_per_share": 150.0,
-            "total_amount": 510.0,
+            "total_amount": -510.0,
             "fee": 0.0
         }
     )
@@ -1285,7 +1285,7 @@ def test_portfolio_status_invalid_split_ratio(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 150.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 1.0
         }
     )
@@ -1338,7 +1338,7 @@ def test_portfolio_status_with_current_prices(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 150.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 1.0
         }
     )
@@ -1352,7 +1352,7 @@ def test_portfolio_status_with_current_prices(client: TestClient):
             "ticker": "MSFT",
             "quantity": 5.0,
             "price_per_share": 300.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 1.0
         }
     )
@@ -1426,7 +1426,7 @@ def test_portfolio_status_with_missing_prices(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 150.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 0.0
         }
     )
@@ -1439,7 +1439,7 @@ def test_portfolio_status_with_missing_prices(client: TestClient):
             "ticker": "UNKNOWN",
             "quantity": 5.0,
             "price_per_share": 100.0,
-            "total_amount": 500.0,
+            "total_amount": -500.0,
             "fee": 0.0
         }
     )
@@ -1500,12 +1500,10 @@ def test_portfolio_status_with_zero_price(client: TestClient):
             "ticker": "PENNY",
             "quantity": 1000.0,
             "price_per_share": 0.50,
-            "total_amount": 500.0,
+            "total_amount": -500.0,
             "fee": 0.0
         }
     )
-    
-    # Mock price as zero
     mock_prices = {'PENNY': 0.0}
     
     with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
@@ -1547,7 +1545,7 @@ def test_portfolio_status_price_service_exception(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 150.0,
-            "total_amount": 1500.0,
+            "total_amount": -1500.0,
             "fee": 0.0
         }
     )
@@ -1597,7 +1595,7 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
             "ticker": "WINNER",
             "quantity": 100.0,
             "price_per_share": 50.0,
-            "total_amount": 5000.0,
+            "total_amount": -5000.0,
             "fee": 0.0
         }
     )
@@ -1611,7 +1609,7 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
             "ticker": "LOSER",
             "quantity": 50.0,
             "price_per_share": 100.0,
-            "total_amount": 5000.0,
+            "total_amount": -5000.0,
             "fee": 0.0
         }
     )
@@ -1625,7 +1623,7 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
             "ticker": "FLAT",
             "quantity": 200.0,
             "price_per_share": 25.0,
-            "total_amount": 5000.0,
+            "total_amount": -5000.0,
             "fee": 0.0
         }
     )

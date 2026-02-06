@@ -113,31 +113,31 @@ class PortfolioService:
         # Process each transaction
         for transaction in transactions:
             tx_type = transaction.type
-            total_amount = transaction.total_amount  # Stored as positive, apply sign as needed
-            fee = transaction.fee  # Stored as positive
+            total_amount = transaction.total_amount  # Now stored with correct sign
+            fee = transaction.fee  # Stored as positive (when present)
             
             if tx_type == TransactionType.DEPOSIT:
-                # Deposit adds cash and increases invested amount
+                # Deposit adds cash and increases invested amount (stored as positive)
                 cash_balance += total_amount
                 total_invested += total_amount
                 if transaction.eur_amount is not None:
                     total_eur_amount += transaction.eur_amount
                 
             elif tx_type == TransactionType.WITHDRAW:
-                # Withdraw removes cash and decreases invested amount (value stored as positive)
-                cash_balance -= total_amount
-                total_invested -= total_amount
+                # Withdraw removes cash and decreases invested amount (stored as negative)
+                cash_balance += total_amount  # total_amount is negative, so this subtracts
+                total_invested += total_amount  # total_amount is negative, so this subtracts
                 if transaction.eur_amount is not None:
-                    total_eur_amount -= transaction.eur_amount
+                    total_eur_amount += transaction.eur_amount  # eur_amount is negative for withdraws
                 
             elif tx_type == TransactionType.BUY:
-                # Buy decreases cash and adds to holdings (value stored as positive)
-                cash_balance -= total_amount
+                # Buy decreases cash and adds to holdings (stored as negative)
+                cash_balance += total_amount  # total_amount is negative, so this subtracts
                 
                 ticker = transaction.ticker
                 quantity = transaction.quantity or 0
                 price_per_share = transaction.price_per_share or 0
-                cost = total_amount  # Cost basis for these quantity
+                cost = abs(total_amount)  # Cost basis is positive
                 
                 if ticker:
                     if ticker not in holdings:
@@ -146,7 +146,7 @@ class PortfolioService:
                     holdings[ticker]['total_cost'] += cost
                     
             elif tx_type == TransactionType.SELL:
-                # Sell increases cash, removes from holdings, and calculates gain (value stored as positive, includes fees)
+                # Sell increases cash, removes from holdings, and calculates gain (stored as positive)
                 cash_balance += total_amount
                 
                 ticker = transaction.ticker
@@ -170,7 +170,7 @@ class PortfolioService:
                     # Cost basis of quantity being sold
                     cost_basis = avg_cost_per_unit * quantity
                     
-                    # Realized gain = sale proceeds - cost basis (fees already included in value)
+                    # Realized gain = sale proceeds - cost basis (fees already included in total_amount)
                     realized_gains += (total_amount - cost_basis)
                     
                     # Update holdings
@@ -182,13 +182,13 @@ class PortfolioService:
                         del holdings[ticker]
                         
             elif tx_type == TransactionType.DIVIDEND:
-                # Dividend adds cash and tracks dividend income (value stored as positive)
+                # Dividend adds cash and tracks dividend income (stored as positive)
                 cash_balance += total_amount
                 dividends_received += total_amount
                 
             elif tx_type == TransactionType.FEE:
-                # Fee reduces cash (value stored as positive, apply negative)
-                cash_balance -= total_amount
+                # Fee reduces cash (stored as negative)
+                cash_balance += total_amount  # total_amount is negative, so this subtracts
                 
             elif tx_type == TransactionType.SPLIT:
                 # Split adjusts the number of quantity

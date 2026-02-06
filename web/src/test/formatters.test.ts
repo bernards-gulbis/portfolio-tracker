@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatDate, getTransactionColor, getDisplayValue } from '../utils/formatters';
+import { formatCurrency, formatDate, getValueColor, getDisplayValue } from '../utils/formatters';
 import { Transaction, TransactionType } from '../api';
 
 describe('Formatters', () => {
@@ -25,56 +25,25 @@ describe('Formatters', () => {
     });
   });
 
-  describe('getTransactionColor', () => {
-    it('returns positive for deposit', () => {
-      const transaction: Transaction = {
-        id: 1,
-        portfolio_id: 1,
-        date: '2020-12-02T20:14:40',
-        type: TransactionType.DEPOSIT,
-        ticker: null,
-        quantity: null,
-        price_per_share: null,
-        fee: 0,
-        total_amount: 3000,
-        eur_amount: null,
-        split_ratio: null,
-      };
-      expect(getTransactionColor(transaction)).toBe('positive');
+  describe('getValueColor', () => {
+    it('returns positive for positive value', () => {
+      expect(getValueColor(3000)).toBe('positive');
     });
 
-    it('returns negative for buy', () => {
-      const transaction: Transaction = {
-        id: 2,
-        portfolio_id: 1,
-        date: '2020-12-02T20:16:10',
-        type: TransactionType.BUY,
-        ticker: 'MSFT',
-        quantity: 15,
-        price_per_share: 183.69,
-        fee: 0,
-        total_amount: 2755.35,  // Now stored as positive
-        eur_amount: null,
-        split_ratio: null,
-      };
-      expect(getTransactionColor(transaction)).toBe('negative');
+    it('returns negative for negative value', () => {
+      expect(getValueColor(-2755.35)).toBe('negative');
     });
 
-    it('returns neutral for split', () => {
-      const transaction: Transaction = {
-        id: 3,
-        portfolio_id: 1,
-        date: '2021-03-10T09:00:00',
-        type: TransactionType.SPLIT,
-        ticker: 'AAPL',
-        quantity: null,
-        price_per_share: null,
-        fee: 0,
-        total_amount: 0,
-        eur_amount: null,
-        split_ratio: 2.0,
-      };
-      expect(getTransactionColor(transaction)).toBe('neutral');
+    it('returns neutral for zero', () => {
+      expect(getValueColor(0)).toBe('neutral');
+    });
+
+    it('returns neutral for null', () => {
+      expect(getValueColor(null)).toBe('neutral');
+    });
+
+    it('returns neutral for undefined', () => {
+      expect(getValueColor(undefined)).toBe('neutral');
     });
   });
 
@@ -89,7 +58,7 @@ describe('Formatters', () => {
         quantity: null,
         price_per_share: null,
         fee: 0,
-        total_amount: 3000,
+        total_amount: 3000,  // Stored as positive
         eur_amount: null,
         split_ratio: null,
       };
@@ -106,7 +75,7 @@ describe('Formatters', () => {
         quantity: 15,
         price_per_share: 183.69,
         fee: 0,
-        total_amount: 2755.35,
+        total_amount: -2755.35,  // Now stored as negative
         eur_amount: null,
         split_ratio: null,
       };
@@ -123,7 +92,7 @@ describe('Formatters', () => {
         quantity: null,
         price_per_share: null,
         fee: 0,
-        total_amount: 500,  // Stored as positive
+        total_amount: -500,  // Now stored as negative
         eur_amount: null,
         split_ratio: null,
       };
@@ -140,7 +109,7 @@ describe('Formatters', () => {
         quantity: null,
         price_per_share: null,
         fee: 0,
-        total_amount: 10,  // Stored as positive
+        total_amount: -10,  // Now stored as negative
         eur_amount: null,
         split_ratio: null,
       };

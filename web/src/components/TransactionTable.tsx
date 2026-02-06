@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Transaction } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate, getTransactionColor, formatTransactionType, getDisplayValue } from '../utils/formatters';
+import { formatCurrency, formatDate, getValueColor, formatTransactionType, getDisplayValue } from '../utils/formatters';
 import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
 
 interface TransactionTableProps {
@@ -141,10 +141,10 @@ const TransactionTable = ({
                 <td className="text-right">
                   {transaction.fee !== null && transaction.fee !== undefined ? formatCurrency(transaction.fee) : '-'}
                 </td>
-                <td className={`text-right value-${getTransactionColor(transaction)}`}>
+                <td className={`text-right value-${getValueColor(transaction.total_amount)}`}>
                   {formatCurrency(getDisplayValue(transaction))}
                 </td>
-                <td className="text-right">
+                <td className={`text-right value-${getValueColor(transaction.eur_amount)}`}>
                   {transaction.eur_amount !== null && transaction.eur_amount !== undefined ? formatCurrency(transaction.eur_amount, 'EUR') : '-'}
                 </td>
                 <td className="text-right">

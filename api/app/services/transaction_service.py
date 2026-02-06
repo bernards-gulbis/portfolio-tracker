@@ -222,13 +222,9 @@ class TransactionService:
         if price_per_share is not None and price_per_share <= 0:
             raise InvalidTransactionDataException("Price must be greater than 0")
         
-        # Validate fee is positive (stored as positive, displayed as negative)
+        # Validate fee is positive
         if fee is not None and fee < 0:
-            raise InvalidTransactionDataException("Fee must be positive (stored as positive, displayed as negative)")
-        
-        # Validate value is positive (stored as positive, signed on display)
-        if total_amount < 0:
-            raise InvalidTransactionDataException("Value must be positive (stored as positive, signed on display)")
+            raise InvalidTransactionDataException("Fee must be positive")
         
         # Transaction type-specific validation
         if transaction_type in (TransactionType.BUY, TransactionType.SELL):
@@ -247,10 +243,16 @@ class TransactionService:
                 )
             
             # Validate value consistency (allowing 1% margin for rounding)
-            expected_value = quantity * price_per_share + (fee or 0)
-            if abs(total_amount - expected_value) > expected_value * 0.01:
+            if transaction_type == TransactionType.BUY:
+                # For BUY: total_amount should be negative (cost)
+                expected_value = -(quantity * price_per_share + (fee or 0))
+            else:  # SELL
+                # For SELL: total_amount should be positive (proceeds)
+                expected_value = quantity * price_per_share - (fee or 0)
+            
+            if abs(total_amount - expected_value) > abs(expected_value) * 0.01:
                 raise InvalidTransactionDataException(
-                    f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share + fee, got {total_amount}"
+                    f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share {'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {total_amount}"
                 )
         
         elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):

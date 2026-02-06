@@ -42,8 +42,8 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       setQuantity(transaction.quantity?.toString() || '');
       setPricePerShare(transaction.price_per_share?.toString() || '');
       setFee(transaction.fee?.toString() || '');
-      setTotalAmount(transaction.total_amount.toString());
-      setValueEur(transaction.eur_amount?.toString() || '');
+      setTotalAmount(Math.abs(transaction.total_amount).toString());
+      setValueEur(transaction.eur_amount ? Math.abs(transaction.eur_amount).toString() : '');
       setSplitRatio(transaction.split_ratio?.toString() || '');
     } else {
       resetForm();
@@ -79,19 +79,29 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       };
 
       // Add fields based on transaction type
-      // Note: All values are stored as positive in the database
       switch (type) {
         case TransactionType.DEPOSIT:
-        case TransactionType.WITHDRAW:
           data.total_amount = Math.abs(parseFloat(totalAmount));
           if (valueEur) data.eur_amount = Math.abs(parseFloat(valueEur));
           break;
 
+        case TransactionType.WITHDRAW:
+          data.total_amount = -Math.abs(parseFloat(totalAmount));
+          if (valueEur) data.eur_amount = -Math.abs(parseFloat(valueEur));
+          break;
+
         case TransactionType.FEE:
-          data.total_amount = Math.abs(parseFloat(totalAmount));
+          data.total_amount = -Math.abs(parseFloat(totalAmount));
           break;
 
         case TransactionType.BUY:
+          data.ticker = ticker;
+          data.quantity = parseFloat(quantity);
+          data.price_per_share = parseFloat(pricePerShare);
+          data.fee = Math.abs(parseFloat(fee || '0'));
+          data.total_amount = -Math.abs(parseFloat(totalAmount));
+          break;
+
         case TransactionType.SELL:
           data.ticker = ticker;
           data.quantity = parseFloat(quantity);
