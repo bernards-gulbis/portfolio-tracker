@@ -112,7 +112,6 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
 
         case TransactionType.DIVIDEND:
           data.ticker = ticker;
-          data.fee = Math.abs(parseFloat(fee || '0'));
           data.total_amount = Math.abs(parseFloat(totalAmount));
           break;
 
@@ -153,7 +152,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
   const showTicker = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND, TransactionType.SPLIT].includes(type);
   const showQuantity = [TransactionType.BUY, TransactionType.SELL].includes(type);
   const showPricePerShare = [TransactionType.BUY, TransactionType.SELL].includes(type);
-  const showFee = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND].includes(type);
+  const showFee = [TransactionType.BUY, TransactionType.SELL].includes(type);
   const showTotalAmount = type !== TransactionType.SPLIT;
   const showValueEur = [TransactionType.DEPOSIT, TransactionType.WITHDRAW].includes(type);
   const showSplitRatio = type === TransactionType.SPLIT;
