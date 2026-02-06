@@ -2,6 +2,7 @@
 Portfolio service for business logic
 """
 import math
+import logging
 from typing import List, Dict
 from sqlmodel import Session
 from app.models import Portfolio, TransactionType
@@ -16,6 +17,8 @@ from app.services.price_service import PriceService
 
 # Precision threshold for holdings quantity (8 decimal places)
 HOLDINGS_EPSILON = 1e-8
+
+logger = logging.getLogger(__name__)
 
 
 class PortfolioService:
@@ -202,6 +205,9 @@ class PortfolioService:
                 if ticker and ticker in holdings:
                     holdings[ticker]['quantity'] *= split_ratio
                     # Cost basis remains the same (value doesn't change, just distribution)
+            
+            else:
+                raise ValueError(f"Unknown transaction type: {tx_type}")
         
         # Convert holdings dict to list of HoldingResponse
         holdings_list = []
@@ -213,7 +219,7 @@ class PortfolioService:
             current_prices = PriceService.get_current_prices(tickers) if tickers else {}
         except Exception as e:
             # If price service fails, continue without prices
-            print(f"Error fetching prices: {e}")
+            logger.error(f"Error fetching prices for portfolio {portfolio_id}: {e}", exc_info=True)
             current_prices = {ticker: None for ticker in tickers}
         
         # Calculate holdings with current prices and unrealized gains

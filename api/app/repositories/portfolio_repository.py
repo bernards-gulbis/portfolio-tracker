@@ -43,12 +43,7 @@ class PortfolioRepository:
         """Delete a portfolio and all its transactions"""
         portfolio = self.get_by_id(portfolio_id)
         if portfolio:
-            # Delete all associated transactions first
-            statement = select(Transaction).where(Transaction.portfolio_id == portfolio_id)
-            transactions = self.session.exec(statement).all()
-            for transaction in transactions:
-                self.session.delete(transaction)
-            
+            # Cascade delete will handle associated transactions
             self.session.delete(portfolio)
             self.session.commit()
             return True

@@ -1,10 +1,13 @@
 """
 Service for fetching current stock prices
 """
+import logging
 from typing import Dict, Optional
 import requests
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logger = logging.getLogger(__name__)
 
 
 class PriceService:
@@ -42,7 +45,7 @@ class PriceService:
                     price = future.result()
                     prices[ticker] = price
                 except Exception as e:
-                    print(f"Error fetching price for {ticker}: {e}")
+                    logger.error(f"Error fetching price for {ticker}: {e}", exc_info=True)
                     prices[ticker] = None
         
         return prices
@@ -88,11 +91,11 @@ class PriceService:
             return None
             
         except requests.exceptions.RequestException as e:
-            print(f"Network error fetching price for {ticker}: {e}")
+            logger.warning(f"Network error fetching price for {ticker}: {e}")
             return None
         except (KeyError, ValueError, IndexError) as e:
-            print(f"Error parsing price data for {ticker}: {e}")
+            logger.warning(f"Error parsing price data for {ticker}: {e}")
             return None
         except Exception as e:
-            print(f"Unexpected error fetching price for {ticker}: {e}")
+            logger.error(f"Unexpected error fetching price for {ticker}: {e}", exc_info=True)
             return None

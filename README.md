@@ -92,7 +92,17 @@ source venv/bin/activate
 pip install fastapi uvicorn sqlmodel pytest httpx
 ```
 
-4. Run the development server:
+4. (Optional) Configure environment variables:
+```bash
+cp .env.example .env
+# Edit .env to customize settings
+```
+
+Available environment variables:
+- `DATABASE_ECHO`: Set to `true` to enable SQL query logging (default: `false`)
+  - ⚠️ **Warning**: Do not enable in production as it logs all SQL queries
+
+5. Run the development server:
 ```bash
 uvicorn main:app --reload
 ```

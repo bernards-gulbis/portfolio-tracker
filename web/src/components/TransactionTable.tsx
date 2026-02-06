@@ -38,8 +38,8 @@ const TransactionTable = ({
           onPageChange(currentPage - 1);
         }
       } catch (error) {
-        console.error('Error deleting transaction:', error);
-        alert('Failed to delete transaction. Please try again.');
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        alert(`Failed to delete transaction: ${errorMsg}`);
       } finally {
         setDeletingId(null);
       }

@@ -1,6 +1,8 @@
 """
 Portfolio Tracker API - Main Application
 """
+import logging
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,14 +19,27 @@ from app.core import (
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
     # Startup
+    logger.info("Starting Portfolio Tracker API...")
     create_db_and_tables()
+    logger.info("Database initialized successfully")
     yield
     # Shutdown (cleanup if needed)
+    logger.info("Shutting down Portfolio Tracker API...")
 
 
 app = FastAPI(

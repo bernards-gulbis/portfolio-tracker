@@ -81,45 +81,48 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       // Add fields based on transaction type
       switch (type) {
         case TransactionType.DEPOSIT:
-          data.total_amount = Math.abs(parseFloat(totalAmount));
-          if (valueEur) data.eur_amount = Math.abs(parseFloat(valueEur));
+          data.total_amount = Math.abs(parseFloat(totalAmount || '0'));
+          if (valueEur && valueEur.trim()) data.eur_amount = Math.abs(parseFloat(valueEur));
           break;
 
         case TransactionType.WITHDRAW:
-          data.total_amount = -Math.abs(parseFloat(totalAmount));
-          if (valueEur) data.eur_amount = -Math.abs(parseFloat(valueEur));
+          data.total_amount = -Math.abs(parseFloat(totalAmount || '0'));
+          if (valueEur && valueEur.trim()) data.eur_amount = -Math.abs(parseFloat(valueEur));
           break;
 
         case TransactionType.FEE:
-          data.total_amount = -Math.abs(parseFloat(totalAmount));
+          data.total_amount = -Math.abs(parseFloat(totalAmount || '0'));
           break;
 
         case TransactionType.BUY:
           data.ticker = ticker;
-          data.quantity = parseFloat(quantity);
-          data.price_per_share = parseFloat(pricePerShare);
+          data.quantity = parseFloat(quantity || '0');
+          data.price_per_share = parseFloat(pricePerShare || '0');
           data.fee = Math.abs(parseFloat(fee || '0'));
-          data.total_amount = -Math.abs(parseFloat(totalAmount));
+          data.total_amount = -Math.abs(parseFloat(totalAmount || '0'));
           break;
 
         case TransactionType.SELL:
           data.ticker = ticker;
-          data.quantity = parseFloat(quantity);
-          data.price_per_share = parseFloat(pricePerShare);
+          data.quantity = parseFloat(quantity || '0');
+          data.price_per_share = parseFloat(pricePerShare || '0');
           data.fee = Math.abs(parseFloat(fee || '0'));
-          data.total_amount = Math.abs(parseFloat(totalAmount));
+          data.total_amount = Math.abs(parseFloat(totalAmount || '0'));
           break;
 
         case TransactionType.DIVIDEND:
           data.ticker = ticker;
-          data.total_amount = Math.abs(parseFloat(totalAmount));
+          data.total_amount = Math.abs(parseFloat(totalAmount || '0'));
           break;
 
         case TransactionType.SPLIT:
           data.ticker = ticker;
-          data.split_ratio = parseFloat(splitRatio);
+          data.split_ratio = parseFloat(splitRatio || '1');
           data.total_amount = 0; // Split doesn't affect total amount
           break;
+
+        default:
+          throw new Error(`Unknown transaction type: ${type}`);
       }
 
       if (isEdit && transaction) {

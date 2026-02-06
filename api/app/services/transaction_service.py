@@ -334,13 +334,25 @@ class TransactionService:
         if total_amount is None:
             raise ValueError(f"Invalid value: {total_amount_str}")
         
-        # Convert to positive (values stored as positive, signed on display)
-        total_amount = abs(total_amount)
+        # Validate sign matches transaction type
+        # BUY, WITHDRAW, FEE should be negative; DEPOSIT, SELL, DIVIDEND should be positive; SPLIT should be 0
+        if transaction_type in [TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE]:
+            if total_amount > 0:
+                raise ValueError(f"{transaction_type.value} transactions must have negative total_amount in CSV, got {total_amount}")
+        elif transaction_type in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]:
+            if total_amount < 0:
+                raise ValueError(f"{transaction_type.value} transactions must have positive total_amount in CSV, got {total_amount}")
+        elif transaction_type == TransactionType.SPLIT:
+            if total_amount != 0:
+                raise ValueError(f"SPLIT transactions must have total_amount of 0 in CSV, got {total_amount}")
         
         # Parse optional EUR value field
         eur_amount = self._clean_csv_number(row.get("EUR", ""), "EUR")
         if eur_amount is not None:
-            eur_amount = abs(eur_amount)  # Also store EUR as positive
+            # Validate EUR amount sign matches total_amount sign (except for SPLIT)
+            if transaction_type != TransactionType.SPLIT:
+                if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
+                    raise ValueError(f"EUR amount sign must match total_amount sign: total_amount={total_amount}, eur_amount={eur_amount}")
         
         # Parse optional split_ratio field
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")

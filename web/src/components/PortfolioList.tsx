@@ -31,7 +31,8 @@ const PortfolioList = () => {
           setActivePortfolioId(null);
         }
       } catch (error) {
-        console.error('Error deleting portfolio:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        alert(`Failed to delete portfolio: ${errorMsg}`);
       }
     }
   };
