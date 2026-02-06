@@ -14,7 +14,7 @@ export const usePortfolioStatus = (portfolioId: number | null) => {
       return getPortfolioStatus(portfolioId);
     },
     enabled: !!portfolioId,
-    staleTime: 1000, // Consider data stale after 1 second
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 30000, // Consider data stale after 30 seconds
+    refetchOnWindowFocus: false, // Don't refetch on window focus (mutations will invalidate)
   });
 };

@@ -64,10 +64,11 @@ export const useUpdateTransaction = () => {
     mutationFn: ({
       transactionId,
       data,
+      portfolioId: _portfolioId,
     }: {
       transactionId: number;
       data: TransactionUpdate;
-      portfolioId: number; // Used in onSuccess callback
+      portfolioId: number;
     }) => updateTransaction(transactionId, data),
     onSuccess: (_, variables) => {
       // Invalidate all paginated transaction queries for this portfolio
@@ -88,7 +89,7 @@ export const useDeleteTransaction = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ transactionId }: { transactionId: number; portfolioId: number }) => // portfolioId used in onSuccess
+    mutationFn: ({ transactionId, portfolioId: _portfolioId }: { transactionId: number; portfolioId: number }) =>
       deleteTransaction(transactionId),
     onSuccess: (_, variables) => {
       // Invalidate all paginated transaction queries for this portfolio

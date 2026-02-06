@@ -198,17 +198,12 @@ class TransactionService:
         if not self.portfolio_repo.exists(portfolio_id):
             raise PortfolioNotFoundException(portfolio_id)
         
-        # Parse CSV
+        # Parse CSV (may raise InvalidCSVFormatException)
         transactions = self._parse_csv(csv_content, portfolio_id)
         
         # Bulk create transactions with atomicity
-        try:
-            return self.transaction_repo.bulk_create(transactions)
-        except Exception as e:
-            # Log the error with context
-            raise InvalidCSVFormatException(
-                f"Failed to import {len(transactions)} transactions: {str(e)}"
-            )
+        # Let database exceptions propagate (they indicate system/data issues, not CSV format problems)
+        return self.transaction_repo.bulk_create(transactions)
     
     def _validate_transaction_data(
         self,
@@ -301,9 +296,13 @@ class TransactionService:
                 try:
                     transaction = self._parse_csv_row(row, portfolio_id)
                     transactions.append(transaction)
-                except Exception as e:
+                except (ValueError, InvalidTransactionDataException, KeyError, InvalidCSVFormatException) as e:
+                    # Wrap known CSV/validation errors with line number
                     raise InvalidCSVFormatException(str(e), line_num)
             
+        except InvalidCSVFormatException:
+            # Already formatted, re-raise as-is
+            raise
         except csv.Error as e:
             raise InvalidCSVFormatException(f"Invalid CSV format: {str(e)}")
         

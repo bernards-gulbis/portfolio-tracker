@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from datetime import datetime
 from typing import Optional, List
 from app.models import TransactionType
@@ -59,7 +59,7 @@ class TransactionBase(BaseModel):
     quantity: Optional[float] = None
     price_per_share: Optional[float] = None
     fee: Optional[float] = None
-    total_amount: float = 0.0
+    total_amount: float
     eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
     
@@ -95,7 +95,29 @@ class TransactionBase(BaseModel):
 
 class TransactionCreate(TransactionBase):
     """Schema for creating a transaction"""
-    pass
+    
+    @model_validator(mode='after')
+    def validate_total_amount_sign(self):
+        """Validate total_amount has correct sign based on transaction type"""
+        tx_type = self.type
+        amount = self.total_amount
+        
+        # Split must have exactly 0 amount
+        if tx_type == TransactionType.SPLIT:
+            if amount != 0:
+                raise ValueError('Split transactions must have total_amount of 0')
+        
+        # Buy, Withdraw, Fee must be negative (money leaving account)
+        elif tx_type in [TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE]:
+            if amount >= 0:
+                raise ValueError(f'{tx_type.value} transactions must have negative total_amount (money leaving account)')
+        
+        # Deposit, Sell, Dividend must be positive (money entering account)
+        elif tx_type in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]:
+            if amount <= 0:
+                raise ValueError(f'{tx_type.value} transactions must have positive total_amount (money entering account)')
+        
+        return self
 
 
 class TransactionUpdate(BaseModel):

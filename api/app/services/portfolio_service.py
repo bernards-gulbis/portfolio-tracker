@@ -110,7 +110,7 @@ class PortfolioService:
         total_invested = 0.0  # Deposits - Withdrawals
         dividends_received = 0.0
         realized_gains = 0.0
-        total_eur_amount = 0.0  # Sum of all EUR values
+        total_eur_amount = 0.0  # Sum of all deposit and withdraw EUR values
         holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {quantity, total_cost}
         
         # Process each transaction
