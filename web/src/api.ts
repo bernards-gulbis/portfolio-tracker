@@ -25,14 +25,14 @@ export interface PortfolioWithTransactions extends Portfolio {
 export interface Transaction {
   id: number;
   portfolio_id: number;
-  date_time: string;
+  date: string;
   type: TransactionType;
   ticker?: string | null;
-  units?: number | null;
-  price?: number | null;
-  fee: number;
-  value: number;
-  value_eur?: number | null;
+  quantity?: number | null;
+  price_per_share?: number | null;
+  fee?: number | null;
+  total_amount: number;
+  eur_amount?: number | null;
   split_ratio?: number | null;
 }
 
@@ -49,26 +49,26 @@ export interface PortfolioCopy {
 }
 
 export interface TransactionCreate {
-  date_time: string;
+  date: string;
   type: TransactionType;
   ticker?: string | null;
-  units?: number | null;
-  price?: number | null;
-  fee?: number;
-  value: number;
-  value_eur?: number | null;
+  quantity?: number | null;
+  price_per_share?: number | null;
+  fee?: number | null;
+  total_amount: number;
+  eur_amount?: number | null;
   split_ratio?: number | null;
 }
 
 export interface TransactionUpdate {
-  date_time?: string;
+  date?: string;
   type?: TransactionType;
   ticker?: string | null;
-  units?: number | null;
-  price?: number | null;
+  quantity?: number | null;
+  price_per_share?: number | null;
   fee?: number;
-  value?: number;
-  value_eur?: number | null;
+  total_amount?: number;
+  eur_amount?: number | null;
   split_ratio?: number | null;
 }
 
@@ -87,7 +87,7 @@ export interface PaginatedTransactionResponse {
 
 export interface Holding {
   ticker: string;
-  units: number;
+  quantity: number;
   average_cost: number;
   total_cost: number;
   current_price?: number | null;
@@ -103,7 +103,7 @@ export interface PortfolioStatus {
   total_invested: number;
   dividends_received: number;
   realized_gains: number;
-  total_value_eur: number;
+  total_eur_amount: number;
   holdings: Holding[];
   total_holdings_cost: number;
   total_current_value: number;

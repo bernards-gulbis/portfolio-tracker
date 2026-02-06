@@ -30,14 +30,14 @@ def create_transaction(
     service = TransactionService(session)
     return service.create_transaction(
         portfolio_id=portfolio_id,
-        date_time=transaction.date_time,
+        date=transaction.date,
         transaction_type=transaction.type,
-        value=transaction.value,
+        total_amount=transaction.total_amount,
         ticker=transaction.ticker,
-        units=transaction.units,
-        price=transaction.price,
+        quantity=transaction.quantity,
+        price_per_share=transaction.price_per_share,
         fee=transaction.fee,
-        value_eur=transaction.value_eur,
+        eur_amount=transaction.eur_amount,
         split_ratio=transaction.split_ratio,
     )
 
@@ -94,7 +94,7 @@ async def import_transactions_csv(
     Import a CSV file to bulk import transactions.
     
     Expected CSV format:
-    date_time,type,ticker,units,price,fee,value,EUR,split_ratio
+    date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
     2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
     2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,
     """
@@ -138,14 +138,14 @@ def update_transaction(
     service = TransactionService(session)
     return service.update_transaction(
         transaction_id=transaction_id,
-        date_time=transaction.date_time,
+        date=transaction.date,
         transaction_type=transaction.type,
         ticker=transaction.ticker,
-        units=transaction.units,
-        price=transaction.price,
+        quantity=transaction.quantity,
+        price_per_share=transaction.price_per_share,
         fee=transaction.fee,
-        value=transaction.value,
-        value_eur=transaction.value_eur,
+        total_amount=transaction.total_amount,
+        eur_amount=transaction.eur_amount,
         split_ratio=transaction.split_ratio,
     )
 

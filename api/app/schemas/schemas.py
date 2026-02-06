@@ -45,14 +45,14 @@ class PortfolioWithTransactions(PortfolioResponse):
 
 class TransactionBase(BaseModel):
     """Base transaction schema"""
-    date_time: datetime
+    date: datetime
     type: TransactionType
     ticker: Optional[str] = Field(None, max_length=20)
-    units: Optional[float] = None
-    price: Optional[float] = None
-    fee: float = 0.0
-    value: float
-    value_eur: Optional[float] = None
+    quantity: Optional[float] = None
+    price_per_share: Optional[float] = None
+    fee: Optional[float] = None
+    total_amount: float = 0.0
+    eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
     
     @field_validator('ticker')
@@ -76,7 +76,7 @@ class TransactionBase(BaseModel):
             raise ValueError('Split ratio must be greater than 0')
         return v
     
-    @field_validator('value')
+    @field_validator('total_amount')
     @classmethod
     def validate_value(cls, v: float) -> float:
         """Validate value is positive (stored as positive, signed on display)"""
@@ -86,9 +86,9 @@ class TransactionBase(BaseModel):
     
     @field_validator('fee')
     @classmethod
-    def validate_fee(cls, v: float) -> float:
+    def validate_fee(cls, v: Optional[float]) -> Optional[float]:
         """Validate fee is positive"""
-        if v < 0:
+        if v is not None and v < 0:
             raise ValueError('Fee must be positive')
         return v
 
@@ -100,14 +100,14 @@ class TransactionCreate(TransactionBase):
 
 class TransactionUpdate(BaseModel):
     """Schema for updating a transaction (all fields optional)"""
-    date_time: Optional[datetime] = None
+    date: Optional[datetime] = None
     type: Optional[TransactionType] = None
     ticker: Optional[str] = None
-    units: Optional[float] = None
-    price: Optional[float] = None
+    quantity: Optional[float] = None
+    price_per_share: Optional[float] = None
     fee: Optional[float] = None
-    value: Optional[float] = None
-    value_eur: Optional[float] = None
+    total_amount: Optional[float] = None
+    eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
 
 
@@ -139,7 +139,7 @@ class PaginatedTransactionResponse(BaseModel):
 class HoldingResponse(BaseModel):
     """Schema for a single holding"""
     ticker: str
-    units: float
+    quantity: float
     average_cost: float
     total_cost: float
     current_price: Optional[float] = None
@@ -158,7 +158,7 @@ class PortfolioStatusResponse(BaseModel):
     total_invested: float  # Deposits - Withdrawals
     dividends_received: float
     realized_gains: float  # Gains/losses from sells
-    total_value_eur: float  # Sum of all value_eur fields
+    total_eur_amount: float  # Sum of all eur_amount fields
     holdings: List[HoldingResponse]
     total_holdings_cost: float  # Sum of all holdings cost basis
     total_current_value: float  # Sum of current market value of all holdings

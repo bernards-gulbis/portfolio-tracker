@@ -100,7 +100,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
             <thead>
               <tr>
                 <th>Ticker</th>
-                <th>Units</th>
+                <th>Quantity</th>
                 <th>Avg Cost</th>
                 <th>Total Cost</th>
                 <th>Current Price</th>
@@ -113,7 +113,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               {status.holdings.map((holding) => (
                 <tr key={holding.ticker}>
                   <td><strong>{holding.ticker}</strong></td>
-                  <td>{formatNumber(holding.units, 8)}</td>
+                  <td>{formatNumber(holding.quantity, 8)}</td>
                   <td>{formatCurrency(holding.average_cost)}</td>
                   <td>{formatCurrency(holding.total_cost)}</td>
                   <td>

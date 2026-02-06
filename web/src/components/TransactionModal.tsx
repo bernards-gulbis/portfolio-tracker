@@ -13,13 +13,13 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
   const isEdit = !!transaction;
   
   // Form state
-  const [dateTime, setDateTime] = useState('');
+  const [date, setDate] = useState('');
   const [type, setType] = useState<TransactionType>(TransactionType.DEPOSIT);
   const [ticker, setTicker] = useState('');
-  const [units, setUnits] = useState('');
-  const [price, setPrice] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [pricePerShare, setPricePerShare] = useState('');
   const [fee, setFee] = useState('');
-  const [value, setValue] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
   const [valueEur, setValueEur] = useState('');
   const [splitRatio, setSplitRatio] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -31,19 +31,19 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
   useEffect(() => {
     if (transaction) {
       // Convert ISO datetime to local datetime-local format
-      const date = new Date(transaction.date_time);
-      const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+      const transactionDate = new Date(transaction.date);
+      const localDateTime = new Date(transactionDate.getTime() - transactionDate.getTimezoneOffset() * 60000)
         .toISOString()
         .slice(0, 16);
       
-      setDateTime(localDateTime);
+      setDate(localDateTime);
       setType(transaction.type);
       setTicker(transaction.ticker || '');
-      setUnits(transaction.units?.toString() || '');
-      setPrice(transaction.price?.toString() || '');
+      setQuantity(transaction.quantity?.toString() || '');
+      setPricePerShare(transaction.price_per_share?.toString() || '');
       setFee(transaction.fee?.toString() || '');
-      setValue(transaction.value.toString());
-      setValueEur(transaction.value_eur?.toString() || '');
+      setTotalAmount(transaction.total_amount.toString());
+      setValueEur(transaction.eur_amount?.toString() || '');
       setSplitRatio(transaction.split_ratio?.toString() || '');
     } else {
       resetForm();
@@ -56,13 +56,13 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       .toISOString()
       .slice(0, 16);
     
-    setDateTime(localDateTime);
+    setDate(localDateTime);
     setType(TransactionType.DEPOSIT);
     setTicker('');
-    setUnits('');
-    setPrice('');
+    setQuantity('');
+    setPricePerShare('');
     setFee('');
-    setValue('');
+    setTotalAmount('');
     setValueEur('');
     setSplitRatio('');
     setError(null);
@@ -74,7 +74,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
 
     try {
       const data: any = {
-        date_time: new Date(dateTime).toISOString(),
+        date: new Date(date).toISOString(),
         type,
       };
 
@@ -83,35 +83,33 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       switch (type) {
         case TransactionType.DEPOSIT:
         case TransactionType.WITHDRAW:
-          data.value = Math.abs(parseFloat(value));
-          if (valueEur) data.value_eur = Math.abs(parseFloat(valueEur));
+          data.total_amount = Math.abs(parseFloat(totalAmount));
+          if (valueEur) data.eur_amount = Math.abs(parseFloat(valueEur));
           break;
 
         case TransactionType.FEE:
-          data.fee = Math.abs(parseFloat(fee));
-          data.value = Math.abs(parseFloat(value));
+          data.total_amount = Math.abs(parseFloat(totalAmount));
           break;
 
         case TransactionType.BUY:
         case TransactionType.SELL:
           data.ticker = ticker;
-          data.units = parseFloat(units);
-          data.price = parseFloat(price);
+          data.quantity = parseFloat(quantity);
+          data.price_per_share = parseFloat(pricePerShare);
           data.fee = Math.abs(parseFloat(fee || '0'));
-          data.value = Math.abs(parseFloat(value));
+          data.total_amount = Math.abs(parseFloat(totalAmount));
           break;
 
         case TransactionType.DIVIDEND:
           data.ticker = ticker;
-          data.price = parseFloat(price); // Amount without fees
           data.fee = Math.abs(parseFloat(fee || '0'));
-          data.value = Math.abs(parseFloat(value));
+          data.total_amount = Math.abs(parseFloat(totalAmount));
           break;
 
         case TransactionType.SPLIT:
           data.ticker = ticker;
           data.split_ratio = parseFloat(splitRatio);
-          data.value = 0; // Split doesn't affect value
+          data.total_amount = 0; // Split doesn't affect total amount
           break;
       }
 
@@ -143,10 +141,10 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
 
   // Determine which fields to show based on transaction type
   const showTicker = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND, TransactionType.SPLIT].includes(type);
-  const showUnits = [TransactionType.BUY, TransactionType.SELL].includes(type);
-  const showPrice = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND].includes(type);
-  const showFee = [TransactionType.FEE, TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND].includes(type);
-  const showValue = type !== TransactionType.SPLIT;
+  const showQuantity = [TransactionType.BUY, TransactionType.SELL].includes(type);
+  const showPricePerShare = [TransactionType.BUY, TransactionType.SELL].includes(type);
+  const showFee = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND].includes(type);
+  const showTotalAmount = type !== TransactionType.SPLIT;
   const showValueEur = [TransactionType.DEPOSIT, TransactionType.WITHDRAW].includes(type);
   const showSplitRatio = type === TransactionType.SPLIT;
 
@@ -162,15 +160,15 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {/* DateTime */}
+            {/* Date */}
             <div className="form-group">
-              <label htmlFor="date-time">Date & Time *</label>
+              <label htmlFor="date">Date & Time *</label>
               <input
-                id="date-time"
+                id="date"
                 type="datetime-local"
                 className="form-control"
-                value={dateTime}
-                onChange={(e) => setDateTime(e.target.value)}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
                 required
               />
             </div>
@@ -211,36 +209,36 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
               </div>
             )}
 
-            {/* Units (for Buy, Sell) */}
-            {showUnits && (
+            {/* Quantity (for Buy, Sell) */}
+            {showQuantity && (
               <div className="form-group">
-                <label htmlFor="units">Units *</label>
+                <label htmlFor="quantity">Quantity *</label>
                 <input
-                  id="units"
+                  id="quantity"
                   type="number"
                   step="0.00000001"
                   className="form-control"
-                  value={units}
-                  onChange={(e) => setUnits(e.target.value)}
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
                   placeholder="Number of shares"
                   required
                 />
               </div>
             )}
 
-            {/* Price (for Buy, Sell, Dividend) */}
-            {showPrice && (
+            {/* Price per Share (for Buy, Sell, Dividend) */}
+            {showPricePerShare && (
               <div className="form-group">
-                <label htmlFor="price">
-                  {type === TransactionType.DIVIDEND ? 'Amount (without fees) *' : 'Price per Unit *'}
+                <label htmlFor="price-per-share">
+                  {type === TransactionType.DIVIDEND ? 'Amount (without fees) *' : 'Price per Share *'}
                 </label>
                 <input
-                  id="price"
+                  id="price-per-share"
                   type="number"
                   step="0.01"
                   className="form-control"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  value={pricePerShare}
+                  onChange={(e) => setPricePerShare(e.target.value)}
                   placeholder="0.00"
                   required
                 />
@@ -264,31 +262,31 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
               </div>
             )}
 
-            {/* Value (for most types) */}
-            {showValue && (
+            {/* Total Amount (for most types) */}
+            {showTotalAmount && (
               <div className="form-group">
-                <label htmlFor="value">
-                  Total Value * (enter as positive)
+                <label htmlFor="total-amount">
+                  Total Amount *
                 </label>
                 <input
-                  id="value"
+                  id="total-amount"
                   type="number"
                   step="0.01"
                   className="form-control"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
+                  value={totalAmount}
+                  onChange={(e) => setTotalAmount(e.target.value)}
                   placeholder="0.00"
                   required
                 />
               </div>
             )}
 
-            {/* Value EUR (for Deposit, Withdraw) */}
+            {/* Amount EUR (for Deposit, Withdraw) */}
             {showValueEur && (
               <div className="form-group">
-                <label htmlFor="value-eur">Value in EUR</label>
+                <label htmlFor="amount-eur">Amount in EUR</label>
                 <input
-                  id="value-eur"
+                  id="amount-eur"
                   type="number"
                   step="0.01"
                   className="form-control"

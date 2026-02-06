@@ -28,11 +28,11 @@ export const getDisplayValue = (transaction: Transaction): number => {
   if (transaction.type === TransactionType.FEE || 
       transaction.type === TransactionType.WITHDRAW || 
       transaction.type === TransactionType.BUY) {
-    return -transaction.value;
+    return -transaction.total_amount;
   }
 
   // Positive display types: DEPOSIT, SELL, DIVIDEND, SPLIT (receiving money)
-  return transaction.value;
+  return transaction.total_amount;
 };
 
 /**

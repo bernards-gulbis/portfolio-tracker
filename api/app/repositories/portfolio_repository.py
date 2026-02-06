@@ -74,14 +74,14 @@ class PortfolioRepository:
         for original_transaction in original.transactions:
             new_transaction = Transaction(
                 portfolio_id=new_portfolio.id,
-                date_time=original_transaction.date_time,
+                date=original_transaction.date,
                 type=original_transaction.type,
                 ticker=original_transaction.ticker,
-                units=original_transaction.units,
-                price=original_transaction.price,
+                quantity=original_transaction.quantity,
+                price_per_share=original_transaction.price_per_share,
                 fee=original_transaction.fee,
-                value=original_transaction.value,
-                value_eur=original_transaction.value_eur,
+                total_amount=original_transaction.total_amount,
+                eur_amount=original_transaction.eur_amount,
                 split_ratio=original_transaction.split_ratio,
             )
             self.session.add(new_transaction)

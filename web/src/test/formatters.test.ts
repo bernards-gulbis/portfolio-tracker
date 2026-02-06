@@ -30,14 +30,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 1,
         portfolio_id: 1,
-        date_time: '2020-12-02T20:14:40',
+        date: '2020-12-02T20:14:40',
         type: TransactionType.DEPOSIT,
         ticker: null,
-        units: null,
-        price: null,
+        quantity: null,
+        price_per_share: null,
         fee: 0,
-        value: 3000,
-        value_eur: null,
+        total_amount: 3000,
+        eur_amount: null,
         split_ratio: null,
       };
       expect(getTransactionColor(transaction)).toBe('positive');
@@ -47,14 +47,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 2,
         portfolio_id: 1,
-        date_time: '2020-12-02T20:16:10',
+        date: '2020-12-02T20:16:10',
         type: TransactionType.BUY,
         ticker: 'MSFT',
-        units: 15,
-        price: 183.69,
+        quantity: 15,
+        price_per_share: 183.69,
         fee: 0,
-        value: 2755.35,  // Now stored as positive
-        value_eur: null,
+        total_amount: 2755.35,  // Now stored as positive
+        eur_amount: null,
         split_ratio: null,
       };
       expect(getTransactionColor(transaction)).toBe('negative');
@@ -64,14 +64,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 3,
         portfolio_id: 1,
-        date_time: '2021-03-10T09:00:00',
+        date: '2021-03-10T09:00:00',
         type: TransactionType.SPLIT,
         ticker: 'AAPL',
-        units: null,
-        price: null,
+        quantity: null,
+        price_per_share: null,
         fee: 0,
-        value: 0,
-        value_eur: null,
+        total_amount: 0,
+        eur_amount: null,
         split_ratio: 2.0,
       };
       expect(getTransactionColor(transaction)).toBe('neutral');
@@ -83,14 +83,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 1,
         portfolio_id: 1,
-        date_time: '2020-12-02T20:14:40',
+        date: '2020-12-02T20:14:40',
         type: TransactionType.DEPOSIT,
         ticker: null,
-        units: null,
-        price: null,
+        quantity: null,
+        price_per_share: null,
         fee: 0,
-        value: 3000,
-        value_eur: null,
+        total_amount: 3000,
+        eur_amount: null,
         split_ratio: null,
       };
       expect(getDisplayValue(transaction)).toBe(3000);
@@ -100,14 +100,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 2,
         portfolio_id: 1,
-        date_time: '2020-12-02T20:16:10',
+        date: '2020-12-02T20:16:10',
         type: TransactionType.BUY,
         ticker: 'MSFT',
-        units: 15,
-        price: 183.69,
+        quantity: 15,
+        price_per_share: 183.69,
         fee: 0,
-        value: 2755.35,
-        value_eur: null,
+        total_amount: 2755.35,
+        eur_amount: null,
         split_ratio: null,
       };
       expect(getDisplayValue(transaction)).toBe(-2755.35);
@@ -117,14 +117,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 3,
         portfolio_id: 1,
-        date_time: '2021-01-10T10:00:00',
+        date: '2021-01-10T10:00:00',
         type: TransactionType.WITHDRAW,
         ticker: null,
-        units: null,
-        price: null,
+        quantity: null,
+        price_per_share: null,
         fee: 0,
-        value: 500,  // Stored as positive
-        value_eur: null,
+        total_amount: 500,  // Stored as positive
+        eur_amount: null,
         split_ratio: null,
       };
       expect(getDisplayValue(transaction)).toBe(-500);
@@ -134,14 +134,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 4,
         portfolio_id: 1,
-        date_time: '2021-02-05T14:30:00',
+        date: '2021-02-05T14:30:00',
         type: TransactionType.FEE,
         ticker: null,
-        units: null,
-        price: null,
+        quantity: null,
+        price_per_share: null,
         fee: 0,
-        value: 10,  // Stored as positive
-        value_eur: null,
+        total_amount: 10,  // Stored as positive
+        eur_amount: null,
         split_ratio: null,
       };
       expect(getDisplayValue(transaction)).toBe(-10);
@@ -151,14 +151,14 @@ describe('Formatters', () => {
       const transaction: Transaction = {
         id: 5,
         portfolio_id: 1,
-        date_time: '2021-03-15T11:20:00',
+        date: '2021-03-15T11:20:00',
         type: TransactionType.SELL,
         ticker: 'AAPL',
-        units: 10,
-        price: 125.50,
+        quantity: 10,
+        price_per_share: 125.50,
         fee: 5,
-        value: 1250,  // Stored as positive
-        value_eur: null,
+        total_amount: 1250,  // Stored as positive
+        eur_amount: null,
         split_ratio: null,
       };
       expect(getDisplayValue(transaction)).toBe(1250);

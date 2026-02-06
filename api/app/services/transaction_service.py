@@ -28,14 +28,14 @@ class TransactionService:
     def create_transaction(
         self,
         portfolio_id: int,
-        date_time: datetime,
+        date: datetime,
         transaction_type: TransactionType,
-        value: float,
+        total_amount: float,
         ticker: Optional[str] = None,
-        units: Optional[float] = None,
-        price: Optional[float] = None,
-        fee: float = 0.0,
-        value_eur: Optional[float] = None,
+        quantity: Optional[float] = None,
+        price_per_share: Optional[float] = None,
+        fee: Optional[float] = None,
+        eur_amount: Optional[float] = None,
         split_ratio: Optional[float] = None,
     ) -> Transaction:
         """Create a new transaction with validation"""
@@ -45,19 +45,19 @@ class TransactionService:
         
         # Business validation
         self._validate_transaction_data(
-            transaction_type, ticker, units, price, value, fee
+            transaction_type, ticker, quantity, price_per_share, total_amount, fee
         )
         
         transaction = Transaction(
             portfolio_id=portfolio_id,
-            date_time=date_time,
+            date=date,
             type=transaction_type,
             ticker=ticker,
-            units=units,
-            price=price,
+            quantity=quantity,
+            price_per_share=price_per_share,
             fee=fee,
-            value=value,
-            value_eur=value_eur,
+            total_amount=total_amount,
+            eur_amount=eur_amount,
             split_ratio=split_ratio,
         )
         
@@ -102,13 +102,13 @@ class TransactionService:
         
         # Write header - must match import format
         writer.writerow([
-            'date_time',
+            'date',
             'type',
             'ticker',
-            'units',
-            'price',
+            'quantity',
+            'price_per_share',
             'fee',
-            'value',
+            'total_amount',
             'EUR',
             'split_ratio'
         ])
@@ -116,14 +116,14 @@ class TransactionService:
         # Write transaction data
         for transaction in transactions:
             writer.writerow([
-                transaction.date_time.strftime('%m/%d/%Y %H:%M:%S'),
+                transaction.date.strftime('%m/%d/%Y %H:%M:%S'),
                 transaction.type.value,
                 transaction.ticker or '',
-                transaction.units if transaction.units is not None else '',
-                transaction.price if transaction.price is not None else '',
-                transaction.fee,
-                transaction.value,
-                transaction.value_eur if transaction.value_eur is not None else '',
+                transaction.quantity if transaction.quantity is not None else '',
+                transaction.price_per_share if transaction.price_per_share is not None else '',
+                transaction.fee if transaction.fee is not None else '',
+                transaction.total_amount,
+                transaction.eur_amount if transaction.eur_amount is not None else '',
                 transaction.split_ratio if transaction.split_ratio is not None else '',
             ])
         
@@ -132,14 +132,14 @@ class TransactionService:
     def update_transaction(
         self,
         transaction_id: int,
-        date_time: Optional[datetime] = None,
+        date: Optional[datetime] = None,
         transaction_type: Optional[TransactionType] = None,
         ticker: Optional[str] = None,
-        units: Optional[float] = None,
-        price: Optional[float] = None,
+        quantity: Optional[float] = None,
+        price_per_share: Optional[float] = None,
         fee: Optional[float] = None,
-        value: Optional[float] = None,
-        value_eur: Optional[float] = None,
+        total_amount: Optional[float] = None,
+        eur_amount: Optional[float] = None,
         split_ratio: Optional[float] = None,
     ) -> Transaction:
         """Update a transaction"""
@@ -150,38 +150,38 @@ class TransactionService:
         # Create a copy of current values for validation
         val_type = transaction_type if transaction_type is not None else transaction.type
         val_ticker = ticker if ticker is not None else transaction.ticker
-        val_units = units if units is not None else transaction.units
-        val_price = price if price is not None else transaction.price
-        val_value = value if value is not None else transaction.value
+        val_quantity = quantity if quantity is not None else transaction.quantity
+        val_price_per_share = price_per_share if price_per_share is not None else transaction.price_per_share
+        val_total_amount = total_amount if total_amount is not None else transaction.total_amount
         val_fee = fee if fee is not None else transaction.fee
         
         # Validate before applying changes
         self._validate_transaction_data(
             val_type,
             val_ticker,
-            val_units,
-            val_price,
-            val_value,
+            val_quantity,
+            val_price_per_share,
+            val_total_amount,
             val_fee
         )
         
         # Update fields after validation passes
-        if date_time is not None:
-            transaction.date_time = date_time
+        if date is not None:
+            transaction.date = date
         if transaction_type is not None:
             transaction.type = transaction_type
         if ticker is not None:
             transaction.ticker = ticker
-        if units is not None:
-            transaction.units = units
-        if price is not None:
-            transaction.price = price
+        if quantity is not None:
+            transaction.quantity = quantity
+        if price_per_share is not None:
+            transaction.price_per_share = price_per_share
         if fee is not None:
             transaction.fee = fee
-        if value is not None:
-            transaction.value = value
-        if value_eur is not None:
-            transaction.value_eur = value_eur
+        if total_amount is not None:
+            transaction.total_amount = total_amount
+        if eur_amount is not None:
+            transaction.eur_amount = eur_amount
         if split_ratio is not None:
             transaction.split_ratio = split_ratio
         
@@ -208,60 +208,60 @@ class TransactionService:
         self,
         transaction_type: TransactionType,
         ticker: Optional[str],
-        units: Optional[float],
-        price: Optional[float],
-        value: float,
-        fee: float,
+        quantity: Optional[float],
+        price_per_share: Optional[float],
+        total_amount: float,
+        fee: Optional[float],
     ) -> None:
         """Validate transaction data based on business rules"""
-        # Validate units
-        if units is not None and units <= 0:
-            raise InvalidTransactionDataException("Units must be greater than 0")
+        # Validate quantity
+        if quantity is not None and quantity <= 0:
+            raise InvalidTransactionDataException("Quantity must be greater than 0")
         
         # Validate price
-        if price is not None and price <= 0:
+        if price_per_share is not None and price_per_share <= 0:
             raise InvalidTransactionDataException("Price must be greater than 0")
         
         # Validate fee is positive (stored as positive, displayed as negative)
-        if fee < 0:
+        if fee is not None and fee < 0:
             raise InvalidTransactionDataException("Fee must be positive (stored as positive, displayed as negative)")
         
         # Validate value is positive (stored as positive, signed on display)
-        if value < 0:
+        if total_amount < 0:
             raise InvalidTransactionDataException("Value must be positive (stored as positive, signed on display)")
         
         # Transaction type-specific validation
         if transaction_type in (TransactionType.BUY, TransactionType.SELL):
-            # Buy and Sell require ticker, units, and price
+            # Buy and Sell require ticker, quantity, and price
             if not ticker:
                 raise InvalidTransactionDataException(
                     f"{transaction_type.value} transactions require a ticker symbol"
                 )
-            if units is None:
+            if quantity is None:
                 raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require units"
+                    f"{transaction_type.value} transactions require quantity"
                 )
-            if price is None:
+            if price_per_share is None:
                 raise InvalidTransactionDataException(
                     f"{transaction_type.value} transactions require a price"
                 )
             
             # Validate value consistency (allowing 1% margin for rounding)
-            expected_value = units * price + fee
-            if abs(value - expected_value) > expected_value * 0.01:
+            expected_value = quantity * price_per_share + (fee or 0)
+            if abs(total_amount - expected_value) > expected_value * 0.01:
                 raise InvalidTransactionDataException(
-                    f"Value inconsistency: expected ~{expected_value:.2f} based on units * price + fee, got {value}"
+                    f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share + fee, got {total_amount}"
                 )
         
         elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):
             # Deposit and Withdraw should not have trading details
-            if ticker or units is not None or price is not None:
+            if ticker or quantity is not None or price_per_share is not None:
                 raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions should not have ticker, units, or price"
+                    f"{transaction_type.value} transactions should not have ticker, quantity, or price"
                 )
         
         elif transaction_type == TransactionType.SPLIT:
-            # Split requires ticker (units and split_ratio validated elsewhere)
+            # Split requires ticker (quantity and split_ratio validated elsewhere)
             if not ticker:
                 raise InvalidTransactionDataException(
                     "Split transactions require a ticker symbol"
@@ -283,7 +283,7 @@ class TransactionService:
             reader = csv.DictReader(csv_file)
             
             # Validate headers
-            required_headers = {"date_time", "type", "value"}
+            required_headers = {"date", "type", "total_amount"}
             if not required_headers.issubset(set(reader.fieldnames or [])):
                 raise InvalidCSVFormatException(
                     f"CSV must contain headers: {', '.join(required_headers)}"
@@ -307,10 +307,10 @@ class TransactionService:
     def _parse_csv_row(self, row: dict, portfolio_id: int) -> Transaction:
         """Parse a single CSV row into a Transaction object"""
         try:
-            # Parse date_time (format: M/D/YYYY H:M:S)
-            date_time = datetime.strptime(row["date_time"].strip(), "%m/%d/%Y %H:%M:%S")
+            # Parse date (format: M/D/YYYY H:M:S)
+            date = datetime.strptime(row["date"].strip(), "%m/%d/%Y %H:%M:%S")
         except ValueError as e:
-            raise ValueError(f"Invalid date format: {row['date_time']}. Expected MM/DD/YYYY HH:MM:SS")
+            raise ValueError(f"Invalid date format: {row['date']}. Expected MM/DD/YYYY HH:MM:SS")
         
         # Parse transaction type
         try:
@@ -320,39 +320,39 @@ class TransactionService:
         
         # Parse optional fields
         ticker = row.get("ticker", "").strip().upper() or None
-        units = self._clean_csv_number(row.get("units", ""), "units")
-        price = self._clean_csv_number(row.get("price", ""), "price")
-        fee = self._clean_csv_number(row.get("fee", ""), "fee") or 0.0
+        quantity = self._clean_csv_number(row.get("quantity", ""), "quantity")
+        price_per_share = self._clean_csv_number(row.get("price_per_share", ""), "price_per_share")
+        fee = self._clean_csv_number(row.get("fee", ""), "fee")
         
         # Parse required value field
-        value_str = row.get("value", "").strip()
-        if not value_str:
+        total_amount_str = row.get("total_amount", "").strip()
+        if not total_amount_str:
             raise ValueError("Value field is required")
-        value = self._clean_csv_number(value_str, "value")
-        if value is None:
-            raise ValueError(f"Invalid value: {value_str}")
+        total_amount = self._clean_csv_number(total_amount_str, "total_amount")
+        if total_amount is None:
+            raise ValueError(f"Invalid value: {total_amount_str}")
         
         # Convert to positive (values stored as positive, signed on display)
-        value = abs(value)
+        total_amount = abs(total_amount)
         
         # Parse optional EUR value field
-        value_eur = self._clean_csv_number(row.get("EUR", ""), "EUR")
-        if value_eur is not None:
-            value_eur = abs(value_eur)  # Also store EUR as positive
+        eur_amount = self._clean_csv_number(row.get("EUR", ""), "EUR")
+        if eur_amount is not None:
+            eur_amount = abs(eur_amount)  # Also store EUR as positive
         
         # Parse optional split_ratio field
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
         
         return Transaction(
             portfolio_id=portfolio_id,
-            date_time=date_time,
+            date=date,
             type=transaction_type,
             ticker=ticker,
-            units=units,
-            price=price,
+            quantity=quantity,
+            price_per_share=price_per_share,
             fee=fee,
-            value=value,
-            value_eur=value_eur,
+            total_amount=total_amount,
+            eur_amount=eur_amount,
             split_ratio=split_ratio,
         )
     

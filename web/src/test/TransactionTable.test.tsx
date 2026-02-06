@@ -8,40 +8,40 @@ const mockTransactions: Transaction[] = [
   {
     id: 1,
     portfolio_id: 1,
-    date_time: '2020-12-02T20:14:40',
+    date: '2020-12-02T20:14:40',
     type: TransactionType.DEPOSIT,
     ticker: null,
-    units: null,
-    price: null,
+    quantity: null,
+    price_per_share: null,
     fee: 0,
-    value: 3000.0,  // Stored as positive
-    value_eur: 2760.27,
+    total_amount: 3000.0,  // Stored as positive
+    eur_amount: 2760.27,
     split_ratio: null,
   },
   {
     id: 2,
     portfolio_id: 1,
-    date_time: '2020-12-02T20:16:10',
+    date: '2020-12-02T20:16:10',
     type: TransactionType.BUY,
     ticker: 'MSFT',
-    units: 15.00000001,
-    price: 183.69,
+    quantity: 15.00000001,
+    price_per_share: 183.69,
     fee: 0,
-    value: 2755.35,  // Now stored as positive (displayed as negative)
-    value_eur: null,
+    total_amount: 2755.35,  // Now stored as positive (displayed as negative)
+    eur_amount: null,
     split_ratio: null,
   },
   {
     id: 3,
     portfolio_id: 1,
-    date_time: '2021-01-15T10:00:00',
+    date: '2021-01-15T10:00:00',
     type: TransactionType.DIVIDEND,
     ticker: 'MSFT',
-    units: null,
-    price: null,
+    quantity: null,
+    price_per_share: null,
     fee: 0,
-    value: 50.0,  // Stored as positive
-    value_eur: 46.0,
+    total_amount: 50.0,  // Stored as positive
+    eur_amount: 46.0,
     split_ratio: null,
   },
 ];

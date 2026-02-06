@@ -14,7 +14,7 @@ from app.core.exceptions import (
 from app.schemas import HoldingResponse, PortfolioStatusResponse
 from app.services.price_service import PriceService
 
-# Precision threshold for holdings units (8 decimal places)
+# Precision threshold for holdings quantity (8 decimal places)
 HOLDINGS_EPSILON = 1e-8
 
 
@@ -99,99 +99,99 @@ class PortfolioService:
         # Get all transactions ordered by date
         transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
         
-        # Sort by date_time to process in chronological order
-        transactions.sort(key=lambda t: (t.date_time, t.id))
+        # Sort by date to process in chronological order
+        transactions.sort(key=lambda t: (t.date, t.id))
         
         # Initialize tracking variables
         cash_balance = 0.0
         total_invested = 0.0  # Deposits - Withdrawals
         dividends_received = 0.0
         realized_gains = 0.0
-        total_value_eur = 0.0  # Sum of all EUR values
-        holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {units, total_cost}
+        total_eur_amount = 0.0  # Sum of all EUR values
+        holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {quantity, total_cost}
         
         # Process each transaction
         for transaction in transactions:
             tx_type = transaction.type
-            value = transaction.value  # Stored as positive, apply sign as needed
+            total_amount = transaction.total_amount  # Stored as positive, apply sign as needed
             fee = transaction.fee  # Stored as positive
             
             if tx_type == TransactionType.DEPOSIT:
                 # Deposit adds cash and increases invested amount
-                cash_balance += value
-                total_invested += value
-                if transaction.value_eur is not None:
-                    total_value_eur += transaction.value_eur
+                cash_balance += total_amount
+                total_invested += total_amount
+                if transaction.eur_amount is not None:
+                    total_eur_amount += transaction.eur_amount
                 
             elif tx_type == TransactionType.WITHDRAW:
                 # Withdraw removes cash and decreases invested amount (value stored as positive)
-                cash_balance -= value
-                total_invested -= value
-                if transaction.value_eur is not None:
-                    total_value_eur -= transaction.value_eur
+                cash_balance -= total_amount
+                total_invested -= total_amount
+                if transaction.eur_amount is not None:
+                    total_eur_amount -= transaction.eur_amount
                 
             elif tx_type == TransactionType.BUY:
                 # Buy decreases cash and adds to holdings (value stored as positive)
-                cash_balance -= value
+                cash_balance -= total_amount
                 
                 ticker = transaction.ticker
-                units = transaction.units or 0
-                price = transaction.price or 0
-                cost = value  # Cost basis for these units
+                quantity = transaction.quantity or 0
+                price_per_share = transaction.price_per_share or 0
+                cost = total_amount  # Cost basis for these quantity
                 
                 if ticker:
                     if ticker not in holdings:
-                        holdings[ticker] = {'units': 0.0, 'total_cost': 0.0}
-                    holdings[ticker]['units'] += units
+                        holdings[ticker] = {'quantity': 0.0, 'total_cost': 0.0}
+                    holdings[ticker]['quantity'] += quantity
                     holdings[ticker]['total_cost'] += cost
                     
             elif tx_type == TransactionType.SELL:
                 # Sell increases cash, removes from holdings, and calculates gain (value stored as positive, includes fees)
-                cash_balance += value
+                cash_balance += total_amount
                 
                 ticker = transaction.ticker
-                units = transaction.units or 0
+                quantity = transaction.quantity or 0
                 
                 if ticker:
                     # Validate ticker exists in holdings
                     if ticker not in holdings:
                         raise ValueError(f"Cannot sell {ticker}: not in holdings for portfolio {portfolio_id}")
                     
-                    # Validate sufficient units (with epsilon for floating-point precision)
-                    if units > holdings[ticker]['units'] + HOLDINGS_EPSILON:
+                    # Validate sufficient quantity (with epsilon for floating-point precision)
+                    if quantity > holdings[ticker]['quantity'] + HOLDINGS_EPSILON:
                         raise ValueError(
-                            f"Cannot sell {units} units of {ticker}: only {holdings[ticker]['units']} available"
+                            f"Cannot sell {quantity} quantity of {ticker}: only {holdings[ticker]['quantity']} available"
                         )
                     
                     # Calculate average cost per unit for this holding
-                    avg_cost_per_unit = (holdings[ticker]['total_cost'] / holdings[ticker]['units'] 
-                                        if holdings[ticker]['units'] > 0 else 0)
+                    avg_cost_per_unit = (holdings[ticker]['total_cost'] / holdings[ticker]['quantity'] 
+                                        if holdings[ticker]['quantity'] > 0 else 0)
                     
-                    # Cost basis of units being sold
-                    cost_basis = avg_cost_per_unit * units
+                    # Cost basis of quantity being sold
+                    cost_basis = avg_cost_per_unit * quantity
                     
                     # Realized gain = sale proceeds - cost basis (fees already included in value)
-                    realized_gains += (value - cost_basis)
+                    realized_gains += (total_amount - cost_basis)
                     
                     # Update holdings
-                    holdings[ticker]['units'] -= units
+                    holdings[ticker]['quantity'] -= quantity
                     holdings[ticker]['total_cost'] -= cost_basis
                     
                     # Remove if fully sold (using 8 decimal place precision)
-                    if math.isclose(holdings[ticker]['units'], 0.0, abs_tol=HOLDINGS_EPSILON) or holdings[ticker]['units'] < HOLDINGS_EPSILON:
+                    if math.isclose(holdings[ticker]['quantity'], 0.0, abs_tol=HOLDINGS_EPSILON) or holdings[ticker]['quantity'] < HOLDINGS_EPSILON:
                         del holdings[ticker]
                         
             elif tx_type == TransactionType.DIVIDEND:
                 # Dividend adds cash and tracks dividend income (value stored as positive)
-                cash_balance += value
-                dividends_received += value
+                cash_balance += total_amount
+                dividends_received += total_amount
                 
             elif tx_type == TransactionType.FEE:
                 # Fee reduces cash (value stored as positive, apply negative)
-                cash_balance -= value
+                cash_balance -= total_amount
                 
             elif tx_type == TransactionType.SPLIT:
-                # Split adjusts the number of units
+                # Split adjusts the number of quantity
                 ticker = transaction.ticker
                 split_ratio = transaction.split_ratio or 1.0
                 
@@ -200,7 +200,7 @@ class PortfolioService:
                     raise ValueError(f"Invalid split ratio {split_ratio}: must be positive")
                 
                 if ticker and ticker in holdings:
-                    holdings[ticker]['units'] *= split_ratio
+                    holdings[ticker]['quantity'] *= split_ratio
                     # Cost basis remains the same (value doesn't change, just distribution)
         
         # Convert holdings dict to list of HoldingResponse
@@ -221,9 +221,9 @@ class PortfolioService:
         total_unrealized_gains = 0.0
         
         for ticker, holding_data in holdings.items():
-            units = holding_data['units']
+            quantity = holding_data['quantity']
             total_cost = holding_data['total_cost']
-            avg_cost = total_cost / units if units > 0 else 0
+            avg_cost = total_cost / quantity if quantity > 0 else 0
             
             # Get current price and calculate current value
             current_price = current_prices.get(ticker)
@@ -232,7 +232,7 @@ class PortfolioService:
             unrealized_gain_loss_percent = None
             
             if current_price is not None and current_price > 0:
-                current_value = units * current_price
+                current_value = quantity * current_price
                 unrealized_gain_loss = current_value - total_cost
                 if total_cost > 0:
                     unrealized_gain_loss_percent = (unrealized_gain_loss / total_cost) * 100
@@ -242,7 +242,7 @@ class PortfolioService:
             
             holdings_list.append(HoldingResponse(
                 ticker=ticker,
-                units=units,
+                quantity=quantity,
                 average_cost=avg_cost,
                 total_cost=total_cost,
                 current_price=current_price,
@@ -270,7 +270,7 @@ class PortfolioService:
             total_invested=normalize_zero(total_invested),
             dividends_received=normalize_zero(dividends_received),
             realized_gains=normalize_zero(realized_gains),
-            total_value_eur=normalize_zero(total_value_eur),
+            total_eur_amount=normalize_zero(total_eur_amount),
             holdings=holdings_list,
             total_holdings_cost=normalize_zero(total_holdings_cost),
             total_current_value=normalize_zero(total_current_value),

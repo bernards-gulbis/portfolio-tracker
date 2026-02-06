@@ -48,7 +48,7 @@ class TransactionRepository:
         statement = (
             select(Transaction)
             .where(Transaction.portfolio_id == portfolio_id)
-            .order_by(Transaction.date_time.desc(), Transaction.id.desc())
+            .order_by(Transaction.date.desc(), Transaction.id.desc())
             .offset(offset)
             .limit(page_size)
         )
