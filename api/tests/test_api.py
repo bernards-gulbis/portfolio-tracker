@@ -1164,7 +1164,7 @@ def test_portfolio_status_overselling(client: TestClient):
             "ticker": "AAPL",
             "quantity": 10.0,
             "price_per_share": 150.0,
-            "total_amount": 1500.0,
+            "total_amount": -1501.0,
             "fee": 1.0
         }
     )

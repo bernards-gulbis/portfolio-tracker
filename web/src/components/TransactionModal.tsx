@@ -38,7 +38,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
     setTicker('');
     setQuantity('');
     setPricePerShare('');
-    setFee('');
+    setFee('0.00');
     setTotalAmount('');
     setValueEur('');
     setSplitRatio('');
@@ -58,10 +58,10 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       setType(transaction.type);
       setTicker(transaction.ticker || '');
       setQuantity(transaction.quantity?.toString() || '');
-      setPricePerShare(transaction.price_per_share?.toString() || '');
-      setFee(transaction.fee?.toString() || '');
-      setTotalAmount(Math.abs(transaction.total_amount).toString());
-      setValueEur(transaction.eur_amount ? Math.abs(transaction.eur_amount).toString() : '');
+      setPricePerShare(transaction.price_per_share ? transaction.price_per_share.toFixed(2) : '');
+      setFee(transaction.fee ? transaction.fee.toFixed(2) : '0.00');
+      setTotalAmount(Math.abs(transaction.total_amount).toFixed(2));
+      setValueEur(transaction.eur_amount ? Math.abs(transaction.eur_amount).toFixed(2) : '');
       setSplitRatio(transaction.split_ratio?.toString() || '');
     } else {
       resetForm();
@@ -301,12 +301,10 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
               </div>
             )}
 
-            {/* Price per Share (for Buy, Sell, Dividend) */}
+            {/* Price per Share (for Buy, Sell) */}
             {showPricePerShare && (
               <div className="form-group">
-                <label htmlFor="price-per-share">
-                  {type === TransactionType.DIVIDEND ? 'Amount (without fees) *' : 'Price per Share *'}
-                </label>
+                <label htmlFor="price-per-share">Price per Share *</label>
                 <input
                   id="price-per-share"
                   type="number"

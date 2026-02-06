@@ -50,8 +50,7 @@ app = FastAPI(
     title="Portfolio Tracker API",
     description="API for tracking investment portfolios and transactions",
     version="1.0.0",
-    lifespan=lifespan,
-    root_path="/api/v1"
+    lifespan=lifespan
 )
 
 # Configure CORS

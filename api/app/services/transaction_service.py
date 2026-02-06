@@ -335,10 +335,10 @@ class TransactionService:
         # Parse required value field
         total_amount_str = row.get("total_amount", "").strip()
         if not total_amount_str:
-            raise ValueError("Value field is required")
+            raise ValueError("total_amount field is required")
         total_amount = self._clean_csv_number(total_amount_str, "total_amount")
         if total_amount is None:
-            raise ValueError(f"Invalid value: {total_amount_str}")
+            raise ValueError(f"Invalid total_amount: {total_amount_str}")
         
         # Validate sign matches transaction type
         # BUY, WITHDRAW, FEE should be negative; DEPOSIT, SELL, DIVIDEND should be positive; SPLIT should be 0

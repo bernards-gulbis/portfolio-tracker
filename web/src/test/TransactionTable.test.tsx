@@ -27,7 +27,7 @@ const mockTransactions: Transaction[] = [
     quantity: 15.00000001,
     price_per_share: 183.69,
     fee: 0,
-    total_amount: 2755.35,  // Now stored as positive (displayed as negative)
+    total_amount: -2755.35,  // Stored as negative (money leaving account)
     eur_amount: null,
     split_ratio: null,
   },

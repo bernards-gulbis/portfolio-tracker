@@ -181,7 +181,7 @@ npm test -- --watch
 - `POST /api/v1/portfolios/{portfolio_id}/transactions/` - Create new transaction
 - `PUT /api/v1/transactions/{id}` - Update transaction
 - `DELETE /api/v1/transactions/{id}` - Delete transaction
-- `POST /api/v1/portfolios/{portfolio_id}/transactions/upload-csv` - Bulk upload via CSV
+- `POST /api/v1/portfolios/{portfolio_id}/transactions/import` - Bulk upload via CSV
 - `GET /api/v1/portfolios/{portfolio_id}/transactions/export-csv` - Export transactions to CSV
 
 ### CSV Upload Format
@@ -194,8 +194,8 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
 01/16/2024 14:30:00,Buy,AAPL,10,150.00,1.00,-1501.00,,
 01/17/2024 09:00:00,Sell,MSFT,5,380.25,0.50,1900.75,,
 01/18/2024 11:00:00,Dividend,AAPL,,,0.00,50.00,,
-01/19/2024 16:00:00,Withdraw,,,,,,-1000.00,-920.00,
-01/20/2024 10:00:00,Fee,,,,,,-10.00,,
+01/19/2024 16:00:00,Withdraw,,,,-1000.00,-920.00,
+01/20/2024 10:00:00,Fee,,,,-10.00,,
 02/01/2024 09:30:00,Split,AAPL,,,,,0.00,,2.0
 ```
 
