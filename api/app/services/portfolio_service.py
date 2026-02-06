@@ -193,7 +193,7 @@ class PortfolioService:
                 cash_balance += total_amount  # total_amount is negative, so this subtracts
                 
             elif tx_type == TransactionType.SPLIT:
-                # Split adjusts the number of quantity
+                # Split adjusts the number of shares
                 ticker = transaction.ticker
                 split_ratio = transaction.split_ratio or 1.0
                 
