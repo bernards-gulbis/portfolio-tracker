@@ -4,6 +4,7 @@ Portfolio service for business logic
 import math
 import logging
 from typing import List, Dict
+from datetime import datetime
 from sqlmodel import Session
 from app.models import Portfolio, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
@@ -112,9 +113,14 @@ class PortfolioService:
         realized_gains = 0.0
         total_eur_amount = 0.0  # Sum of all deposit and withdraw EUR values
         holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {quantity, total_cost}
+        first_transaction_date = None
         
         # Process each transaction
         for transaction in transactions:
+            # Track first transaction date for annualized yield calculation
+            if first_transaction_date is None:
+                first_transaction_date = transaction.date
+                
             tx_type = transaction.type
             total_amount = transaction.total_amount  # Now stored with correct sign
             
@@ -263,6 +269,25 @@ class PortfolioService:
         # Calculate total portfolio value
         total_portfolio_value = cash_balance + total_current_value
         
+        # Calculate annualized yield percentage
+        current_yield = 0.0
+        if total_invested > 0 and first_transaction_date is not None:
+            # Calculate time period in years
+            current_date = datetime.now()
+            time_delta = current_date - first_transaction_date
+            years = time_delta.days / 365.25  # Account for leap years
+            
+            # Calculate total return
+            total_return = total_portfolio_value / total_invested
+            
+            # Annualize the return if time period is at least 1 day
+            if years > (1/365.25):  # At least 1 day
+                # Annualized return: (total_return ^ (1/years) - 1) * 100
+                current_yield = (math.pow(total_return, 1/years) - 1) * 100
+            else:
+                # For very short periods, use simple return
+                current_yield = (total_return - 1) * 100
+        
         # Normalize negative zero values for display
         def normalize_zero(value: float) -> float:
             """Convert -0.0 to 0.0 to avoid negative zero display"""
@@ -280,5 +305,6 @@ class PortfolioService:
             total_holdings_cost=normalize_zero(total_holdings_cost),
             total_current_value=normalize_zero(total_current_value),
             unrealized_gains=normalize_zero(total_unrealized_gains),
-            total_portfolio_value=normalize_zero(total_portfolio_value)
+            total_portfolio_value=normalize_zero(total_portfolio_value),
+            current_yield=normalize_zero(current_yield)
         )

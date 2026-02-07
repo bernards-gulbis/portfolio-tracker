@@ -109,6 +109,7 @@ export interface PortfolioStatus {
   total_current_value: number;
   unrealized_gains: number;
   total_portfolio_value: number;
+  current_yield: number;
 }
 
 // ================== API Configuration ==================

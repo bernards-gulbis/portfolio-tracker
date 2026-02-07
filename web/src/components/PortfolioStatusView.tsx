@@ -48,18 +48,35 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
       {/* Financial Summary */}
       <div className="status-summary">
         <div className="status-card">
-          <h3>Cash Balance</h3>
+          <h3>Invested</h3>
+          <p className="status-value">{formatCurrency(status.total_invested)}</p>
+        </div>
+
+        <div className="status-card">
+          <h3>Holdings Market Value</h3>
+          <p className="status-value">{formatCurrency(status.total_current_value)}</p>
+        </div>
+
+        <div className="status-card">
+          <h3>Cash</h3>
           <p className="status-value">{formatCurrency(status.cash_balance)}</p>
         </div>
 
         <div className="status-card">
-          <h3>Total Portfolio Value</h3>
+          <h3>Portfolio Value</h3>
           <p className="status-value">{formatCurrency(status.total_portfolio_value)}</p>
         </div>
 
         <div className="status-card">
-          <h3>Total Invested</h3>
-          <p className="status-value">{formatCurrency(status.total_invested)}</p>
+          <h3>Dividends</h3>
+          <p className="status-value">{formatCurrency(status.dividends_received)}</p>
+        </div>
+
+        <div className="status-card">
+          <h3>Yield</h3>
+          <p className={`status-value`}>
+            {status.current_yield.toFixed(2)}%
+          </p>
         </div>
 
         <div className="status-card">
@@ -74,21 +91,6 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
           <p className={`status-value ${status.realized_gains >= 0 ? 'positive' : 'negative'}`}>
             {formatCurrency(status.realized_gains)}
           </p>
-        </div>
-
-        <div className="status-card">
-          <h3>Dividends Received</h3>
-          <p className="status-value">{formatCurrency(status.dividends_received)}</p>
-        </div>
-
-        <div className="status-card">
-          <h3>Holdings Cost Basis</h3>
-          <p className="status-value">{formatCurrency(status.total_holdings_cost)}</p>
-        </div>
-
-        <div className="status-card">
-          <h3>Holdings Market Value</h3>
-          <p className="status-value">{formatCurrency(status.total_current_value)}</p>
         </div>
       </div>
 

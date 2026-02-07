@@ -186,5 +186,6 @@ class PortfolioStatusResponse(BaseModel):
     total_current_value: float  # Sum of current market value of all holdings
     unrealized_gains: float  # Total unrealized gains/losses
     total_portfolio_value: float  # Cash + Holdings current value
+    current_yield: float  # Annualized yield percentage based on portfolio value vs invested amount
     
     model_config = ConfigDict(from_attributes=True)
