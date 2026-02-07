@@ -99,16 +99,18 @@ export interface Holding {
 export interface PortfolioStatus {
   portfolio_id: number;
   portfolio_name: string;
-  cash_balance: number;
-  total_invested: number;
-  dividends_received: number;
-  realized_gains: number;
-  total_eur_amount: number;
+  portfolio_value: number;
+  portfolio_value_eur: number | null;
+  invested: number;
+  invested_eur: number;
+  dividends: number;
+  dividends_eur: number | null;
+  cash: number;
   holdings: Holding[];
-  total_holdings_cost: number;
-  total_current_value: number;
+  holdings_cost: number;
+  holdings_value: number;
   unrealized_gains: number;
-  total_portfolio_value: number;
+  realized_gains: number;
   current_yield: number;
 }
 

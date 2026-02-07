@@ -49,27 +49,33 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
       <div className="status-summary">
         <div className="status-card">
           <h3>Invested</h3>
-          <p className="status-value">{formatCurrency(status.total_invested)}</p>
-        </div>
-
-        <div className="status-card">
-          <h3>Holdings Market Value</h3>
-          <p className="status-value">{formatCurrency(status.total_current_value)}</p>
-        </div>
-
-        <div className="status-card">
-          <h3>Cash</h3>
-          <p className="status-value">{formatCurrency(status.cash_balance)}</p>
+          <p className="status-value">{formatCurrency(status.invested)}</p>
+          <p className="status-value-secondary">{formatCurrency(status.invested_eur, 'EUR')}</p>
         </div>
 
         <div className="status-card">
           <h3>Portfolio Value</h3>
-          <p className="status-value">{formatCurrency(status.total_portfolio_value)}</p>
+          <p className="status-value">{formatCurrency(status.portfolio_value)}</p>
+          <p className="status-value-secondary">
+            {status.portfolio_value_eur !== null
+              ? formatCurrency(status.portfolio_value_eur, 'EUR')
+              : formatCurrency(status.portfolio_value)}
+          </p>
+        </div>
+
+        <div className="status-card">
+          <h3>Holdings Market Value</h3>
+          <p className="status-value">{formatCurrency(status.holdings_value)}</p>
+        </div>
+
+        <div className="status-card">
+          <h3>Cash</h3>
+          <p className="status-value">{formatCurrency(status.cash)}</p>
         </div>
 
         <div className="status-card">
           <h3>Dividends</h3>
-          <p className="status-value">{formatCurrency(status.dividends_received)}</p>
+          <p className="status-value">{formatCurrency(status.dividends)}</p>
         </div>
 
         <div className="status-card">

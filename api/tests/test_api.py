@@ -747,13 +747,13 @@ def test_portfolio_status_empty_portfolio(client: TestClient):
     
     assert data["portfolio_id"] == portfolio_id
     assert data["portfolio_name"] == "Empty Portfolio"
-    assert data["cash_balance"] == 0.0
-    assert data["total_invested"] == 0.0
-    assert data["dividends_received"] == 0.0
-    assert data["realized_gains"] == 0.0
-    assert data["total_eur_amount"] == 0.0
+    assert data["invested"] == 0.0
+    assert data["invested_eur"] == 0.0
+    assert data["dividends"] == 0.0
+    assert data["cash"] == 0.0
     assert data["holdings"] == []
-    assert data["total_holdings_cost"] == 0.0
+    assert data["realized_gains"] == 0.0
+    assert data["holdings_cost"] == 0.0
 
 
 def test_portfolio_status_with_deposit(client: TestClient):
@@ -781,8 +781,8 @@ def test_portfolio_status_with_deposit(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 1000.0
-    assert data["total_invested"] == 1000.0
+    assert data["cash"] == 1000.0
+    assert data["invested"] == 1000.0
     assert data["holdings"] == []
 
 
@@ -838,8 +838,8 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 2000.0  # 5000 - 1500 - 1500 (fees included in values)
-    assert data["total_invested"] == 5000.0
+    assert data["cash"] == 2000.0  # 5000 - 1500 - 1500 (fees included in values)
+    assert data["invested"] == 5000.0
     assert len(data["holdings"]) == 2
     
     # Check AAPL holding
@@ -854,7 +854,7 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     assert msft_holding["average_cost"] == 300.0
     assert msft_holding["total_cost"] == 1500.0
     
-    assert data["total_holdings_cost"] == 3000.0
+    assert data["holdings_cost"] == 3000.0
 
 
 def test_portfolio_status_with_sell_transactions(client: TestClient):
@@ -909,8 +909,8 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 9500.0  # 10000 - 2000 + 1500 (fees included in values)
-    assert data["total_invested"] == 10000.0
+    assert data["cash"] == 9500.0  # 10000 - 2000 + 1500 (fees included in values)
+    assert data["invested"] == 10000.0
     
     # Should have 10 AAPL left
     assert len(data["holdings"]) == 1
@@ -985,8 +985,8 @@ def test_portfolio_status_with_dividends(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 3600.0  # 5000 - 1500 + 50 + 50 (fees included in values)
-    assert data["dividends_received"] == 100.0
+    assert data["cash"] == 3600.0  # 5000 - 1500 + 50 + 50 (fees included in values)
+    assert data["dividends"] == 100.0
     assert len(data["holdings"]) == 1
 
 
@@ -1086,8 +1086,8 @@ def test_portfolio_status_with_withdrawal(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 3000.0  # 5000 - 2000
-    assert data["total_invested"] == 3000.0  # 5000 - 2000
+    assert data["cash"] == 3000.0  # 5000 - 2000
+    assert data["invested"] == 3000.0  # 5000 - 2000
 
 
 def test_portfolio_status_nonexistent_portfolio(client: TestClient):
@@ -1370,7 +1370,7 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     data = response.json()
     
     # Check cash balance
-    assert data["cash_balance"] == 7000.0  # 10000 - 1500 - 1500
+    assert data["cash"] == 7000.0  # 10000 - 1500 - 1500
     
     # Check AAPL holding with price data
     aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
@@ -1393,10 +1393,10 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     assert abs(msft_holding["unrealized_gain_loss_percent"] - (-10.0)) < 0.01
     
     # Check portfolio totals
-    assert data["total_holdings_cost"] == 3000.0
-    assert data["total_current_value"] == 3150.0  # 1800 + 1350
+    assert data["holdings_cost"] == 3000.0
+    assert data["holdings_value"] == 3150.0  # 1800 + 1350
     assert data["unrealized_gains"] == 150.0  # 300 - 150
-    assert data["total_portfolio_value"] == 10150.0  # 7000 cash + 3150 holdings
+    assert data["portfolio_value"] == 10150.0  # 7000 cash + 3150 holdings
 
 
 def test_portfolio_status_with_missing_prices(client: TestClient):
@@ -1470,7 +1470,7 @@ def test_portfolio_status_with_missing_prices(client: TestClient):
     assert unknown_holding["unrealized_gain_loss_percent"] is None
     
     # Totals should only include holdings with prices
-    assert data["total_current_value"] == 1800.0  # Only AAPL
+    assert data["holdings_value"] == 1800.0  # Only AAPL
     assert data["unrealized_gains"] == 300.0  # Only AAPL gain
 
 
@@ -1658,9 +1658,9 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
     assert data["unrealized_gains"] == 1000.0
     
     # Total portfolio value: 5000 cash + (7500 + 3500 + 5000) holdings = 21000
-    assert data["cash_balance"] == 5000.0
-    assert data["total_current_value"] == 16000.0
-    assert data["total_portfolio_value"] == 21000.0
+    assert data["cash"] == 5000.0
+    assert data["holdings_value"] == 16000.0
+    assert data["portfolio_value"] == 21000.0
 
 
 # ================== Health Check Test ==================

@@ -107,11 +107,11 @@ class PortfolioService:
         transactions.sort(key=lambda t: (t.date, t.id))
         
         # Initialize tracking variables
-        cash_balance = 0.0
-        total_invested = 0.0  # Deposits - Withdrawals
-        dividends_received = 0.0
+        cash = 0.0
+        invested = 0.0  # Deposits - Withdrawals
+        dividends = 0.0
         realized_gains = 0.0
-        total_eur_amount = 0.0  # Sum of all deposit and withdraw EUR values
+        invested_eur = 0.0  # Sum of all deposit and withdraw EUR values
         holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {quantity, total_cost}
         first_transaction_date = None
         
@@ -126,21 +126,21 @@ class PortfolioService:
             
             if tx_type == TransactionType.DEPOSIT:
                 # Deposit adds cash and increases invested amount (stored as positive)
-                cash_balance += total_amount
-                total_invested += total_amount
+                cash += total_amount
+                invested += total_amount
                 if transaction.eur_amount is not None:
-                    total_eur_amount += transaction.eur_amount
+                    invested_eur += transaction.eur_amount
                 
             elif tx_type == TransactionType.WITHDRAW:
                 # Withdraw removes cash and decreases invested amount (stored as negative)
-                cash_balance += total_amount  # total_amount is negative, so this subtracts
-                total_invested += total_amount  # total_amount is negative, so this subtracts
+                cash += total_amount  # total_amount is negative, so this subtracts
+                invested += total_amount  # total_amount is negative, so this subtracts
                 if transaction.eur_amount is not None:
-                    total_eur_amount += transaction.eur_amount  # eur_amount is negative for withdraws
+                    invested_eur += transaction.eur_amount  # eur_amount is negative for withdraws
                 
             elif tx_type == TransactionType.BUY:
                 # Buy decreases cash and adds to holdings (stored as negative)
-                cash_balance += total_amount  # total_amount is negative, so this subtracts
+                cash += total_amount  # total_amount is negative, so this subtracts
                 
                 ticker = transaction.ticker
                 quantity = transaction.quantity or 0
@@ -155,7 +155,7 @@ class PortfolioService:
                     
             elif tx_type == TransactionType.SELL:
                 # Sell increases cash, removes from holdings, and calculates gain (stored as positive)
-                cash_balance += total_amount
+                cash += total_amount
                 
                 ticker = transaction.ticker
                 quantity = transaction.quantity or 0
@@ -191,12 +191,12 @@ class PortfolioService:
                         
             elif tx_type == TransactionType.DIVIDEND:
                 # Dividend adds cash and tracks dividend income (stored as positive)
-                cash_balance += total_amount
-                dividends_received += total_amount
+                cash += total_amount
+                dividends += total_amount
                 
             elif tx_type == TransactionType.FEE:
                 # Fee reduces cash (stored as negative)
-                cash_balance += total_amount  # total_amount is negative, so this subtracts
+                cash += total_amount  # total_amount is negative, so this subtracts
                 
             elif tx_type == TransactionType.SPLIT:
                 # Split adjusts the number of shares
@@ -216,7 +216,7 @@ class PortfolioService:
         
         # Convert holdings dict to list of HoldingResponse
         holdings_list = []
-        total_holdings_cost = 0.0
+        holdings_cost = 0.0
         
         # Get current prices for all tickers
         tickers = list(holdings.keys())
@@ -228,8 +228,8 @@ class PortfolioService:
             current_prices = {ticker: None for ticker in tickers}
         
         # Calculate holdings with current prices and unrealized gains
-        total_current_value = 0.0
-        total_unrealized_gains = 0.0
+        holdings_value = 0.0
+        unrealized_gains = 0.0
         
         for ticker, holding_data in holdings.items():
             quantity = holding_data['quantity']
@@ -248,8 +248,8 @@ class PortfolioService:
                 if total_cost > 0:
                     unrealized_gain_loss_percent = (unrealized_gain_loss / total_cost) * 100
                 
-                total_current_value += current_value
-                total_unrealized_gains += unrealized_gain_loss
+                holdings_value += current_value
+                unrealized_gains += unrealized_gain_loss
             
             holdings_list.append(HoldingResponse(
                 ticker=ticker,
@@ -261,24 +261,35 @@ class PortfolioService:
                 unrealized_gain_loss=unrealized_gain_loss,
                 unrealized_gain_loss_percent=unrealized_gain_loss_percent
             ))
-            total_holdings_cost += total_cost
+            holdings_cost += total_cost
         
         # Sort holdings by ticker
         holdings_list.sort(key=lambda h: h.ticker)
         
         # Calculate total portfolio value
-        total_portfolio_value = cash_balance + total_current_value
+        portfolio_value = cash + holdings_value
+        
+        # Calculate portfolio value in EUR
+        portfolio_value_eur = None
+        dividends_eur = None
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+            if usd_to_eur_rate is not None:
+                portfolio_value_eur = portfolio_value * usd_to_eur_rate
+                dividends_eur = dividends * usd_to_eur_rate
+        except Exception as e:
+            logger.error(f"Error fetching USD to EUR exchange rate for portfolio {portfolio_id}: {e}", exc_info=True)
         
         # Calculate annualized yield percentage
         current_yield = 0.0
-        if total_invested > 0 and first_transaction_date is not None:
+        if invested > 0 and first_transaction_date is not None:
             # Calculate time period in years
             current_date = datetime.now()
             time_delta = current_date - first_transaction_date
             years = time_delta.days / 365.25  # Account for leap years
             
             # Calculate total return
-            total_return = total_portfolio_value / total_invested
+            total_return = portfolio_value / invested
             
             # Annualize the return if time period is at least 1 day
             if years > (1/365.25):  # At least 1 day
@@ -296,15 +307,17 @@ class PortfolioService:
         return PortfolioStatusResponse(
             portfolio_id=portfolio.id,
             portfolio_name=portfolio.name,
-            cash_balance=normalize_zero(cash_balance),
-            total_invested=normalize_zero(total_invested),
-            dividends_received=normalize_zero(dividends_received),
-            realized_gains=normalize_zero(realized_gains),
-            total_eur_amount=normalize_zero(total_eur_amount),
+            portfolio_value=normalize_zero(portfolio_value),
+            portfolio_value_eur=normalize_zero(portfolio_value_eur) if portfolio_value_eur is not None else None,
+            invested=normalize_zero(invested),
+            invested_eur=normalize_zero(invested_eur),
+            dividends=normalize_zero(dividends),
+            dividends_eur=normalize_zero(dividends_eur) if dividends_eur is not None else None,
+            cash=normalize_zero(cash),
             holdings=holdings_list,
-            total_holdings_cost=normalize_zero(total_holdings_cost),
-            total_current_value=normalize_zero(total_current_value),
-            unrealized_gains=normalize_zero(total_unrealized_gains),
-            total_portfolio_value=normalize_zero(total_portfolio_value),
+            holdings_cost=normalize_zero(holdings_cost),
+            holdings_value=normalize_zero(holdings_value),
+            unrealized_gains=normalize_zero(unrealized_gains),
+            realized_gains=normalize_zero(realized_gains),
             current_yield=normalize_zero(current_yield)
         )

@@ -176,16 +176,18 @@ class PortfolioStatusResponse(BaseModel):
     """Schema for portfolio status with calculated metrics"""
     portfolio_id: int
     portfolio_name: str
-    cash_balance: float
-    total_invested: float  # Deposits - Withdrawals
-    dividends_received: float
-    realized_gains: float  # Gains/losses from sells
-    total_eur_amount: float  # Sum of all eur_amount fields
+    portfolio_value: float  # Cash + Holdings current value
+    portfolio_value_eur: Optional[float]  # Portfolio value in EUR
+    invested: float  # Deposits - Withdrawals
+    invested_eur: float  # Sum of all eur_amount fields
+    dividends: float
+    dividends_eur: Optional[float]  # Dividends in EUR
+    cash: float
     holdings: List[HoldingResponse]
-    total_holdings_cost: float  # Sum of all holdings cost basis
-    total_current_value: float  # Sum of current market value of all holdings
+    holdings_cost: float  # Sum of all holdings cost basis
+    holdings_value: float  # Sum of current market value of all holdings
     unrealized_gains: float  # Total unrealized gains/losses
-    total_portfolio_value: float  # Cash + Holdings current value
+    realized_gains: float  # Gains/losses from sells
     current_yield: float  # Annualized yield percentage based on portfolio value vs invested amount
     
     model_config = ConfigDict(from_attributes=True)
