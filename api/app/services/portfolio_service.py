@@ -97,7 +97,55 @@ class PortfolioService:
         return copied_portfolio
     
     def calculate_portfolio_status(self, portfolio_id: int) -> PortfolioStatusResponse:
-        """Calculate current portfolio status including holdings, cash balance, and metrics"""
+        """
+        Calculate comprehensive portfolio status including holdings, cash balance, and performance metrics.
+        
+        This method processes all transactions chronologically to build the current portfolio state,
+        calculates valuation at current market prices, and computes tax-adjusted return metrics.
+        
+        Args:
+            portfolio_id: The ID of the portfolio to calculate status for
+            
+        Returns:
+            PortfolioStatusResponse containing:
+                - current_value: Total current value in USD (cash + holdings at market prices)
+                - current_value_eur: Current value converted to EUR at current exchange rate
+                - principal: Net deposits/withdrawals in USD (deposits - withdrawals)
+                - principal_eur: Net deposits/withdrawals converted to EUR at historical exchange rates
+                - unrealized_gains: Current paper gains/losses on open positions in USD
+                - unrealized_gains_eur: Unrealized gains converted to EUR at current exchange rate
+                - unrealized_gains_percent: Unrealized gains as percentage of cost basis (if holdings exist)
+                - realized_gains: Cumulative gains/losses from closed positions in USD
+                - dividends: Total dividends received in USD
+                - dividends_eur: Total dividends converted to EUR at historical exchange rates
+                - tax_eur: Estimated tax liability (TAX_RATE * capital_gains_eur) where capital_gains excludes dividends
+                - total_return_after_tax_eur: Net profit after taxes (current_value_eur - principal_eur - tax_eur)
+                - total_return_after_tax_percent: After-tax return as percentage of principal_eur
+                - cash_balance: Cash available in USD
+                - holdings: List of current positions with quantities and market values
+                
+        Raises:
+            PortfolioNotFoundException: If portfolio_id does not exist
+            
+        Calculation Logic:
+            1. Process transactions chronologically to build position history:
+               - DEPOSIT/WITHDRAW: Update cash and principal
+               - BUY: Reduce cash, increase holdings quantity and cost basis
+               - SELL: Increase cash, reduce holdings, calculate realized gains
+               - DIVIDEND: Increase cash and track dividends separately
+            2. Value current holdings at latest market prices (excluding holdings without prices)
+            3. Convert USD values to EUR using appropriate exchange rates:
+               - principal_eur: Sum of deposits/withdrawals converted at their historical rates
+               - dividends_eur: Sum of dividends converted at their historical rates
+               - current_value_eur, unrealized_gains_eur: Current values at today's rate
+            4. Calculate tax on capital gains: (current_value_eur - principal_eur - dividends_eur) * TAX_RATE
+            5. Calculate after-tax return: (current_value_eur - principal_eur) - tax_eur
+            
+        Edge Cases:
+            - Holdings without current price: Excluded from unrealized gains calculation
+            - Zero principal: Returns None for percentage-based metrics to avoid division by zero
+            - Negative cash balance: Allowed (represents margin/borrowed funds)
+        """
         # Get portfolio
         portfolio = self.portfolio_repo.get_by_id(portfolio_id)
         if not portfolio:
@@ -284,11 +332,13 @@ class PortfolioService:
         current_value = cash + holdings_value
         
         # Calculate unrealized gains percentage
+        # Note: Only includes holdings with available prices in both numerator and denominator
         unrealized_gains_percent = None
         if holdings_cost > 0:
             unrealized_gains_percent = (unrealized_gains / holdings_cost) * 100
         
-        # Calculate portfolio value in EUR
+        # Calculate portfolio value in EUR using current exchange rate
+        # Note: All USD values are converted using the current rate, regardless of transaction dates
         current_value_eur = None
         unrealized_gains_eur = None
         try:
@@ -299,13 +349,15 @@ class PortfolioService:
         except Exception as e:
             logger.error(f"Error fetching USD to EUR exchange rate for portfolio {portfolio_id}: {e}", exc_info=True)
         
-        # Calculate tax_eur (cannot be negative)
+        # Calculate tax on capital gains (cannot be negative)
+        # Tax base = current portfolio value - initial principal - dividends received
+        # This represents only price appreciation gains (both realized and unrealized)
+        # Dividends are excluded as they may have different tax treatment
         tax_eur = None
         if current_value_eur is not None:
             dividends_for_tax = dividends_eur if dividends_eur is not None else 0.0
-            tax_eur = (current_value_eur - principal_eur - dividends_for_tax) * TAX_RATE
-            if tax_eur < 0:
-                tax_eur = 0.0
+            capital_gains = current_value_eur - principal_eur - dividends_for_tax
+            tax_eur = capital_gains * TAX_RATE if capital_gains > 0 else 0.0
         
         # Calculate total return after tax
         total_return_after_tax_eur = None
@@ -315,11 +367,12 @@ class PortfolioService:
             if principal_eur != 0:
                 total_return_after_tax_percent = (total_return_after_tax_eur / principal_eur) * 100
         
-        # Set dividends_eur to None if no dividend transactions had fx_rate or eur_amount
-        if dividends_eur == 0.0 and dividends == 0.0:
+        # Set dividends_eur to None if no EUR conversion is available
+        if dividends > 0.0 and dividends_eur == 0.0:
+            # Dividends exist but no EUR conversion was available
             dividends_eur = None
-        elif dividends_eur == 0.0 and dividends > 0.0:
-            # If we have dividends but no EUR calculation, set to None
+        elif dividends == 0.0:
+            # No dividends at all
             dividends_eur = None
         
         # Normalize negative zero values for display

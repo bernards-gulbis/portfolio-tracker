@@ -80,12 +80,11 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               : ''
           }`}>
             {status.total_return_after_tax_eur !== null
-              ? formatCurrency(status.total_return_after_tax_eur, 'EUR')
-              : '-'}
-          </p>
-          <p className="status-value-secondary">
-            {status.total_return_after_tax_percent !== null
-              ? `${status.total_return_after_tax_percent.toFixed(2)}%`
+              ? `${status.total_return_after_tax_eur > 0 ? '+' : status.total_return_after_tax_eur < 0 ? '' : ''}${formatCurrency(status.total_return_after_tax_eur, 'EUR')} ${
+                  status.total_return_after_tax_percent !== null
+                    ? `(${status.total_return_after_tax_percent > 0 ? '+' : status.total_return_after_tax_percent < 0 ? '' : ''}${status.total_return_after_tax_percent.toFixed(2)}%)`
+                    : ''
+                }`
               : '-'}
           </p>
         </div>
@@ -104,12 +103,11 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
           <h3>Unrealized Gains</h3>
           <p className={`status-value ${status.unrealized_gains >= 0 ? 'positive' : 'negative'}`}>
             {status.unrealized_gains_eur !== null
-              ? formatCurrency(status.unrealized_gains_eur, 'EUR')
-              : '-'}
-          </p>
-          <p className="status-value-secondary">
-            {status.unrealized_gains_percent !== null
-              ? `${status.unrealized_gains_percent.toFixed(2)}%`
+              ? `${status.unrealized_gains_eur > 0 ? '+' : status.unrealized_gains_eur < 0 ? '' : ''}${formatCurrency(status.unrealized_gains_eur, 'EUR')} ${
+                  status.unrealized_gains_percent !== null
+                    ? `(${status.unrealized_gains_percent > 0 ? '+' : status.unrealized_gains_percent < 0 ? '' : ''}${status.unrealized_gains_percent.toFixed(2)}%)`
+                    : ''
+                }`
               : '-'}
           </p>
         </div>
