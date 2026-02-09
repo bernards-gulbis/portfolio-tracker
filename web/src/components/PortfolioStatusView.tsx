@@ -48,34 +48,29 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
       {/* Financial Summary */}
       <div className="status-summary">
         <div className="status-card">
-          <h3>Invested</h3>
-          <p className="status-value">{formatCurrency(status.invested)}</p>
-          <p className="status-value-secondary">{formatCurrency(status.invested_eur, 'EUR')}</p>
-        </div>
-
-        <div className="status-card">
           <h3>Portfolio Value</h3>
-          <p className="status-value">{formatCurrency(status.portfolio_value)}</p>
-          <p className="status-value-secondary">
+          <p className="status-value">
             {status.portfolio_value_eur !== null
               ? formatCurrency(status.portfolio_value_eur, 'EUR')
-              : formatCurrency(status.portfolio_value)}
+              : '-'}
           </p>
+          <p className="status-value-secondary">{formatCurrency(status.portfolio_value)}</p>
         </div>
 
         <div className="status-card">
-          <h3>Holdings Market Value</h3>
-          <p className="status-value">{formatCurrency(status.holdings_value)}</p>
+          <h3>Invested</h3>
+          <p className="status-value">{formatCurrency(status.invested_eur, 'EUR')}</p>
+          <p className="status-value-secondary">{formatCurrency(status.invested)}</p>
         </div>
-
-        <div className="status-card">
-          <h3>Cash</h3>
-          <p className="status-value">{formatCurrency(status.cash)}</p>
-        </div>
-
+        
         <div className="status-card">
           <h3>Dividends</h3>
-          <p className="status-value">{formatCurrency(status.dividends)}</p>
+          <p className="status-value">
+            {status.dividends_eur !== null
+              ? formatCurrency(status.dividends_eur, 'EUR')
+              : '-'}
+          </p>
+          <p className="status-value-secondary">{formatCurrency(status.dividends)}</p>
         </div>
 
         <div className="status-card">
@@ -86,82 +81,88 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
         </div>
 
         <div className="status-card">
-          <h3>Unrealized Gains</h3>
-          <p className={`status-value ${status.unrealized_gains >= 0 ? 'positive' : 'negative'}`}>
-            {formatCurrency(status.unrealized_gains)}
-          </p>
-        </div>
-
-        <div className="status-card">
           <h3>Realized Gains</h3>
           <p className={`status-value ${status.realized_gains >= 0 ? 'positive' : 'negative'}`}>
             {formatCurrency(status.realized_gains)}
           </p>
         </div>
+
+        <div className="status-card">
+          <h3>Unrealized Gains</h3>
+          <p className={`status-value ${status.unrealized_gains >= 0 ? 'positive' : 'negative'}`}>
+            {formatCurrency(status.unrealized_gains)}
+          </p>
+        </div>
       </div>
 
       {/* Holdings Table */}
-      {status.holdings.length > 0 ? (
-        <div className="holdings-section">
-          <h3>Current Holdings</h3>
-          <table className="holdings-table">
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Quantity</th>
-                <th>Avg Cost</th>
-                <th>Total Cost</th>
-                <th>Current Price</th>
-                <th>Market Value</th>
-                <th>Unrealized G/L</th>
-                <th>G/L %</th>
+      <div className="holdings-section">
+        <h3>Current Holdings</h3>
+        <table className="holdings-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Quantity</th>
+              <th>Avg Cost</th>
+              <th>Total Cost</th>
+              <th>Current Price</th>
+              <th>Market Value</th>
+              <th>Unrealized G/L</th>
+              <th>G/L %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Cash row */}
+            <tr key="CASH" className="cash-row">
+              <td><strong>CASH</strong></td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>{formatCurrency(status.cash)}</td>
+              <td>-</td>
+              <td>-</td>
+            </tr>
+            {/* Stock holdings */}
+            {status.holdings.map((holding) => (
+              <tr key={holding.ticker}>
+                <td><strong>{holding.ticker}</strong></td>
+                <td>{formatNumber(holding.quantity, 8)}</td>
+                <td>{formatCurrency(holding.average_cost)}</td>
+                <td>{formatCurrency(holding.total_cost)}</td>
+                <td>
+                  {holding.current_price !== null && holding.current_price !== undefined
+                    ? formatCurrency(holding.current_price)
+                    : '-'}
+                </td>
+                <td>
+                  {holding.current_value !== null && holding.current_value !== undefined
+                    ? formatCurrency(holding.current_value)
+                    : '-'}
+                </td>
+                <td className={
+                  holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
+                    ? holding.unrealized_gain_loss >= 0 ? 'positive' : 'negative'
+                    : ''
+                }>
+                  {holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
+                    ? formatCurrency(holding.unrealized_gain_loss)
+                    : '-'}
+                </td>
+                <td className={
+                  holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
+                    ? holding.unrealized_gain_loss_percent >= 0 ? 'positive' : 'negative'
+                    : ''
+                }>
+                  {holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
+                    ? `${holding.unrealized_gain_loss_percent.toFixed(2)}%`
+                    : '-'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {status.holdings.map((holding) => (
-                <tr key={holding.ticker}>
-                  <td><strong>{holding.ticker}</strong></td>
-                  <td>{formatNumber(holding.quantity, 8)}</td>
-                  <td>{formatCurrency(holding.average_cost)}</td>
-                  <td>{formatCurrency(holding.total_cost)}</td>
-                  <td>
-                    {holding.current_price !== null && holding.current_price !== undefined
-                      ? formatCurrency(holding.current_price)
-                      : '-'}
-                  </td>
-                  <td>
-                    {holding.current_value !== null && holding.current_value !== undefined
-                      ? formatCurrency(holding.current_value)
-                      : '-'}
-                  </td>
-                  <td className={
-                    holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
-                      ? holding.unrealized_gain_loss >= 0 ? 'positive' : 'negative'
-                      : ''
-                  }>
-                    {holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
-                      ? formatCurrency(holding.unrealized_gain_loss)
-                      : '-'}
-                  </td>
-                  <td className={
-                    holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
-                      ? holding.unrealized_gain_loss_percent >= 0 ? 'positive' : 'negative'
-                      : ''
-                  }>
-                    {holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
-                      ? `${holding.unrealized_gain_loss_percent.toFixed(2)}%`
-                      : '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="holdings-section">
-          <p>No holdings in this portfolio</p>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

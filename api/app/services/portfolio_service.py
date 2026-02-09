@@ -110,6 +110,7 @@ class PortfolioService:
         cash = 0.0
         invested = 0.0  # Deposits - Withdrawals
         dividends = 0.0
+        dividends_eur = 0.0  # Sum of all dividend EUR values calculated from fx_rate
         realized_gains = 0.0
         invested_eur = 0.0  # Sum of all deposit and withdraw EUR values
         holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {quantity, total_cost}
@@ -130,6 +131,8 @@ class PortfolioService:
                 invested += total_amount
                 if transaction.eur_amount is not None:
                     invested_eur += transaction.eur_amount
+                elif transaction.fx_rate is not None and transaction.fx_rate > 0:
+                    invested_eur += total_amount / transaction.fx_rate
                 
             elif tx_type == TransactionType.WITHDRAW:
                 # Withdraw removes cash and decreases invested amount (stored as negative)
@@ -137,6 +140,8 @@ class PortfolioService:
                 invested += total_amount  # total_amount is negative, so this subtracts
                 if transaction.eur_amount is not None:
                     invested_eur += transaction.eur_amount  # eur_amount is negative for withdraws
+                elif transaction.fx_rate is not None and transaction.fx_rate > 0:
+                    invested_eur += total_amount / transaction.fx_rate  # total_amount is negative for withdraws
                 
             elif tx_type == TransactionType.BUY:
                 # Buy decreases cash and adds to holdings (stored as negative)
@@ -145,7 +150,9 @@ class PortfolioService:
                 ticker = transaction.ticker
                 quantity = transaction.quantity or 0
                 price_per_share = transaction.price_per_share or 0
-                cost = abs(total_amount)  # Cost basis is positive
+                fee = transaction.fee or 0
+                # Cost basis includes purchase price plus fees
+                cost = quantity * price_per_share + fee
                 
                 if ticker:
                     if ticker not in holdings:
@@ -171,14 +178,17 @@ class PortfolioService:
                             f"Cannot sell {quantity} quantity of {ticker}: only {holdings[ticker]['quantity']} available"
                         )
                     
-                    # Calculate average cost per unit for this holding
+                    # Calculate average cost per unit for this holding (includes buy fees proportionally)
                     avg_cost_per_unit = (holdings[ticker]['total_cost'] / holdings[ticker]['quantity'] 
                                         if holdings[ticker]['quantity'] > 0 else 0)
                     
-                    # Cost basis of quantity being sold
+                    # Cost basis of quantity being sold (includes buy fees proportionally)
                     cost_basis = avg_cost_per_unit * quantity
                     
-                    # Realized gain = sale proceeds - cost basis (fees already included in total_amount)
+                    # Realized gain = net proceeds - cost basis
+                    # total_amount = sale proceeds after deducting sell fee
+                    # cost_basis = purchase cost including buy fees
+                    # Both buy and sell fees reduce the realized gain (standard accounting)
                     realized_gains += (total_amount - cost_basis)
                     
                     # Update holdings
@@ -193,6 +203,12 @@ class PortfolioService:
                 # Dividend adds cash and tracks dividend income (stored as positive)
                 cash += total_amount
                 dividends += total_amount
+                
+                # Calculate EUR amount using fx_rate if available
+                if transaction.eur_amount is not None:
+                    dividends_eur += transaction.eur_amount
+                elif transaction.fx_rate is not None and transaction.fx_rate > 0:
+                    dividends_eur += total_amount / transaction.fx_rate
                 
             elif tx_type == TransactionType.FEE:
                 # Fee reduces cash (stored as negative)
@@ -271,14 +287,19 @@ class PortfolioService:
         
         # Calculate portfolio value in EUR
         portfolio_value_eur = None
-        dividends_eur = None
         try:
             usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
             if usd_to_eur_rate is not None:
                 portfolio_value_eur = portfolio_value * usd_to_eur_rate
-                dividends_eur = dividends * usd_to_eur_rate
         except Exception as e:
             logger.error(f"Error fetching USD to EUR exchange rate for portfolio {portfolio_id}: {e}", exc_info=True)
+        
+        # Set dividends_eur to None if no dividend transactions had fx_rate or eur_amount
+        if dividends_eur == 0.0 and dividends == 0.0:
+            dividends_eur = None
+        elif dividends_eur == 0.0 and dividends > 0.0:
+            # If we have dividends but no EUR calculation, set to None
+            dividends_eur = None
         
         # Calculate annualized yield percentage
         current_yield = 0.0

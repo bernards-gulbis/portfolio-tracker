@@ -113,7 +113,7 @@ class TransactionService:
             'price_per_share',
             'fee',
             'total_amount',
-            'EUR',
+            'eur',
             'split_ratio',
             'currency',
             'fx_rate'
@@ -366,7 +366,7 @@ class TransactionService:
                 raise ValueError(f"SPLIT transactions must have total_amount of 0 in CSV, got {total_amount}")
         
         # Parse optional EUR value field
-        eur_amount = self._clean_csv_number(row.get("EUR", ""), "EUR")
+        eur_amount = self._clean_csv_number(row.get("eur", ""), "eur")
         if eur_amount is not None:
             # Validate EUR amount sign matches total_amount sign (except for SPLIT)
             if transaction_type != TransactionType.SPLIT:
