@@ -73,6 +73,24 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
         </div>
 
         <div className="status-card">
+          <h3>Return After Tax</h3>
+          <p className={`status-value ${
+            status.total_return_after_tax_eur !== null
+              ? status.total_return_after_tax_eur >= 0 ? 'positive' : 'negative'
+              : ''
+          }`}>
+            {status.total_return_after_tax_eur !== null
+              ? formatCurrency(status.total_return_after_tax_eur, 'EUR')
+              : '-'}
+          </p>
+          <p className="status-value-secondary">
+            {status.total_return_after_tax_percent !== null
+              ? `${status.total_return_after_tax_percent.toFixed(2)}%`
+              : '-'}
+          </p>
+        </div>
+
+        <div className="status-card">
           <h3>Current Value</h3>
           <p className="status-value">
             {status.current_value_eur !== null
@@ -92,24 +110,6 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
           <p className="status-value-secondary">
             {status.unrealized_gains_percent !== null
               ? `${status.unrealized_gains_percent.toFixed(2)}%`
-              : '-'}
-          </p>
-        </div>
-
-        <div className="status-card">
-          <h3>Return After Tax</h3>
-          <p className={`status-value ${
-            status.total_return_after_tax_eur !== null
-              ? status.total_return_after_tax_eur >= 0 ? 'positive' : 'negative'
-              : ''
-          }`}>
-            {status.total_return_after_tax_eur !== null
-              ? formatCurrency(status.total_return_after_tax_eur, 'EUR')
-              : '-'}
-          </p>
-          <p className="status-value-secondary">
-            {status.total_return_after_tax_percent !== null
-              ? `${status.total_return_after_tax_percent.toFixed(2)}%`
               : '-'}
           </p>
         </div>
