@@ -114,14 +114,9 @@ class PortfolioService:
         realized_gains = 0.0
         invested_eur = 0.0  # Sum of all deposit and withdraw EUR values
         holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {quantity, total_cost}
-        first_transaction_date = None
         
         # Process each transaction
         for transaction in transactions:
-            # Track first transaction date for annualized yield calculation
-            if first_transaction_date is None:
-                first_transaction_date = transaction.date
-                
             tx_type = transaction.type
             total_amount = transaction.total_amount  # Now stored with correct sign
             
@@ -301,30 +296,6 @@ class PortfolioService:
             # If we have dividends but no EUR calculation, set to None
             dividends_eur = None
         
-        # Calculate annualized yield percentage
-        current_yield = 0.0
-        if invested > 0 and first_transaction_date is not None:
-            # Calculate time period in years
-            current_date = datetime.now()
-            time_delta = current_date - first_transaction_date
-            years = time_delta.days / 365.25  # Account for leap years
-            
-            # Calculate total return
-            total_return = portfolio_value / invested
-            
-            # Annualize the return if time period is at least 1 day
-            if years > (1/365.25):  # At least 1 day
-                # Annualized return: (total_return ^ (1/years) - 1) * 100
-                # Handle negative returns (can't take fractional power of negative number)
-                if total_return > 0:
-                    current_yield = (math.pow(total_return, 1/years) - 1) * 100
-                else:
-                    # For negative returns, use simple annualized loss
-                    current_yield = ((total_return - 1) / years) * 100
-            else:
-                # For very short periods, use simple return
-                current_yield = (total_return - 1) * 100
-        
         # Normalize negative zero values for display
         def normalize_zero(value: float) -> float:
             """Convert -0.0 to 0.0 to avoid negative zero display"""
@@ -344,6 +315,5 @@ class PortfolioService:
             holdings_cost=normalize_zero(holdings_cost),
             holdings_value=normalize_zero(holdings_value),
             unrealized_gains=normalize_zero(unrealized_gains),
-            realized_gains=normalize_zero(realized_gains),
-            current_yield=normalize_zero(current_yield)
+            realized_gains=normalize_zero(realized_gains)
         )

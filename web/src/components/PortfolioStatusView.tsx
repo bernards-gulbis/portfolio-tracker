@@ -74,13 +74,6 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
         </div>
 
         <div className="status-card">
-          <h3>Yield</h3>
-          <p className={`status-value`}>
-            {status.current_yield.toFixed(2)}%
-          </p>
-        </div>
-
-        <div className="status-card">
           <h3>Realized Gains</h3>
           <p className={`status-value ${status.realized_gains >= 0 ? 'positive' : 'negative'}`}>
             {formatCurrency(status.realized_gains)}
