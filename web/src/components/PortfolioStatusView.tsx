@@ -48,19 +48,9 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
       {/* Financial Summary */}
       <div className="status-summary">
         <div className="status-card">
-          <h3>Portfolio Value</h3>
-          <p className="status-value">
-            {status.portfolio_value_eur !== null
-              ? formatCurrency(status.portfolio_value_eur, 'EUR')
-              : '-'}
-          </p>
-          <p className="status-value-secondary">{formatCurrency(status.portfolio_value)}</p>
-        </div>
-
-        <div className="status-card">
-          <h3>Invested</h3>
-          <p className="status-value">{formatCurrency(status.invested_eur, 'EUR')}</p>
-          <p className="status-value-secondary">{formatCurrency(status.invested)}</p>
+          <h3>Principal</h3>
+          <p className="status-value">{formatCurrency(status.principal_eur, 'EUR')}</p>
+          <p className="status-value-secondary">{formatCurrency(status.principal)}</p>
         </div>
         
         <div className="status-card">
@@ -74,16 +64,53 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
         </div>
 
         <div className="status-card">
-          <h3>Realized Gains</h3>
-          <p className={`status-value ${status.realized_gains >= 0 ? 'positive' : 'negative'}`}>
-            {formatCurrency(status.realized_gains)}
+          <h3>Tax EUR</h3>
+          <p className="status-value">
+            {status.tax_eur !== null
+              ? formatCurrency(status.tax_eur, 'EUR')
+              : '-'}
           </p>
+        </div>
+
+        <div className="status-card">
+          <h3>Current Value</h3>
+          <p className="status-value">
+            {status.current_value_eur !== null
+              ? formatCurrency(status.current_value_eur, 'EUR')
+              : '-'}
+          </p>
+          <p className="status-value-secondary">{formatCurrency(status.current_value)}</p>
         </div>
 
         <div className="status-card">
           <h3>Unrealized Gains</h3>
           <p className={`status-value ${status.unrealized_gains >= 0 ? 'positive' : 'negative'}`}>
-            {formatCurrency(status.unrealized_gains)}
+            {status.unrealized_gains_eur !== null
+              ? formatCurrency(status.unrealized_gains_eur, 'EUR')
+              : '-'}
+          </p>
+          <p className="status-value-secondary">
+            {status.unrealized_gains_percent !== null
+              ? `${status.unrealized_gains_percent.toFixed(2)}%`
+              : '-'}
+          </p>
+        </div>
+
+        <div className="status-card">
+          <h3>Return After Tax</h3>
+          <p className={`status-value ${
+            status.total_return_after_tax_eur !== null
+              ? status.total_return_after_tax_eur >= 0 ? 'positive' : 'negative'
+              : ''
+          }`}>
+            {status.total_return_after_tax_eur !== null
+              ? formatCurrency(status.total_return_after_tax_eur, 'EUR')
+              : '-'}
+          </p>
+          <p className="status-value-secondary">
+            {status.total_return_after_tax_percent !== null
+              ? `${status.total_return_after_tax_percent.toFixed(2)}%`
+              : '-'}
           </p>
         </div>
       </div>

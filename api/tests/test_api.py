@@ -753,8 +753,8 @@ def test_portfolio_status_empty_portfolio(client: TestClient):
     
     assert data["portfolio_id"] == portfolio_id
     assert data["portfolio_name"] == "Empty Portfolio"
-    assert data["invested"] == 0.0
-    assert data["invested_eur"] == 0.0
+    assert data["principal"] == 0.0
+    assert data["principal_eur"] == 0.0
     assert data["dividends"] == 0.0
     assert data["cash"] == 0.0
     assert data["holdings"] == []
@@ -788,7 +788,7 @@ def test_portfolio_status_with_deposit(client: TestClient):
     data = response.json()
     
     assert data["cash"] == 1000.0
-    assert data["invested"] == 1000.0
+    assert data["principal"] == 1000.0
     assert data["holdings"] == []
 
 
@@ -845,7 +845,7 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     data = response.json()
     
     assert data["cash"] == 2000.0  # 5000 - 1500 - 1500 (fees included in values)
-    assert data["invested"] == 5000.0
+    assert data["principal"] == 5000.0
     assert len(data["holdings"]) == 2
     
     # Check AAPL holding
@@ -916,7 +916,7 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
     data = response.json()
     
     assert data["cash"] == 9500.0  # 10000 - 2000 + 1500 (fees included in values)
-    assert data["invested"] == 10000.0
+    assert data["principal"] == 10000.0
     
     # Should have 10 AAPL left
     assert len(data["holdings"]) == 1
@@ -1093,7 +1093,7 @@ def test_portfolio_status_with_withdrawal(client: TestClient):
     data = response.json()
     
     assert data["cash"] == 3000.0  # 5000 - 2000
-    assert data["invested"] == 3000.0  # 5000 - 2000
+    assert data["principal"] == 3000.0  # 5000 - 2000
 
 
 def test_portfolio_status_nonexistent_portfolio(client: TestClient):
@@ -1402,7 +1402,7 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     assert data["holdings_cost"] == 3000.0
     assert data["holdings_value"] == 3150.0  # 1800 + 1350
     assert data["unrealized_gains"] == 150.0  # 300 - 150
-    assert data["portfolio_value"] == 10150.0  # 7000 cash + 3150 holdings
+    assert data["current_value"] == 10150.0  # 7000 cash + 3150 holdings
 
 
 def test_portfolio_status_with_missing_prices(client: TestClient):
@@ -1666,7 +1666,7 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
     # Total portfolio value: 5000 cash + (7500 + 3500 + 5000) holdings = 21000
     assert data["cash"] == 5000.0
     assert data["holdings_value"] == 16000.0
-    assert data["portfolio_value"] == 21000.0
+    assert data["current_value"] == 21000.0
 
 
 # ================== Health Check Test ==================

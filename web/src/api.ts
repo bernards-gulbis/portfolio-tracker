@@ -105,10 +105,10 @@ export interface Holding {
 export interface PortfolioStatus {
   portfolio_id: number;
   portfolio_name: string;
-  portfolio_value: number;
-  portfolio_value_eur: number | null;
-  invested: number;
-  invested_eur: number;
+  current_value: number;
+  current_value_eur: number | null;
+  principal: number;
+  principal_eur: number;
   dividends: number;
   dividends_eur: number | null;
   cash: number;
@@ -116,7 +116,12 @@ export interface PortfolioStatus {
   holdings_cost: number;
   holdings_value: number;
   unrealized_gains: number;
+  unrealized_gains_percent: number | null;
+  unrealized_gains_eur: number | null;
   realized_gains: number;
+  tax_eur: number | null;
+  total_return_after_tax_eur: number | null;
+  total_return_after_tax_percent: number | null;
 }
 
 // ================== API Configuration ==================

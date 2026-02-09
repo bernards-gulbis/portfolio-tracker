@@ -180,10 +180,10 @@ class PortfolioStatusResponse(BaseModel):
     """Schema for portfolio status with calculated metrics"""
     portfolio_id: int
     portfolio_name: str
-    portfolio_value: float  # Cash + Holdings current value
-    portfolio_value_eur: Optional[float]  # Portfolio value in EUR
-    invested: float  # Deposits - Withdrawals
-    invested_eur: float  # Sum of all eur_amount fields
+    current_value: float  # Cash + Holdings current value
+    current_value_eur: Optional[float]  # Portfolio value in EUR
+    principal: float  # Deposits - Withdrawals
+    principal_eur: float  # Sum of all eur_amount fields
     dividends: float
     dividends_eur: Optional[float]  # Dividends in EUR
     cash: float
@@ -191,6 +191,11 @@ class PortfolioStatusResponse(BaseModel):
     holdings_cost: float  # Sum of all holdings cost basis
     holdings_value: float  # Sum of current market value of all holdings
     unrealized_gains: float  # Total unrealized gains/losses
+    unrealized_gains_percent: Optional[float]  # Total unrealized gains/losses percentage
+    unrealized_gains_eur: Optional[float]  # Unrealized gains in EUR
     realized_gains: float  # Gains/losses from sells
+    tax_eur: Optional[float]  # Tax amount in EUR: 25% of (current_value_eur - principal_eur - dividends_eur), cannot be negative
+    total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
+    total_return_after_tax_percent: Optional[float]  # Total return after tax percentage
     
     model_config = ConfigDict(from_attributes=True)
