@@ -365,6 +365,8 @@ def test_export_transactions_csv(client: TestClient):
     assert "quantity" in header
     assert "price_per_share" in header
     assert "total_amount" in header
+    assert "currency" in header
+    assert "fx_rate" in header
     
     # Check first transaction (Deposit)
     assert "Deposit" in lines[1]
@@ -529,9 +531,9 @@ def test_csv_upload(client: TestClient):
     portfolio_id = portfolio_response.json()["id"]
     
     # Create CSV content
-    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
-2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio,currency,fx_rate
+2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",,USD,1.0871
+2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,,
 """
     
     # Upload CSV
@@ -551,6 +553,8 @@ def test_csv_upload(client: TestClient):
     assert transaction1["type"] == "Deposit"
     assert transaction1["total_amount"] == 3000.00
     assert transaction1["eur_amount"] == 2760.27
+    assert transaction1["currency"] == "USD"
+    assert transaction1["fx_rate"] == 1.0871
     
     # Verify second transaction (Buy)
     transaction2 = data["transactions"][1]
@@ -559,6 +563,8 @@ def test_csv_upload(client: TestClient):
     assert transaction2["quantity"] == 15.00000001
     assert transaction2["price_per_share"] == 183.69
     assert transaction2["total_amount"] == -2755.35
+    assert transaction2["currency"] is None
+    assert transaction2["fx_rate"] is None
 
 
 def test_csv_upload_invalid_file_type(client: TestClient):
@@ -583,8 +589,8 @@ def test_csv_upload_invalid_file_type(client: TestClient):
 
 def test_csv_upload_nonexistent_portfolio(client: TestClient):
     """Test uploading CSV to a portfolio that doesn't exist"""
-    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio,currency,fx_rate
+2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",,USD,1.0871
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
@@ -606,14 +612,14 @@ def test_csv_with_complex_transactions(client: TestClient):
     portfolio_id = portfolio_response.json()["id"]
     
     # Create CSV with multiple transaction types (M/D/YYYY format required)
-    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,
-1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,-1580.00,,
-2/20/2020 14:00:00,Dividend,AAPL,,,0.00,50.00,46.00,
-3/10/2020 09:00:00,Split,AAPL,,,,0.00,,2.0
-4/15/2020 16:00:00,Sell,AAPL,5.0,200.00,5.00,995.00,,
-5/20/2020 10:00:00,Fee,,,,,-10.00,-9.20,
-6/30/2020 17:00:00,Withdraw,,,,,-1000.00,-920.00,
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio,currency,fx_rate
+1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,,,
+1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,-1580.00,,,
+2/20/2020 14:00:00,Dividend,AAPL,,,0.00,50.00,46.00,,,
+3/10/2020 09:00:00,Split,AAPL,,,,0.00,,2.0,,
+4/15/2020 16:00:00,Sell,AAPL,5.0,200.00,5.00,995.00,,,
+5/20/2020 10:00:00,Fee,,,,,-10.00,-9.20,,,
+6/30/2020 17:00:00,Withdraw,,,,,-1000.00,-920.00,,,
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}

@@ -34,6 +34,8 @@ export interface Transaction {
   total_amount: number;
   eur_amount?: number | null;
   split_ratio?: number | null;
+  currency?: string | null;
+  fx_rate?: number | null;
 }
 
 export interface PortfolioCreate {
@@ -58,6 +60,8 @@ export interface TransactionCreate {
   total_amount: number;
   eur_amount?: number | null;
   split_ratio?: number | null;
+  currency?: string | null;
+  fx_rate?: number | null;
 }
 
 export interface TransactionUpdate {
@@ -70,6 +74,8 @@ export interface TransactionUpdate {
   total_amount?: number;
   eur_amount?: number | null;
   split_ratio?: number | null;
+  currency?: string | null;
+  fx_rate?: number | null;
 }
 
 export interface BulkImportResponse {

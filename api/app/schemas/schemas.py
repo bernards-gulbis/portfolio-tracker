@@ -62,6 +62,8 @@ class TransactionBase(BaseModel):
     total_amount: float
     eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
+    currency: Optional[str] = Field(None, max_length=3)
+    fx_rate: Optional[float] = None
     
     @field_validator('ticker')
     @classmethod
@@ -131,6 +133,8 @@ class TransactionUpdate(BaseModel):
     total_amount: Optional[float] = None
     eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
+    currency: Optional[str] = None
+    fx_rate: Optional[float] = None
 
 
 class TransactionResponse(TransactionBase):

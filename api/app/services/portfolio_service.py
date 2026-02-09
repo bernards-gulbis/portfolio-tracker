@@ -16,8 +16,8 @@ from app.core.exceptions import (
 from app.schemas import HoldingResponse, PortfolioStatusResponse
 from app.services.price_service import PriceService
 
-# Precision threshold for holdings quantity (8 decimal places)
-HOLDINGS_EPSILON = 1e-8
+# Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
+HOLDINGS_EPSILON = 1e-6
 
 logger = logging.getLogger(__name__)
 
@@ -294,7 +294,12 @@ class PortfolioService:
             # Annualize the return if time period is at least 1 day
             if years > (1/365.25):  # At least 1 day
                 # Annualized return: (total_return ^ (1/years) - 1) * 100
-                current_yield = (math.pow(total_return, 1/years) - 1) * 100
+                # Handle negative returns (can't take fractional power of negative number)
+                if total_return > 0:
+                    current_yield = (math.pow(total_return, 1/years) - 1) * 100
+                else:
+                    # For negative returns, use simple annualized loss
+                    current_yield = ((total_return - 1) / years) * 100
             else:
                 # For very short periods, use simple return
                 current_yield = (total_return - 1) * 100
