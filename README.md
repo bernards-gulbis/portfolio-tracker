@@ -189,7 +189,7 @@ npm test -- --watch
 The CSV file must include the following headers:
 
 ```csv
-date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio,currency,fx_rate
+date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
 2/12/2020 20:14:39,Deposit,,,,,3000,2760.27,,USD,1.0871
 01/16/2024 14:30:00,Buy,AAPL,10,150.00,1.00,-1501.00,,,,
 01/17/2024 09:00:00,Sell,MSFT,5,380.25,0.50,1900.75,,,,
@@ -210,7 +210,7 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio,curre
   - **Negative** for: Buy, Withdraw, Fee (money leaving account)
   - **Positive** for: Deposit, Sell, Dividend (money entering account)
   - Zero for: Split (no cash impact)
-- `EUR`: EUR equivalent amount (optional, follows same sign convention as total_amount)
+- `eur`: EUR equivalent amount (optional, follows same sign convention as total_amount)
 - `split_ratio`: Stock split ratio (required for Split transactions, e.g., 2.0 for 2-for-1 split)
 - `currency`: Currency code (optional, 3-letter code, e.g., USD, EUR, GBP)
 - `fx_rate`: Foreign exchange rate (optional, up to 4 decimal places)
