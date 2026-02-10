@@ -45,6 +45,10 @@ class TransactionService:
         if not self.portfolio_repo.exists(portfolio_id):
             raise PortfolioNotFoundException(portfolio_id)
         
+        # Validate fx_rate
+        if fx_rate is not None and fx_rate <= 0:
+            raise InvalidTransactionDataException("fx_rate must be positive")
+        
         # Business validation
         self._validate_transaction_data(
             transaction_type, ticker, quantity, price_per_share, total_amount, fee
@@ -164,6 +168,10 @@ class TransactionService:
         val_price_per_share = price_per_share if price_per_share is not None else transaction.price_per_share
         val_total_amount = total_amount if total_amount is not None else transaction.total_amount
         val_fee = fee if fee is not None else transaction.fee
+        
+        # Validate fx_rate
+        if fx_rate is not None and fx_rate <= 0:
+            raise InvalidTransactionDataException("fx_rate must be positive")
         
         # Validate before applying changes
         self._validate_transaction_data(
@@ -383,6 +391,8 @@ class TransactionService:
         
         # Parse optional fx_rate field (4 decimal places)
         fx_rate = self._clean_csv_number(row.get("fx_rate", ""), "fx_rate")
+        if fx_rate is not None and fx_rate <= 0:
+            raise ValueError(f"fx_rate must be positive, got: {fx_rate}")
         
         return Transaction(
             portfolio_id=portfolio_id,

@@ -644,6 +644,40 @@ def test_csv_with_complex_transactions(client: TestClient):
     assert transactions[6]["type"] == "Withdraw"
 
 
+def test_csv_upload_invalid_fx_rate(client: TestClient):
+    """Test CSV upload with invalid fx_rate values"""
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "FX Rate Validation Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Test with zero fx_rate
+    csv_content_zero = """date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,,USD,0.0
+"""
+    files = {"file": ("transactions.csv", BytesIO(csv_content_zero.encode()), "text/csv")}
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files=files
+    )
+    assert response.status_code == 400
+    assert "fx_rate must be positive" in response.json()["detail"].lower()
+    
+    # Test with negative fx_rate
+    csv_content_negative = """date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,,USD,-1.5
+"""
+    files = {"file": ("transactions.csv", BytesIO(csv_content_negative.encode()), "text/csv")}
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files=files
+    )
+    assert response.status_code == 400
+    assert "fx_rate must be positive" in response.json()["detail"].lower()
+
+
 def test_copy_portfolio_with_transactions(client: TestClient):
     """Test copying a portfolio with all its transactions"""
     # Create portfolio
