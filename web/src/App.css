@@ -589,6 +589,22 @@ body {
   color: var(--danger-color);
 }
 
+/* Performance Chart Styles */
+.performance-chart {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background-color: var(--background-secondary);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.performance-chart h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
 .holdings-section {
   margin-top: 2rem;
 }

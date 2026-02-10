@@ -1,6 +1,8 @@
 import React from 'react';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
+import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { formatCurrency, formatNumber } from '../utils/formatters';
+import { PerformanceChart } from './PerformanceChart';
 
 interface PortfolioStatusProps {
   portfolioId: number | null;
@@ -37,6 +39,12 @@ const formatCurrencyWithPercent = (
 
 export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioId }) => {
   const { data: status, isLoading, error } = usePortfolioStatus(portfolioId);
+  const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
+    portfolioId,
+    undefined,
+    undefined,
+    30
+  );
 
   if (!portfolioId) {
     return (
@@ -123,6 +131,12 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
           </p>
         </div>
       </div>
+
+      {/* Performance Chart */}
+      <PerformanceChart 
+        data={performance?.data_points || []} 
+        loading={performanceLoading} 
+      />
 
       {/* Holdings Table */}
       <div className="holdings-section">

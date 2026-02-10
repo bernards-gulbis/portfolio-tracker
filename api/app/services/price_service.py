@@ -2,7 +2,7 @@
 Service for fetching current stock prices
 """
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 import requests
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -137,3 +137,139 @@ class PriceService:
         if eur_usd_rate and eur_usd_rate > 0:
             return 1.0 / eur_usd_rate  # Convert to USD/EUR
         return None
+    
+    @staticmethod
+    def get_historical_prices(
+        ticker: str, 
+        start_date: datetime, 
+        end_date: datetime
+    ) -> Dict[str, Optional[float]]:
+        """
+        Fetch historical daily closing prices for a ticker from Yahoo Finance
+        
+        Args:
+            ticker: Ticker symbol
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            
+        Returns:
+            Dictionary mapping date strings (YYYY-MM-DD) to closing prices
+        """
+        try:
+            # Convert dates to Unix timestamps
+            period1 = int(start_date.timestamp())
+            period2 = int(end_date.timestamp())
+            
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            params = {
+                'period1': period1,
+                'period2': period2,
+                'interval': '1d'
+            }
+            
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            result = data.get('chart', {}).get('result', [])
+            if not result:
+                return {}
+            
+            # Extract timestamps and closing prices
+            timestamps = result[0].get('timestamp', [])
+            quotes = result[0].get('indicators', {}).get('quote', [{}])[0]
+            closes = quotes.get('close', [])
+            
+            # Build dictionary mapping date strings to prices
+            prices = {}
+            for timestamp, close in zip(timestamps, closes):
+                if close is not None:
+                    date_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
+                    prices[date_str] = float(close)
+            
+            return prices
+            
+        except Exception as e:
+            logger.error(f"Error fetching historical prices for {ticker}: {e}", exc_info=True)
+            return {}
+    
+    @staticmethod
+    def get_historical_usd_to_eur_rates(
+        start_date: datetime, 
+        end_date: datetime
+    ) -> Dict[str, Optional[float]]:
+        """
+        Fetch historical USD to EUR exchange rates from Yahoo Finance
+        
+        Args:
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            
+        Returns:
+            Dictionary mapping date strings (YYYY-MM-DD) to exchange rates (EUR per USD)
+        """
+        # Get EUR/USD rates (how many USD per EUR)
+        eur_usd_rates = PriceService.get_historical_prices("EURUSD=X", start_date, end_date)
+        
+        # Convert to USD/EUR (how many EUR per USD)
+        usd_eur_rates = {}
+        for date_str, rate in eur_usd_rates.items():
+            if rate and rate > 0:
+                usd_eur_rates[date_str] = 1.0 / rate
+        
+        return usd_eur_rates
+    
+    @staticmethod
+    def get_historical_prices_for_multiple_tickers(
+        tickers: List[str], 
+        start_date: datetime, 
+        end_date: datetime,
+        max_workers: int = 5
+    ) -> Dict[str, Dict[str, Optional[float]]]:
+        """
+        Fetch historical prices for multiple tickers in parallel
+        
+        Args:
+            tickers: List of ticker symbols
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            max_workers: Maximum number of concurrent API requests (default: 5)
+            
+        Returns:
+            Dictionary mapping ticker symbols to date-price dictionaries
+        """
+        if not tickers:
+            return {}
+        
+        all_prices = {}
+        
+        # Use ThreadPoolExecutor for parallel requests
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all requests
+            future_to_ticker = {
+                executor.submit(
+                    PriceService.get_historical_prices, 
+                    ticker, 
+                    start_date, 
+                    end_date
+                ): ticker 
+                for ticker in tickers
+            }
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_ticker):
+                ticker = future_to_ticker[future]
+                try:
+                    prices = future.result()
+                    all_prices[ticker] = prices
+                except Exception as e:
+                    logger.error(f"Error fetching historical prices for {ticker}: {e}", exc_info=True)
+                    all_prices[ticker] = {}
+        
+        return all_prices

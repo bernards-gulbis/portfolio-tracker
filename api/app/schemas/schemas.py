@@ -200,3 +200,21 @@ class PortfolioStatusResponse(BaseModel):
     current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class PerformanceDataPoint(BaseModel):
+    """Schema for a single performance data point"""
+    date: str  # YYYY-MM-DD format
+    principal_eur: float
+    current_value_eur: Optional[float]
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PortfolioPerformanceResponse(BaseModel):
+    """Schema for portfolio performance over time"""
+    portfolio_id: int
+    portfolio_name: str
+    data_points: List[PerformanceDataPoint]
+    
+    model_config = ConfigDict(from_attributes=True)
