@@ -1805,6 +1805,11 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     assert data["total_return_after_tax_eur"] == expected_return
     assert data["total_return_after_tax_eur"] == 7500.0
     assert data["total_return_after_tax_percent"] == 75.0  # 7500 / 10000 * 100
+    
+    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7500 = 17500 EUR
+    expected_value_after_tax = 10000.0 + 7500.0
+    assert data["current_value_after_tax_eur"] == expected_value_after_tax
+    assert data["current_value_after_tax_eur"] == 17500.0
 
 
 def test_portfolio_status_tax_excludes_dividends(client: TestClient):
@@ -1883,6 +1888,11 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     expected_return = 17000.0 - 10000.0 - 1250.0
     assert data["total_return_after_tax_eur"] == expected_return
     assert data["total_return_after_tax_eur"] == 5750.0
+    
+    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 5750 = 15750 EUR
+    expected_value_after_tax = 10000.0 + 5750.0
+    assert data["current_value_after_tax_eur"] == expected_value_after_tax
+    assert data["current_value_after_tax_eur"] == 15750.0
 
 
 def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
@@ -1953,6 +1963,7 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
     # After-tax metrics should also be None
     assert data["total_return_after_tax_eur"] is None
     assert data["total_return_after_tax_percent"] is None
+    assert data["current_value_after_tax_eur"] is None
 
 
 def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestClient):
@@ -2009,6 +2020,7 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
     assert data["tax_eur"] is None
     assert data["total_return_after_tax_eur"] is None
     assert data["total_return_after_tax_percent"] is None
+    assert data["current_value_after_tax_eur"] is None
     
     # Historical EUR values should still be available
     assert data["principal_eur"] == 10000.0  # Converted at historical rate

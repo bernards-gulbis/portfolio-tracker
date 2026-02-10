@@ -122,6 +122,7 @@ export interface PortfolioStatus {
   tax_eur: number | null;
   total_return_after_tax_eur: number | null;
   total_return_after_tax_percent: number | null;
+  current_value_after_tax_eur: number | null;
 }
 
 // ================== API Configuration ==================

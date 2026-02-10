@@ -121,6 +121,7 @@ class PortfolioService:
                 - tax_eur: Estimated tax liability (TAX_RATE * capital_gains_eur) where capital_gains excludes dividends
                 - total_return_after_tax_eur: Net profit after taxes (current_value_eur - principal_eur - tax_eur)
                 - total_return_after_tax_percent: After-tax return as percentage of principal_eur
+                - current_value_after_tax_eur: Portfolio value after taxes (current_value_eur - tax_eur)
                 - cash: Cash available in USD
                 - holdings: List of current positions with quantities and market values
                 
@@ -379,6 +380,11 @@ class PortfolioService:
             if principal_eur != 0:
                 total_return_after_tax_percent = (total_return_after_tax_eur / principal_eur) * 100
         
+        # Calculate current value after tax
+        current_value_after_tax_eur = None
+        if current_value_eur is not None and tax_eur is not None:
+            current_value_after_tax_eur = current_value_eur - tax_eur
+        
         # Normalize negative zero values for display
         def normalize_zero(value: float) -> float:
             """Convert -0.0 to 0.0 to avoid negative zero display"""
@@ -403,5 +409,6 @@ class PortfolioService:
             realized_gains=normalize_zero(realized_gains),
             tax_eur=normalize_zero(tax_eur) if tax_eur is not None else None,
             total_return_after_tax_eur=normalize_zero(total_return_after_tax_eur) if total_return_after_tax_eur is not None else None,
-            total_return_after_tax_percent=normalize_zero(total_return_after_tax_percent) if total_return_after_tax_percent is not None else None
+            total_return_after_tax_percent=normalize_zero(total_return_after_tax_percent) if total_return_after_tax_percent is not None else None,
+            current_value_after_tax_eur=normalize_zero(current_value_after_tax_eur) if current_value_after_tax_eur is not None else None
         )
