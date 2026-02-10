@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { PortfolioProvider } from './context/PortfolioContext';
 import { usePortfolioContext } from './context/PortfolioContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import PortfolioList from './components/PortfolioList';
 import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
@@ -19,11 +20,21 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const { activePortfolioId } = usePortfolioContext();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>Portfolio Tracker</h1>
+        <button 
+          className="theme-toggle" 
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+          <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
+        </button>
       </header>
 
       <main className="app-main">
@@ -44,9 +55,11 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <PortfolioProvider>
-        <AppContent />
-      </PortfolioProvider>
+      <ThemeProvider>
+        <PortfolioProvider>
+          <AppContent />
+        </PortfolioProvider>
+      </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
