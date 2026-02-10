@@ -98,7 +98,7 @@ def get_portfolio_performance(
     portfolio_id: int,
     start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
     end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
-    num_points: int = Query(30, ge=2, le=365, description="Number of data points to return"),
+    num_points: int = Query(60, ge=2, le=365, description="Number of data points to return"),
     session: Session = Depends(get_session)
 ):
     """

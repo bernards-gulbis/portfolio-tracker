@@ -115,10 +115,7 @@ const TransactionTable = ({
               <th>Ticker</th>
               <th className="text-right">Quantity</th>
               <th className="text-right">Price per Share</th>
-              <th className="text-right">Fee</th>
               <th className="text-right">Total Amount</th>
-              <th className="text-right">EUR Amount</th>
-              <th className="text-right">Split Ratio</th>
               <th className="text-center">Actions</th>
             </tr>
           </thead>
@@ -138,17 +135,8 @@ const TransactionTable = ({
                 <td className="text-right">
                   {transaction.price_per_share !== null && transaction.price_per_share !== undefined ? formatCurrency(transaction.price_per_share) : '-'}
                 </td>
-                <td className="text-right">
-                  {transaction.fee !== null && transaction.fee !== undefined ? formatCurrency(transaction.fee) : '-'}
-                </td>
                 <td className={`text-right value-${getValueColor(transaction.total_amount)}`}>
                   {formatCurrency(getDisplayValue(transaction))}
-                </td>
-                <td className={`text-right value-${getValueColor(transaction.eur_amount)}`}>
-                  {transaction.eur_amount !== null && transaction.eur_amount !== undefined ? formatCurrency(transaction.eur_amount, 'EUR') : '-'}
-                </td>
-                <td className="text-right">
-                  {transaction.split_ratio !== null && transaction.split_ratio !== undefined ? transaction.split_ratio.toFixed(2) : '-'}
                 </td>
                 <td className="text-center">
                   <div className="action-buttons">

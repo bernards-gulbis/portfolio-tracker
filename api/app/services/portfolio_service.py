@@ -600,7 +600,7 @@ class PortfolioService:
         portfolio_id: int,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        num_points: int = 30
+        num_points: int = 60
     ) -> List[Dict]:
         """
         Get portfolio performance over time as a time series.
@@ -616,7 +616,7 @@ class PortfolioService:
             portfolio_id: The ID of the portfolio
             start_date: Start date for the performance data (defaults to first transaction date)
             end_date: End date for the performance data (defaults to today)
-            num_points: Number of data points to return (default: 30)
+            num_points: Number of data points to return (default: 60)
             
         Returns:
             List of dictionaries with keys: date, principal_eur, current_value_eur

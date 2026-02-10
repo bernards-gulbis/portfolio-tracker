@@ -3,6 +3,7 @@ import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { PerformanceChart } from './PerformanceChart';
+import { HoldingsAllocationChart } from './HoldingsAllocationChart';
 
 interface PortfolioStatusProps {
   portfolioId: number | null;
@@ -43,7 +44,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
     portfolioId,
     undefined,
     undefined,
-    30
+    60
   );
 
   if (!portfolioId) {
@@ -132,26 +133,32 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
         </div>
       </div>
 
-      {/* Performance Chart */}
-      <PerformanceChart 
-        data={performance?.data_points || []} 
-        loading={performanceLoading} 
-      />
+      {/* Charts Section */}
+      <div className="charts-container">
+        <PerformanceChart 
+          data={performance?.data_points || []} 
+          loading={performanceLoading} 
+        />
+        <HoldingsAllocationChart 
+          holdings={status.holdings}
+          cash={status.cash}
+          loading={isLoading}
+        />
+      </div>
 
       {/* Holdings Table */}
       <div className="holdings-section">
-        <h3>Current Holdings</h3>
+        <h3>Current holdings</h3>
         <table className="holdings-table">
           <thead>
             <tr>
               <th>Ticker</th>
               <th>Quantity</th>
-              <th>Avg Cost</th>
-              <th>Total Cost</th>
-              <th>Current Price</th>
-              <th>Market Value</th>
+              <th>Avg cost</th>
+              <th>Total cost</th>
+              <th>Current price</th>
+              <th>Market value</th>
               <th>Unrealized G/L</th>
-              <th>G/L %</th>
             </tr>
           </thead>
           <tbody>
@@ -163,7 +170,6 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               <td>-</td>
               <td>-</td>
               <td>{formatCurrency(status.cash)}</td>
-              <td>-</td>
               <td>-</td>
             </tr>
             {/* Stock holdings */}
@@ -180,13 +186,8 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
                   {holding.current_value != null ? formatCurrency(holding.current_value) : '-'}
                 </td>
                 <td className={getValueClass(holding.unrealized_gain_loss)}>
-                  {holding.unrealized_gain_loss != null
-                    ? formatCurrency(holding.unrealized_gain_loss)
-                    : '-'}
-                </td>
-                <td className={getValueClass(holding.unrealized_gain_loss_percent)}>
-                  {holding.unrealized_gain_loss_percent != null
-                    ? `${holding.unrealized_gain_loss_percent.toFixed(2)}%`
+                  {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_percent != null
+                    ? `${formatCurrency(holding.unrealized_gain_loss)} (${holding.unrealized_gain_loss_percent >= 0 ? '+' : ''}${holding.unrealized_gain_loss_percent.toFixed(2)}%)`
                     : '-'}
                 </td>
               </tr>

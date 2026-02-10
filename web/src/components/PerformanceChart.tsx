@@ -4,7 +4,6 @@ import {
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
@@ -26,7 +25,7 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data, loadin
   if (loading) {
     return (
       <div className="performance-chart">
-        <h3>Portfolio Performance Over Time</h3>
+        <h3>Performance</h3>
         <p>Loading chart data...</p>
       </div>
     );
@@ -35,7 +34,7 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data, loadin
   if (!data || data.length === 0) {
     return (
       <div className="performance-chart">
-        <h3>Portfolio Performance Over Time</h3>
+        <h3>Performance</h3>
         <p>No performance data available</p>
       </div>
     );
@@ -96,13 +95,12 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data, loadin
 
   return (
     <div className="performance-chart">
-      <h3>Portfolio Performance Over Time</h3>
+      <h3>Performance</h3>
       <ResponsiveContainer width="100%" height={400}>
         <LineChart
           data={chartData}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
           <XAxis
             dataKey="date"
             tickFormatter={formatXAxis}
