@@ -98,7 +98,7 @@ class PortfolioService:
     
     def calculate_portfolio_status(self, portfolio_id: int) -> PortfolioStatusResponse:
         """
-        Calculate comprehensive portfolio status including holdings, cash balance, and performance metrics.
+        Calculate comprehensive portfolio status including holdings, cash, and performance metrics.
         
         This method processes all transactions chronologically to build the current portfolio state,
         calculates valuation at current market prices, and computes tax-adjusted return metrics.
@@ -121,7 +121,7 @@ class PortfolioService:
                 - tax_eur: Estimated tax liability (TAX_RATE * capital_gains_eur) where capital_gains excludes dividends
                 - total_return_after_tax_eur: Net profit after taxes (current_value_eur - principal_eur - tax_eur)
                 - total_return_after_tax_percent: After-tax return as percentage of principal_eur
-                - cash_balance: Cash available in USD
+                - cash: Cash available in USD
                 - holdings: List of current positions with quantities and market values
                 
         Raises:
@@ -144,7 +144,7 @@ class PortfolioService:
         Edge Cases:
             - Holdings without current price: Excluded from unrealized gains calculation
             - Zero principal: Returns None for percentage-based metrics to avoid division by zero
-            - Negative cash balance: Allowed (represents margin/borrowed funds)
+            - Negative cash: Allowed (represents margin/borrowed funds)
         """
         # Get portfolio
         portfolio = self.portfolio_repo.get_by_id(portfolio_id)
@@ -195,10 +195,8 @@ class PortfolioService:
                 
                 ticker = transaction.ticker
                 quantity = transaction.quantity or 0
-                price_per_share = transaction.price_per_share or 0
-                fee = transaction.fee or 0
-                # Cost basis includes purchase price plus fees
-                cost = quantity * price_per_share + fee
+                # Cost basis includes purchase price plus fees (total_amount is negative for buys)
+                cost = -total_amount
                 
                 if ticker:
                     if ticker not in holdings:
@@ -349,15 +347,29 @@ class PortfolioService:
         except Exception as e:
             logger.error(f"Error fetching USD to EUR exchange rate for portfolio {portfolio_id}: {e}", exc_info=True)
         
+        # Normalize dividends_eur before computing tax
+        # If dividends exist but no EUR conversion is available, set to None
+        if dividends > 0.0 and dividends_eur == 0.0:
+            # Dividends exist but no EUR conversion was available
+            dividends_eur = None
+        elif dividends == 0.0:
+            # No dividends at all
+            dividends_eur = None
+        
         # Calculate tax on capital gains (cannot be negative)
         # Tax base = current portfolio value - initial principal - dividends received
         # This represents only price appreciation gains (both realized and unrealized)
         # Dividends are excluded as they may have different tax treatment
+        # If dividends exist but EUR conversion is unavailable, we cannot compute accurate tax
         tax_eur = None
         if current_value_eur is not None:
-            dividends_for_tax = dividends_eur if dividends_eur is not None else 0.0
-            capital_gains = current_value_eur - principal_eur - dividends_for_tax
-            tax_eur = capital_gains * TAX_RATE if capital_gains > 0 else 0.0
+            if dividends > 0.0 and dividends_eur is None:
+                # Dividends exist but EUR conversion unavailable - cannot compute accurate tax
+                tax_eur = None
+            else:
+                dividends_for_tax = dividends_eur if dividends_eur is not None else 0.0
+                capital_gains = current_value_eur - principal_eur - dividends_for_tax
+                tax_eur = capital_gains * TAX_RATE if capital_gains > 0 else 0.0
         
         # Calculate total return after tax
         total_return_after_tax_eur = None
@@ -366,14 +378,6 @@ class PortfolioService:
             total_return_after_tax_eur = (current_value_eur - principal_eur) - tax_eur
             if principal_eur != 0:
                 total_return_after_tax_percent = (total_return_after_tax_eur / principal_eur) * 100
-        
-        # Set dividends_eur to None if no EUR conversion is available
-        if dividends > 0.0 and dividends_eur == 0.0:
-            # Dividends exist but no EUR conversion was available
-            dividends_eur = None
-        elif dividends == 0.0:
-            # No dividends at all
-            dividends_eur = None
         
         # Normalize negative zero values for display
         def normalize_zero(value: float) -> float:

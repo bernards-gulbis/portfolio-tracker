@@ -6,6 +6,35 @@ interface PortfolioStatusProps {
   portfolioId: number | null;
 }
 
+// Helper functions for formatting signed values
+const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD'): string => {
+  if (value == null) return '-';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${formatCurrency(value, currency)}`;
+};
+
+const formatSignedPercent = (value: number | null | undefined): string => {
+  if (value == null) return '';
+  const sign = value > 0 ? '+' : '';
+  return `(${sign}${value.toFixed(2)}%)`;
+};
+
+const getValueClass = (value: number | null | undefined): string => {
+  if (value == null) return '';
+  return value >= 0 ? 'positive' : 'negative';
+};
+
+const formatCurrencyWithPercent = (
+  currencyValue: number | null | undefined,
+  percentValue: number | null | undefined,
+  currency: string = 'USD'
+): string => {
+  if (currencyValue == null) return '-';
+  const formattedCurrency = formatSignedCurrency(currencyValue, currency);
+  const formattedPercent = percentValue != null ? ` ${formatSignedPercent(percentValue)}` : '';
+  return `${formattedCurrency}${formattedPercent}`;
+};
+
 export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioId }) => {
   const { data: status, isLoading, error } = usePortfolioStatus(portfolioId);
 
@@ -74,18 +103,12 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
 
         <div className="status-card">
           <h3>Return After Tax</h3>
-          <p className={`status-value ${
-            status.total_return_after_tax_eur !== null
-              ? status.total_return_after_tax_eur >= 0 ? 'positive' : 'negative'
-              : ''
-          }`}>
-            {status.total_return_after_tax_eur !== null
-              ? `${status.total_return_after_tax_eur > 0 ? '+' : status.total_return_after_tax_eur < 0 ? '' : ''}${formatCurrency(status.total_return_after_tax_eur, 'EUR')} ${
-                  status.total_return_after_tax_percent !== null
-                    ? `(${status.total_return_after_tax_percent > 0 ? '+' : status.total_return_after_tax_percent < 0 ? '' : ''}${status.total_return_after_tax_percent.toFixed(2)}%)`
-                    : ''
-                }`
-              : '-'}
+          <p className={`status-value ${getValueClass(status.total_return_after_tax_eur)}`}>
+            {formatCurrencyWithPercent(
+              status.total_return_after_tax_eur,
+              status.total_return_after_tax_percent,
+              'EUR'
+            )}
           </p>
         </div>
 
@@ -101,14 +124,12 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
 
         <div className="status-card">
           <h3>Unrealized Gains</h3>
-          <p className={`status-value ${status.unrealized_gains >= 0 ? 'positive' : 'negative'}`}>
-            {status.unrealized_gains_eur !== null
-              ? `${status.unrealized_gains_eur > 0 ? '+' : status.unrealized_gains_eur < 0 ? '' : ''}${formatCurrency(status.unrealized_gains_eur, 'EUR')} ${
-                  status.unrealized_gains_percent !== null
-                    ? `(${status.unrealized_gains_percent > 0 ? '+' : status.unrealized_gains_percent < 0 ? '' : ''}${status.unrealized_gains_percent.toFixed(2)}%)`
-                    : ''
-                }`
-              : '-'}
+          <p className={`status-value ${getValueClass(status.unrealized_gains_eur)}`}>
+            {formatCurrencyWithPercent(
+              status.unrealized_gains_eur,
+              status.unrealized_gains_percent,
+              'EUR'
+            )}
           </p>
         </div>
       </div>
@@ -149,30 +170,18 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
                 <td>{formatCurrency(holding.average_cost)}</td>
                 <td>{formatCurrency(holding.total_cost)}</td>
                 <td>
-                  {holding.current_price !== null && holding.current_price !== undefined
-                    ? formatCurrency(holding.current_price)
-                    : '-'}
+                  {holding.current_price != null ? formatCurrency(holding.current_price) : '-'}
                 </td>
                 <td>
-                  {holding.current_value !== null && holding.current_value !== undefined
-                    ? formatCurrency(holding.current_value)
-                    : '-'}
+                  {holding.current_value != null ? formatCurrency(holding.current_value) : '-'}
                 </td>
-                <td className={
-                  holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
-                    ? holding.unrealized_gain_loss >= 0 ? 'positive' : 'negative'
-                    : ''
-                }>
-                  {holding.unrealized_gain_loss !== null && holding.unrealized_gain_loss !== undefined
+                <td className={getValueClass(holding.unrealized_gain_loss)}>
+                  {holding.unrealized_gain_loss != null
                     ? formatCurrency(holding.unrealized_gain_loss)
                     : '-'}
                 </td>
-                <td className={
-                  holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
-                    ? holding.unrealized_gain_loss_percent >= 0 ? 'positive' : 'negative'
-                    : ''
-                }>
-                  {holding.unrealized_gain_loss_percent !== null && holding.unrealized_gain_loss_percent !== undefined
+                <td className={getValueClass(holding.unrealized_gain_loss_percent)}>
+                  {holding.unrealized_gain_loss_percent != null
                     ? `${holding.unrealized_gain_loss_percent.toFixed(2)}%`
                     : '-'}
                 </td>
