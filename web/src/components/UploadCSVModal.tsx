@@ -75,7 +75,7 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
                 onChange={handleFileChange}
               />
               <small className="form-text">
-                Expected format: date, type, ticker, quantity, price_per_share, fee, total_amount, EUR, split_ratio
+                Expected format: date, type, ticker, quantity, price_per_share, fee, total_amount, eur, split_ratio
               </small>
             </div>
 

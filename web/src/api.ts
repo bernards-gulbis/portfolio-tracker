@@ -34,6 +34,8 @@ export interface Transaction {
   total_amount: number;
   eur_amount?: number | null;
   split_ratio?: number | null;
+  currency?: string | null;
+  fx_rate?: number | null;
 }
 
 export interface PortfolioCreate {
@@ -58,6 +60,8 @@ export interface TransactionCreate {
   total_amount: number;
   eur_amount?: number | null;
   split_ratio?: number | null;
+  currency?: string | null;
+  fx_rate?: number | null;
 }
 
 export interface TransactionUpdate {
@@ -70,6 +74,8 @@ export interface TransactionUpdate {
   total_amount?: number;
   eur_amount?: number | null;
   split_ratio?: number | null;
+  currency?: string | null;
+  fx_rate?: number | null;
 }
 
 export interface BulkImportResponse {
@@ -99,16 +105,24 @@ export interface Holding {
 export interface PortfolioStatus {
   portfolio_id: number;
   portfolio_name: string;
-  cash_balance: number;
-  total_invested: number;
-  dividends_received: number;
-  realized_gains: number;
-  total_eur_amount: number;
+  current_value: number;
+  current_value_eur: number | null;
+  principal: number;
+  principal_eur: number;
+  dividends: number;
+  dividends_eur: number | null;
+  cash: number;
   holdings: Holding[];
-  total_holdings_cost: number;
-  total_current_value: number;
+  holdings_cost: number;
+  holdings_value: number;
   unrealized_gains: number;
-  total_portfolio_value: number;
+  unrealized_gains_percent: number | null;
+  unrealized_gains_eur: number | null;
+  realized_gains: number;
+  tax_eur: number | null;
+  total_return_after_tax_eur: number | null;
+  total_return_after_tax_percent: number | null;
+  current_value_after_tax_eur: number | null;
 }
 
 // ================== API Configuration ==================

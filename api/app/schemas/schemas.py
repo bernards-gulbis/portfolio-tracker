@@ -62,6 +62,8 @@ class TransactionBase(BaseModel):
     total_amount: float
     eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
+    currency: Optional[str] = Field(None, max_length=3)
+    fx_rate: Optional[float] = None
     
     @field_validator('ticker')
     @classmethod
@@ -131,6 +133,8 @@ class TransactionUpdate(BaseModel):
     total_amount: Optional[float] = None
     eur_amount: Optional[float] = None
     split_ratio: Optional[float] = None
+    currency: Optional[str] = None
+    fx_rate: Optional[float] = None
 
 
 class TransactionResponse(TransactionBase):
@@ -176,15 +180,23 @@ class PortfolioStatusResponse(BaseModel):
     """Schema for portfolio status with calculated metrics"""
     portfolio_id: int
     portfolio_name: str
-    cash_balance: float
-    total_invested: float  # Deposits - Withdrawals
-    dividends_received: float
-    realized_gains: float  # Gains/losses from sells
-    total_eur_amount: float  # Sum of all eur_amount fields
+    current_value: float  # Cash + Holdings current value
+    current_value_eur: Optional[float]  # Portfolio value in EUR
+    principal: float  # Deposits - Withdrawals
+    principal_eur: float  # Sum of all eur_amount fields
+    dividends: float
+    dividends_eur: Optional[float]  # Dividends in EUR
+    cash: float
     holdings: List[HoldingResponse]
-    total_holdings_cost: float  # Sum of all holdings cost basis
-    total_current_value: float  # Sum of current market value of all holdings
+    holdings_cost: float  # Sum of all holdings cost basis
+    holdings_value: float  # Sum of current market value of all holdings
     unrealized_gains: float  # Total unrealized gains/losses
-    total_portfolio_value: float  # Cash + Holdings current value
+    unrealized_gains_percent: Optional[float]  # Total unrealized gains/losses percentage
+    unrealized_gains_eur: Optional[float]  # Unrealized gains in EUR
+    realized_gains: float  # Gains/losses from sells
+    tax_eur: Optional[float]  # Tax amount in EUR: 25% of capital gains (current_value_eur - principal_eur - dividends_eur)
+    total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
+    total_return_after_tax_percent: Optional[float]  # Total return after tax percentage
+    current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
     
     model_config = ConfigDict(from_attributes=True)

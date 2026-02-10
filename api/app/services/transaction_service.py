@@ -37,11 +37,17 @@ class TransactionService:
         fee: Optional[float] = None,
         eur_amount: Optional[float] = None,
         split_ratio: Optional[float] = None,
+        currency: Optional[str] = None,
+        fx_rate: Optional[float] = None,
     ) -> Transaction:
         """Create a new transaction with validation"""
         # Verify portfolio exists
         if not self.portfolio_repo.exists(portfolio_id):
             raise PortfolioNotFoundException(portfolio_id)
+        
+        # Validate fx_rate
+        if fx_rate is not None and fx_rate <= 0:
+            raise InvalidTransactionDataException("fx_rate must be positive")
         
         # Business validation
         self._validate_transaction_data(
@@ -59,6 +65,8 @@ class TransactionService:
             total_amount=total_amount,
             eur_amount=eur_amount,
             split_ratio=split_ratio,
+            currency=currency,
+            fx_rate=fx_rate,
         )
         
         return self.transaction_repo.create(transaction)
@@ -109,8 +117,10 @@ class TransactionService:
             'price_per_share',
             'fee',
             'total_amount',
-            'EUR',
-            'split_ratio'
+            'eur',
+            'split_ratio',
+            'currency',
+            'fx_rate'
         ])
         
         # Write transaction data
@@ -125,6 +135,8 @@ class TransactionService:
                 transaction.total_amount,
                 transaction.eur_amount if transaction.eur_amount is not None else '',
                 transaction.split_ratio if transaction.split_ratio is not None else '',
+                transaction.currency if transaction.currency is not None else '',
+                transaction.fx_rate if transaction.fx_rate is not None else '',
             ])
         
         return output.getvalue()
@@ -141,6 +153,8 @@ class TransactionService:
         total_amount: Optional[float] = None,
         eur_amount: Optional[float] = None,
         split_ratio: Optional[float] = None,
+        currency: Optional[str] = None,
+        fx_rate: Optional[float] = None,
     ) -> Transaction:
         """Update a transaction"""
         transaction = self.transaction_repo.get_by_id(transaction_id)
@@ -154,6 +168,10 @@ class TransactionService:
         val_price_per_share = price_per_share if price_per_share is not None else transaction.price_per_share
         val_total_amount = total_amount if total_amount is not None else transaction.total_amount
         val_fee = fee if fee is not None else transaction.fee
+        
+        # Validate fx_rate
+        if fx_rate is not None and fx_rate <= 0:
+            raise InvalidTransactionDataException("fx_rate must be positive")
         
         # Validate before applying changes
         self._validate_transaction_data(
@@ -184,6 +202,10 @@ class TransactionService:
             transaction.eur_amount = eur_amount
         if split_ratio is not None:
             transaction.split_ratio = split_ratio
+        if currency is not None:
+            transaction.currency = currency
+        if fx_rate is not None:
+            transaction.fx_rate = fx_rate
         
         return self.transaction_repo.update(transaction)
     
@@ -352,7 +374,7 @@ class TransactionService:
                 raise ValueError(f"SPLIT transactions must have total_amount of 0 in CSV, got {total_amount}")
         
         # Parse optional EUR value field
-        eur_amount = self._clean_csv_number(row.get("EUR", ""), "EUR")
+        eur_amount = self._clean_csv_number(row.get("eur", ""), "eur")
         if eur_amount is not None:
             # Validate EUR amount sign matches total_amount sign (except for SPLIT)
             if transaction_type != TransactionType.SPLIT:
@@ -361,6 +383,16 @@ class TransactionService:
         
         # Parse optional split_ratio field
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
+        
+        # Parse optional currency field (3 letter code)
+        currency = row.get("currency", "").strip().upper() or None
+        if currency and len(currency) != 3:
+            raise ValueError(f"Currency must be a 3-letter code, got: {currency}")
+        
+        # Parse optional fx_rate field (4 decimal places)
+        fx_rate = self._clean_csv_number(row.get("fx_rate", ""), "fx_rate")
+        if fx_rate is not None and fx_rate <= 0:
+            raise ValueError(f"fx_rate must be positive, got: {fx_rate}")
         
         return Transaction(
             portfolio_id=portfolio_id,
@@ -373,6 +405,8 @@ class TransactionService:
             total_amount=total_amount,
             eur_amount=eur_amount,
             split_ratio=split_ratio,
+            currency=currency,
+            fx_rate=fx_rate,
         )
     
     @staticmethod

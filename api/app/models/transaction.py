@@ -22,6 +22,8 @@ class Transaction(SQLModel, table=True):
     total_amount: float = Field(default=0.0, decimal_places=2)
     eur_amount: Optional[float] = Field(default=None, decimal_places=2)
     split_ratio: Optional[float] = Field(default=None)
+    currency: Optional[str] = Field(default=None, max_length=3)
+    fx_rate: Optional[float] = Field(default=None, decimal_places=4)
     
     # Relationship
     portfolio: "Portfolio" = Relationship(back_populates="transactions")

@@ -4,6 +4,7 @@ Portfolio service for business logic
 import math
 import logging
 from typing import List, Dict
+from datetime import datetime
 from sqlmodel import Session
 from app.models import Portfolio, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
@@ -15,8 +16,11 @@ from app.core.exceptions import (
 from app.schemas import HoldingResponse, PortfolioStatusResponse
 from app.services.price_service import PriceService
 
-# Precision threshold for holdings quantity (8 decimal places)
-HOLDINGS_EPSILON = 1e-8
+# Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
+HOLDINGS_EPSILON = 1e-6
+
+# Tax rate applied to capital gains
+TAX_RATE = 0.25
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +97,56 @@ class PortfolioService:
         return copied_portfolio
     
     def calculate_portfolio_status(self, portfolio_id: int) -> PortfolioStatusResponse:
-        """Calculate current portfolio status including holdings, cash balance, and metrics"""
+        """
+        Calculate comprehensive portfolio status including holdings, cash, and performance metrics.
+        
+        This method processes all transactions chronologically to build the current portfolio state,
+        calculates valuation at current market prices, and computes tax-adjusted return metrics.
+        
+        Args:
+            portfolio_id: The ID of the portfolio to calculate status for
+            
+        Returns:
+            PortfolioStatusResponse containing:
+                - current_value: Total current value in USD (cash + holdings at market prices)
+                - current_value_eur: Current value converted to EUR at current exchange rate
+                - principal: Net deposits/withdrawals in USD (deposits - withdrawals)
+                - principal_eur: Net deposits/withdrawals converted to EUR at historical exchange rates
+                - unrealized_gains: Current paper gains/losses on open positions in USD
+                - unrealized_gains_eur: Unrealized gains converted to EUR at current exchange rate
+                - unrealized_gains_percent: Unrealized gains as percentage of cost basis (if holdings exist)
+                - realized_gains: Cumulative gains/losses from closed positions in USD
+                - dividends: Total dividends received in USD
+                - dividends_eur: Total dividends converted to EUR at historical exchange rates
+                - tax_eur: Estimated tax liability (TAX_RATE * capital_gains_eur) where capital_gains excludes dividends
+                - total_return_after_tax_eur: Net profit after taxes (current_value_eur - principal_eur - tax_eur)
+                - total_return_after_tax_percent: After-tax return as percentage of principal_eur
+                - current_value_after_tax_eur: Portfolio value after taxes (current_value_eur - tax_eur)
+                - cash: Cash available in USD
+                - holdings: List of current positions with quantities and market values
+                
+        Raises:
+            PortfolioNotFoundException: If portfolio_id does not exist
+            
+        Calculation Logic:
+            1. Process transactions chronologically to build position history:
+               - DEPOSIT/WITHDRAW: Update cash and principal
+               - BUY: Reduce cash, increase holdings quantity and cost basis
+               - SELL: Increase cash, reduce holdings, calculate realized gains
+               - DIVIDEND: Increase cash and track dividends separately
+            2. Value current holdings at latest market prices (excluding holdings without prices)
+            3. Convert USD values to EUR using appropriate exchange rates:
+               - principal_eur: Sum of deposits/withdrawals converted at their historical rates
+               - dividends_eur: Sum of dividends converted at their historical rates
+               - current_value_eur, unrealized_gains_eur: Current values at today's rate
+            4. Calculate tax on capital gains: (current_value_eur - principal_eur - dividends_eur) * TAX_RATE
+            5. Calculate after-tax return: (current_value_eur - principal_eur) - tax_eur
+            
+        Edge Cases:
+            - Holdings without current price: Excluded from unrealized gains calculation
+            - Zero principal: Returns None for percentage-based metrics to avoid division by zero
+            - Negative cash: Allowed (represents margin/borrowed funds)
+        """
         # Get portfolio
         portfolio = self.portfolio_repo.get_by_id(portfolio_id)
         if not portfolio:
@@ -106,11 +159,12 @@ class PortfolioService:
         transactions.sort(key=lambda t: (t.date, t.id))
         
         # Initialize tracking variables
-        cash_balance = 0.0
-        total_invested = 0.0  # Deposits - Withdrawals
-        dividends_received = 0.0
+        cash = 0.0
+        principal = 0.0  # Deposits - Withdrawals
+        dividends = 0.0
+        dividends_eur = 0.0  # Sum of all dividend EUR values calculated from fx_rate
         realized_gains = 0.0
-        total_eur_amount = 0.0  # Sum of all deposit and withdraw EUR values
+        principal_eur = 0.0  # Sum of all deposit and withdraw EUR values
         holdings: Dict[str, Dict[str, float]] = {}  # ticker -> {quantity, total_cost}
         
         # Process each transaction
@@ -119,27 +173,31 @@ class PortfolioService:
             total_amount = transaction.total_amount  # Now stored with correct sign
             
             if tx_type == TransactionType.DEPOSIT:
-                # Deposit adds cash and increases invested amount (stored as positive)
-                cash_balance += total_amount
-                total_invested += total_amount
+                # Deposit adds cash and increases principal amount (stored as positive)
+                cash += total_amount
+                principal += total_amount
                 if transaction.eur_amount is not None:
-                    total_eur_amount += transaction.eur_amount
+                    principal_eur += transaction.eur_amount
+                elif transaction.fx_rate is not None and transaction.fx_rate > 0:
+                    principal_eur += total_amount / transaction.fx_rate
                 
             elif tx_type == TransactionType.WITHDRAW:
-                # Withdraw removes cash and decreases invested amount (stored as negative)
-                cash_balance += total_amount  # total_amount is negative, so this subtracts
-                total_invested += total_amount  # total_amount is negative, so this subtracts
+                # Withdraw removes cash and decreases principal amount (stored as negative)
+                cash += total_amount  # total_amount is negative, so this subtracts
+                principal += total_amount  # total_amount is negative, so this subtracts
                 if transaction.eur_amount is not None:
-                    total_eur_amount += transaction.eur_amount  # eur_amount is negative for withdraws
+                    principal_eur += transaction.eur_amount  # eur_amount is negative for withdraws
+                elif transaction.fx_rate is not None and transaction.fx_rate > 0:
+                    principal_eur += total_amount / transaction.fx_rate  # total_amount is negative for withdraws
                 
             elif tx_type == TransactionType.BUY:
                 # Buy decreases cash and adds to holdings (stored as negative)
-                cash_balance += total_amount  # total_amount is negative, so this subtracts
+                cash += total_amount  # total_amount is negative, so this subtracts
                 
                 ticker = transaction.ticker
                 quantity = transaction.quantity or 0
-                price_per_share = transaction.price_per_share or 0
-                cost = abs(total_amount)  # Cost basis is positive
+                # Cost basis includes purchase price plus fees (total_amount is negative for buys)
+                cost = -total_amount
                 
                 if ticker:
                     if ticker not in holdings:
@@ -149,7 +207,7 @@ class PortfolioService:
                     
             elif tx_type == TransactionType.SELL:
                 # Sell increases cash, removes from holdings, and calculates gain (stored as positive)
-                cash_balance += total_amount
+                cash += total_amount
                 
                 ticker = transaction.ticker
                 quantity = transaction.quantity or 0
@@ -165,14 +223,17 @@ class PortfolioService:
                             f"Cannot sell {quantity} quantity of {ticker}: only {holdings[ticker]['quantity']} available"
                         )
                     
-                    # Calculate average cost per unit for this holding
+                    # Calculate average cost per unit for this holding (includes buy fees proportionally)
                     avg_cost_per_unit = (holdings[ticker]['total_cost'] / holdings[ticker]['quantity'] 
                                         if holdings[ticker]['quantity'] > 0 else 0)
                     
-                    # Cost basis of quantity being sold
+                    # Cost basis of quantity being sold (includes buy fees proportionally)
                     cost_basis = avg_cost_per_unit * quantity
                     
-                    # Realized gain = sale proceeds - cost basis (fees already included in total_amount)
+                    # Realized gain = net proceeds - cost basis
+                    # total_amount = sale proceeds after deducting sell fee
+                    # cost_basis = purchase cost including buy fees
+                    # Both buy and sell fees reduce the realized gain (standard accounting)
                     realized_gains += (total_amount - cost_basis)
                     
                     # Update holdings
@@ -185,12 +246,18 @@ class PortfolioService:
                         
             elif tx_type == TransactionType.DIVIDEND:
                 # Dividend adds cash and tracks dividend income (stored as positive)
-                cash_balance += total_amount
-                dividends_received += total_amount
+                cash += total_amount
+                dividends += total_amount
+                
+                # Calculate EUR amount using fx_rate if available
+                if transaction.eur_amount is not None:
+                    dividends_eur += transaction.eur_amount
+                elif transaction.fx_rate is not None and transaction.fx_rate > 0:
+                    dividends_eur += total_amount / transaction.fx_rate
                 
             elif tx_type == TransactionType.FEE:
                 # Fee reduces cash (stored as negative)
-                cash_balance += total_amount  # total_amount is negative, so this subtracts
+                cash += total_amount  # total_amount is negative, so this subtracts
                 
             elif tx_type == TransactionType.SPLIT:
                 # Split adjusts the number of shares
@@ -210,7 +277,7 @@ class PortfolioService:
         
         # Convert holdings dict to list of HoldingResponse
         holdings_list = []
-        total_holdings_cost = 0.0
+        holdings_cost = 0.0
         
         # Get current prices for all tickers
         tickers = list(holdings.keys())
@@ -222,8 +289,8 @@ class PortfolioService:
             current_prices = {ticker: None for ticker in tickers}
         
         # Calculate holdings with current prices and unrealized gains
-        total_current_value = 0.0
-        total_unrealized_gains = 0.0
+        holdings_value = 0.0
+        unrealized_gains = 0.0
         
         for ticker, holding_data in holdings.items():
             quantity = holding_data['quantity']
@@ -242,8 +309,8 @@ class PortfolioService:
                 if total_cost > 0:
                     unrealized_gain_loss_percent = (unrealized_gain_loss / total_cost) * 100
                 
-                total_current_value += current_value
-                total_unrealized_gains += unrealized_gain_loss
+                holdings_value += current_value
+                unrealized_gains += unrealized_gain_loss
             
             holdings_list.append(HoldingResponse(
                 ticker=ticker,
@@ -255,13 +322,68 @@ class PortfolioService:
                 unrealized_gain_loss=unrealized_gain_loss,
                 unrealized_gain_loss_percent=unrealized_gain_loss_percent
             ))
-            total_holdings_cost += total_cost
+            holdings_cost += total_cost
         
         # Sort holdings by ticker
         holdings_list.sort(key=lambda h: h.ticker)
         
         # Calculate total portfolio value
-        total_portfolio_value = cash_balance + total_current_value
+        current_value = cash + holdings_value
+        
+        # Calculate unrealized gains percentage
+        # Note: Only includes holdings with available prices in both numerator and denominator
+        unrealized_gains_percent = None
+        if holdings_cost > 0:
+            unrealized_gains_percent = (unrealized_gains / holdings_cost) * 100
+        
+        # Calculate portfolio value in EUR using current exchange rate
+        # Note: All USD values are converted using the current rate, regardless of transaction dates
+        current_value_eur = None
+        unrealized_gains_eur = None
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+            if usd_to_eur_rate is not None:
+                current_value_eur = current_value * usd_to_eur_rate
+                unrealized_gains_eur = unrealized_gains * usd_to_eur_rate
+        except Exception as e:
+            logger.error(f"Error fetching USD to EUR exchange rate for portfolio {portfolio_id}: {e}", exc_info=True)
+        
+        # Normalize dividends_eur before computing tax
+        # If dividends exist but no EUR conversion is available, set to None
+        if dividends > 0.0 and dividends_eur == 0.0:
+            # Dividends exist but no EUR conversion was available
+            dividends_eur = None
+        elif dividends == 0.0:
+            # No dividends at all
+            dividends_eur = None
+        
+        # Calculate tax on capital gains (cannot be negative)
+        # Tax base = current portfolio value - initial principal - dividends received
+        # This represents only price appreciation gains (both realized and unrealized)
+        # Dividends are excluded as they may have different tax treatment
+        # If dividends exist but EUR conversion is unavailable, we cannot compute accurate tax
+        tax_eur = None
+        if current_value_eur is not None:
+            if dividends > 0.0 and dividends_eur is None:
+                # Dividends exist but EUR conversion unavailable - cannot compute accurate tax
+                tax_eur = None
+            else:
+                dividends_for_tax = dividends_eur if dividends_eur is not None else 0.0
+                capital_gains = current_value_eur - principal_eur - dividends_for_tax
+                tax_eur = capital_gains * TAX_RATE if capital_gains > 0 else 0.0
+        
+        # Calculate total return after tax
+        total_return_after_tax_eur = None
+        total_return_after_tax_percent = None
+        if current_value_eur is not None and tax_eur is not None:
+            total_return_after_tax_eur = (current_value_eur - principal_eur) - tax_eur
+            if principal_eur != 0:
+                total_return_after_tax_percent = (total_return_after_tax_eur / principal_eur) * 100
+        
+        # Calculate current value after tax
+        current_value_after_tax_eur = None
+        if current_value_eur is not None and tax_eur is not None:
+            current_value_after_tax_eur = current_value_eur - tax_eur
         
         # Normalize negative zero values for display
         def normalize_zero(value: float) -> float:
@@ -271,14 +393,22 @@ class PortfolioService:
         return PortfolioStatusResponse(
             portfolio_id=portfolio.id,
             portfolio_name=portfolio.name,
-            cash_balance=normalize_zero(cash_balance),
-            total_invested=normalize_zero(total_invested),
-            dividends_received=normalize_zero(dividends_received),
-            realized_gains=normalize_zero(realized_gains),
-            total_eur_amount=normalize_zero(total_eur_amount),
+            current_value=normalize_zero(current_value),
+            current_value_eur=normalize_zero(current_value_eur) if current_value_eur is not None else None,
+            principal=normalize_zero(principal),
+            principal_eur=normalize_zero(principal_eur),
+            dividends=normalize_zero(dividends),
+            dividends_eur=normalize_zero(dividends_eur) if dividends_eur is not None else None,
+            cash=normalize_zero(cash),
             holdings=holdings_list,
-            total_holdings_cost=normalize_zero(total_holdings_cost),
-            total_current_value=normalize_zero(total_current_value),
-            unrealized_gains=normalize_zero(total_unrealized_gains),
-            total_portfolio_value=normalize_zero(total_portfolio_value)
+            holdings_cost=normalize_zero(holdings_cost),
+            holdings_value=normalize_zero(holdings_value),
+            unrealized_gains=normalize_zero(unrealized_gains),
+            unrealized_gains_percent=normalize_zero(unrealized_gains_percent) if unrealized_gains_percent is not None else None,
+            unrealized_gains_eur=normalize_zero(unrealized_gains_eur) if unrealized_gains_eur is not None else None,
+            realized_gains=normalize_zero(realized_gains),
+            tax_eur=normalize_zero(tax_eur) if tax_eur is not None else None,
+            total_return_after_tax_eur=normalize_zero(total_return_after_tax_eur) if total_return_after_tax_eur is not None else None,
+            total_return_after_tax_percent=normalize_zero(total_return_after_tax_percent) if total_return_after_tax_percent is not None else None,
+            current_value_after_tax_eur=normalize_zero(current_value_after_tax_eur) if current_value_after_tax_eur is not None else None
         )

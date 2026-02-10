@@ -39,6 +39,8 @@ def create_transaction(
         fee=transaction.fee,
         eur_amount=transaction.eur_amount,
         split_ratio=transaction.split_ratio,
+        currency=transaction.currency,
+        fx_rate=transaction.fx_rate,
     )
 
 
@@ -94,9 +96,9 @@ async def import_transactions_csv(
     Import a CSV file to bulk import transactions.
     
     Expected CSV format:
-    date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-    2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
-    2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,
+    date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+    2/12/2020 20:14:39,Deposit,,,,,3000,2760.27,,USD,1.0871
+    2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,,,
     """
     # Verify file is CSV
     if not file.filename.endswith('.csv'):
@@ -147,6 +149,8 @@ def update_transaction(
         total_amount=transaction.total_amount,
         eur_amount=transaction.eur_amount,
         split_ratio=transaction.split_ratio,
+        currency=transaction.currency,
+        fx_rate=transaction.fx_rate,
     )
 
 

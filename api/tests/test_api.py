@@ -365,6 +365,8 @@ def test_export_transactions_csv(client: TestClient):
     assert "quantity" in header
     assert "price_per_share" in header
     assert "total_amount" in header
+    assert "currency" in header
+    assert "fx_rate" in header
     
     # Check first transaction (Deposit)
     assert "Deposit" in lines[1]
@@ -529,9 +531,9 @@ def test_csv_upload(client: TestClient):
     portfolio_id = portfolio_response.json()["id"]
     
     # Create CSV content
-    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
-2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",,USD,1.0871
+2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,,
 """
     
     # Upload CSV
@@ -551,6 +553,8 @@ def test_csv_upload(client: TestClient):
     assert transaction1["type"] == "Deposit"
     assert transaction1["total_amount"] == 3000.00
     assert transaction1["eur_amount"] == 2760.27
+    assert transaction1["currency"] == "USD"
+    assert transaction1["fx_rate"] == 1.0871
     
     # Verify second transaction (Buy)
     transaction2 = data["transactions"][1]
@@ -559,6 +563,8 @@ def test_csv_upload(client: TestClient):
     assert transaction2["quantity"] == 15.00000001
     assert transaction2["price_per_share"] == 183.69
     assert transaction2["total_amount"] == -2755.35
+    assert transaction2["currency"] is None
+    assert transaction2["fx_rate"] is None
 
 
 def test_csv_upload_invalid_file_type(client: TestClient):
@@ -583,8 +589,8 @@ def test_csv_upload_invalid_file_type(client: TestClient):
 
 def test_csv_upload_nonexistent_portfolio(client: TestClient):
     """Test uploading CSV to a portfolio that doesn't exist"""
-    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+2/12/2020 20:14:40,Deposit,,,,,"3,000.00","2,760.27",,USD,1.0871
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
@@ -606,14 +612,14 @@ def test_csv_with_complex_transactions(client: TestClient):
     portfolio_id = portfolio_response.json()["id"]
     
     # Create CSV with multiple transaction types (M/D/YYYY format required)
-    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,
-1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,-1580.00,,
-2/20/2020 14:00:00,Dividend,AAPL,,,0.00,50.00,46.00,
-3/10/2020 09:00:00,Split,AAPL,,,,0.00,,2.0
-4/15/2020 16:00:00,Sell,AAPL,5.0,200.00,5.00,995.00,,
-5/20/2020 10:00:00,Fee,,,,,-10.00,-9.20,
-6/30/2020 17:00:00,Withdraw,,,,,-1000.00,-920.00,
+    csv_content = """date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,,,
+1/16/2020 11:30:00,Buy,AAPL,10.5,150.00,5.00,-1580.00,,,
+2/20/2020 14:00:00,Dividend,AAPL,,,0.00,50.00,46.00,,,
+3/10/2020 09:00:00,Split,AAPL,,,,0.00,,2.0,,
+4/15/2020 16:00:00,Sell,AAPL,5.0,200.00,5.00,995.00,,,
+5/20/2020 10:00:00,Fee,,,,,-10.00,-9.20,,,
+6/30/2020 17:00:00,Withdraw,,,,,-1000.00,-920.00,,,
 """
     
     files = {"file": ("transactions.csv", BytesIO(csv_content.encode()), "text/csv")}
@@ -636,6 +642,40 @@ def test_csv_with_complex_transactions(client: TestClient):
     assert transactions[4]["type"] == "Sell"
     assert transactions[5]["type"] == "Fee"
     assert transactions[6]["type"] == "Withdraw"
+
+
+def test_csv_upload_invalid_fx_rate(client: TestClient):
+    """Test CSV upload with invalid fx_rate values"""
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "FX Rate Validation Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Test with zero fx_rate
+    csv_content_zero = """date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,,USD,0.0
+"""
+    files = {"file": ("transactions.csv", BytesIO(csv_content_zero.encode()), "text/csv")}
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files=files
+    )
+    assert response.status_code == 400
+    assert "fx_rate must be positive" in response.json()["detail"].lower()
+    
+    # Test with negative fx_rate
+    csv_content_negative = """date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+1/15/2020 10:00:00,Deposit,,,,,5000.00,4600.00,,USD,-1.5
+"""
+    files = {"file": ("transactions.csv", BytesIO(csv_content_negative.encode()), "text/csv")}
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files=files
+    )
+    assert response.status_code == 400
+    assert "fx_rate must be positive" in response.json()["detail"].lower()
 
 
 def test_copy_portfolio_with_transactions(client: TestClient):
@@ -747,13 +787,13 @@ def test_portfolio_status_empty_portfolio(client: TestClient):
     
     assert data["portfolio_id"] == portfolio_id
     assert data["portfolio_name"] == "Empty Portfolio"
-    assert data["cash_balance"] == 0.0
-    assert data["total_invested"] == 0.0
-    assert data["dividends_received"] == 0.0
-    assert data["realized_gains"] == 0.0
-    assert data["total_eur_amount"] == 0.0
+    assert data["principal"] == 0.0
+    assert data["principal_eur"] == 0.0
+    assert data["dividends"] == 0.0
+    assert data["cash"] == 0.0
     assert data["holdings"] == []
-    assert data["total_holdings_cost"] == 0.0
+    assert data["realized_gains"] == 0.0
+    assert data["holdings_cost"] == 0.0
 
 
 def test_portfolio_status_with_deposit(client: TestClient):
@@ -781,8 +821,8 @@ def test_portfolio_status_with_deposit(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 1000.0
-    assert data["total_invested"] == 1000.0
+    assert data["cash"] == 1000.0
+    assert data["principal"] == 1000.0
     assert data["holdings"] == []
 
 
@@ -838,8 +878,8 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 2000.0  # 5000 - 1500 - 1500 (fees included in values)
-    assert data["total_invested"] == 5000.0
+    assert data["cash"] == 2000.0  # 5000 - 1500 - 1500 (fees included in values)
+    assert data["principal"] == 5000.0
     assert len(data["holdings"]) == 2
     
     # Check AAPL holding
@@ -854,7 +894,7 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     assert msft_holding["average_cost"] == 300.0
     assert msft_holding["total_cost"] == 1500.0
     
-    assert data["total_holdings_cost"] == 3000.0
+    assert data["holdings_cost"] == 3000.0
 
 
 def test_portfolio_status_with_sell_transactions(client: TestClient):
@@ -909,8 +949,8 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 9500.0  # 10000 - 2000 + 1500 (fees included in values)
-    assert data["total_invested"] == 10000.0
+    assert data["cash"] == 9500.0  # 10000 - 2000 + 1500 (fees included in values)
+    assert data["principal"] == 10000.0
     
     # Should have 10 AAPL left
     assert len(data["holdings"]) == 1
@@ -985,8 +1025,8 @@ def test_portfolio_status_with_dividends(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 3600.0  # 5000 - 1500 + 50 + 50 (fees included in values)
-    assert data["dividends_received"] == 100.0
+    assert data["cash"] == 3600.0  # 5000 - 1500 + 50 + 50 (fees included in values)
+    assert data["dividends"] == 100.0
     assert len(data["holdings"]) == 1
 
 
@@ -1086,8 +1126,8 @@ def test_portfolio_status_with_withdrawal(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash_balance"] == 3000.0  # 5000 - 2000
-    assert data["total_invested"] == 3000.0  # 5000 - 2000
+    assert data["cash"] == 3000.0  # 5000 - 2000
+    assert data["principal"] == 3000.0  # 5000 - 2000
 
 
 def test_portfolio_status_nonexistent_portfolio(client: TestClient):
@@ -1370,7 +1410,7 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     data = response.json()
     
     # Check cash balance
-    assert data["cash_balance"] == 7000.0  # 10000 - 1500 - 1500
+    assert data["cash"] == 7000.0  # 10000 - 1500 - 1500
     
     # Check AAPL holding with price data
     aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
@@ -1393,10 +1433,10 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     assert abs(msft_holding["unrealized_gain_loss_percent"] - (-10.0)) < 0.01
     
     # Check portfolio totals
-    assert data["total_holdings_cost"] == 3000.0
-    assert data["total_current_value"] == 3150.0  # 1800 + 1350
+    assert data["holdings_cost"] == 3000.0
+    assert data["holdings_value"] == 3150.0  # 1800 + 1350
     assert data["unrealized_gains"] == 150.0  # 300 - 150
-    assert data["total_portfolio_value"] == 10150.0  # 7000 cash + 3150 holdings
+    assert data["current_value"] == 10150.0  # 7000 cash + 3150 holdings
 
 
 def test_portfolio_status_with_missing_prices(client: TestClient):
@@ -1470,7 +1510,7 @@ def test_portfolio_status_with_missing_prices(client: TestClient):
     assert unknown_holding["unrealized_gain_loss_percent"] is None
     
     # Totals should only include holdings with prices
-    assert data["total_current_value"] == 1800.0  # Only AAPL
+    assert data["holdings_value"] == 1800.0  # Only AAPL
     assert data["unrealized_gains"] == 300.0  # Only AAPL gain
 
 
@@ -1658,9 +1698,422 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
     assert data["unrealized_gains"] == 1000.0
     
     # Total portfolio value: 5000 cash + (7500 + 3500 + 5000) holdings = 21000
-    assert data["cash_balance"] == 5000.0
-    assert data["total_current_value"] == 16000.0
-    assert data["total_portfolio_value"] == 21000.0
+    assert data["cash"] == 5000.0
+    assert data["holdings_value"] == 16000.0
+    assert data["current_value"] == 21000.0
+
+
+# ================== EUR Conversion and Tax Tests ==================
+
+def test_portfolio_status_with_eur_conversion(client: TestClient):
+    """Test portfolio status with EUR conversion and tax calculation"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "EUR Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit $10,000 with fx_rate = 1.1111 (meaning 1 EUR = 1.1111 USD)
+    # This converts to: 10000 / 1.1111 = 9000 EUR
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.1111,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL at $100 (10 shares = $1000)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 100.0,
+            "total_amount": -1000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current price: AAPL at $150 (50% gain)
+    # Mock USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
+    mock_prices = {'AAPL': 150.0}
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # USD values
+    assert data["cash"] == 9000.0
+    assert data["principal"] == 10000.0
+    assert data["current_value"] == 10500.0  # 9000 cash + 1500 holdings
+    assert data["unrealized_gains"] == 500.0  # 1500 - 1000
+    
+    # EUR values
+    assert abs(data["principal_eur"] - 9000.0) < 0.1  # 10000 / 1.1111 ≈ 9000
+    assert data["current_value_eur"] == 8925.0  # 10500 * 0.85
+    assert data["unrealized_gains_eur"] == 425.0  # 500 * 0.85
+    
+    # Tax calculation: (current_value_eur - principal_eur - dividends_eur) * 0.25
+    # dividends_eur is None (no dividends), treated as 0
+    capital_gains_eur = 8925.0 - 9000.0  # -75 EUR
+    expected_tax = 0.0  # No tax on negative gains
+    assert data["tax_eur"] == expected_tax
+    
+    # After-tax return: (current_value_eur - principal_eur) - tax_eur
+    expected_return = 8925.0 - 9000.0 - expected_tax
+    assert abs(data["total_return_after_tax_eur"] - expected_return) < 0.1
+    assert abs(data["total_return_after_tax_percent"] - (expected_return / 9000.0 * 100)) < 0.01
+
+
+def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
+    """Test tax calculation with positive capital gains"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Tax Test Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit $10,000 with EUR conversion at 1.0 (for simplicity)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL at $100 (100 shares = $10,000)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current price: AAPL at $200 (100% gain = $10,000 gain)
+    # Mock USD to EUR rate: 1.0 (for simplicity)
+    mock_prices = {'AAPL': 200.0}
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # USD values
+    assert data["current_value"] == 20000.0  # 0 cash + 20000 holdings
+    assert data["principal"] == 10000.0
+    assert data["unrealized_gains"] == 10000.0
+    
+    # EUR values
+    assert data["current_value_eur"] == 20000.0
+    assert data["principal_eur"] == 10000.0
+    
+    # Tax calculation: (20000 - 10000 - 0) * 0.25 = 2500 EUR
+    capital_gains_eur = 20000.0 - 10000.0 - 0.0
+    expected_tax = capital_gains_eur * 0.25
+    assert data["tax_eur"] == expected_tax
+    assert data["tax_eur"] == 2500.0
+    
+    # After-tax return: (20000 - 10000) - 2500 = 7500 EUR
+    expected_return = 20000.0 - 10000.0 - 2500.0
+    assert data["total_return_after_tax_eur"] == expected_return
+    assert data["total_return_after_tax_eur"] == 7500.0
+    assert data["total_return_after_tax_percent"] == 75.0  # 7500 / 10000 * 100
+    
+    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7500 = 17500 EUR
+    expected_value_after_tax = 10000.0 + 7500.0
+    assert data["current_value_after_tax_eur"] == expected_value_after_tax
+    assert data["current_value_after_tax_eur"] == 17500.0
+
+
+def test_portfolio_status_tax_excludes_dividends(client: TestClient):
+    """Test that tax calculation excludes dividends from capital gains base"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Dividend Tax Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Receive $2,000 dividend
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Dividend",
+            "ticker": "AAPL",
+            "total_amount": 2000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current price: AAPL at $150 ($5,000 unrealized gain)
+    mock_prices = {'AAPL': 150.0}
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Current value: $2,000 cash + $15,000 holdings = $17,000
+    assert data["cash"] == 2000.0
+    assert data["current_value"] == 17000.0
+    assert data["principal"] == 10000.0
+    assert data["dividends"] == 2000.0
+    assert data["dividends_eur"] == 2000.0
+    
+    # Total gain: 17000 - 10000 = 7000 (includes dividends)
+    # Capital gains (for tax): 17000 - 10000 - 2000 = 5000 (excludes dividends)
+    # Tax: 5000 * 0.25 = 1250 EUR
+    capital_gains_eur = 17000.0 - 10000.0 - 2000.0
+    expected_tax = capital_gains_eur * 0.25
+    assert data["tax_eur"] == expected_tax
+    assert data["tax_eur"] == 1250.0
+    
+    # After-tax return: (17000 - 10000) - 1250 = 5750 EUR
+    expected_return = 17000.0 - 10000.0 - 1250.0
+    assert data["total_return_after_tax_eur"] == expected_return
+    assert data["total_return_after_tax_eur"] == 5750.0
+    
+    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 5750 = 15750 EUR
+    expected_value_after_tax = 10000.0 + 5750.0
+    assert data["current_value_after_tax_eur"] == expected_value_after_tax
+    assert data["current_value_after_tax_eur"] == 15750.0
+
+
+def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
+    """Test that tax_eur is None when dividends exist but EUR conversion is unavailable"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Missing Dividend EUR Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Receive dividend WITHOUT fx_rate (EUR conversion unavailable)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Dividend",
+            "ticker": "AAPL",
+            "total_amount": 1000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current price
+    mock_prices = {'AAPL': 150.0}
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Dividends exist in USD
+    assert data["dividends"] == 1000.0
+    
+    # Dividends EUR should be None (no fx_rate provided)
+    assert data["dividends_eur"] is None
+    
+    # Tax should be None (cannot compute without knowing dividend EUR value)
+    assert data["tax_eur"] is None
+    
+    # After-tax metrics should also be None
+    assert data["total_return_after_tax_eur"] is None
+    assert data["total_return_after_tax_percent"] is None
+    assert data["current_value_after_tax_eur"] is None
+
+
+def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestClient):
+    """Test that EUR metrics are None when current exchange rate is unavailable"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "No Exchange Rate Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Buy AAPL
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current price but NO exchange rate
+    mock_prices = {'AAPL': 150.0}
+    
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=None):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # USD values should be available
+    assert data["current_value"] == 15000.0
+    assert data["principal"] == 10000.0
+    
+    # EUR values should be None
+    assert data["current_value_eur"] is None
+    assert data["unrealized_gains_eur"] is None
+    assert data["tax_eur"] is None
+    assert data["total_return_after_tax_eur"] is None
+    assert data["total_return_after_tax_percent"] is None
+    assert data["current_value_after_tax_eur"] is None
+    
+    # Historical EUR values should still be available
+    assert data["principal_eur"] == 10000.0  # Converted at historical rate
+
+
+def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient):
+    """Test EUR conversion uses correct rates (historical for transactions, current for valuation)"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Rate Difference Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+    
+    # Deposit $10,000 at historical fx_rate 1.10 (1 EUR = 1.10 USD)
+    # Converts to: 10000 / 1.10 = 9090.91 EUR
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0
+        }
+    )
+    
+    # Deposit another $5,000 at different historical fx_rate 1.05 (1 EUR = 1.05 USD)
+    # Converts to: 5000 / 1.05 = 4761.90 EUR
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-02-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fx_rate": 1.05,
+            "fee": 0.0
+        }
+    )
+    
+    # Mock current USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value={}), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Principal in USD
+    assert data["principal"] == 15000.0
+    
+    # Principal in EUR (using historical fx_rates)
+    # 10000 / 1.10 + 5000 / 1.05 = 9090.91 + 4761.90 = 13852.81
+    expected_principal_eur = 10000.0 / 1.10 + 5000.0 / 1.05
+    assert abs(data["principal_eur"] - expected_principal_eur) < 0.01
+    
+    # Current value in EUR (using current rate)
+    # 15000 * 0.85 = 12750.0
+    expected_current_value_eur = 15000.0 * 0.85
+    assert data["current_value_eur"] == expected_current_value_eur
 
 
 # ================== Health Check Test ==================

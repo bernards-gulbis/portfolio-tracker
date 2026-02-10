@@ -8,7 +8,7 @@ A full-stack portfolio tracking application built with FastAPI and React. Track 
 - **Multi-Type Transactions**: Support for Deposits, Withdrawals, Buy/Sell stocks, Dividends, Fees, and Stock Splits
 - **CSV Import/Export**: Bulk upload and download transactions via CSV format
 - **Portfolio Status**: Real-time portfolio valuation with current holdings, cash balance, and realized/unrealized gains
-- **Multi-Currency Support**: Track EUR amounts alongside primary currency
+- **Multi-Currency Support**: Track transactions in different currencies with EUR amounts and FX rates
 - **Transaction History**: Paginated view with filtering and search capabilities
 - **Real-time Updates**: Automatic UI updates using TanStack Query
 - **Responsive Design**: Mobile-friendly interface with modern UI
@@ -189,14 +189,14 @@ npm test -- --watch
 The CSV file must include the following headers:
 
 ```csv
-date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
-01/15/2024 10:00:00,Deposit,,,,,5000.00,4600.00,
-01/16/2024 14:30:00,Buy,AAPL,10,150.00,1.00,-1501.00,,
-01/17/2024 09:00:00,Sell,MSFT,5,380.25,0.50,1900.75,,
-01/18/2024 11:00:00,Dividend,AAPL,,,0.00,50.00,,
-01/19/2024 16:00:00,Withdraw,,,,,-1000.00,-920.00,
-01/20/2024 10:00:00,Fee,,,,,-10.00,,
-02/01/2024 09:30:00,Split,AAPL,,,,,0.00,,2.0
+date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+2/12/2020 20:14:39,Deposit,,,,,3000,2760.27,,USD,1.0871
+01/16/2024 14:30:00,Buy,AAPL,10,150.00,1.00,-1501.00,,,,
+01/17/2024 09:00:00,Sell,MSFT,5,380.25,0.50,1900.75,,,,
+01/18/2024 11:00:00,Dividend,AAPL,,,0.00,50.00,,,,
+01/19/2024 16:00:00,Withdraw,,,,,-1000.00,-920.00,,,
+01/20/2024 10:00:00,Fee,,,,,-10.00,,,,
+02/01/2024 09:30:00,Split,AAPL,,,,,0.00,,2.0,,
 ```
 
 **Field Descriptions:**
@@ -210,8 +210,10 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
   - **Negative** for: Buy, Withdraw, Fee (money leaving account)
   - **Positive** for: Deposit, Sell, Dividend (money entering account)
   - Zero for: Split (no cash impact)
-- `EUR`: EUR equivalent amount (optional, follows same sign convention as total_amount)
+- `eur`: EUR equivalent amount (optional, follows same sign convention as total_amount)
 - `split_ratio`: Stock split ratio (required for Split transactions, e.g., 2.0 for 2-for-1 split)
+- `currency`: Currency code (optional, 3-letter code, e.g., USD, EUR, GBP)
+- `fx_rate`: Foreign exchange rate (optional, up to 4 decimal places)
 
 **Notes:**
 - Leave fields blank (empty) if not applicable for that transaction type
@@ -240,6 +242,8 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,EUR,split_ratio
   - Positive for income (Deposit, Sell, Dividend)
 - `eur_amount`: EUR equivalent amount (optional, follows same sign convention)
 - `split_ratio`: Stock split ratio (optional, required for Split transactions)
+- `currency`: Currency code (optional, 3-letter code)
+- `fx_rate`: Foreign exchange rate (optional, up to 4 decimal places)
 
 ## Development
 

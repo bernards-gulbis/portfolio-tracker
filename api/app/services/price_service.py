@@ -122,3 +122,18 @@ class PriceService:
         except Exception as e:
             logger.error(f"Unexpected error fetching price for {ticker}: {e}", exc_info=True)
             return None
+    
+    @staticmethod
+    def get_usd_to_eur_rate() -> Optional[float]:
+        """
+        Fetch current USD to EUR exchange rate from Yahoo Finance
+        
+        Returns:
+            Exchange rate (EUR per USD) or None if not found
+        """
+        # EURUSD=X gives EUR/USD (how many USD per EUR)
+        # We need USD/EUR (how many EUR per USD), which is 1 / EURUSD
+        eur_usd_rate = PriceService.get_current_price("EURUSD=X")
+        if eur_usd_rate and eur_usd_rate > 0:
+            return 1.0 / eur_usd_rate  # Convert to USD/EUR
+        return None
