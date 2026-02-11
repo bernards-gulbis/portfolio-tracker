@@ -506,6 +506,7 @@ body {
 .transaction-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 /* Transaction Table */
@@ -779,15 +780,9 @@ body {
   transition: color 0.2s ease;
 }
 
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.table-info {
   margin-bottom: 12px;
   padding: 8px 0;
-}
-
-.table-info {
   color: var(--text-secondary);
   font-size: 14px;
 }
@@ -840,7 +835,7 @@ body {
   cursor: pointer;
   font-size: 14px;
   color: var(--text-primary);
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 .header-actions .menu-item:hover:not(:disabled) {
@@ -848,7 +843,7 @@ body {
 }
 
 .header-actions .menu-item:disabled {
-  opacity: 0.5;
+  opacity: 0.38;
   cursor: not-allowed;
 }
 

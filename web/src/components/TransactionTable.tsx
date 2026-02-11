@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Transaction } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate, getValueColor, formatTransactionType, getDisplayValue } from '../utils/formatters';
+import { formatCurrency, formatDate, formatTransactionType, getDisplayValue } from '../utils/formatters';
 import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
 
 interface TransactionTableProps {
@@ -13,9 +13,6 @@ interface TransactionTableProps {
   total: number;
   onPageChange: (page: number) => void;
   isLoading: boolean;
-  onImportCSV: () => void;
-  onExportCSV: () => void;
-  isExporting: boolean;
 }
 
 const TransactionTable = ({ 
@@ -26,15 +23,11 @@ const TransactionTable = ({
   totalPages,
   total,
   onPageChange,
-  isLoading,
-  onImportCSV,
-  onExportCSV,
-  isExporting
+  isLoading
 }: TransactionTableProps) => {
   const deleteTransaction = useDeleteTransaction();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
 
   const toggleMenu = (transactionId: number) => {
     setOpenMenuId(openMenuId === transactionId ? null : transactionId);
@@ -44,24 +37,31 @@ const TransactionTable = ({
     setOpenMenuId(null);
   };
 
-  // Close menu when clicking outside
+  // Close menu when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('.action-menu-container') && !target.closest('.header-actions')) {
+      if (!target.closest('.action-menu-container')) {
         closeMenu();
-        setIsHeaderMenuOpen(false);
       }
     };
 
-    if (openMenuId !== null || isHeaderMenuOpen) {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
+    };
+
+    if (openMenuId !== null) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
     };
-  }, [openMenuId, isHeaderMenuOpen]);
+  }, [openMenuId]);
 
   const handleDelete = async (transactionId: number) => {
     closeMenu();
@@ -137,44 +137,10 @@ const TransactionTable = ({
 
   return (
     <>
-      <div className="table-header">
-        <div className="table-info">
-          <p>
-            Showing {startIndex + 1}-{endIndex} of {total} transactions
-          </p>
-        </div>
-        <div className="header-actions">
-          <button
-            className="btn-menu"
-            onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
-            aria-label="Table actions menu"
-          >
-            ⋮
-          </button>
-          {isHeaderMenuOpen && (
-            <div className="action-menu-dropdown">
-              <button
-                className="menu-item"
-                onClick={() => {
-                  onImportCSV();
-                  setIsHeaderMenuOpen(false);
-                }}
-              >
-                Import CSV
-              </button>
-              <button
-                className="menu-item"
-                onClick={() => {
-                  onExportCSV();
-                  setIsHeaderMenuOpen(false);
-                }}
-                disabled={isExporting || transactions.length === 0}
-              >
-                {isExporting ? 'Exporting...' : 'Export CSV'}
-              </button>
-            </div>
-          )}
-        </div>
+      <div className="table-info">
+        <p>
+          Showing {startIndex + 1}-{endIndex} of {total} transactions
+        </p>
       </div>
       <div className="table-container">
         <table className="transaction-table">
@@ -215,6 +181,8 @@ const TransactionTable = ({
                       onClick={() => toggleMenu(transaction.id)}
                       disabled={deletingId === transaction.id}
                       aria-label="Actions menu"
+                      aria-haspopup="true"
+                      aria-expanded={openMenuId === transaction.id}
                     >
                       ⋮
                     </button>

@@ -30,7 +30,7 @@ const PortfolioList = () => {
     setOpenMenuId(null);
   };
 
-  // Close menu when clicking outside
+  // Close menu when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -39,12 +39,20 @@ const PortfolioList = () => {
       }
     };
 
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
+    };
+
     if (openMenuId !== null) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
     };
   }, [openMenuId]);
 
@@ -141,6 +149,8 @@ const PortfolioList = () => {
                   onClick={(e) => toggleMenu(portfolio.id, e)}
                   disabled={deletePortfolio.isPending}
                   aria-label="Actions menu"
+                  aria-haspopup="true"
+                  aria-expanded={openMenuId === portfolio.id}
                 >
                   ⋮
                 </button>
