@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { formatCurrency, formatNumber } from '../utils/formatters';
-import { PerformanceChart } from './PerformanceChart';
+import { PerformanceChart, TimePeriod } from './PerformanceChart';
 import { HoldingsAllocationChart } from './HoldingsAllocationChart';
 
 interface PortfolioStatusProps {
@@ -39,12 +39,34 @@ const formatCurrencyWithPercent = (
 };
 
 export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioId }) => {
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('1month');
   const { data: status, isLoading, error } = usePortfolioStatus(portfolioId);
+  
+  // Calculate date range and num_points based on selected period
+  const getPerformanceParams = () => {
+    if (timePeriod === '1month') {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 1);
+      return {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        numPoints: 30 // Daily data for 1 month
+      };
+    }
+    return {
+      startDate: undefined,
+      endDate: undefined,
+      numPoints: 60 // All time with 60 points
+    };
+  };
+
+  const params = getPerformanceParams();
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
     portfolioId,
-    undefined,
-    undefined,
-    60
+    params.startDate,
+    params.endDate,
+    params.numPoints
   );
 
   if (!portfolioId) {
@@ -137,7 +159,9 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
       <div className="charts-container">
         <PerformanceChart 
           data={performance?.data_points || []} 
-          loading={performanceLoading} 
+          loading={performanceLoading}
+          selectedPeriod={timePeriod}
+          onPeriodChange={setTimePeriod}
         />
         <HoldingsAllocationChart 
           holdings={status.holdings}
