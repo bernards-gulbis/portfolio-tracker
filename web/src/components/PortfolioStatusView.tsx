@@ -18,8 +18,8 @@ const formatSignedCurrency = (value: number | null | undefined, currency: string
 
 const formatSignedPercent = (value: number | null | undefined): string => {
   if (value == null) return '';
-  const sign = value > 0 ? '+' : '';
-  return `(${sign}${value.toFixed(2)}%)`;
+  const sign = value >= 0 ? '▲' : '▼';
+  return `${sign}${Math.abs(value).toFixed(2)}%`;
 };
 
 const getValueClass = (value: number | null | undefined): string => {
@@ -31,11 +31,17 @@ const formatCurrencyWithPercent = (
   currencyValue: number | null | undefined,
   percentValue: number | null | undefined,
   currency: string = 'USD'
-): string => {
+): JSX.Element | string => {
   if (currencyValue == null) return '-';
   const formattedCurrency = formatSignedCurrency(currencyValue, currency);
-  const formattedPercent = percentValue != null ? ` ${formatSignedPercent(percentValue)}` : '';
-  return `${formattedCurrency}${formattedPercent}`;
+  const formattedPercent = percentValue != null ? formatSignedPercent(percentValue) : '';
+  const percentColor = currencyValue >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+  return (
+    <>
+      <span>{formattedCurrency}</span>
+      {formattedPercent && <span style={{ color: percentColor, fontWeight: 700, marginLeft: '6px' }}>{formattedPercent}</span>}
+    </>
+  );
 };
 
 export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioId }) => {
@@ -114,7 +120,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               ? formatCurrency(status.current_value_eur, 'EUR')
               : '-'}
           </p>
-          <p className={`status-value-secondary ${getValueClass(status.unrealized_gains_eur)}`} style={{ color: status.unrealized_gains_eur != null ? (status.unrealized_gains_eur >= 0 ? 'green' : 'red') : undefined }}>
+          <p className="status-value-secondary">
             {formatCurrencyWithPercent(
               status.unrealized_gains_eur,
               status.unrealized_gains_percent,
@@ -145,7 +151,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               ? formatCurrency(status.current_value_after_tax_eur, 'EUR')
               : '-'}
           </p>
-          <p className={`status-value-secondary ${getValueClass(status.total_return_after_tax_eur)}`} style={{ color: status.total_return_after_tax_eur != null ? (status.total_return_after_tax_eur >= 0 ? 'green' : 'red') : undefined }}>
+          <p className="status-value-secondary">
             {formatCurrencyWithPercent(
               status.total_return_after_tax_eur,
               status.total_return_after_tax_percent,
@@ -209,9 +215,16 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
                 <td>
                   {holding.current_value != null ? formatCurrency(holding.current_value) : '-'}
                 </td>
-                <td className={getValueClass(holding.unrealized_gain_loss)}>
+                <td>
                   {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_percent != null
-                    ? `${formatCurrency(holding.unrealized_gain_loss)} (${holding.unrealized_gain_loss_percent >= 0 ? '+' : ''}${holding.unrealized_gain_loss_percent.toFixed(2)}%)`
+                    ? (
+                      <>
+                        <span>{formatCurrency(holding.unrealized_gain_loss)}</span>
+                        <span className={getValueClass(holding.unrealized_gain_loss)} style={{ fontWeight: 700, marginLeft: '6px' }}>
+                          {holding.unrealized_gain_loss_percent >= 0 ? '▲' : '▼'}{Math.abs(holding.unrealized_gain_loss_percent).toFixed(2)}%
+                        </span>
+                      </>
+                    )
                     : '-'}
                 </td>
               </tr>

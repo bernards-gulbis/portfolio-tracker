@@ -108,20 +108,24 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({
 
   return (
     <div className="performance-chart">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h3 style={{ margin: 0 }}>Performance</h3>
         {onPeriodChange && (
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '0', backgroundColor: 'transparent', padding: '0', borderRadius: '0', border: 'none' }}>
             <button
               onClick={() => onPeriodChange('1month')}
               style={{
                 padding: '6px 12px',
-                border: selectedPeriod === '1month' ? '2px solid #007acc' : '1px solid #ccc',
-                backgroundColor: selectedPeriod === '1month' ? '#007acc' : 'white',
-                color: selectedPeriod === '1month' ? 'white' : '#333',
-                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: selectedPeriod === '1month' ? 'var(--primary-color)' : 'var(--text-secondary)',
+                borderBottom: selectedPeriod === '1month' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                borderRadius: '0',
                 cursor: 'pointer',
-                fontWeight: selectedPeriod === '1month' ? 'bold' : 'normal',
+                fontWeight: selectedPeriod === '1month' ? 500 : 400,
+                fontSize: '14px',
+                transition: 'all 0.2s ease',
+                letterSpacing: '0',
               }}
             >
               1M
@@ -130,12 +134,16 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({
               onClick={() => onPeriodChange('all')}
               style={{
                 padding: '6px 12px',
-                border: selectedPeriod === 'all' ? '2px solid #007acc' : '1px solid #ccc',
-                backgroundColor: selectedPeriod === 'all' ? '#007acc' : 'white',
-                color: selectedPeriod === 'all' ? 'white' : '#333',
-                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: selectedPeriod === 'all' ? 'var(--primary-color)' : 'var(--text-secondary)',
+                borderBottom: selectedPeriod === 'all' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                borderRadius: '0',
                 cursor: 'pointer',
-                fontWeight: selectedPeriod === 'all' ? 'bold' : 'normal',
+                fontWeight: selectedPeriod === 'all' ? 500 : 400,
+                fontSize: '14px',
+                transition: 'all 0.2s ease',
+                letterSpacing: '0',
               }}
             >
               All
@@ -150,15 +158,15 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({
         >
           <defs>
             <linearGradient id="colorPrincipal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#8884d8" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#8884d8" stopOpacity={0.05}/>
+              <stop offset="5%" stopColor="#5f6368" stopOpacity={0.2}/>
+              <stop offset="95%" stopColor="#5f6368" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="colorCurrentValue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.4}/>
-              <stop offset="95%" stopColor="#82ca9d" stopOpacity={0.05}/>
+              <stop offset="5%" stopColor="#1a73e8" stopOpacity={0.2}/>
+              <stop offset="95%" stopColor="#1a73e8" stopOpacity={0}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#dadce0" vertical={false} />
           <XAxis
             dataKey="date"
             tickFormatter={formatXAxis}
@@ -178,8 +186,8 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({
           <Area
             type="monotone"
             dataKey="Principal (EUR)"
-            stroke="#8884d8"
-            strokeWidth={2}
+            stroke="#5f6368"
+            strokeWidth={1.5}
             fill="url(#colorPrincipal)"
             fillOpacity={1}
             connectNulls
@@ -187,8 +195,8 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({
           <Area
             type="monotone"
             dataKey="Current Value (EUR)"
-            stroke="#82ca9d"
-            strokeWidth={2.5}
+            stroke="#1a73e8"
+            strokeWidth={2}
             fill="url(#colorCurrentValue)"
             fillOpacity={1}
             connectNulls

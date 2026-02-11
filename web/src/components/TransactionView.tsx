@@ -102,28 +102,12 @@ const TransactionView = () => {
     <div className="transaction-view">
       <div className="transaction-header">
         <h2>Transactions</h2>
-        <div className="transaction-actions">
-          <button
-            className="btn btn-success"
-            onClick={handleAddTransaction}
-          >
-            ➕ Add Transaction
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={handleExport}
-            disabled={isExporting || !transactions || transactions.length === 0}
-            title="Export transactions to CSV"
-          >
-            {isExporting ? '⏳ Exporting...' : '📥 Export CSV'}
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => setIsImportModalOpen(true)}
-          >
-            📤 Import CSV
-          </button>
-        </div>
+        <button
+          className="btn btn-primary"
+          onClick={handleAddTransaction}
+        >
+          + Add Transaction
+        </button>
       </div>
 
       {transactions && (
@@ -136,6 +120,9 @@ const TransactionView = () => {
           total={total}
           onPageChange={setCurrentPage}
           isLoading={isLoading}
+          onImportCSV={() => setIsImportModalOpen(true)}
+          onExportCSV={handleExport}
+          isExporting={isExporting}
         />
       )}
 

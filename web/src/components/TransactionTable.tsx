@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Transaction } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
 import { formatCurrency, formatDate, getValueColor, formatTransactionType, getDisplayValue } from '../utils/formatters';
@@ -13,6 +13,9 @@ interface TransactionTableProps {
   total: number;
   onPageChange: (page: number) => void;
   isLoading: boolean;
+  onImportCSV: () => void;
+  onExportCSV: () => void;
+  isExporting: boolean;
 }
 
 const TransactionTable = ({ 
@@ -23,12 +26,45 @@ const TransactionTable = ({
   totalPages,
   total,
   onPageChange,
-  isLoading
+  isLoading,
+  onImportCSV,
+  onExportCSV,
+  isExporting
 }: TransactionTableProps) => {
   const deleteTransaction = useDeleteTransaction();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+
+  const toggleMenu = (transactionId: number) => {
+    setOpenMenuId(openMenuId === transactionId ? null : transactionId);
+  };
+
+  const closeMenu = () => {
+    setOpenMenuId(null);
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.action-menu-container') && !target.closest('.header-actions')) {
+        closeMenu();
+        setIsHeaderMenuOpen(false);
+      }
+    };
+
+    if (openMenuId !== null || isHeaderMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openMenuId, isHeaderMenuOpen]);
 
   const handleDelete = async (transactionId: number) => {
+    closeMenu();
     if (window.confirm('Are you sure you want to delete this transaction?')) {
       setDeletingId(transactionId);
       try {
@@ -101,10 +137,44 @@ const TransactionTable = ({
 
   return (
     <>
-      <div className="table-info">
-        <p>
-          Showing {startIndex + 1}-{endIndex} of {total} transactions
-        </p>
+      <div className="table-header">
+        <div className="table-info">
+          <p>
+            Showing {startIndex + 1}-{endIndex} of {total} transactions
+          </p>
+        </div>
+        <div className="header-actions">
+          <button
+            className="btn-menu"
+            onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
+            aria-label="Table actions menu"
+          >
+            ⋮
+          </button>
+          {isHeaderMenuOpen && (
+            <div className="action-menu-dropdown">
+              <button
+                className="menu-item"
+                onClick={() => {
+                  onImportCSV();
+                  setIsHeaderMenuOpen(false);
+                }}
+              >
+                Import CSV
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => {
+                  onExportCSV();
+                  setIsHeaderMenuOpen(false);
+                }}
+                disabled={isExporting || transactions.length === 0}
+              >
+                {isExporting ? 'Exporting...' : 'Export CSV'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       <div className="table-container">
         <table className="transaction-table">
@@ -135,25 +205,40 @@ const TransactionTable = ({
                 <td className="text-right">
                   {transaction.price_per_share !== null && transaction.price_per_share !== undefined ? formatCurrency(transaction.price_per_share) : '-'}
                 </td>
-                <td className={`text-right value-${getValueColor(transaction.total_amount)}`}>
+                <td className="text-right">
                   {formatCurrency(getDisplayValue(transaction))}
                 </td>
                 <td className="text-center">
-                  <div className="action-buttons">
+                  <div className="action-menu-container">
                     <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => onEdit(transaction)}
+                      className="btn-menu"
+                      onClick={() => toggleMenu(transaction.id)}
                       disabled={deletingId === transaction.id}
+                      aria-label="Actions menu"
                     >
-                      Edit
+                      ⋮
                     </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleDelete(transaction.id)}
-                      disabled={deletingId === transaction.id}
-                    >
-                      {deletingId === transaction.id ? 'Deleting...' : 'Delete'}
-                    </button>
+                    {openMenuId === transaction.id && (
+                      <div className="action-menu-dropdown">
+                        <button
+                          className="menu-item"
+                          onClick={() => {
+                            onEdit(transaction);
+                            closeMenu();
+                          }}
+                          disabled={deletingId === transaction.id}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="menu-item menu-item-danger"
+                          onClick={() => handleDelete(transaction.id)}
+                          disabled={deletingId === transaction.id}
+                        >
+                          {deletingId === transaction.id ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
