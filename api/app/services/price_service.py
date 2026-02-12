@@ -25,6 +25,7 @@ class PriceService:
     # In-memory cache for historical prices (clears after request completes)
     _historical_cache: Dict[str, Dict[str, float]] = {}
     _historical_cache_lock = Lock()
+    _HISTORICAL_CACHE_MAX_SIZE = 100  # Max entries to prevent memory issues
     
     # Configuration: days to consider data "historical" (immutable)
     _HISTORICAL_DATA_CUTOFF_DAYS = 2
@@ -58,36 +59,31 @@ class PriceService:
     
     @classmethod
     def _save_historical_prices(cls, ticker: str, prices: Dict[str, float]) -> None:
-        """Save historical prices to database"""
+        """Save historical prices to database using bulk upsert"""
         if not prices:
             return
         
-        with Session(engine) as session:
-            for date_str, price in prices.items():
-                # Check if record exists
-                existing = session.exec(
-                    select(HistoricalPrice).where(
-                        HistoricalPrice.ticker == ticker,
-                        HistoricalPrice.date == date_str
-                    )
-                ).first()
-                
-                if existing:
-                    # Update existing
-                    existing.price = price
-                    existing.created_at = datetime.utcnow()
-                else:
-                    # Create new
-                    historical_price = HistoricalPrice(
+        now = datetime.now(timezone.utc)
+        
+        try:
+            with Session(engine) as session:
+                # Bulk upsert using merge (works with SQLite and PostgreSQL)
+                for date_str, price in prices.items():
+                    price_record = HistoricalPrice(
                         ticker=ticker,
                         date=date_str,
-                        price=price
+                        price=price,
+                        created_at=now
                     )
-                    session.add(historical_price)
+                    session.merge(price_record)
+                
+                session.commit()
             
-            session.commit()
-        
-        logger.debug(f"Saved {len(prices)} historical prices for {ticker} to cache")
+            logger.debug(f"Saved {len(prices)} historical prices for {ticker} to cache")
+        except Exception as e:
+            logger.error(f"Failed to save {len(prices)} historical prices for {ticker}: {e}", exc_info=True)
+            # Don't raise - caching failure shouldn't break the request
+            # Data will be refetched next time
     
     @classmethod
     def _get_cached_fx_rates(
@@ -109,32 +105,29 @@ class PriceService:
     
     @classmethod
     def _save_fx_rates(cls, rates: Dict[str, float]) -> None:
-        """Save FX rates to database"""
+        """Save FX rates to database using bulk upsert"""
         if not rates:
             return
         
-        with Session(engine) as session:
-            for date_str, rate in rates.items():
-                # Check if record exists
-                existing = session.exec(
-                    select(FxRate).where(FxRate.date == date_str)
-                ).first()
-                
-                if existing:
-                    # Update existing
-                    existing.usd_to_eur_rate = rate
-                    existing.created_at = datetime.utcnow()
-                else:
-                    # Create new
+        now = datetime.now(timezone.utc)
+        
+        try:
+            with Session(engine) as session:
+                # Bulk upsert using merge
+                for date_str, rate in rates.items():
                     fx_rate = FxRate(
                         date=date_str,
-                        usd_to_eur_rate=rate
+                        usd_to_eur_rate=rate,
+                        created_at=now
                     )
-                    session.add(fx_rate)
+                    session.merge(fx_rate)
+                
+                session.commit()
             
-            session.commit()
-        
-        logger.debug(f"Saved {len(rates)} FX rates to cache")
+            logger.debug(f"Saved {len(rates)} FX rates to cache")
+        except Exception as e:
+            logger.error(f"Failed to save {len(rates)} FX rates: {e}", exc_info=True)
+            # Don't raise - caching failure shouldn't break the request
     
     @staticmethod
     def get_current_prices(tickers: List[str], max_workers: int = 5) -> Dict[str, Optional[float]]:
@@ -272,7 +265,14 @@ class PriceService:
             
         Returns:
             Dictionary mapping date strings (YYYY-MM-DD) to closing prices (only trading days)
+            
+        Raises:
+            ValueError: If start_date >= end_date
         """
+        # Input validation
+        if start_date >= end_date:
+            raise ValueError(f"start_date ({start_date}) must be before end_date ({end_date})")
+        
         # Check in-memory cache first (for current request session)
         cache_key = f"{ticker}:{start_date.date()}:{end_date.date()}"
         with PriceService._historical_cache_lock:
@@ -339,10 +339,14 @@ class PriceService:
         
         # If no ranges to fetch, return cached data
         if not ranges_to_fetch:
-            return cached_prices
-        
-        # If no ranges to fetch, return cached data
-        if not ranges_to_fetch:
+            # Store in in-memory cache before returning
+            with PriceService._historical_cache_lock:
+                # Enforce cache size limit
+                if len(PriceService._historical_cache) >= PriceService._HISTORICAL_CACHE_MAX_SIZE:
+                    first_key = next(iter(PriceService._historical_cache))
+                    PriceService._historical_cache.pop(first_key)
+                    logger.debug(f"Evicted cache entry: {first_key}")
+                PriceService._historical_cache[cache_key] = cached_prices.copy()
             return cached_prices
         
         # Fetch missing data from API for each range
@@ -404,6 +408,12 @@ class PriceService:
         
         # Store in in-memory cache
         with PriceService._historical_cache_lock:
+            # Enforce cache size limit to prevent memory issues
+            if len(PriceService._historical_cache) >= PriceService._HISTORICAL_CACHE_MAX_SIZE:
+                # Remove first entry (FIFO eviction) - deterministic in Python 3.7+
+                first_key = next(iter(PriceService._historical_cache))
+                PriceService._historical_cache.pop(first_key)
+                logger.debug(f"Evicted cache entry: {first_key}")
             PriceService._historical_cache[cache_key] = cached_prices.copy()
         
         return cached_prices
