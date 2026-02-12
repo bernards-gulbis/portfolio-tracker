@@ -281,15 +281,6 @@ body {
   box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3);
 }
 
-.btn-secondary {
-  background-color: var(--secondary-color);
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--secondary-hover);
-}
-
 .btn-success {
   background-color: #10b981;
   color: white;

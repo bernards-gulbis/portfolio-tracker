@@ -13,8 +13,8 @@ DATABASE_URL = os.getenv(
     "sqlite:///./portfolio_tracker.db"
 )
 
-# Determine if we're using PostgreSQL
-is_postgresql = DATABASE_URL.startswith("postgresql://")
+# Determine if we're using PostgreSQL (supports both postgresql:// and postgres:// schemes)
+is_postgresql = DATABASE_URL.startswith(("postgresql://", "postgres://"))
 
 try:
     # Configure connection arguments based on database type

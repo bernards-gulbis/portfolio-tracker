@@ -33,8 +33,9 @@ const PortfolioList = () => {
   // Close menu when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.action-menu-container')) {
+      const target = event.target;
+      // Check if target is an Element before calling closest (text nodes don't have closest)
+      if (target instanceof Element && !target.closest('.action-menu-container')) {
         closeMenu();
       }
     };
@@ -148,7 +149,7 @@ const PortfolioList = () => {
                   className="btn-menu"
                   onClick={(e) => toggleMenu(portfolio.id, e)}
                   disabled={deletePortfolio.isPending}
-                  aria-label="Actions menu"
+                  aria-label={`Actions for ${portfolio.name} portfolio`}
                   aria-haspopup="true"
                   aria-expanded={openMenuId === portfolio.id}
                 >

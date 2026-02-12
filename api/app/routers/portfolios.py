@@ -119,11 +119,11 @@ def get_portfolio_performance(
         if end_date:
             end_dt = datetime.strptime(end_date, '%Y-%m-%d')
         
-        # Validate date range
-        if start_dt and end_dt and start_dt > end_dt:
+        # Validate date range (must be strictly before to calculate performance over time)
+        if start_dt and end_dt and start_dt >= end_dt:
             raise HTTPException(
                 status_code=400, 
-                detail="start_date must be before or equal to end_date"
+                detail="start_date must be before end_date"
             )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")

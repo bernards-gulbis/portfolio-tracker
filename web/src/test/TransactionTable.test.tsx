@@ -146,7 +146,8 @@ describe('TransactionTable', () => {
     );
 
     // Check that action menu buttons exist (one for each transaction)
-    const menuButtons = screen.getAllByLabelText('Actions menu');
+    // Note: aria-labels now include context like "Actions for MSFT on Dec 2, 2020, 08:16 PM"
+    const menuButtons = screen.getAllByLabelText(/Actions for/);
     expect(menuButtons).toHaveLength(3);
   });
 

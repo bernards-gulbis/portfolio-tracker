@@ -40,8 +40,9 @@ const TransactionTable = ({
   // Close menu when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.action-menu-container')) {
+      const target = event.target;
+      // Check if target is an Element before calling closest (text nodes don't have closest)
+      if (target instanceof Element && !target.closest('.action-menu-container')) {
         closeMenu();
       }
     };
@@ -180,7 +181,7 @@ const TransactionTable = ({
                       className="btn-menu"
                       onClick={() => toggleMenu(transaction.id)}
                       disabled={deletingId === transaction.id}
-                      aria-label="Actions menu"
+                      aria-label={`Actions for ${transaction.ticker || 'transaction'} on ${formatDate(transaction.date)}`}
                       aria-haspopup="true"
                       aria-expanded={openMenuId === transaction.id}
                     >

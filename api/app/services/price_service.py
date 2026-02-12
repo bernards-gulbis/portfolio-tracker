@@ -8,7 +8,9 @@ from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from sqlmodel import Session, select
-from app.core.database import engine
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from app.core.database import engine, is_postgresql
 from app.models.historical_price import HistoricalPrice, FxRate
 
 logger = logging.getLogger(__name__)
@@ -67,16 +69,39 @@ class PriceService:
         
         try:
             with Session(engine) as session:
-                # Bulk upsert using merge (works with SQLite and PostgreSQL)
-                for date_str, price in prices.items():
-                    price_record = HistoricalPrice(
-                        ticker=ticker,
-                        date=date_str,
-                        price=price,
-                        created_at=now
-                    )
-                    session.merge(price_record)
+                # Prepare bulk insert data
+                values = [
+                    {
+                        'ticker': ticker,
+                        'date': date_str,
+                        'price': price,
+                        'created_at': now
+                    }
+                    for date_str, price in prices.items()
+                ]
                 
+                # Use database-specific bulk upsert (ON CONFLICT)
+                if is_postgresql:
+                    stmt = pg_insert(HistoricalPrice).values(values)
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=['ticker', 'date'],
+                        set_=dict(
+                            price=stmt.excluded.price,
+                            created_at=stmt.excluded.created_at
+                        )
+                    )
+                else:
+                    # SQLite: Use ON CONFLICT with composite primary key
+                    stmt = sqlite_insert(HistoricalPrice).values(values)
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=['ticker', 'date'],
+                        set_=dict(
+                            price=stmt.excluded.price,
+                            created_at=stmt.excluded.created_at
+                        )
+                    )
+                
+                session.execute(stmt)
                 session.commit()
             
             logger.debug(f"Saved {len(prices)} historical prices for {ticker} to cache")
@@ -113,15 +138,38 @@ class PriceService:
         
         try:
             with Session(engine) as session:
-                # Bulk upsert using merge
-                for date_str, rate in rates.items():
-                    fx_rate = FxRate(
-                        date=date_str,
-                        usd_to_eur_rate=rate,
-                        created_at=now
-                    )
-                    session.merge(fx_rate)
+                # Prepare bulk insert data
+                values = [
+                    {
+                        'date': date_str,
+                        'usd_to_eur_rate': rate,
+                        'created_at': now
+                    }
+                    for date_str, rate in rates.items()
+                ]
                 
+                # Use database-specific bulk upsert (ON CONFLICT)
+                if is_postgresql:
+                    stmt = pg_insert(FxRate).values(values)
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=['date'],
+                        set_=dict(
+                            usd_to_eur_rate=stmt.excluded.usd_to_eur_rate,
+                            created_at=stmt.excluded.created_at
+                        )
+                    )
+                else:
+                    # SQLite: Use ON CONFLICT with primary key
+                    stmt = sqlite_insert(FxRate).values(values)
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=['date'],
+                        set_=dict(
+                            usd_to_eur_rate=stmt.excluded.usd_to_eur_rate,
+                            created_at=stmt.excluded.created_at
+                        )
+                    )
+                
+                session.execute(stmt)
                 session.commit()
             
             logger.debug(f"Saved {len(rates)} FX rates to cache")
@@ -354,8 +402,11 @@ class PriceService:
         for fetch_start, fetch_end in ranges_to_fetch:
             try:
                 # Convert dates to Unix timestamps
-                period1 = int(fetch_start.timestamp())
-                period2 = int(fetch_end.timestamp())
+                # Normalize naive datetimes to timezone-aware UTC to avoid local timezone interpretation
+                fetch_start_utc = fetch_start.replace(tzinfo=timezone.utc) if fetch_start.tzinfo is None else fetch_start
+                fetch_end_utc = fetch_end.replace(tzinfo=timezone.utc) if fetch_end.tzinfo is None else fetch_end
+                period1 = int(fetch_start_utc.timestamp())
+                period2 = int(fetch_end_utc.timestamp())
                 
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
                 

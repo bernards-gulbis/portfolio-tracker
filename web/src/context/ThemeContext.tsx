@@ -17,10 +17,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     
     // Check localStorage for saved theme preference
-    const savedTheme = localStorage.getItem('theme');
-    // Validate that savedTheme is actually 'light' or 'dark'
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      return savedTheme;
+    try {
+      const savedTheme = localStorage.getItem('theme');
+      // Validate that savedTheme is actually 'light' or 'dark'
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        return savedTheme;
+      }
+    } catch (error) {
+      // localStorage may throw in privacy mode or when storage is blocked
+      console.warn('Failed to access localStorage:', error);
     }
     
     // Check system preference
@@ -39,7 +44,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     // Update document class and save to localStorage
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (error) {
+      // localStorage may throw in privacy mode or when storage is blocked
+      console.warn('Failed to save theme to localStorage:', error);
+    }
   }, [theme]);
 
   const toggleTheme = () => {

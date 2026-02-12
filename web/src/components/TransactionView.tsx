@@ -29,8 +29,9 @@ const TransactionView = () => {
   // Close menu when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.header-actions')) {
+      const target = event.target;
+      // Check if target is an Element before calling closest (text nodes don't have closest)
+      if (target instanceof Element && !target.closest('.header-actions')) {
         setIsMenuOpen(false);
       }
     };
@@ -140,7 +141,7 @@ const TransactionView = () => {
             <button
               className="btn-menu"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Table actions menu"
+              aria-label="Transaction table actions menu"
               aria-haspopup="true"
               aria-expanded={isMenuOpen}
             >

@@ -625,7 +625,8 @@ class PortfolioService:
         Raises:
             PortfolioNotFoundException: If portfolio_id does not exist
             ValueError: If start_date >= end_date or num_points < 2
-        """        # Clear session cache to ensure we use persistent cache + avoid redundant fetches in this request
+        """
+        # Clear session cache to ensure we use persistent cache + avoid redundant fetches in this request
         PriceService.clear_session_cache()
                 # Get portfolio
         portfolio = self.portfolio_repo.get_by_id(portfolio_id)
