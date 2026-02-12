@@ -79,6 +79,8 @@ class PortfolioRepository:
                 total_amount=original_transaction.total_amount,
                 eur_amount=original_transaction.eur_amount,
                 split_ratio=original_transaction.split_ratio,
+                currency=original_transaction.currency,
+                fx_rate=original_transaction.fx_rate,
             )
             self.session.add(new_transaction)
         

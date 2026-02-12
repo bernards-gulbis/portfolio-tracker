@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 class Portfolio(SQLModel, table=True):
     """Portfolio model"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
+    name: str = Field(index=True, max_length=255)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationship

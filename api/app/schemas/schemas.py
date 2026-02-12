@@ -8,7 +8,7 @@ from app.models import TransactionType
 
 class PortfolioBase(BaseModel):
     """Base portfolio schema"""
-    name: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=255)
     
     @field_validator('name')
     @classmethod
