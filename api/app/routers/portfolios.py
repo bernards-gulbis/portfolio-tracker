@@ -1,7 +1,8 @@
 """Portfolio API routes"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 
 from app.core import get_session
 from app.schemas import (
@@ -11,6 +12,8 @@ from app.schemas import (
     PortfolioResponse,
     PortfolioWithTransactions,
     PortfolioStatusResponse,
+    PortfolioPerformanceResponse,
+    PerformanceDataPoint,
 )
 from app.services import PortfolioService
 
@@ -88,3 +91,69 @@ def delete_portfolio(
     service = PortfolioService(session)
     service.delete_portfolio(portfolio_id)
     return None
+
+
+@router.get("/{portfolio_id}/performance", response_model=PortfolioPerformanceResponse)
+def get_portfolio_performance(
+    portfolio_id: int,
+    start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
+    num_points: int = Query(60, ge=2, le=365, description="Number of data points to return"),
+    session: Session = Depends(get_session)
+):
+    """
+    Get portfolio performance over time.
+    
+    Returns a time series of portfolio values showing how the portfolio has evolved.
+    Includes principal_eur (deposits/withdrawals) and current_value_eur (market value).
+    """
+    service = PortfolioService(session)
+    
+    # Parse dates if provided
+    start_dt = None
+    end_dt = None
+    
+    try:
+        if start_date:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        if end_date:
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Validate date range (must be strictly before to calculate performance over time)
+        if start_dt and end_dt and start_dt >= end_dt:
+            raise HTTPException(
+                status_code=400, 
+                detail="start_date must be before end_date"
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    
+    try:
+        # Get the portfolio to check if it exists and get the name
+        portfolio = service.get_portfolio(portfolio_id)
+        
+        # Get performance data
+        performance_data = service.get_portfolio_performance(
+            portfolio_id,
+            start_date=start_dt,
+            end_date=end_dt,
+            num_points=num_points
+        )
+        
+        # Convert to schema objects
+        data_points = [
+            PerformanceDataPoint(
+                date=dp['date'],
+                principal_eur=dp['principal_eur'],
+                current_value_eur=dp['current_value_eur']
+            )
+            for dp in performance_data
+        ]
+        
+        return PortfolioPerformanceResponse(
+            portfolio_id=portfolio.id,
+            portfolio_name=portfolio.name,
+            data_points=data_points
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

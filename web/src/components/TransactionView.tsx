@@ -15,6 +15,7 @@ const TransactionView = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
   const [isExporting, setIsExporting] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const transactions = paginatedData?.transactions || [];
   const totalPages = paginatedData?.total_pages || 1;
@@ -24,6 +25,33 @@ const TransactionView = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [activePortfolioId]);
+
+  // Close menu when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target;
+      // Check if target is an Element before calling closest (text nodes don't have closest)
+      if (target instanceof Element && !target.closest('.header-actions')) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [isMenuOpen]);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -104,25 +132,45 @@ const TransactionView = () => {
         <h2>Transactions</h2>
         <div className="transaction-actions">
           <button
-            className="btn btn-success"
+            className="btn btn-primary"
             onClick={handleAddTransaction}
           >
-            ➕ Add Transaction
+            + Add Transaction
           </button>
-          <button
-            className="btn btn-secondary"
-            onClick={handleExport}
-            disabled={isExporting || !transactions || transactions.length === 0}
-            title="Export transactions to CSV"
-          >
-            {isExporting ? '⏳ Exporting...' : '📥 Export CSV'}
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => setIsImportModalOpen(true)}
-          >
-            📤 Import CSV
-          </button>
+          <div className="header-actions">
+            <button
+              className="btn-menu"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Transaction table actions menu"
+              aria-haspopup="true"
+              aria-expanded={isMenuOpen}
+            >
+              ⋮
+            </button>
+            {isMenuOpen && (
+              <div className="action-menu-dropdown">
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    setIsImportModalOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Import CSV
+                </button>
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    handleExport();
+                    setIsMenuOpen(false);
+                  }}
+                  disabled={isExporting || !transactions || transactions.length === 0}
+                >
+                  {isExporting ? 'Exporting...' : 'Export CSV'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

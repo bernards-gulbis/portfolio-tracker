@@ -3,6 +3,7 @@ Transaction repository for data access
 """
 from sqlmodel import Session, select, func
 from typing import List, Optional
+from sqlalchemy.exc import SQLAlchemyError
 from app.models import Transaction
 
 
@@ -34,8 +35,8 @@ class TransactionRepository:
                 self.session.refresh(transaction)
             
             return transactions
-        except Exception:
-            # Rollback on any error to maintain atomicity
+        except SQLAlchemyError:
+            # Rollback on any database error to maintain atomicity
             self.session.rollback()
             raise
     

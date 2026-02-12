@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Transaction } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate, getValueColor, formatTransactionType, getDisplayValue } from '../utils/formatters';
+import { formatCurrency, formatDate, formatTransactionType, getDisplayValue } from '../utils/formatters';
 import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
 
 interface TransactionTableProps {
@@ -27,8 +27,45 @@ const TransactionTable = ({
 }: TransactionTableProps) => {
   const deleteTransaction = useDeleteTransaction();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  const toggleMenu = (transactionId: number) => {
+    setOpenMenuId(openMenuId === transactionId ? null : transactionId);
+  };
+
+  const closeMenu = () => {
+    setOpenMenuId(null);
+  };
+
+  // Close menu when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target;
+      // Check if target is an Element before calling closest (text nodes don't have closest)
+      if (target instanceof Element && !target.closest('.action-menu-container')) {
+        closeMenu();
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
+    };
+
+    if (openMenuId !== null) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [openMenuId]);
 
   const handleDelete = async (transactionId: number) => {
+    closeMenu();
     if (window.confirm('Are you sure you want to delete this transaction?')) {
       setDeletingId(transactionId);
       try {
@@ -115,10 +152,7 @@ const TransactionTable = ({
               <th>Ticker</th>
               <th className="text-right">Quantity</th>
               <th className="text-right">Price per Share</th>
-              <th className="text-right">Fee</th>
               <th className="text-right">Total Amount</th>
-              <th className="text-right">EUR Amount</th>
-              <th className="text-right">Split Ratio</th>
               <th className="text-center">Actions</th>
             </tr>
           </thead>
@@ -139,33 +173,41 @@ const TransactionTable = ({
                   {transaction.price_per_share !== null && transaction.price_per_share !== undefined ? formatCurrency(transaction.price_per_share) : '-'}
                 </td>
                 <td className="text-right">
-                  {transaction.fee !== null && transaction.fee !== undefined ? formatCurrency(transaction.fee) : '-'}
-                </td>
-                <td className={`text-right value-${getValueColor(transaction.total_amount)}`}>
                   {formatCurrency(getDisplayValue(transaction))}
                 </td>
-                <td className={`text-right value-${getValueColor(transaction.eur_amount)}`}>
-                  {transaction.eur_amount !== null && transaction.eur_amount !== undefined ? formatCurrency(transaction.eur_amount, 'EUR') : '-'}
-                </td>
-                <td className="text-right">
-                  {transaction.split_ratio !== null && transaction.split_ratio !== undefined ? transaction.split_ratio.toFixed(2) : '-'}
-                </td>
                 <td className="text-center">
-                  <div className="action-buttons">
+                  <div className="action-menu-container">
                     <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => onEdit(transaction)}
+                      className="btn-menu"
+                      onClick={() => toggleMenu(transaction.id)}
                       disabled={deletingId === transaction.id}
+                      aria-label={`Actions for ${transaction.ticker || 'transaction'} on ${formatDate(transaction.date)}`}
+                      aria-haspopup="true"
+                      aria-expanded={openMenuId === transaction.id}
                     >
-                      Edit
+                      ⋮
                     </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleDelete(transaction.id)}
-                      disabled={deletingId === transaction.id}
-                    >
-                      {deletingId === transaction.id ? 'Deleting...' : 'Delete'}
-                    </button>
+                    {openMenuId === transaction.id && (
+                      <div className="action-menu-dropdown">
+                        <button
+                          className="menu-item"
+                          onClick={() => {
+                            onEdit(transaction);
+                            closeMenu();
+                          }}
+                          disabled={deletingId === transaction.id}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="menu-item menu-item-danger"
+                          onClick={() => handleDelete(transaction.id)}
+                          disabled={deletingId === transaction.id}
+                        >
+                          {deletingId === transaction.id ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>

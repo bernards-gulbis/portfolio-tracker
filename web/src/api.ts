@@ -125,6 +125,18 @@ export interface PortfolioStatus {
   current_value_after_tax_eur: number | null;
 }
 
+export interface PerformanceDataPoint {
+  date: string;
+  principal_eur: number;
+  current_value_eur: number | null;
+}
+
+export interface PortfolioPerformance {
+  portfolio_id: number;
+  portfolio_name: string;
+  data_points: PerformanceDataPoint[];
+}
+
 // ================== API Configuration ==================
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -199,6 +211,33 @@ export const copyPortfolio = async (
  */
 export const getPortfolioStatus = async (portfolioId: number): Promise<PortfolioStatus> => {
   const response = await api.get<PortfolioStatus>(`/portfolios/${portfolioId}/status`);
+  return response.data;
+};
+
+/**
+ * Get portfolio performance over time
+ */
+export const getPortfolioPerformance = async (
+  portfolioId: number,
+  startDate?: string,
+  endDate?: string,
+  numPoints?: number
+): Promise<PortfolioPerformance> => {
+  interface PerformanceParams {
+    start_date?: string;
+    end_date?: string;
+    num_points?: number;
+  }
+
+  const params: PerformanceParams = {};
+  if (startDate) params.start_date = startDate;
+  if (endDate) params.end_date = endDate;
+  if (numPoints) params.num_points = numPoints;
+
+  const response = await api.get<PortfolioPerformance>(
+    `/portfolios/${portfolioId}/performance`,
+    { params }
+  );
   return response.data;
 };
 

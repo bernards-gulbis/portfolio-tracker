@@ -89,7 +89,7 @@ source venv/bin/activate
 
 3. Install dependencies:
 ```bash
-pip install fastapi uvicorn sqlmodel pytest httpx
+pip install -r requirements.txt
 ```
 
 4. (Optional) Configure environment variables:

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePortfolios, useDeletePortfolio } from '../hooks/usePortfolios';
 import { usePortfolioContext } from '../context/PortfolioContext';
 import { Portfolio } from '../api';
@@ -11,6 +11,7 @@ const PortfolioList = () => {
   const { activePortfolioId, setActivePortfolioId } = usePortfolioContext();
   const deletePortfolio = useDeletePortfolio();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [editModalState, setEditModalState] = useState<{ isOpen: boolean; portfolio: Portfolio | null }>({
     isOpen: false,
     portfolio: null,
@@ -20,8 +21,45 @@ const PortfolioList = () => {
     portfolio: null,
   });
 
+  const toggleMenu = (portfolioId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenMenuId(openMenuId === portfolioId ? null : portfolioId);
+  };
+
+  const closeMenu = () => {
+    setOpenMenuId(null);
+  };
+
+  // Close menu when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target;
+      // Check if target is an Element before calling closest (text nodes don't have closest)
+      if (target instanceof Element && !target.closest('.action-menu-container')) {
+        closeMenu();
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
+    };
+
+    if (openMenuId !== null) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [openMenuId]);
+
   const handleDelete = async (portfolioId: number, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the portfolio when deleting
+    closeMenu();
     
     if (window.confirm('Are you sure you want to delete this portfolio? All transactions will be deleted.')) {
       try {
@@ -39,11 +77,13 @@ const PortfolioList = () => {
 
   const handleEdit = (portfolio: Portfolio, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the portfolio when editing
+    closeMenu();
     setEditModalState({ isOpen: true, portfolio });
   };
 
   const handleCopy = (portfolio: Portfolio, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the portfolio when copying
+    closeMenu();
     setCopyModalState({ isOpen: true, portfolio });
   };
 
@@ -95,7 +135,7 @@ const PortfolioList = () => {
           {portfolios?.map((portfolio) => (
             <div
               key={portfolio.id}
-              className={`portfolio-card ${activePortfolioId === portfolio.id ? 'active' : ''}`}
+              className={`portfolio-card ${activePortfolioId === portfolio.id ? 'active' : ''} ${openMenuId === portfolio.id ? 'menu-open' : ''}`}
               onClick={() => handlePortfolioClick(portfolio)}
             >
               <div className="portfolio-card-content">
@@ -104,28 +144,40 @@ const PortfolioList = () => {
                   Created: {new Date(portfolio.created_at).toLocaleDateString()}
                 </p>
               </div>
-              <div className="portfolio-card-actions">
+              <div className="action-menu-container">
                 <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={(e) => handleEdit(portfolio, e)}
-                  title="Rename portfolio"
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={(e) => handleCopy(portfolio, e)}
-                  title="Copy portfolio with all transactions"
-                >
-                  Copy
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={(e) => handleDelete(portfolio.id, e)}
+                  className="btn-menu"
+                  onClick={(e) => toggleMenu(portfolio.id, e)}
                   disabled={deletePortfolio.isPending}
+                  aria-label={`Actions for ${portfolio.name} portfolio`}
+                  aria-haspopup="true"
+                  aria-expanded={openMenuId === portfolio.id}
                 >
-                  Delete
+                  ⋮
                 </button>
+                {openMenuId === portfolio.id && (
+                  <div className="action-menu-dropdown">
+                    <button
+                      className="menu-item"
+                      onClick={(e) => handleEdit(portfolio, e)}
+                    >
+                      Rename
+                    </button>
+                    <button
+                      className="menu-item"
+                      onClick={(e) => handleCopy(portfolio, e)}
+                    >
+                      Copy
+                    </button>
+                    <button
+                      className="menu-item menu-item-danger"
+                      onClick={(e) => handleDelete(portfolio.id, e)}
+                      disabled={deletePortfolio.isPending}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

@@ -145,11 +145,10 @@ describe('TransactionTable', () => {
       </QueryClientProvider>
     );
 
-    const editButtons = screen.getAllByText('Edit');
-    const deleteButtons = screen.getAllByText('Delete');
-
-    expect(editButtons).toHaveLength(3);
-    expect(deleteButtons).toHaveLength(3);
+    // Check that action menu buttons exist (one for each transaction)
+    // Note: aria-labels now include context like "Actions for MSFT on Dec 2, 2020, 08:16 PM"
+    const menuButtons = screen.getAllByLabelText(/Actions for/);
+    expect(menuButtons).toHaveLength(3);
   });
 
   it('formats currency values correctly', () => {
@@ -166,14 +165,11 @@ describe('TransactionTable', () => {
       </QueryClientProvider>
     );
 
-    // Check USD formatting
+    // Check USD formatting in Total Amount column
     expect(screen.getByText('$3,000.00')).toBeInTheDocument();
     expect(screen.getByText('-$2,755.35')).toBeInTheDocument();
     expect(screen.getByText('$183.69')).toBeInTheDocument();
-
-    // Check EUR formatting
-    expect(screen.getByText('€2,760.27')).toBeInTheDocument();
-    expect(screen.getByText('€46.00')).toBeInTheDocument();
+    expect(screen.getByText('$50.00')).toBeInTheDocument();
   });
 
   it('displays units with 8 decimal places', () => {

@@ -1,6 +1,6 @@
 """Core functionality - database, exceptions, config"""
 
-from .database import create_db_and_tables, get_session, engine
+from .database import create_db_and_tables, get_session, engine, verify_connection
 from .exceptions import (
     PortfolioTrackerException,
     PortfolioNotFoundException,
@@ -15,6 +15,7 @@ __all__ = [
     "create_db_and_tables",
     "get_session",
     "engine",
+    "verify_connection",
     "PortfolioTrackerException",
     "PortfolioNotFoundException",
     "TransactionNotFoundException",

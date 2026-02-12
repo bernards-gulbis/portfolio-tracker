@@ -13,7 +13,7 @@ class Transaction(SQLModel, table=True):
     """Transaction model"""
     id: Optional[int] = Field(default=None, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolio.id", index=True, ondelete="CASCADE")
-    date: datetime
+    date: datetime = Field(index=True)  # Indexed for efficient sorting and filtering
     type: TransactionType
     ticker: Optional[str] = Field(default=None)
     quantity: Optional[float] = Field(default=None, decimal_places=8)
