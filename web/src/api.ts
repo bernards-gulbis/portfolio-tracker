@@ -223,7 +223,13 @@ export const getPortfolioPerformance = async (
   endDate?: string,
   numPoints?: number
 ): Promise<PortfolioPerformance> => {
-  const params: any = {};
+  interface PerformanceParams {
+    start_date?: string;
+    end_date?: string;
+    num_points?: number;
+  }
+
+  const params: PerformanceParams = {};
   if (startDate) params.start_date = startDate;
   if (endDate) params.end_date = endDate;
   if (numPoints) params.num_points = numPoints;

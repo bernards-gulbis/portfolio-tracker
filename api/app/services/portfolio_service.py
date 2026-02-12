@@ -417,9 +417,9 @@ class PortfolioService:
         self, 
         portfolio_id: int, 
         target_date: datetime,
-        historical_prices: Dict[str, Optional[float]] = None,
+        historical_prices: Optional[Dict[str, float]] = None,
         usd_to_eur_rate: Optional[float] = None
-    ) -> tuple[float, float]:
+    ) -> tuple[float, Optional[float]]:
         """
         Calculate portfolio value (principal_eur and current_value_eur) at a specific date.
         
@@ -431,6 +431,7 @@ class PortfolioService:
             target_date: The date to calculate the portfolio status for
             historical_prices: Optional dict of ticker -> price for the target date.
                              If not provided, will fetch from PriceService.
+                             Only includes tickers with available prices (missing prices are excluded).
             usd_to_eur_rate: Optional USD to EUR exchange rate for the target date.
                            If not provided, will fetch from PriceService.
             
@@ -535,7 +536,7 @@ class PortfolioService:
                 
                 for ticker, date_prices in all_historical_prices.items():
                     if not date_prices:
-                        historical_prices[ticker] = None
+                        # Skip tickers with no price data (exclude from dict)
                         continue
                     
                     # Try to get exact date first
@@ -624,8 +625,9 @@ class PortfolioService:
         Raises:
             PortfolioNotFoundException: If portfolio_id does not exist
             ValueError: If start_date >= end_date or num_points < 2
-        """
-        # Get portfolio
+        """        # Clear session cache to ensure we use persistent cache + avoid redundant fetches in this request
+        PriceService.clear_session_cache()
+                # Get portfolio
         portfolio = self.portfolio_repo.get_by_id(portfolio_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
@@ -654,7 +656,10 @@ class PortfolioService:
         
         # Generate date points
         total_days = (end_date - start_date).days
-        if total_days < num_points:
+        if total_days == 0:
+            # Same calendar day - return both start and end times to satisfy num_points >= 2
+            date_points = [start_date, end_date]
+        elif total_days < num_points:
             # Use daily data points if the range is short
             date_points = [start_date + timedelta(days=i) for i in range(total_days + 1)]
         else:
@@ -662,8 +667,8 @@ class PortfolioService:
             interval = total_days / (num_points - 1)
             date_points = [start_date + timedelta(days=int(i * interval)) for i in range(num_points)]
         
-        # Ensure end_date is included
-        if date_points[-1].date() != end_date.date():
+        # Ensure end_date is included (skip check for same-day case as both are already included)
+        if total_days > 0 and date_points[-1].date() != end_date.date():
             date_points[-1] = end_date
         
         # Get all unique tickers across all transactions

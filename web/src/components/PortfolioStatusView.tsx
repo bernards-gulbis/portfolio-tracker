@@ -188,7 +188,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               <th>Total cost</th>
               <th>Current price</th>
               <th>Market value</th>
-              <th>Unrealized G/L</th>
+              <th>Unrealized G/L (amount, %)</th>
             </tr>
           </thead>
           <tbody>
