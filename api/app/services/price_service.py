@@ -177,7 +177,7 @@ class PriceService:
         Returns:
             Current price or None if not found
         """
-        # Check cache first (thread-safe)
+        # Check cache first (thread-safe) - keep entire check inside lock to avoid race condition
         now = datetime.now()
         with PriceService._cache_lock:
             if ticker in PriceService._price_cache:
@@ -185,6 +185,7 @@ class PriceService:
                 if now - cached_time < PriceService._cache_ttl:
                     logger.debug(f"Cache hit for {ticker}: {cached_price}")
                     return cached_price
+                # Cache expired, will be updated below
         
         # Fetch from API
         try:

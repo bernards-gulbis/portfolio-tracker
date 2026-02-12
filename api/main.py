@@ -39,6 +39,13 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
     # Startup
     logger.info("Starting Portfolio Tracker API...")
+    
+    # Verify database connection before proceeding
+    from app.core.database import verify_connection
+    if not verify_connection():
+        logger.error("Failed to connect to database")
+        raise RuntimeError("Database connection failed")
+    
     create_db_and_tables()
     logger.info("Database initialized successfully")
     yield

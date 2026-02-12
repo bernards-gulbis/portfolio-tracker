@@ -1,7 +1,10 @@
 from sqlmodel import SQLModel, create_engine, Session
 from typing import Generator
 import os
+import logging
 from sqlalchemy import event
+
+logger = logging.getLogger(__name__)
 
 # Get database URL from environment variable
 # Default to SQLite for local development
@@ -13,40 +16,72 @@ DATABASE_URL = os.getenv(
 # Determine if we're using PostgreSQL
 is_postgresql = DATABASE_URL.startswith("postgresql://")
 
-# Configure connection arguments based on database type
-if is_postgresql:
-    # PostgreSQL configuration
-    connect_args = {}
-    engine = create_engine(
-        DATABASE_URL,
-        echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
-        pool_pre_ping=True,  # Verify connections before using
-        pool_size=10,
-        max_overflow=20
-    )
-else:
-    # SQLite configuration
-    connect_args = {
-        "check_same_thread": False,  # Needed for SQLite
-        "timeout": 30  # Set timeout for SQLite
-    }
-    engine = create_engine(
-        DATABASE_URL,
-        echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
-        connect_args=connect_args
-    )
-    
-    # Enable foreign key support for SQLite only
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_conn, connection_record):
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+try:
+    # Configure connection arguments based on database type
+    if is_postgresql:
+        # PostgreSQL configuration with SSL support
+        connect_args = {
+            "sslmode": "require",  # Enforce SSL for security
+        }
+        
+        # Get pool configuration from environment or use defaults
+        pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
+        max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+        
+        engine = create_engine(
+            DATABASE_URL,
+            echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
+            connect_args=connect_args,
+            pool_pre_ping=True,  # Verify connections before using
+            pool_size=pool_size,
+            max_overflow=max_overflow
+        )
+        logger.info(f"PostgreSQL engine created (pool_size={pool_size}, max_overflow={max_overflow})")
+    else:
+        # SQLite configuration
+        connect_args = {
+            "check_same_thread": False,  # Needed for SQLite
+            "timeout": 30  # Set timeout for SQLite
+        }
+        engine = create_engine(
+            DATABASE_URL,
+            echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
+            connect_args=connect_args
+        )
+        logger.info("SQLite engine created")
+        
+        # Enable foreign key support for SQLite only
+        @event.listens_for(engine, "connect")
+        def set_sqlite_pragma(dbapi_conn, connection_record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+except Exception as e:
+    logger.error(f"Failed to create database engine: {e}")
+    raise RuntimeError(f"Database configuration error: {e}") from e
 
 
 def create_db_and_tables():
     """Create database tables"""
-    SQLModel.metadata.create_all(engine)
+    try:
+        SQLModel.metadata.create_all(engine)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create database tables: {e}")
+        raise
+
+
+def verify_connection():
+    """Verify database connection is working"""
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection verified")
+        return True
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        return False
 
 
 def get_session() -> Generator[Session, None, None]:

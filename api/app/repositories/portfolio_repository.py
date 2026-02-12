@@ -3,6 +3,7 @@ Portfolio repository for data access
 """
 from sqlmodel import Session, select
 from typing import List, Optional
+from sqlalchemy.exc import SQLAlchemyError
 from app.models import Portfolio, Transaction
 
 
