@@ -119,6 +119,8 @@ export interface PortfolioStatus {
   unrealized_gains_percent: number | null;
   unrealized_gains_eur: number | null;
   realized_gains: number;
+  capital_gains_eur: number | null;
+  capital_gains_tax_rate: number;
   tax_eur: number | null;
   total_return_after_tax_eur: number | null;
   total_return_after_tax_percent: number | null;

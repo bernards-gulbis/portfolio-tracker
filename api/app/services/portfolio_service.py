@@ -363,14 +363,16 @@ class PortfolioService:
         # Dividends are excluded as they may have different tax treatment
         # If dividends exist but EUR conversion is unavailable, we cannot compute accurate tax
         tax_eur = None
+        capital_gains_eur = None
         if current_value_eur is not None:
             if dividends > 0.0 and dividends_eur is None:
                 # Dividends exist but EUR conversion unavailable - cannot compute accurate tax
                 tax_eur = None
+                capital_gains_eur = None
             else:
                 dividends_for_tax = dividends_eur if dividends_eur is not None else 0.0
-                capital_gains = current_value_eur - principal_eur - dividends_for_tax
-                tax_eur = capital_gains * TAX_RATE if capital_gains > 0 else 0.0
+                capital_gains_eur = current_value_eur - principal_eur - dividends_for_tax
+                tax_eur = capital_gains_eur * TAX_RATE if capital_gains_eur > 0 else 0.0
         
         # Calculate total return after tax
         total_return_after_tax_eur = None
@@ -407,6 +409,8 @@ class PortfolioService:
             unrealized_gains_percent=normalize_zero(unrealized_gains_percent) if unrealized_gains_percent is not None else None,
             unrealized_gains_eur=normalize_zero(unrealized_gains_eur) if unrealized_gains_eur is not None else None,
             realized_gains=normalize_zero(realized_gains),
+            capital_gains_eur=normalize_zero(capital_gains_eur) if capital_gains_eur is not None else None,
+            capital_gains_tax_rate=TAX_RATE,
             tax_eur=normalize_zero(tax_eur) if tax_eur is not None else None,
             total_return_after_tax_eur=normalize_zero(total_return_after_tax_eur) if total_return_after_tax_eur is not None else None,
             total_return_after_tax_percent=normalize_zero(total_return_after_tax_percent) if total_return_after_tax_percent is not None else None,

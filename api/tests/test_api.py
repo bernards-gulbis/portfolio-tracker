@@ -1766,6 +1766,8 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     # dividends_eur is None (no dividends), treated as 0
     capital_gains_eur = 8925.0 - 9000.0  # -75 EUR
     expected_tax = 0.0  # No tax on negative gains
+    assert abs(data["capital_gains_eur"] - capital_gains_eur) < 0.1
+    assert data["capital_gains_tax_rate"] == 0.25
     assert data["tax_eur"] == expected_tax
     
     # After-tax return: (current_value_eur - principal_eur) - tax_eur
@@ -1831,6 +1833,9 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     # Tax calculation: (20000 - 10000 - 0) * 0.25 = 2500 EUR
     capital_gains_eur = 20000.0 - 10000.0 - 0.0
     expected_tax = capital_gains_eur * 0.25
+    assert data["capital_gains_eur"] == capital_gains_eur
+    assert data["capital_gains_eur"] == 10000.0
+    assert data["capital_gains_tax_rate"] == 0.25
     assert data["tax_eur"] == expected_tax
     assert data["tax_eur"] == 2500.0
     
@@ -1915,6 +1920,9 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     # Tax: 5000 * 0.25 = 1250 EUR
     capital_gains_eur = 17000.0 - 10000.0 - 2000.0
     expected_tax = capital_gains_eur * 0.25
+    assert data["capital_gains_eur"] == capital_gains_eur
+    assert data["capital_gains_eur"] == 5000.0
+    assert data["capital_gains_tax_rate"] == 0.25
     assert data["tax_eur"] == expected_tax
     assert data["tax_eur"] == 1250.0
     

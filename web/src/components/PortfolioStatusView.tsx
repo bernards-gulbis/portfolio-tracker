@@ -114,7 +114,12 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
       {/* Financial Summary */}
       <div className="status-summary">
         <div className="status-card">
-          <h3>Current Value</h3>
+          <h3>Net Contributed</h3>
+          <p className="status-value">{formatCurrency(status.principal_eur, 'EUR')}</p>
+          <p className="status-value-secondary">{formatCurrency(status.principal)}</p>
+        </div>
+        <div className="status-card">
+          <h3>Market Value</h3>
           <p className="status-value">
             {status.current_value_eur !== null
               ? formatCurrency(status.current_value_eur, 'EUR')
@@ -128,24 +133,33 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
             )}
           </p>
         </div>
-        <div className="status-card">
-          <h3>Principal</h3>
-          <p className="status-value">{formatCurrency(status.principal_eur, 'EUR')}</p>
-          <p className="status-value-secondary">{formatCurrency(status.principal)}</p>
-        </div>
-        
 
         <div className="status-card">
-          <h3>Tax EUR</h3>
+          <h3>Dividend Income</h3>
+          <p className="status-value">
+            {status.dividends_eur !== null
+              ? formatCurrency(status.dividends_eur, 'EUR')
+              : '-'}
+          </p>
+          <p className="status-value-secondary">{formatCurrency(status.dividends)}</p>
+        </div>
+        
+        <div className="status-card">
+          <h3>Estimated Tax</h3>
           <p className="status-value">
             {status.tax_eur !== null
               ? formatCurrency(status.tax_eur, 'EUR')
               : '-'}
           </p>
+          <p className="status-value-secondary">
+            {status.capital_gains_eur !== null
+              ? `${formatCurrency(status.capital_gains_eur, 'EUR')} × ${(status.capital_gains_tax_rate * 100).toFixed(0)}%`
+              : '-'}
+          </p>
         </div>
 
         <div className="status-card">
-          <h3>Value After Tax</h3>
+          <h3>Net Liquidation Value</h3>
           <p className="status-value">
             {status.current_value_after_tax_eur !== null
               ? formatCurrency(status.current_value_after_tax_eur, 'EUR')

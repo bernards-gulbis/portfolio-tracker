@@ -194,7 +194,9 @@ class PortfolioStatusResponse(BaseModel):
     unrealized_gains_percent: Optional[float]  # Total unrealized gains/losses percentage
     unrealized_gains_eur: Optional[float]  # Unrealized gains in EUR
     realized_gains: float  # Gains/losses from sells
-    tax_eur: Optional[float]  # Tax amount in EUR: 25% of capital gains (current_value_eur - principal_eur - dividends_eur)
+    capital_gains_eur: Optional[float]  # Capital gains before tax (current_value_eur - principal_eur - dividends_eur)
+    capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
+    tax_eur: Optional[float]  # Tax amount in EUR: capital_gains_tax_rate * capital_gains_eur
     total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
     total_return_after_tax_percent: Optional[float]  # Total return after tax percentage
     current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
