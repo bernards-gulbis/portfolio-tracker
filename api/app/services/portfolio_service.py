@@ -340,11 +340,21 @@ class PortfolioService:
         # Note: All USD values are converted using the current rate, regardless of transaction dates
         current_value_eur = None
         unrealized_gains_eur = None
+        currency_gains_eur = None
+        currency_gains_percent = None
         try:
             usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
             if usd_to_eur_rate is not None:
                 current_value_eur = current_value * usd_to_eur_rate
                 unrealized_gains_eur = unrealized_gains * usd_to_eur_rate
+                
+                # Calculate currency gains from FX rate changes
+                # Shows the impact of exchange rate fluctuations on principal
+                # Positive = EUR weakened (good for USD holders), Negative = EUR strengthened
+                principal_at_current_rate = principal * usd_to_eur_rate
+                currency_gains_eur = principal_at_current_rate - principal_eur
+                if principal_eur != 0:
+                    currency_gains_percent = (currency_gains_eur / principal_eur) * 100
         except Exception as e:
             logger.error(f"Error fetching USD to EUR exchange rate for portfolio {portfolio_id}: {e}", exc_info=True)
         
@@ -409,6 +419,8 @@ class PortfolioService:
             unrealized_gains_percent=normalize_zero(unrealized_gains_percent) if unrealized_gains_percent is not None else None,
             unrealized_gains_eur=normalize_zero(unrealized_gains_eur) if unrealized_gains_eur is not None else None,
             realized_gains=normalize_zero(realized_gains),
+            currency_gains_eur=normalize_zero(currency_gains_eur) if currency_gains_eur is not None else None,
+            currency_gains_percent=normalize_zero(currency_gains_percent) if currency_gains_percent is not None else None,
             capital_gains_eur=normalize_zero(capital_gains_eur) if capital_gains_eur is not None else None,
             capital_gains_tax_rate=TAX_RATE,
             tax_eur=normalize_zero(tax_eur) if tax_eur is not None else None,

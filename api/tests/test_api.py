@@ -1762,6 +1762,17 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     assert data["current_value_eur"] == 8925.0  # 10500 * 0.85
     assert data["unrealized_gains_eur"] == 425.0  # 500 * 0.85
     
+    # Currency gains: (principal @ current rate) - principal_eur
+    # principal @ current rate = 10000 * 0.85 = 8500 EUR
+    # currency_gains_eur = 8500 - 9000 = -500 EUR (EUR strengthened, loss for USD holder)
+    principal_at_current_rate = 10000.0 * 0.85
+    expected_currency_gains = principal_at_current_rate - 9000.0
+    assert abs(data["currency_gains_eur"] - expected_currency_gains) < 0.1
+    assert abs(data["currency_gains_eur"] - (-500.0)) < 0.1
+    # currency_gains_percent = -500 / 9000 * 100 ≈ -5.56%
+    expected_currency_gains_percent = (expected_currency_gains / 9000.0) * 100
+    assert abs(data["currency_gains_percent"] - expected_currency_gains_percent) < 0.01
+    
     # Tax calculation: (current_value_eur - principal_eur - dividends_eur) * 0.25
     # dividends_eur is None (no dividends), treated as 0
     capital_gains_eur = 8925.0 - 9000.0  # -75 EUR
@@ -1829,6 +1840,10 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     # EUR values
     assert data["current_value_eur"] == 20000.0
     assert data["principal_eur"] == 10000.0
+    
+    # Currency gains: FX rate unchanged (1.0 deposit, 1.0 current) = 0 currency gains
+    assert data["currency_gains_eur"] == 0.0
+    assert data["currency_gains_percent"] == 0.0
     
     # Tax calculation: (20000 - 10000 - 0) * 0.25 = 2500 EUR
     capital_gains_eur = 20000.0 - 10000.0 - 0.0

@@ -114,11 +114,6 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
       {/* Financial Summary */}
       <div className="status-summary">
         <div className="status-card">
-          <h3>Net Contributed</h3>
-          <p className="status-value">{formatCurrency(status.principal_eur, 'EUR')}</p>
-          <p className="status-value-secondary">{formatCurrency(status.principal)}</p>
-        </div>
-        <div className="status-card">
           <h3>Market Value</h3>
           <p className="status-value">
             {status.current_value_eur !== null
@@ -131,6 +126,18 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               status.unrealized_gains_percent,
               'EUR'
             )}
+          </p>
+        </div>
+
+        <div className="status-card">
+          <h3>Net Contributed</h3>
+          <p className="status-value">{formatCurrency(status.principal_eur, 'EUR')}</p>
+          <p className="status-value-secondary">
+            {status.currency_gains_eur !== null && (
+            <p className="status-value-secondary" style={{ fontSize: '0.85em', marginTop: '4px' }}>
+              FX: {formatCurrencyWithPercent(status.currency_gains_eur, status.currency_gains_percent, 'EUR')}
+            </p>
+          )}
           </p>
         </div>
 
