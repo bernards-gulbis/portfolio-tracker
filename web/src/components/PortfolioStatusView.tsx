@@ -121,7 +121,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               : '-'}
           </p>
           <p className="status-value-secondary">
-            UG:
+            Unrealized:
             {formatCurrencyWithPercent(
               status.unrealized_gains_eur,
               status.unrealized_gains_percent,
@@ -207,7 +207,7 @@ export const PortfolioStatusView: React.FC<PortfolioStatusProps> = ({ portfolioI
               <th>Total cost</th>
               <th>Current price</th>
               <th>Market value</th>
-              <th>Unrealized G/L (amount, %)</th>
+              <th>Unrealized G/L</th>
             </tr>
           </thead>
           <tbody>
