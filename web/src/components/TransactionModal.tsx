@@ -22,6 +22,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
   const [totalAmount, setTotalAmount] = useState('');
   const [valueEur, setValueEur] = useState('');
   const [splitRatio, setSplitRatio] = useState('');
+  const [fxRate, setFxRate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const createTransaction = useCreateTransaction();
@@ -42,6 +43,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
     setTotalAmount('');
     setValueEur('');
     setSplitRatio('');
+    setFxRate('');
     setError(null);
   }, []);
 
@@ -63,6 +65,7 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
       setTotalAmount(Math.abs(transaction.total_amount).toFixed(2));
       setValueEur(transaction.eur_amount ? Math.abs(transaction.eur_amount).toFixed(2) : '');
       setSplitRatio(transaction.split_ratio?.toString() || '');
+      setFxRate(transaction.fx_rate ? transaction.fx_rate.toFixed(4) : '');
     } else {
       resetForm();
     }
@@ -157,6 +160,8 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
         case TransactionType.DIVIDEND:
           data.ticker = ticker;
           data.total_amount = Math.abs(parseFloat(totalAmount || '0'));
+          if (fee && fee.trim()) data.fee = Math.abs(parseFloat(fee));
+          if (fxRate && fxRate.trim()) data.fx_rate = parseFloat(fxRate);
           break;
 
         case TransactionType.SPLIT:
@@ -217,10 +222,11 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
   const showTicker = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND, TransactionType.SPLIT].includes(type);
   const showQuantity = [TransactionType.BUY, TransactionType.SELL].includes(type);
   const showPricePerShare = [TransactionType.BUY, TransactionType.SELL].includes(type);
-  const showFee = [TransactionType.BUY, TransactionType.SELL].includes(type);
+  const showFee = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND].includes(type);
   const showTotalAmount = type !== TransactionType.SPLIT;
   const showValueEur = [TransactionType.DEPOSIT, TransactionType.WITHDRAW].includes(type);
   const showSplitRatio = type === TransactionType.SPLIT;
+  const showFxRate = type === TransactionType.DIVIDEND;
 
   return (
     <div className="modal-overlay" onClick={handleClose}>
@@ -389,6 +395,26 @@ const TransactionModal = ({ isOpen, onClose, portfolioId, transaction }: Transac
                 />
                 <small className="form-text">
                   Enter the split ratio (e.g., 2 for a 2-for-1 split)
+                </small>
+              </div>
+            )}
+
+            {/* FX Rate (for Dividend) */}
+            {showFxRate && (
+              <div className="form-group">
+                <label htmlFor="fx-rate">FX Rate</label>
+                <input
+                  id="fx-rate"
+                  type="number"
+                  step="0.0001"
+                  min="0.0001"
+                  className="form-control"
+                  value={fxRate}
+                  onChange={(e) => setFxRate(e.target.value)}
+                  placeholder="e.g., 1.0850"
+                />
+                <small className="form-text">
+                  Exchange rate used for currency conversion
                 </small>
               </div>
             )}
