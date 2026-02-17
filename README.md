@@ -1,19 +1,19 @@
 # Portfolio Tracker v4
 
-A full-stack portfolio tracking application built with FastAPI and React. Track multiple investment portfolios and their transactions with an intuitive web interface.
+A self-hosted investment portfolio tracker for European retail investors who trade in multiple currencies but report in EUR. Manage multiple portfolios, record all transaction types (buy, sell, deposit, withdrawal, dividend, fee, stock split), and get real-time valuations, gain/loss calculations, performance charts, and tax estimates — all with automatic EUR conversion via FX rates.
+
+Built with FastAPI and React. Live market prices from Yahoo Finance with multi-level caching.
 
 ## Features
 
-- **Portfolio Management**: Create, view, update, delete, and copy multiple investment portfolios
-- **Multi-Type Transactions**: Support for Deposits, Withdrawals, Buy/Sell stocks, Dividends, Fees, and Stock Splits
-- **CSV Import/Export**: Bulk upload and download transactions via CSV format
-- **Portfolio Status**: Real-time portfolio valuation with current holdings, cash balance, and realized/unrealized gains
-- **Multi-Currency Support**: Track transactions in different currencies with EUR amounts and FX rates
-- **Transaction History**: Paginated view with filtering and search capabilities
-- **Real-time Updates**: Automatic UI updates using TanStack Query
-- **Responsive Design**: Mobile-friendly interface with modern UI
-- **Data Validation**: Comprehensive input validation on both frontend and backend
-- **Signed Value Display**: Color-coded positive/negative amounts for easy tracking
+- **Multi-Portfolio Management**: Create, copy, and manage separate investment portfolios
+- **Full Transaction Support**: Deposits, withdrawals, buy/sell, dividends, fees, and stock splits
+- **Real-Time Valuation**: Live market prices via Yahoo Finance with current holdings, cash balance, and unrealized gains
+- **EUR-Centric Multi-Currency**: Track transactions in any currency with automatic EUR amount and FX rate recording for tax reporting
+- **Gain/Loss & Tax Calculations**: Realized and unrealized gains with 25% capital gains tax estimates
+- **Performance Charts**: Time-series portfolio performance visualization
+- **CSV Import/Export**: Bulk import transaction history from brokers or other tools
+- **Responsive UI**: Mobile-friendly interface with light/dark theme, color-coded signed values, and paginated transaction history
 
 ## Getting Started
 

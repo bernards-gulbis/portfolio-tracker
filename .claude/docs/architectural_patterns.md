@@ -1,5 +1,7 @@
 # Architectural Patterns
 
+Implementation details, conventions, and code-level patterns. For project overview, domain rules, API routes, and sync requirements, see [CLAUDE.md](../../CLAUDE.md).
+
 ## Backend: Layered Clean Architecture
 
 The API follows a strict 4-layer architecture. Dependencies flow downward only: Router -> Service -> Repository -> Model.
@@ -84,6 +86,7 @@ Every API entity has a dedicated hook file wrapping `useQuery`/`useMutation`:
 - `['portfolio', portfolioId]` - single portfolio
 - `['transactions', portfolioId, page, pageSize]` - paginated transactions
 - `['portfolioStatus', portfolioId]` - status data
+- `['portfolioPerformance', portfolioId]` - performance chart data
 
 **Mutation invalidation pattern:** Every mutation's `onSuccess` invalidates related query keys. Transaction mutations invalidate `transactions`, `portfolio`, and `portfolioStatus` keys for the affected portfolio (`web/src/hooks/useTransactions.ts:49-53`).
 
@@ -117,10 +120,6 @@ Global defaults set in `web/src/App.tsx:12-19`:
 - `retry: 1` - single retry on failure
 
 ## Cross-Cutting Patterns
-
-### Type Mirroring
-
-TypeScript interfaces in `web/src/api.ts` mirror Pydantic schemas in `api/app/schemas/schemas.py`. The `TransactionType` enum is duplicated in both (`api/app/models/transaction_type.py` and `web/src/api.ts:5-13`). Keep these in sync when modifying transaction types.
 
 ### Pagination
 

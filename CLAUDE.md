@@ -1,6 +1,6 @@
 # Portfolio Tracker v4
 
-Full-stack investment portfolio tracker with multi-currency support, real-time valuation, performance charts, and tax reporting.
+Self-hosted investment portfolio tracker for European retail investors. Multi-currency transaction recording with EUR conversion, real-time valuations via Yahoo Finance, gain/loss and 25% capital gains tax calculations, and performance charting.
 
 ## Tech Stack
 
@@ -11,32 +11,38 @@ Full-stack investment portfolio tracker with multi-currency support, real-time v
 
 ```
 api/
-  main.py                  # FastAPI app, CORS, exception handlers, health checks
+  main.py                    # FastAPI app, CORS, security headers, exception handlers, health checks
   app/
     core/
-      database.py          # Engine config, session management (SQLite/PostgreSQL)
-      exceptions.py        # Custom exception hierarchy (PortfolioTrackerException base)
-    models/                # SQLModel ORM models (Portfolio, Transaction, HistoricalPrice)
-    schemas/schemas.py     # Pydantic request/response DTOs with validators
-    repositories/          # Data access layer (PortfolioRepository, TransactionRepository)
-    services/              # Business logic layer
-      portfolio_service.py # Core calculations: status, holdings, gains, tax (largest file)
+      database.py            # Engine config, session management, SQLite/PostgreSQL detection
+      exceptions.py          # PortfolioTrackerException hierarchy (6 exception types)
+    models/
+      portfolio.py           # Portfolio model
+      transaction.py         # Transaction model (all fields including eur_amount, fx_rate)
+      transaction_type.py    # TransactionType enum — keep in sync with frontend
+      historical_price.py    # HistoricalPrice and FxRate models (DB price cache)
+    schemas/schemas.py       # Pydantic request/response DTOs, cross-field model_validators
+    repositories/            # Data access layer
+      portfolio_repository.py
+      transaction_repository.py  # Includes paginated queries (OFFSET/LIMIT)
+    services/
+      portfolio_service.py   # Core calculations: status, holdings, gains, tax (largest file)
       transaction_service.py # CRUD, CSV import/export, validation
-      price_service.py     # Yahoo Finance integration with multi-level caching
-    routers/               # API endpoint definitions
-      portfolios.py        # Portfolio CRUD, status, performance, copy
-      transactions.py      # Transaction CRUD, pagination, CSV import/export
-  tests/test_api.py        # 17 integration tests with in-memory SQLite
+      price_service.py       # Yahoo Finance with in-memory + DB caching, thread locks
+    routers/
+      portfolios.py          # Portfolio CRUD, status, performance, copy
+      transactions.py        # Two routers: portfolio-scoped + standalone transaction ops
+  tests/test_api.py          # 48 integration tests with in-memory SQLite
 
 web/
   src/
-    api.ts                 # Axios client, all TypeScript interfaces, API functions
-    App.tsx                # Root component, QueryClient config (5min staleTime)
-    components/            # 13 React components (views, modals, charts)
-    hooks/                 # TanStack Query wrappers (usePortfolios, useTransactions, etc.)
-    context/               # PortfolioContext (active selection), ThemeContext (light/dark)
-    utils/formatters.ts    # Currency, date, number formatting
-    constants/pagination.ts # Page size config (default: 20)
+    api.ts                   # Axios client, all TypeScript interfaces, API functions
+    App.tsx                  # Root component, QueryClient config (5min staleTime, 1 retry)
+    components/              # 11 React components (views, modals, charts)
+    hooks/                   # TanStack Query wrappers (usePortfolios, useTransactions, etc.)
+    context/                 # PortfolioContext (active selection), ThemeContext (light/dark)
+    utils/formatters.ts      # Currency, date, number formatting
+    constants/pagination.ts  # Page size config (default: 20)
 ```
 
 ## Commands
@@ -62,9 +68,17 @@ npm run test:ui      # Vitest with UI
 npm run test:coverage
 ```
 
+## Architecture
+
+**Backend:** Strict layered design — **Router → Service → Repository → Model**. Three routers in `main.py`. Services per-request; `PriceService` is the exception (class-level caches). Domain exceptions bubble from services to centralized handlers in `main.py`.
+
+**Frontend:** `api.ts` (Axios + types) → hooks (TanStack Query) → components. UI state via React Context (`PortfolioContext`, `ThemeContext`).
+
+For implementation details, conventions, and patterns to follow when extending, see [Architectural Patterns](.claude/docs/architectural_patterns.md).
+
 ## API Routes
 
-Base path: no prefix (routers use `/portfolios` and `/transactions`)
+Backend routes have no path prefix. The Vite dev server proxies `/api/*` → `localhost:8000/*` (stripping the `/api` prefix).
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -79,24 +93,38 @@ Base path: no prefix (routers use `/portfolios` and `/transactions`)
 | POST | /portfolios/{id}/transactions/ | Create transaction |
 | GET | /portfolios/{id}/transactions | Paginated transactions |
 | GET | /portfolios/{id}/transactions/export | CSV export |
-| POST | /portfolios/{id}/transactions/import | CSV bulk import |
+| POST | /portfolios/{id}/transactions/import | CSV bulk import (5MB limit) |
 | PUT | /transactions/{id} | Update transaction |
 | DELETE | /transactions/{id} | Delete transaction |
 
-## Key Domain Concepts
+## Domain Rules
 
 - **Transaction types:** Deposit, Buy, Sell, Withdraw, Dividend, Fee, Split
-- **Sign convention:** Buy/Withdraw/Fee = negative total_amount; Deposit/Sell/Dividend = positive; Split = 0
-- **EUR tracking:** `eur_amount` and `fx_rate` fields enable multi-currency portfolio valuation
-- **Tax rate:** 25% capital gains, defined in `api/app/services/portfolio_service.py:23`
-- **Holdings epsilon:** Floating-point threshold at `api/app/services/portfolio_service.py:20`
+- **Sign convention:** Buy/Withdraw/Fee = negative `total_amount`; Deposit/Sell/Dividend = positive; Split = 0
+- **EUR tracking:** Every transaction can store `eur_amount`, `fx_rate`, and `currency` for multi-currency EUR-based reporting
+- **Tax rate:** 25% capital gains — `TAX_RATE` constant at `api/app/services/portfolio_service.py:23`
+- **Holdings epsilon:** Floating-point threshold `HOLDINGS_EPSILON = 1e-6` at `api/app/services/portfolio_service.py:20`
+
+## Keeping Things in Sync
+
+The `TransactionType` enum is duplicated in backend and frontend — both must match:
+- **Python:** `api/app/models/transaction_type.py`
+- **TypeScript:** `web/src/api.ts` (lines 5-13)
+
+TypeScript interfaces in `api.ts` mirror Pydantic schemas in `schemas.py`. When modifying response shapes, update both.
 
 ## Environment Variables
 
-See `api/.env.example` for all options. Key vars: `DATABASE_URL`, `CORS_ORIGINS`, `DATABASE_ECHO`
+See `api/.env.example` for all options.
 
-## Additional Documentation
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DATABASE_URL` | SQLite file | `sqlite:///` or `postgresql://` connection string |
+| `DATABASE_ECHO` | `false` | SQL query logging (do not enable in prod) |
+| `CORS_ORIGINS` | `localhost:3000,5173` | Comma-separated allowed origins |
+| `DB_POOL_SIZE` | `5` | PostgreSQL connection pool size |
+| `DB_MAX_OVERFLOW` | `10` | PostgreSQL max overflow connections |
+| `LOG_LEVEL` | `INFO` | Python logging level |
+| `PRICE_CACHE_TTL` | `15` | Price cache TTL in minutes |
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Frontend API base URL (build-time) |
 
-When working on tasks related to these topics, check:
-
-- [Architectural Patterns](.claude/docs/architectural_patterns.md) - layered architecture, repository pattern, state management, DI, error handling conventions
