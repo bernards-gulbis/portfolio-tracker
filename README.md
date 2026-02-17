@@ -15,54 +15,6 @@ A full-stack portfolio tracking application built with FastAPI and React. Track 
 - **Data Validation**: Comprehensive input validation on both frontend and backend
 - **Signed Value Display**: Color-coded positive/negative amounts for easy tracking
 
-## Tech Stack
-
-### Backend
-- **FastAPI**: Modern Python web framework
-- **SQLModel**: SQL database interactions with Python type hints
-- **SQLite**: Lightweight database with foreign key constraints
-- **Pydantic**: Data validation using Python type annotations
-- **Pytest**: Comprehensive test suite (17 tests)
-
-### Frontend
-- **React 18**: Modern UI library with hooks
-- **TypeScript**: Type-safe JavaScript
-- **Vite**: Fast build tool and dev server
-- **TanStack Query**: Server state management
-- **Axios**: HTTP client
-- **Vitest**: Unit testing framework (12 tests)
-
-## Project Structure
-
-```
-portfolio-tracker-v4/
-├── api/                    # Backend API
-│   ├── app/                # Application package
-│   │   ├── core/           # Core functionality (database, exceptions)
-│   │   ├── models/         # SQLModel database models
-│   │   ├── schemas/        # Pydantic request/response schemas
-│   │   ├── repositories/   # Data access layer (Repository pattern)
-│   │   ├── services/       # Business logic layer (Service pattern)
-│   │   └── routers/        # API route handlers
-│   ├── tests/              # Backend tests
-│   ├── main.py             # FastAPI application entry point
-│   └── README.md           # API documentation
-│
-├── web/                    # Frontend application
-│   ├── src/
-│   │   ├── api.ts          # API client & TypeScript interfaces
-│   │   ├── App.tsx         # Main application component
-│   │   ├── components/     # React components
-│   │   ├── context/        # React Context providers
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── utils/          # Utility functions
-│   │   └── test/           # Frontend tests
-│   ├── package.json
-│   └── vite.config.ts
-│
-└── README.md
-```
-
 ## Getting Started
 
 ### Prerequisites
@@ -155,36 +107,7 @@ npm test
 npm test -- --watch
 ```
 
-## API Endpoints
-
-**Base URL:** `/api/v1`
-
-### Health Checks
-
-- `GET /` - Basic health check
-- `GET /health` - Comprehensive health check with database connectivity test
-
-### Portfolios
-
-- `GET /api/v1/portfolios/` - List all portfolios
-- `GET /api/v1/portfolios/{id}` - Get portfolio by ID with transactions
-- `POST /api/v1/portfolios/` - Create new portfolio
-- `PUT /api/v1/portfolios/{id}` - Update portfolio name
-- `DELETE /api/v1/portfolios/{id}` - Delete portfolio (cascades to transactions)
-- `POST /api/v1/portfolios/{id}/copy` - Copy portfolio with all transactions
-- `GET /api/v1/portfolios/{id}/status` - Get portfolio status (holdings, cash balance, gains/losses)
-
-### Transactions
-
-- `GET /api/v1/portfolios/{portfolio_id}/transactions/` - List transactions for a portfolio (paginated)
-- `GET /api/v1/transactions/{id}` - Get transaction by ID
-- `POST /api/v1/portfolios/{portfolio_id}/transactions/` - Create new transaction
-- `PUT /api/v1/transactions/{id}` - Update transaction
-- `DELETE /api/v1/transactions/{id}` - Delete transaction
-- `POST /api/v1/portfolios/{portfolio_id}/transactions/import` - Bulk upload via CSV
-- `GET /api/v1/portfolios/{portfolio_id}/transactions/export-csv` - Export transactions to CSV
-
-### CSV Upload Format
+## CSV Upload Format
 
 The CSV file must include the following headers:
 
@@ -244,27 +167,3 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,curre
 - `split_ratio`: Stock split ratio (optional, required for Split transactions)
 - `currency`: Currency code (optional, 3-letter code)
 - `fx_rate`: Foreign exchange rate (optional, up to 4 decimal places)
-
-## Development
-
-### Backend Development
-
-The backend uses:
-- **Clean Architecture** with layered design (routers → services → repositories)
-- **Repository Pattern** for data access abstraction
-- **Service Pattern** for business logic encapsulation
-- **Custom Exceptions** with centralized error handling
-- FastAPI's lifespan events for startup/shutdown
-- SQLModel for ORM with relationships
-- Foreign key constraints enabled via PRAGMA
-- CORS middleware for cross-origin requests
-- Dependency injection for database sessions
-
-### Frontend Development
-
-The frontend uses:
-- React Context API for active portfolio state
-- TanStack Query for server state caching
-- Custom hooks for API operations
-- TypeScript interfaces matching backend schemas
-- Utility functions for formatting (currency, dates, colors)
