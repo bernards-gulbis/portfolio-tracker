@@ -127,8 +127,8 @@ describe('TransactionTable', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByText('No transactions yet.')).toBeInTheDocument();
-    expect(screen.getByText('Upload a CSV file or add transactions manually.')).toBeInTheDocument();
+    expect(screen.getByText('No Transactions Yet')).toBeInTheDocument();
+    expect(screen.getByText('Upload a CSV file or add transactions manually using the button above.')).toBeInTheDocument();
   });
 
   it('renders edit and delete buttons for each transaction', () => {

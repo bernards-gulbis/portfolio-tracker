@@ -1,6 +1,29 @@
-import { useState, FormEvent, ChangeEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm } from 'react-hook-form';
+import * as z from 'zod';
 import { useImportTransactionsCSV } from '../hooks/useTransactions';
 import { getErrorMessage } from '../api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+
+const schema = z.object({
+  file: z
+    .custom<File>((v) => v instanceof File, 'Please select a file')
+    .refine((f) => f.name.toLowerCase().endsWith('.csv'), 'Please select a CSV file'),
+});
+
+type FormValues = z.infer<typeof schema>;
 
 interface ImportCSVModalProps {
   isOpen: boolean;
@@ -9,105 +32,118 @@ interface ImportCSVModalProps {
 }
 
 const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) => {
-  const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const importCSV = useImportTransactionsCSV();
+  const [importCount, setImportCount] = useState<number | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+  });
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      if (!selectedFile.name.endsWith('.csv')) {
-        setError('Please select a CSV file');
-        setFile(null);
-        return;
-      }
-      setFile(selectedFile);
-      setError(null);
+  const { reset } = form;
+  const file = form.watch('file');
+
+  useEffect(() => {
+    if (!isOpen) {
+      reset();
+      setImportCount(null);
     }
-  };
+  }, [isOpen, reset]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current !== null) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
 
-    if (!file) {
-      setError('Please select a file');
-      return;
-    }
-
+  const onSubmit = async (values: FormValues) => {
     try {
-      const result = await importCSV.mutateAsync({ portfolioId, file });
-      alert(`Successfully imported ${result.imported_count} transactions!`);
-      setFile(null);
-      onClose();
+      const result = await importCSV.mutateAsync({ portfolioId, file: values.file });
+      setImportCount(result.imported_count);
+      closeTimeoutRef.current = setTimeout(() => onClose(), 1500);
     } catch (err) {
-      setError(getErrorMessage(err));
+      form.setError('root', { message: getErrorMessage(err) });
     }
   };
 
   const handleClose = () => {
-    setFile(null);
-    setError(null);
+    if (closeTimeoutRef.current !== null) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    reset();
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Upload Transactions CSV</h2>
-          <button className="btn-close" onClick={handleClose}>
-            ×
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upload Transactions CSV</DialogTitle>
+          <DialogDescription className="sr-only">
+            Form to upload a CSV file of transactions
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            <div className="form-group">
-              <label htmlFor="csv-file">CSV File</label>
-              <input
-                id="csv-file"
-                type="file"
-                accept=".csv"
-                className="form-control"
-                onChange={handleFileChange}
-              />
-              <small className="form-text">
-                Expected format: date, type, ticker, quantity, price_per_share, fee, total_amount, eur, split_ratio
-              </small>
-            </div>
-
-            {file && (
-              <div className="file-info">
-                <strong>Selected file:</strong> {file.name} ({(file.size / 1024).toFixed(2)} KB)
-              </div>
+        <form id="upload-csv-form" onSubmit={form.handleSubmit(onSubmit)}>
+          <FieldGroup className="py-4">
+            <Controller
+              name="file"
+              control={form.control}
+              render={({ field: { onChange }, fieldState }) => (
+                <Field data-invalid={fieldState.invalid || undefined}>
+                  <FieldLabel htmlFor="csv-file">CSV File</FieldLabel>
+                  <Input
+                    id="csv-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => onChange(e.target.files?.[0])}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {file instanceof File && (
+                    <div className="p-3 bg-muted rounded-md text-sm">
+                      <strong>Selected:</strong> {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                    </div>
+                  )}
+                  <FieldDescription>
+                    Expected format: date, type, ticker, quantity, price_per_share, fee,
+                    total_amount, eur, split_ratio
+                  </FieldDescription>
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+            {importCount !== null && (
+              <Alert>
+                <AlertDescription>Successfully imported {importCount} transactions!</AlertDescription>
+              </Alert>
             )}
-
-            {error && <div className="error-message">{error}</div>}
-          </div>
-
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleClose}
-              disabled={importCSV.isPending}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={importCSV.isPending || !file}
-            >
-              {importCSV.isPending ? 'Importing...' : 'Import'}
-            </button>
-          </div>
+            {form.formState.errors.root && (
+              <Alert variant="destructive">
+                <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
+              </Alert>
+            )}
+          </FieldGroup>
         </form>
-      </div>
-    </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={importCSV.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="upload-csv-form"
+            disabled={importCSV.isPending}
+          >
+            {importCSV.isPending ? 'Importing...' : 'Import'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

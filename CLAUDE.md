@@ -5,7 +5,7 @@ Self-hosted investment portfolio tracker for European retail investors. Multi-cu
 ## Tech Stack
 
 **Backend (api/):** Python, FastAPI, SQLModel (SQLAlchemy + Pydantic), SQLite (dev) / PostgreSQL (prod), Pytest
-**Frontend (web/):** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, Vitest
+**Frontend (web/):** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui, Tailwind CSS v4, Vitest
 
 ## Project Structure
 
@@ -38,9 +38,11 @@ web/
   src/
     api.ts                   # Axios client, all TypeScript interfaces, API functions
     App.tsx                  # Root component, QueryClient config (5min staleTime, 1 retry)
-    components/              # 11 React components (views, modals, charts)
+    components/              # 11 React app components (views, modals, charts)
+    components/ui/           # 22 shadcn/ui primitives (copied into repo, not a package)
     hooks/                   # TanStack Query wrappers (usePortfolios, useTransactions, etc.)
     context/                 # PortfolioContext (active selection), ThemeContext (light/dark)
+    lib/utils.ts             # cn() utility — clsx + tailwind-merge
     utils/formatters.ts      # Currency, date, number formatting
     constants/pagination.ts  # Page size config (default: 20)
 ```
@@ -75,6 +77,65 @@ npm run test:coverage
 **Frontend:** `api.ts` (Axios + types) → hooks (TanStack Query) → components. UI state via React Context (`PortfolioContext`, `ThemeContext`).
 
 For implementation details, conventions, and patterns to follow when extending, see [Architectural Patterns](.claude/docs/architectural_patterns.md).
+
+## UI Component System
+
+The frontend uses **shadcn/ui** — components are copied directly into `web/src/components/ui/` and owned by this repo (not a node_modules package). Configured via `web/components.json`.
+
+### Configuration
+
+- **Style:** new-york
+- **Base color:** neutral
+- **Icons:** lucide-react
+- **CSS variables:** enabled (all colors as design tokens, not hardcoded Tailwind values)
+- **Path alias:** `@/` → `web/src/` (configured in `vite.config.ts`)
+- **Tailwind:** v4, configured via `@theme` block in `web/src/index.css` — no `tailwind.config.js`
+
+### Adding New Components
+
+```bash
+cd web
+npx shadcn@latest add <component-name>
+```
+
+This copies the component source into `web/src/components/ui/`. Modify freely after adding.
+
+### Available Components
+
+| Component | File | Used in |
+|-----------|------|---------|
+| `Alert`, `AlertDescription` | `ui/alert.tsx` | All modals, TransactionTable, TransactionView, PortfolioList |
+| `AlertDialog` + sub-components | `ui/alert-dialog.tsx` | Delete confirmations in PortfolioList, TransactionTable |
+| `Badge` | `ui/badge.tsx` | Transaction type labels in TransactionTable |
+| `Button` | `ui/button.tsx` | All interactive elements |
+| `Calendar` | `ui/calendar.tsx` | Date picker in TransactionModal |
+| `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`, `CardAction` | `ui/card.tsx` | All view and chart components |
+| `ChartContainer`, `ChartTooltip`, `ChartTooltipContent` | `ui/chart.tsx` | PerformanceChart, HoldingsAllocationChart |
+| `Dialog` + sub-components | `ui/dialog.tsx` | All modal components |
+| `DropdownMenu` + sub-components | `ui/dropdown-menu.tsx` | Row action menus in PortfolioList, TransactionTable, TransactionView |
+| `Empty`, `EmptyHeader`, `EmptyTitle`, `EmptyDescription`, `EmptyMedia`, `EmptyContent` | `ui/empty.tsx` | Empty states in PortfolioList, TransactionTable |
+| `Field`, `FieldGroup`, `FieldLabel`, `FieldError`, `FieldDescription` | `ui/field.tsx` | Form fields in all modal forms |
+| `Input` | `ui/input.tsx` | Text inputs in all forms |
+| `InputGroup`, `InputGroupAddon`, `InputGroupInput`, `InputGroupText` | `ui/input-group.tsx` | Currency/amount fields in TransactionModal |
+| `Label` | `ui/label.tsx` | Form labels |
+| `Pagination` + sub-components | `ui/pagination.tsx` | TransactionTable pagination |
+| `Popover`, `PopoverTrigger`, `PopoverContent` | `ui/popover.tsx` | Date picker in TransactionModal |
+| `Select` + sub-components | `ui/select.tsx` | Transaction type and time fields in TransactionModal |
+| `Separator` | `ui/separator.tsx` | PortfolioList, TransactionView |
+| `Skeleton` | `ui/skeleton.tsx` | Loading states in all components |
+| `Table` + sub-components | `ui/table.tsx` | PortfolioList, PortfolioStatusView, TransactionTable |
+| `Tabs`, `TabsList`, `TabsTrigger` | `ui/tabs.tsx` | Period selector in PerformanceChart |
+| `Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider` | `ui/tooltip.tsx` | Available, not currently used |
+
+### Key Conventions
+
+- **Always use shadcn components** — never raw `<button>`, `<input>`, `<table>`, `<dialog>` where a shadcn equivalent exists
+- **Card structure:** `CardHeader` + `CardTitle` for the heading, then `CardContent` for the body — never put a heading element directly inside `CardContent`
+- **CardAction:** use for secondary controls in a card header (e.g. tab strip, action buttons); the `CardHeader` grid positions it to the right automatically
+- **Form fields:** always wrap with `Field` > `FieldGroup` > `FieldLabel` + input + `FieldError`; never raw `<label>` + `<input>`
+- **Errors:** use `<Alert variant="destructive"><AlertDescription>` for inline error messages — no `alert()` calls
+- **Design tokens:** use `text-muted-foreground`, `bg-muted`, `text-destructive`, `border-border`, etc. — not raw Tailwind color classes (exception: `text-green-600`/`text-red-600` for financial gain/loss indicators)
+- **`cn()` utility:** always use `cn()` from `@/lib/utils` when merging classNames — never string concatenation
 
 ## API Routes
 

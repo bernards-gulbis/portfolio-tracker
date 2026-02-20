@@ -2,7 +2,7 @@
 
 A self-hosted investment portfolio tracker for European retail investors who trade in multiple currencies but report in EUR. Manage multiple portfolios, record all transaction types (buy, sell, deposit, withdrawal, dividend, fee, stock split), and get real-time valuations, gain/loss calculations, performance charts, and tax estimates — all with automatic EUR conversion via FX rates.
 
-Built with FastAPI and React. Live market prices from Yahoo Finance with multi-level caching.
+Built with FastAPI and React. Live market prices from Yahoo Finance with multi-level caching. UI built with shadcn/ui components on Tailwind CSS v4.
 
 ## Features
 
@@ -14,6 +14,7 @@ Built with FastAPI and React. Live market prices from Yahoo Finance with multi-l
 - **Performance Charts**: Time-series portfolio performance visualization
 - **CSV Import/Export**: Bulk import transaction history from brokers or other tools
 - **Responsive UI**: Mobile-friendly interface with light/dark theme, color-coded signed values, and paginated transaction history
+- **shadcn/ui Design System**: Accessible component library built on Radix UI primitives with a neutral theme
 
 ## Getting Started
 
@@ -63,7 +64,7 @@ The API will be available at `http://localhost:8000`
 
 API documentation is available at `http://localhost:8000/docs`
 
-**Note:** All API endpoints are versioned under `/api/v1` prefix.
+**Note:** Backend routes have no path prefix. The Vite dev server proxies `/api/*` → `localhost:8000/*` (stripping the `/api` prefix).
 
 ### Frontend Setup
 
@@ -82,7 +83,15 @@ npm install
 npm run dev
 ```
 
-The web application will be available at `http://localhost:5173`
+The web application will be available at `http://localhost:3000`
+
+**Frontend stack:** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui (Radix UI + Tailwind CSS v4)
+
+To add a new shadcn/ui component:
+```bash
+cd web
+npx shadcn@latest add <component-name>
+```
 
 ## Running Tests
 

@@ -113,6 +113,106 @@ Pattern: `api.ts` exports typed async functions (one per endpoint), hooks import
 - **Modal components** handle CRUD forms (TransactionModal, CreatePortfolioModal, etc.)
 - **Chart components** handle visualization (PerformanceChart, HoldingsAllocationChart)
 
+### UI Component Conventions
+
+All UI is built with shadcn/ui primitives from `web/src/components/ui/`. These are copied source files, not a package — they can be modified directly.
+
+**Card structure** — always `CardHeader`/`CardTitle` for the heading, then `CardContent` for body content. Never put a heading inside `CardContent`:
+
+```tsx
+// Correct
+<Card>
+  <CardHeader>
+    <CardTitle>Holdings</CardTitle>
+    <CardAction><Button>Export</Button></CardAction>  {/* optional — grid-positions to the right */}
+  </CardHeader>
+  <CardContent>...</CardContent>
+</Card>
+
+// Wrong
+<Card>
+  <CardContent>
+    <h3>Holdings</h3>
+    ...
+  </CardContent>
+</Card>
+```
+
+**Form fields** — always use `Field` wrapper components from `ui/field.tsx`. Never raw `<label>` + `<input>`:
+
+```tsx
+<Field>
+  <FieldGroup>
+    <FieldLabel>Portfolio Name</FieldLabel>
+    <Controller
+      control={control}
+      name="name"
+      render={({ field }) => <Input {...field} />}
+    />
+    <FieldError>{errors.name?.message}</FieldError>
+  </FieldGroup>
+</Field>
+```
+
+**Amount inputs with prefix/suffix** — use `InputGroup` from `ui/input-group.tsx`:
+
+```tsx
+<InputGroup>
+  <InputGroupAddon><InputGroupText>€</InputGroupText></InputGroupAddon>
+  <InputGroupInput><Input type="number" {...field} /></InputGroupInput>
+</InputGroup>
+```
+
+**Inline errors** — use `Alert` with `variant="destructive"`, never `alert()` or custom error divs:
+
+```tsx
+{error && (
+  <Alert variant="destructive">
+    <AlertDescription>{error}</AlertDescription>
+  </Alert>
+)}
+```
+
+**Dialog (modal) pattern** — modal components accept an `isOpen` prop and pass it to `Dialog open={}`. This allows the parent to control open state while keeping form logic inside the modal:
+
+```tsx
+// Modal component
+const MyModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+  <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    ...
+  </Dialog>
+);
+
+// Parent — conditionally render OR pass isOpen={false} to keep the component mounted
+<MyModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+```
+
+**Delete confirmation** — use `AlertDialog` (not `Dialog`) with a controlled `open` prop:
+
+```tsx
+<AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, id: null })}>
+  <AlertDialogContent>
+    <AlertDialogHeader>...</AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction onClick={handleConfirm}>Delete</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+**Pagination disabled state** — `PaginationPrevious`/`PaginationNext` use `<a>` elements which have no `disabled` attribute. Use `className` to disable:
+
+```tsx
+<PaginationPrevious
+  onClick={() => handlePageChange(currentPage - 1)}
+  aria-disabled={currentPage === 1}
+  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+/>
+```
+
+**Loading skeletons** — use `Skeleton` from `ui/skeleton.tsx`. Match the shape of the content being loaded (e.g. circular skeleton for pie chart, full-width rows for tables).
+
 ### QueryClient Configuration
 
 Global defaults set in `web/src/App.tsx:12-19`:
