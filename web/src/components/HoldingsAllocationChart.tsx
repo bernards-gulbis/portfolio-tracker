@@ -1,24 +1,18 @@
-import React from 'react';
 import {
   PieChart,
   Pie,
   Cell,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from 'recharts';
 import { formatCurrency } from '../utils/formatters';
-
-interface Holding {
-  ticker: string;
-  quantity: number;
-  average_cost: number;
-  total_cost: number;
-  current_price?: number | null;
-  current_value?: number | null;
-  unrealized_gain_loss?: number | null;
-  unrealized_gain_loss_percent?: number | null;
-}
+import { Holding } from '../api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 
 interface HoldingsAllocationChartProps {
   holdings: Holding[];
@@ -26,133 +20,141 @@ interface HoldingsAllocationChartProps {
   loading?: boolean;
 }
 
-// Color palette for the pie chart
 const COLORS = [
-  '#3b82f6', // blue
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // purple
-  '#ec4899', // pink
-  '#14b8a6', // teal
-  '#f97316', // orange
-  '#06b6d4', // cyan
-  '#84cc16', // lime
+  '#4f6ef7',
+  '#5bc87c',
+  '#f59e0b',
+  '#a78bfa',
+  '#f472b6',
+  '#14b8a6',
+  '#f97316',
+  '#06b6d4',
+  '#e6fd7f',
+  '#84cc16',
 ];
 
-export const HoldingsAllocationChart: React.FC<HoldingsAllocationChartProps> = ({
+export const HoldingsAllocationChart = ({
   holdings,
   cash,
   loading,
-}) => {
+}: HoldingsAllocationChartProps) => {
   if (loading) {
     return (
-      <div className="allocation-chart">
-        <h3>Allocation</h3>
-        <p>Loading chart data...</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-4 w-20" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center mb-3">
+            <Skeleton className="h-[240px] w-[240px] rounded-full" />
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-4 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  // Prepare data for pie chart
   const chartData: Array<{ name: string; value: number }> = [];
-  
-  // Add cash if it exists
+
   if (cash > 0) {
-    chartData.push({
-      name: 'CASH',
-      value: cash,
-    });
+    chartData.push({ name: 'CASH', value: cash });
   }
 
-  // Add holdings with current values
   holdings.forEach((holding) => {
     if (holding.current_value && holding.current_value > 0) {
-      chartData.push({
-        name: holding.ticker,
-        value: holding.current_value,
-      });
+      chartData.push({ name: holding.ticker, value: holding.current_value });
     }
   });
 
   if (chartData.length === 0) {
     return (
-      <div className="allocation-chart">
-        <h3>Allocation</h3>
-        <p>No allocation data available</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Allocation</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No allocation data available</p>
+        </CardContent>
+      </Card>
     );
   }
 
-  // Calculate total for percentages
   const total = chartData.reduce((sum, item) => sum + item.value, 0);
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0];
-      const percentage = ((data.value / total) * 100).toFixed(1);
-      return (
-        <div
-          style={{
-            backgroundColor: 'var(--background)',
-            padding: '10px',
-            border: '1px solid var(--border-color)',
-            borderRadius: '4px',
-          }}
-        >
-          <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-            {data.name}
-          </p>
-          <p style={{ margin: '3px 0', color: 'var(--text-primary)' }}>
-            Value: {formatCurrency(data.value, 'USD')}
-          </p>
-          <p style={{ margin: '3px 0', color: 'var(--text-secondary)' }}>
-            {percentage}% of portfolio
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Custom label to show percentages
-  const renderLabel = (entry: any) => {
-    const percentage = ((entry.value / total) * 100).toFixed(1);
-    return `${percentage}%`;
-  };
+  const chartConfig = chartData.reduce((acc, entry, index) => {
+    acc[entry.name] = {
+      label: entry.name,
+      color: COLORS[index % COLORS.length],
+    };
+    return acc;
+  }, {} as ChartConfig);
 
   return (
-    <div className="allocation-chart">
-      <h3>Allocation</h3>
-      <ResponsiveContainer width="100%" height={400}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={renderLabel}
-            innerRadius={70}
-            outerRadius={120}
-            fill="#8884d8"
-            dataKey="value"
-          >
-            {chartData.map((_entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip content={<CustomTooltip />} />
-          <Legend 
-            verticalAlign="bottom" 
-            height={36}
-            formatter={(value, entry: any) => {
-              const percentage = ((entry.payload.value / total) * 100).toFixed(1);
-              return `${value} (${percentage}%)`;
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Allocation</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="relative">
+          <ChartContainer config={chartConfig} className="h-[240px]">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                innerRadius={72}
+                outerRadius={108}
+                dataKey="value"
+                strokeWidth={2}
+                stroke="var(--card)"
+              >
+                {chartData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    hideLabel
+                    formatter={(value) => formatCurrency(value as number, 'EUR')}
+                  />
+                }
+              />
+            </PieChart>
+          </ChartContainer>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Market Value</p>
+              <p className="text-base font-bold">{formatCurrency(total, 'EUR')}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 space-y-1.5">
+          {chartData.map((entry, index) => {
+            const percentage = ((entry.value / total) * 100).toFixed(1);
+            return (
+              <div key={entry.name} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  />
+                  <span className="text-muted-foreground">{entry.name}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-muted-foreground">{formatCurrency(entry.value, 'EUR')}</span>
+                  <span className="font-semibold w-12 text-right">{percentage}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 };

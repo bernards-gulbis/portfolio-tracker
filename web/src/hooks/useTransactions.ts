@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   getPortfolio,
   getTransactions,
@@ -50,6 +51,7 @@ export const useCreateTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      toast.success('Transaction added');
     },
   });
 };
@@ -71,13 +73,13 @@ export const useUpdateTransaction = () => {
       portfolioId: number;
     }) => updateTransaction(transactionId, data),
     onSuccess: (_, variables) => {
-      // Invalidate all paginated transaction queries for this portfolio
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
-        exact: false 
+        exact: false
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      toast.success('Transaction updated');
     },
   });
 };
@@ -92,13 +94,13 @@ export const useDeleteTransaction = () => {
     mutationFn: ({ transactionId, portfolioId: _portfolioId }: { transactionId: number; portfolioId: number }) =>
       deleteTransaction(transactionId),
     onSuccess: (_, variables) => {
-      // Invalidate all paginated transaction queries for this portfolio
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
-        exact: false 
+        exact: false
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      toast.success('Transaction deleted');
     },
   });
 };
@@ -112,14 +114,14 @@ export const useImportTransactionsCSV = () => {
   return useMutation({
     mutationFn: ({ portfolioId, file }: { portfolioId: number; file: File }) =>
       importTransactionsCSV(portfolioId, file),
-    onSuccess: (_, variables) => {
-      // Invalidate all paginated transaction queries for this portfolio
-      queryClient.invalidateQueries({ 
+    onSuccess: (result, variables) => {
+      queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
-        exact: false 
+        exact: false
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      toast.success(`Imported ${result.imported_count} transaction${result.imported_count === 1 ? '' : 's'}`);
     },
   });
 };

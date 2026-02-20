@@ -54,6 +54,12 @@ venv.bak/
 # FastAPI / uvicorn
 *.log
 
+# Screenshots
+screenshots/
+*.png
+*.jpg
+*.jpeg
+
 # OS
 .DS_Store
 .DS_Store?
@@ -89,6 +95,9 @@ lerna-debug.log*
 dist/
 dist-ssr/
 *.local
+
+# Claude Code
+.claude/settings.local.json
 
 # Editor directories and files
 .vscode/*

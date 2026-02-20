@@ -6,7 +6,10 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import PortfolioList from './components/PortfolioList';
 import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
-import './App.css';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
+import { Sun, Moon } from 'lucide-react';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -23,26 +26,29 @@ function AppContent() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Portfolio Tracker</h1>
-        <button 
-          className="theme-toggle" 
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-        >
-          {theme === 'light' ? '🌙' : '☀️'}
-          <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
-        </button>
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <header className="border-b px-6 py-3 flex justify-between items-center">
+        <h1 className="text-lg font-semibold">Portfolio Tracker</h1>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+                {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Switch to {theme === 'light' ? 'dark' : 'light'} mode
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </header>
 
-      <main className="app-main">
-        <div className="app-layout">
-          <aside className="app-sidebar">
+      <main className="flex-1 p-6">
+        <div className="grid grid-cols-[300px_1fr] gap-6 max-lg:grid-cols-1">
+          <aside>
             <PortfolioList />
           </aside>
-          <section className="app-content">
+          <section>
             <PortfolioStatusView portfolioId={activePortfolioId} />
             <TransactionView />
           </section>
@@ -59,6 +65,7 @@ function App() {
         <PortfolioProvider>
           <AppContent />
         </PortfolioProvider>
+        <Toaster position="bottom-right" />
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

@@ -13,9 +13,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [theme, setTheme] = useState<Theme>(() => {
     // Guard against non-browser environments (tests/SSR)
     if (typeof window === 'undefined') {
-      return 'light';
+      return 'dark';
     }
-    
+
     // Check localStorage for saved theme preference
     try {
       const savedTheme = localStorage.getItem('theme');
@@ -27,13 +27,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // localStorage may throw in privacy mode or when storage is blocked
       console.warn('Failed to access localStorage:', error);
     }
-    
-    // Check system preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    
-    return 'light';
+
+    return 'dark';
   });
 
   useEffect(() => {
@@ -41,9 +36,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (typeof window === 'undefined') {
       return;
     }
-    
+
     // Update document class and save to localStorage
-    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     try {
       localStorage.setItem('theme', theme);
     } catch (error) {

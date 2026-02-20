@@ -6,6 +6,19 @@ import TransactionTable from './TransactionTable';
 import ImportCSVModal from './UploadCSVModal';
 import TransactionModal from './TransactionModal';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Plus, MoreVertical, UploadIcon, DownloadIcon } from 'lucide-react';
 
 const TransactionView = () => {
   const { activePortfolioId } = usePortfolioContext();
@@ -15,7 +28,7 @@ const TransactionView = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
   const [isExporting, setIsExporting] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const transactions = paginatedData?.transactions || [];
   const totalPages = paginatedData?.total_pages || 1;
@@ -25,33 +38,6 @@ const TransactionView = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [activePortfolioId]);
-
-  // Close menu when clicking outside or pressing Escape
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target;
-      // Check if target is an Element before calling closest (text nodes don't have closest)
-      if (target instanceof Element && !target.closest('.header-actions')) {
-        setIsMenuOpen(false);
-      }
-    };
-
-    const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsMenuOpen(false);
-      }
-    };
-
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscapeKey);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscapeKey);
-    };
-  }, [isMenuOpen]);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -72,22 +58,21 @@ const TransactionView = () => {
     if (!activePortfolioId) return;
 
     setIsExporting(true);
+    setExportError(null);
     try {
       const blob = await exportTransactionsCSV(activePortfolioId);
-      
-      // Create a download link
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `portfolio_${activePortfolioId}_transactions.csv`;
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
+
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(`Error exporting transactions: ${getErrorMessage(err)}`);
+      setExportError(`Error exporting transactions: ${getErrorMessage(err)}`);
     } finally {
       setIsExporting(false);
     }
@@ -95,86 +80,91 @@ const TransactionView = () => {
 
   if (!activePortfolioId) {
     return (
-      <div className="transaction-view">
-        <div className="empty-state">
-          <h2>No Portfolio Selected</h2>
-          <p>Select a portfolio from the list to view its transactions.</p>
-        </div>
-      </div>
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center text-muted-foreground">
+            <h2 className="text-lg font-medium mb-1">No Portfolio Selected</h2>
+            <p className="text-sm">Select a portfolio from the list to view its transactions.</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="transaction-view">
-        <div className="transaction-header">
-          <h2>Transactions</h2>
-        </div>
-        <div className="loading">Loading transactions...</div>
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg font-normal">Transactions</CardTitle>
+        </CardHeader>
+        <Separator />
+        <CardContent className="pt-4">
+          <Skeleton className="h-4 w-48 mb-3" />
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (error) {
     return (
-      <div className="transaction-view">
-        <div className="transaction-header">
-          <h2>Transactions</h2>
-        </div>
-        <div className="error">Error loading transactions: {(error as Error).message}</div>
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg font-normal">Transactions</CardTitle>
+        </CardHeader>
+        <Separator />
+        <CardContent className="py-8">
+          <p className="text-center text-destructive text-sm">Error loading transactions: {getErrorMessage(error)}</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="transaction-view">
-      <div className="transaction-header">
-        <h2>Transactions</h2>
-        <div className="transaction-actions">
-          <button
-            className="btn btn-primary"
-            onClick={handleAddTransaction}
-          >
-            + Add Transaction
-          </button>
-          <div className="header-actions">
-            <button
-              className="btn-menu"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Transaction table actions menu"
-              aria-haspopup="true"
-              aria-expanded={isMenuOpen}
-            >
-              ⋮
-            </button>
-            {isMenuOpen && (
-              <div className="action-menu-dropdown">
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    setIsImportModalOpen(true);
-                    setIsMenuOpen(false);
-                  }}
-                >
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-lg font-normal">Transactions</CardTitle>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={handleAddTransaction}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Transaction
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Transaction table actions menu">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => setIsImportModalOpen(true)}>
+                  <UploadIcon />
                   Import CSV
-                </button>
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    handleExport();
-                    setIsMenuOpen(false);
-                  }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleExport}
                   disabled={isExporting || !transactions || transactions.length === 0}
                 >
+                  <DownloadIcon />
                   {isExporting ? 'Exporting...' : 'Export CSV'}
-                </button>
-              </div>
-            )}
-          </div>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
+      </CardHeader>
+      <Separator />
 
-      {transactions && (
+      <CardContent className="pt-4">
+        {exportError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{exportError}</AlertDescription>
+          </Alert>
+        )}
         <TransactionTable
           transactions={transactions}
           portfolioId={activePortfolioId}
@@ -185,7 +175,7 @@ const TransactionView = () => {
           onPageChange={setCurrentPage}
           isLoading={isLoading}
         />
-      )}
+      </CardContent>
 
       <ImportCSVModal
         isOpen={isImportModalOpen}
@@ -199,7 +189,7 @@ const TransactionView = () => {
         portfolioId={activePortfolioId}
         transaction={editingTransaction}
       />
-    </div>
+    </Card>
   );
 };
 

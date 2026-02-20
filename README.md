@@ -1,67 +1,21 @@
 # Portfolio Tracker v4
 
-A full-stack portfolio tracking application built with FastAPI and React. Track multiple investment portfolios and their transactions with an intuitive web interface.
+A self-hosted investment portfolio tracker for European retail investors who trade in multiple currencies but report in EUR. Manage multiple portfolios, record all transaction types (buy, sell, deposit, withdrawal, dividend, fee, stock split), and get real-time valuations, gain/loss calculations, performance charts, and tax estimates — all with automatic EUR conversion via FX rates.
+
+Built with FastAPI and React. Live market prices from Yahoo Finance with multi-level caching. UI built with shadcn/ui components on Tailwind CSS v4.
 
 ## Features
 
-- **Portfolio Management**: Create, view, update, delete, and copy multiple investment portfolios
-- **Multi-Type Transactions**: Support for Deposits, Withdrawals, Buy/Sell stocks, Dividends, Fees, and Stock Splits
-- **CSV Import/Export**: Bulk upload and download transactions via CSV format
-- **Portfolio Status**: Real-time portfolio valuation with current holdings, cash balance, and realized/unrealized gains
-- **Multi-Currency Support**: Track transactions in different currencies with EUR amounts and FX rates
-- **Transaction History**: Paginated view with filtering and search capabilities
-- **Real-time Updates**: Automatic UI updates using TanStack Query
-- **Responsive Design**: Mobile-friendly interface with modern UI
-- **Data Validation**: Comprehensive input validation on both frontend and backend
-- **Signed Value Display**: Color-coded positive/negative amounts for easy tracking
-
-## Tech Stack
-
-### Backend
-- **FastAPI**: Modern Python web framework
-- **SQLModel**: SQL database interactions with Python type hints
-- **SQLite**: Lightweight database with foreign key constraints
-- **Pydantic**: Data validation using Python type annotations
-- **Pytest**: Comprehensive test suite (17 tests)
-
-### Frontend
-- **React 18**: Modern UI library with hooks
-- **TypeScript**: Type-safe JavaScript
-- **Vite**: Fast build tool and dev server
-- **TanStack Query**: Server state management
-- **Axios**: HTTP client
-- **Vitest**: Unit testing framework (12 tests)
-
-## Project Structure
-
-```
-portfolio-tracker-v4/
-├── api/                    # Backend API
-│   ├── app/                # Application package
-│   │   ├── core/           # Core functionality (database, exceptions)
-│   │   ├── models/         # SQLModel database models
-│   │   ├── schemas/        # Pydantic request/response schemas
-│   │   ├── repositories/   # Data access layer (Repository pattern)
-│   │   ├── services/       # Business logic layer (Service pattern)
-│   │   └── routers/        # API route handlers
-│   ├── tests/              # Backend tests
-│   ├── main.py             # FastAPI application entry point
-│   └── README.md           # API documentation
-│
-├── web/                    # Frontend application
-│   ├── src/
-│   │   ├── api.ts          # API client & TypeScript interfaces
-│   │   ├── App.tsx         # Main application component
-│   │   ├── components/     # React components
-│   │   ├── context/        # React Context providers
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── utils/          # Utility functions
-│   │   └── test/           # Frontend tests
-│   ├── package.json
-│   └── vite.config.ts
-│
-└── README.md
-```
+- **Multi-Portfolio Management**: Create, copy, and manage separate investment portfolios
+- **Full Transaction Support**: Deposits, withdrawals, buy/sell, dividends, fees, and stock splits
+- **Real-Time Valuation**: Live market prices via Yahoo Finance with current holdings, cash balance, and unrealized gains
+- **EUR-Centric Multi-Currency**: Track transactions in any currency with automatic EUR amount and FX rate recording for tax reporting
+- **Gain/Loss & Tax Calculations**: Realized and unrealized gains with 25% capital gains tax estimates
+- **Performance Charts**: Time-series portfolio performance visualization
+- **CSV Import/Export**: Bulk import transaction history from brokers or other tools
+- **Responsive UI**: Mobile-friendly interface with light/dark theme, color-coded signed values, and paginated transaction history
+- **Toast Notifications**: Sonner-powered toast feedback on all mutations (create, update, delete, import)
+- **shadcn/ui Design System**: Accessible component library built on Radix UI primitives with a neutral theme
 
 ## Getting Started
 
@@ -111,7 +65,7 @@ The API will be available at `http://localhost:8000`
 
 API documentation is available at `http://localhost:8000/docs`
 
-**Note:** All API endpoints are versioned under `/api/v1` prefix.
+**Note:** Backend routes have no path prefix. The Vite dev server proxies `/api/*` → `localhost:8000/*` (stripping the `/api` prefix).
 
 ### Frontend Setup
 
@@ -130,7 +84,15 @@ npm install
 npm run dev
 ```
 
-The web application will be available at `http://localhost:5173`
+The web application will be available at `http://localhost:3000`
+
+**Frontend stack:** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui (Radix UI + Tailwind CSS v4), sonner (toasts)
+
+To add a new shadcn/ui component:
+```bash
+cd web
+npx shadcn@latest add <component-name>
+```
 
 ## Running Tests
 
@@ -155,36 +117,7 @@ npm test
 npm test -- --watch
 ```
 
-## API Endpoints
-
-**Base URL:** `/api/v1`
-
-### Health Checks
-
-- `GET /` - Basic health check
-- `GET /health` - Comprehensive health check with database connectivity test
-
-### Portfolios
-
-- `GET /api/v1/portfolios/` - List all portfolios
-- `GET /api/v1/portfolios/{id}` - Get portfolio by ID with transactions
-- `POST /api/v1/portfolios/` - Create new portfolio
-- `PUT /api/v1/portfolios/{id}` - Update portfolio name
-- `DELETE /api/v1/portfolios/{id}` - Delete portfolio (cascades to transactions)
-- `POST /api/v1/portfolios/{id}/copy` - Copy portfolio with all transactions
-- `GET /api/v1/portfolios/{id}/status` - Get portfolio status (holdings, cash balance, gains/losses)
-
-### Transactions
-
-- `GET /api/v1/portfolios/{portfolio_id}/transactions/` - List transactions for a portfolio (paginated)
-- `GET /api/v1/transactions/{id}` - Get transaction by ID
-- `POST /api/v1/portfolios/{portfolio_id}/transactions/` - Create new transaction
-- `PUT /api/v1/transactions/{id}` - Update transaction
-- `DELETE /api/v1/transactions/{id}` - Delete transaction
-- `POST /api/v1/portfolios/{portfolio_id}/transactions/import` - Bulk upload via CSV
-- `GET /api/v1/portfolios/{portfolio_id}/transactions/export-csv` - Export transactions to CSV
-
-### CSV Upload Format
+## CSV Upload Format
 
 The CSV file must include the following headers:
 
@@ -244,27 +177,3 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,curre
 - `split_ratio`: Stock split ratio (optional, required for Split transactions)
 - `currency`: Currency code (optional, 3-letter code)
 - `fx_rate`: Foreign exchange rate (optional, up to 4 decimal places)
-
-## Development
-
-### Backend Development
-
-The backend uses:
-- **Clean Architecture** with layered design (routers → services → repositories)
-- **Repository Pattern** for data access abstraction
-- **Service Pattern** for business logic encapsulation
-- **Custom Exceptions** with centralized error handling
-- FastAPI's lifespan events for startup/shutdown
-- SQLModel for ORM with relationships
-- Foreign key constraints enabled via PRAGMA
-- CORS middleware for cross-origin requests
-- Dependency injection for database sessions
-
-### Frontend Development
-
-The frontend uses:
-- React Context API for active portfolio state
-- TanStack Query for server state caching
-- Custom hooks for API operations
-- TypeScript interfaces matching backend schemas
-- Utility functions for formatting (currency, dates, colors)
