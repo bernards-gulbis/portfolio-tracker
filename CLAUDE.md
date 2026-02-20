@@ -5,7 +5,7 @@ Self-hosted investment portfolio tracker for European retail investors. Multi-cu
 ## Tech Stack
 
 **Backend (api/):** Python, FastAPI, SQLModel (SQLAlchemy + Pydantic), SQLite (dev) / PostgreSQL (prod), Pytest
-**Frontend (web/):** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui, Tailwind CSS v4, Vitest
+**Frontend (web/):** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui, Tailwind CSS v4, sonner (toasts), Vitest
 
 ## Project Structure
 
@@ -39,7 +39,7 @@ web/
     api.ts                   # Axios client, all TypeScript interfaces, API functions
     App.tsx                  # Root component, QueryClient config (5min staleTime, 1 retry)
     components/              # 11 React app components (views, modals, charts)
-    components/ui/           # 22 shadcn/ui primitives (copied into repo, not a package)
+    components/ui/           # 23 shadcn/ui primitives (copied into repo, not a package)
     hooks/                   # TanStack Query wrappers (usePortfolios, useTransactions, etc.)
     context/                 # PortfolioContext (active selection), ThemeContext (light/dark)
     lib/utils.ts             # cn() utility — clsx + tailwind-merge
@@ -125,6 +125,7 @@ This copies the component source into `web/src/components/ui/`. Modify freely af
 | `Skeleton` | `ui/skeleton.tsx` | Loading states in all components |
 | `Table` + sub-components | `ui/table.tsx` | PortfolioList, PortfolioStatusView, TransactionTable |
 | `Tabs`, `TabsList`, `TabsTrigger` | `ui/tabs.tsx` | Period selector in PerformanceChart |
+| `Toaster` | `ui/sonner.tsx` | Mounted once in `App.tsx` inside `ThemeProvider`; import `toast` from `sonner` directly in hooks/components |
 | `Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider` | `ui/tooltip.tsx` | Available, not currently used |
 
 ### Key Conventions
@@ -133,7 +134,8 @@ This copies the component source into `web/src/components/ui/`. Modify freely af
 - **Card structure:** `CardHeader` + `CardTitle` for the heading, then `CardContent` for the body — never put a heading element directly inside `CardContent`
 - **CardAction:** use for secondary controls in a card header (e.g. tab strip, action buttons); the `CardHeader` grid positions it to the right automatically
 - **Form fields:** always wrap with `Field` > `FieldGroup` > `FieldLabel` + input + `FieldError`; never raw `<label>` + `<input>`
-- **Errors:** use `<Alert variant="destructive"><AlertDescription>` for inline error messages — no `alert()` calls
+- **Toasts:** use `toast.success(...)` / `toast.error(...)` from `sonner` for transient mutation feedback (CRUD success/failure) — call these in TanStack Query `onSuccess`/catch handlers, not in component render
+- **Errors:** use `<Alert variant="destructive"><AlertDescription>` for persistent inline errors that stay visible (form root errors, query fetch failures) — not for transient mutation feedback
 - **Design tokens:** use `text-muted-foreground`, `bg-muted`, `text-destructive`, `border-border`, etc. — not raw Tailwind color classes (exception: `text-green-600`/`text-red-600` for financial gain/loss indicators)
 - **`cn()` utility:** always use `cn()` from `@/lib/utils` when merging classNames — never string concatenation
 

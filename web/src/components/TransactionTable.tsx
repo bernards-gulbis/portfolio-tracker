@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Transaction } from '../api';
+import { Transaction, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
 import { formatCurrency, formatDate, formatTransactionType, getDisplayValue } from '../utils/formatters';
 import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
@@ -49,7 +49,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -76,7 +76,6 @@ const TransactionTable = ({
   const deleteTransaction = useDeleteTransaction();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; transactionId: number | null }>({ open: false, transactionId: null });
 
   const toggleMenu = (transactionId: number) => {
@@ -103,8 +102,7 @@ const TransactionTable = ({
         onPageChange(currentPage - 1);
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-      setDeleteError(`Failed to delete transaction: ${errorMsg}`);
+      toast.error(`Failed to delete transaction: ${getErrorMessage(error)}`);
     } finally {
       setDeletingId(null);
     }
@@ -167,11 +165,6 @@ const TransactionTable = ({
 
   return (
     <>
-      {deleteError && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertDescription>{deleteError}</AlertDescription>
-        </Alert>
-      )}
       <p className="text-sm text-muted-foreground mb-3">
         Showing {startIndex + 1}-{endIndex} of {total} transactions
       </p>

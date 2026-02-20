@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -33,8 +33,6 @@ interface ImportCSVModalProps {
 
 const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) => {
   const importCSV = useImportTransactionsCSV();
-  const [importCount, setImportCount] = useState<number | null>(null);
-  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
@@ -45,31 +43,19 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
   useEffect(() => {
     if (!isOpen) {
       reset();
-      setImportCount(null);
     }
   }, [isOpen, reset]);
 
-  useEffect(() => {
-    return () => {
-      if (closeTimeoutRef.current !== null) clearTimeout(closeTimeoutRef.current);
-    };
-  }, []);
-
   const onSubmit = async (values: FormValues) => {
     try {
-      const result = await importCSV.mutateAsync({ portfolioId, file: values.file });
-      setImportCount(result.imported_count);
-      closeTimeoutRef.current = setTimeout(() => onClose(), 1500);
+      await importCSV.mutateAsync({ portfolioId, file: values.file });
+      onClose();
     } catch (err) {
       form.setError('root', { message: getErrorMessage(err) });
     }
   };
 
   const handleClose = () => {
-    if (closeTimeoutRef.current !== null) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
     reset();
     onClose();
   };
@@ -112,11 +98,6 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
                 </Field>
               )}
             />
-            {importCount !== null && (
-              <Alert>
-                <AlertDescription>Successfully imported {importCount} transactions!</AlertDescription>
-              </Alert>
-            )}
             {form.formState.errors.root && (
               <Alert variant="destructive">
                 <AlertDescription>{form.formState.errors.root.message}</AlertDescription>

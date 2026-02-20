@@ -1,8 +1,22 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TransactionTable from '../components/TransactionTable';
 import { Transaction, TransactionType } from '../api';
+import { toast } from 'sonner';
+import { useDeleteTransaction } from '../hooks/useTransactions';
+
+vi.mock('../hooks/useTransactions', () => ({
+  useDeleteTransaction: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 const mockTransactions: Transaction[] = [
   {
@@ -14,7 +28,7 @@ const mockTransactions: Transaction[] = [
     quantity: null,
     price_per_share: null,
     fee: 0,
-    total_amount: 3000.0,  // Stored as positive
+    total_amount: 3000.0,
     eur_amount: 2760.27,
     split_ratio: null,
   },
@@ -27,7 +41,7 @@ const mockTransactions: Transaction[] = [
     quantity: 15.00000001,
     price_per_share: 183.69,
     fee: 0,
-    total_amount: -2755.35,  // Stored as negative (money leaving account)
+    total_amount: -2755.35,
     eur_amount: null,
     split_ratio: null,
   },
@@ -40,7 +54,7 @@ const mockTransactions: Transaction[] = [
     quantity: null,
     price_per_share: null,
     fee: 0,
-    total_amount: 50.0,  // Stored as positive
+    total_amount: 50.0,
     eur_amount: 46.0,
     split_ratio: null,
   },
@@ -65,14 +79,22 @@ describe('TransactionTable', () => {
     isLoading: false,
   };
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useDeleteTransaction).mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useDeleteTransaction>);
+  });
+
   it('renders the correct number of transaction rows', () => {
     const queryClient = createTestQueryClient();
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable 
-          transactions={mockTransactions} 
-          portfolioId={1} 
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
           onEdit={mockOnEdit}
           {...defaultProps}
         />
@@ -88,26 +110,23 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable 
-          transactions={mockTransactions} 
-          portfolioId={1} 
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
           onEdit={mockOnEdit}
           {...defaultProps}
         />
       </QueryClientProvider>
     );
 
-    // Check for deposit transaction
     expect(screen.getByText('Deposit')).toBeInTheDocument();
     expect(screen.getByText('$3,000.00')).toBeInTheDocument();
 
-    // Check for buy transaction
     expect(screen.getByText('Buy')).toBeInTheDocument();
     const msftElements = screen.getAllByText('MSFT');
-    expect(msftElements).toHaveLength(2); // Appears in Buy and Dividend transactions
+    expect(msftElements).toHaveLength(2);
     expect(screen.getByText('-$2,755.35')).toBeInTheDocument();
 
-    // Check for dividend transaction
     expect(screen.getByText('Dividend')).toBeInTheDocument();
     expect(screen.getByText('$50.00')).toBeInTheDocument();
   });
@@ -117,9 +136,9 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable 
-          transactions={[]} 
-          portfolioId={1} 
+        <TransactionTable
+          transactions={[]}
+          portfolioId={1}
           onEdit={mockOnEdit}
           {...defaultProps}
           total={0}
@@ -136,17 +155,15 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable 
-          transactions={mockTransactions} 
-          portfolioId={1} 
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
           onEdit={mockOnEdit}
           {...defaultProps}
         />
       </QueryClientProvider>
     );
 
-    // Check that action menu buttons exist (one for each transaction)
-    // Note: aria-labels now include context like "Actions for MSFT on Dec 2, 2020, 08:16 PM"
     const menuButtons = screen.getAllByLabelText(/Actions for/);
     expect(menuButtons).toHaveLength(3);
   });
@@ -156,16 +173,15 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable 
-          transactions={mockTransactions} 
-          portfolioId={1} 
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
           onEdit={mockOnEdit}
           {...defaultProps}
         />
       </QueryClientProvider>
     );
 
-    // Check USD formatting in Total Amount column
     expect(screen.getByText('$3,000.00')).toBeInTheDocument();
     expect(screen.getByText('-$2,755.35')).toBeInTheDocument();
     expect(screen.getByText('$183.69')).toBeInTheDocument();
@@ -177,9 +193,9 @@ describe('TransactionTable', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <TransactionTable 
-          transactions={mockTransactions} 
-          portfolioId={1} 
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
           onEdit={mockOnEdit}
           {...defaultProps}
         />
@@ -187,5 +203,38 @@ describe('TransactionTable', () => {
     );
 
     expect(screen.getByText('15.00000001')).toBeInTheDocument();
+  });
+
+  it('shows error toast when transaction delete fails', async () => {
+    vi.mocked(useDeleteTransaction).mockReturnValue({
+      mutateAsync: vi.fn().mockRejectedValueOnce(new Error('Delete failed')),
+      isPending: false,
+    } as unknown as ReturnType<typeof useDeleteTransaction>);
+
+    const queryClient = createTestQueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
+      </QueryClientProvider>
+    );
+
+    // Open the action menu for the first transaction row
+    await userEvent.click(screen.getAllByLabelText(/Actions for/)[0]);
+
+    // Click "Delete" in the dropdown
+    await userEvent.click(await screen.findByText('Delete'));
+
+    // Confirm deletion in the AlertDialog
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to delete transaction: Delete failed');
+    });
   });
 });

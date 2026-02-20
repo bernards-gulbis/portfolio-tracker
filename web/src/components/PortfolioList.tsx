@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,8 +57,6 @@ const PortfolioList = () => {
     open: false,
     portfolioId: null,
   });
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
   const handleDeleteClick = (portfolioId: number) => {
     setDeleteConfirm({ open: true, portfolioId });
   };
@@ -71,7 +69,7 @@ const PortfolioList = () => {
         setActivePortfolioId(null);
       }
     } catch (error) {
-      setDeleteError(`Failed to delete portfolio: ${getErrorMessage(error)}`);
+      toast.error(`Failed to delete portfolio: ${getErrorMessage(error)}`);
     } finally {
       setDeleteConfirm({ open: false, portfolioId: null });
     }
@@ -138,11 +136,6 @@ const PortfolioList = () => {
         <Separator />
 
         <CardContent className="p-0">
-          {deleteError && (
-            <Alert variant="destructive" className="m-4">
-              <AlertDescription>{deleteError}</AlertDescription>
-            </Alert>
-          )}
           {portfolios && portfolios.length === 0 ? (
             <Empty>
               <EmptyHeader>

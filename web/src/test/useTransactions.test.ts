@@ -5,10 +5,13 @@ import React from 'react';
 import {
   useTransactions,
   useCreateTransaction,
+  useUpdateTransaction,
   useDeleteTransaction,
+  useImportTransactionsCSV,
 } from '../hooks/useTransactions';
 import * as api from '../api';
 import type { PaginatedTransactionResponse, Transaction, TransactionType } from '../api';
+import { toast } from 'sonner';
 
 vi.mock('../api', async () => {
   const actual = await vi.importActual('../api');
@@ -16,9 +19,18 @@ vi.mock('../api', async () => {
     ...actual,
     getTransactions: vi.fn(),
     createTransaction: vi.fn(),
+    updateTransaction: vi.fn(),
     deleteTransaction: vi.fn(),
+    importTransactionsCSV: vi.fn(),
   };
 });
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -117,6 +129,58 @@ describe('useCreateTransaction', () => {
       total_amount: 1000,
     });
   });
+
+  it('shows "Transaction added" toast on success', async () => {
+    vi.mocked(api.createTransaction).mockResolvedValueOnce(mockTransaction);
+    vi.mocked(api.getTransactions).mockResolvedValue(mockPaginatedResponse);
+
+    const { result } = renderHook(() => useCreateTransaction(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({
+      portfolioId: 1,
+      data: { date: '2024-01-01', type: 'Deposit' as TransactionType, total_amount: 1000 },
+    });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Transaction added');
+    });
+  });
+});
+
+describe('useUpdateTransaction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls updateTransaction API with correct arguments', async () => {
+    vi.mocked(api.updateTransaction).mockResolvedValueOnce(mockTransaction);
+
+    const { result } = renderHook(() => useUpdateTransaction(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({
+      transactionId: 1,
+      data: { total_amount: 2000 },
+      portfolioId: 1,
+    });
+
+    expect(api.updateTransaction).toHaveBeenCalledWith(1, { total_amount: 2000 });
+  });
+
+  it('shows "Transaction updated" toast on success', async () => {
+    vi.mocked(api.updateTransaction).mockResolvedValueOnce(mockTransaction);
+
+    const { result } = renderHook(() => useUpdateTransaction(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({
+      transactionId: 1,
+      data: { total_amount: 2000 },
+      portfolioId: 1,
+    });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Transaction updated');
+    });
+  });
 });
 
 describe('useDeleteTransaction', () => {
@@ -133,5 +197,61 @@ describe('useDeleteTransaction', () => {
     await result.current.mutateAsync({ transactionId: 1, portfolioId: 1 });
 
     expect(api.deleteTransaction).toHaveBeenCalledWith(1);
+  });
+
+  it('shows "Transaction deleted" toast on success', async () => {
+    vi.mocked(api.deleteTransaction).mockResolvedValueOnce(undefined);
+    vi.mocked(api.getTransactions).mockResolvedValue(mockPaginatedResponse);
+
+    const { result } = renderHook(() => useDeleteTransaction(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({ transactionId: 1, portfolioId: 1 });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Transaction deleted');
+    });
+  });
+});
+
+describe('useImportTransactionsCSV', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls importTransactionsCSV API with portfolioId and file', async () => {
+    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 3, transactions: [] });
+
+    const { result } = renderHook(() => useImportTransactionsCSV(), { wrapper: createWrapper() });
+    const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
+
+    await result.current.mutateAsync({ portfolioId: 1, file });
+
+    expect(api.importTransactionsCSV).toHaveBeenCalledWith(1, file);
+  });
+
+  it('shows plural "transactions" toast when count > 1', async () => {
+    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 3, transactions: [] });
+
+    const { result } = renderHook(() => useImportTransactionsCSV(), { wrapper: createWrapper() });
+    const file = new File([''], 'data.csv', { type: 'text/csv' });
+
+    await result.current.mutateAsync({ portfolioId: 1, file });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Imported 3 transactions');
+    });
+  });
+
+  it('shows singular "transaction" toast when count is 1', async () => {
+    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 1, transactions: [] });
+
+    const { result } = renderHook(() => useImportTransactionsCSV(), { wrapper: createWrapper() });
+    const file = new File([''], 'data.csv', { type: 'text/csv' });
+
+    await result.current.mutateAsync({ portfolioId: 1, file });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Imported 1 transaction');
+    });
   });
 });

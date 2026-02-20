@@ -8,6 +8,7 @@ import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
 import { Sun, Moon } from 'lucide-react';
 
 // Create a client
@@ -64,6 +65,7 @@ function App() {
         <PortfolioProvider>
           <AppContent />
         </PortfolioProvider>
+        <Toaster position="bottom-right" />
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

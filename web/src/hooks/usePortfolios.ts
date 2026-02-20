@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { getPortfolios, createPortfolio, updatePortfolio, deletePortfolio, copyPortfolio, PortfolioCreate, PortfolioUpdate } from '../api';
 
 /**
@@ -19,9 +20,9 @@ export const useCreatePortfolio = () => {
 
   return useMutation({
     mutationFn: (data: PortfolioCreate) => createPortfolio(data),
-    onSuccess: () => {
-      // Invalidate and refetch portfolios list
+    onSuccess: (portfolio) => {
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+      toast.success(`Portfolio "${portfolio.name}" created`);
     },
   });
 };
@@ -35,9 +36,9 @@ export const useUpdatePortfolio = () => {
   return useMutation({
     mutationFn: ({ portfolioId, data }: { portfolioId: number; data: PortfolioUpdate }) =>
       updatePortfolio(portfolioId, data),
-    onSuccess: () => {
-      // Invalidate and refetch portfolios list
+    onSuccess: (portfolio) => {
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+      toast.success(`Portfolio renamed to "${portfolio.name}"`);
     },
   });
 };
@@ -51,8 +52,8 @@ export const useDeletePortfolio = () => {
   return useMutation({
     mutationFn: (portfolioId: number) => deletePortfolio(portfolioId),
     onSuccess: () => {
-      // Invalidate and refetch portfolios list
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+      toast.success('Portfolio deleted');
     },
   });
 };
@@ -66,9 +67,9 @@ export const useCopyPortfolio = () => {
   return useMutation({
     mutationFn: ({ portfolioId, newName }: { portfolioId: number; newName: string }) =>
       copyPortfolio(portfolioId, newName),
-    onSuccess: () => {
-      // Invalidate and refetch portfolios list
+    onSuccess: (portfolio) => {
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+      toast.success(`Portfolio copied as "${portfolio.name}"`);
     },
   });
 };

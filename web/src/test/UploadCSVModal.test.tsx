@@ -74,7 +74,7 @@ describe('UploadCSVModal', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('shows imported count success message after successful import', async () => {
+  it('submits form with valid csv file successfully', async () => {
     mockMutateAsync.mockResolvedValueOnce({ imported_count: 5, transactions: [] });
     renderModal();
 
@@ -84,9 +84,11 @@ describe('UploadCSVModal', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Import' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Successfully imported 5 transactions!')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
+      portfolioId: 1,
+      file: expect.any(File),
+    }));
+    expect(screen.queryByText(/Please select a file/)).not.toBeInTheDocument();
   });
 
   it('shows API error on import failure', async () => {

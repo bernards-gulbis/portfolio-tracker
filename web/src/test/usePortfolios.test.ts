@@ -11,6 +11,7 @@ import {
 } from '../hooks/usePortfolios';
 import * as api from '../api';
 import type { Portfolio } from '../api';
+import { toast } from 'sonner';
 
 vi.mock('../api', async () => {
   const actual = await vi.importActual('../api');
@@ -23,6 +24,13 @@ vi.mock('../api', async () => {
     copyPortfolio: vi.fn(),
   };
 });
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -98,6 +106,19 @@ describe('useCreatePortfolio', () => {
     expect(api.createPortfolio).toHaveBeenCalledWith({ name: 'Test Portfolio' });
   });
 
+  it('shows success toast with portfolio name', async () => {
+    vi.mocked(api.createPortfolio).mockResolvedValueOnce(mockPortfolio);
+    vi.mocked(api.getPortfolios).mockResolvedValue([]);
+
+    const { result } = renderHook(() => useCreatePortfolio(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({ name: 'Test Portfolio' });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Portfolio "Test Portfolio" created');
+    });
+  });
+
   it('propagates API errors', async () => {
     vi.mocked(api.createPortfolio).mockRejectedValueOnce(new Error('Duplicate name'));
 
@@ -122,6 +143,19 @@ describe('useUpdatePortfolio', () => {
 
     expect(api.updatePortfolio).toHaveBeenCalledWith(1, { name: 'Renamed' });
   });
+
+  it('shows success toast with the new portfolio name', async () => {
+    vi.mocked(api.updatePortfolio).mockResolvedValueOnce({ ...mockPortfolio, name: 'Renamed' });
+    vi.mocked(api.getPortfolios).mockResolvedValue([]);
+
+    const { result } = renderHook(() => useUpdatePortfolio(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({ portfolioId: 1, data: { name: 'Renamed' } });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Portfolio renamed to "Renamed"');
+    });
+  });
 });
 
 describe('useDeletePortfolio', () => {
@@ -139,6 +173,19 @@ describe('useDeletePortfolio', () => {
 
     expect(api.deletePortfolio).toHaveBeenCalledWith(1);
   });
+
+  it('shows success toast on delete', async () => {
+    vi.mocked(api.deletePortfolio).mockResolvedValueOnce(undefined);
+    vi.mocked(api.getPortfolios).mockResolvedValue([]);
+
+    const { result } = renderHook(() => useDeletePortfolio(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync(1);
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Portfolio deleted');
+    });
+  });
 });
 
 describe('useCopyPortfolio', () => {
@@ -155,5 +202,18 @@ describe('useCopyPortfolio', () => {
     await result.current.mutateAsync({ portfolioId: 1, newName: 'Copy' });
 
     expect(api.copyPortfolio).toHaveBeenCalledWith(1, 'Copy');
+  });
+
+  it('shows success toast with the copied portfolio name', async () => {
+    vi.mocked(api.copyPortfolio).mockResolvedValueOnce({ ...mockPortfolio, id: 2, name: 'Copy' });
+    vi.mocked(api.getPortfolios).mockResolvedValue([]);
+
+    const { result } = renderHook(() => useCopyPortfolio(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({ portfolioId: 1, newName: 'Copy' });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Portfolio copied as "Copy"');
+    });
   });
 });

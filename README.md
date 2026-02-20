@@ -14,6 +14,7 @@ Built with FastAPI and React. Live market prices from Yahoo Finance with multi-l
 - **Performance Charts**: Time-series portfolio performance visualization
 - **CSV Import/Export**: Bulk import transaction history from brokers or other tools
 - **Responsive UI**: Mobile-friendly interface with light/dark theme, color-coded signed values, and paginated transaction history
+- **Toast Notifications**: Sonner-powered toast feedback on all mutations (create, update, delete, import)
 - **shadcn/ui Design System**: Accessible component library built on Radix UI primitives with a neutral theme
 
 ## Getting Started
@@ -85,7 +86,7 @@ npm run dev
 
 The web application will be available at `http://localhost:3000`
 
-**Frontend stack:** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui (Radix UI + Tailwind CSS v4)
+**Frontend stack:** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui (Radix UI + Tailwind CSS v4), sonner (toasts)
 
 To add a new shadcn/ui component:
 ```bash
