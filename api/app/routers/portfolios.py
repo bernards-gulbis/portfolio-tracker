@@ -5,6 +5,8 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core import get_session
+from app.core.auth import current_active_user
+from app.models.user import User
 from app.schemas import (
     PortfolioCreate,
     PortfolioUpdate,
@@ -23,39 +25,45 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 @router.post("/", response_model=PortfolioResponse, status_code=201)
 def create_portfolio(
     portfolio: PortfolioCreate,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
 ):
     """Create a new portfolio"""
     service = PortfolioService(session)
-    return service.create_portfolio(portfolio.name)
+    return service.create_portfolio(portfolio.name, user.id)
 
 
 @router.get("/", response_model=List[PortfolioResponse])
-def list_portfolios(session: Session = Depends(get_session)):
+def list_portfolios(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
+):
     """Get all portfolios"""
     service = PortfolioService(session)
-    return service.get_all_portfolios()
+    return service.get_all_portfolios(user.id)
 
 
 @router.get("/{portfolio_id}", response_model=PortfolioWithTransactions)
 def get_portfolio(
     portfolio_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
 ):
     """Get a specific portfolio with its transactions"""
     service = PortfolioService(session)
-    return service.get_portfolio(portfolio_id)
+    return service.get_portfolio(portfolio_id, user.id)
 
 
 @router.get("/{portfolio_id}/status", response_model=PortfolioStatusResponse)
 def get_portfolio_status(
     portfolio_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
 ):
     """Get portfolio status with holdings, cash balance, and performance metrics"""
     service = PortfolioService(session)
     try:
-        return service.calculate_portfolio_status(portfolio_id)
+        return service.calculate_portfolio_status(portfolio_id, user.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -64,32 +72,35 @@ def get_portfolio_status(
 def update_portfolio(
     portfolio_id: int,
     portfolio: PortfolioUpdate,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
 ):
     """Update a portfolio"""
     service = PortfolioService(session)
-    return service.update_portfolio(portfolio_id, portfolio.name)
+    return service.update_portfolio(portfolio_id, portfolio.name, user.id)
 
 
 @router.post("/{portfolio_id}/copy", response_model=PortfolioResponse, status_code=201)
 def copy_portfolio(
     portfolio_id: int,
     copy_request: PortfolioCopy,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
 ):
     """Copy a portfolio with all its transactions"""
     service = PortfolioService(session)
-    return service.copy_portfolio(portfolio_id, copy_request.new_name)
+    return service.copy_portfolio(portfolio_id, copy_request.new_name, user.id)
 
 
 @router.delete("/{portfolio_id}", status_code=204)
 def delete_portfolio(
     portfolio_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
 ):
     """Delete a portfolio and all its transactions"""
     service = PortfolioService(session)
-    service.delete_portfolio(portfolio_id)
+    service.delete_portfolio(portfolio_id, user.id)
     return None
 
 
@@ -99,48 +110,45 @@ def get_portfolio_performance(
     start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
     end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
     num_points: int = Query(60, ge=2, le=365, description="Number of data points to return"),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(current_active_user),
 ):
     """
     Get portfolio performance over time.
-    
+
     Returns a time series of portfolio values showing how the portfolio has evolved.
     Includes principal_eur (deposits/withdrawals) and current_value_eur (market value).
     """
     service = PortfolioService(session)
-    
-    # Parse dates if provided
+
     start_dt = None
     end_dt = None
-    
+
     try:
         if start_date:
             start_dt = datetime.strptime(start_date, '%Y-%m-%d')
         if end_date:
             end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-        
-        # Validate date range (must be strictly before to calculate performance over time)
+
         if start_dt and end_dt and start_dt >= end_dt:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="start_date must be before end_date"
             )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
-    
+
     try:
-        # Get the portfolio to check if it exists and get the name
-        portfolio = service.get_portfolio(portfolio_id)
-        
-        # Get performance data
+        portfolio = service.get_portfolio(portfolio_id, user.id)
+
         performance_data = service.get_portfolio_performance(
             portfolio_id,
+            user_id=user.id,
             start_date=start_dt,
             end_date=end_dt,
             num_points=num_points
         )
-        
-        # Convert to schema objects
+
         data_points = [
             PerformanceDataPoint(
                 date=dp['date'],
@@ -149,7 +157,7 @@ def get_portfolio_performance(
             )
             for dp in performance_data
         ]
-        
+
         return PortfolioPerformanceResponse(
             portfolio_id=portfolio.id,
             portfolio_name=portfolio.name,

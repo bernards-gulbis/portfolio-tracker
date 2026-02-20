@@ -1,7 +1,23 @@
+import uuid
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from datetime import datetime
 from typing import Optional, List
 from app.models import TransactionType
+from fastapi_users import schemas as fu_schemas
+
+
+# ================== User Schemas ==================
+
+class UserRead(fu_schemas.BaseUser[uuid.UUID]):
+    pass
+
+
+class UserCreate(fu_schemas.BaseUserCreate):
+    pass
+
+
+class UserUpdate(fu_schemas.BaseUserUpdate):
+    pass
 
 
 # ================== Portfolio Schemas ==================

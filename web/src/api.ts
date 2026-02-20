@@ -12,6 +12,24 @@ export enum TransactionType {
   DIVIDEND = 'Dividend',
 }
 
+export interface UserRead {
+  id: string;
+  email: string;
+  is_active: boolean;
+  is_superuser: boolean;
+  is_verified: boolean;
+}
+
+export interface LoginCredentials {
+  username: string; // FastAPI Users uses "username" field (which is the email)
+  password: string;
+}
+
+export interface RegisterCredentials {
+  email: string;
+  password: string;
+}
+
 export interface Portfolio {
   id: number;
   name: string;
@@ -147,10 +165,59 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true, // Send httpOnly cookies automatically
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// 401 interceptor — fires auth:logout event so AuthContext can react
+api.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ================== Auth API Functions ==================
+
+export const login = async (credentials: LoginCredentials): Promise<void> => {
+  // FastAPI Users login requires application/x-www-form-urlencoded with field "username"
+  const params = new URLSearchParams();
+  params.append('username', credentials.username);
+  params.append('password', credentials.password);
+  await api.post('/auth/cookie/login', params, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+};
+
+export const register = async (credentials: RegisterCredentials): Promise<UserRead> => {
+  const response = await api.post<UserRead>('/auth/register', credentials);
+  return response.data;
+};
+
+export const logoutApi = async (): Promise<void> => {
+  await api.post('/auth/cookie/logout');
+};
+
+export const getCurrentUser = async (): Promise<UserRead> => {
+  const response = await api.get<UserRead>('/users/me');
+  return response.data;
+};
+
+export const getGoogleAuthorizeUrl = async (redirectUri: string): Promise<string> => {
+  const response = await api.get<{ authorization_url: string }>('/auth/google/authorize', {
+    params: { redirect_uri: redirectUri },
+  });
+  return response.data.authorization_url;
+};
+
+export const handleGoogleCallback = async (code: string, state: string): Promise<void> => {
+  await api.get('/auth/google/callback', { params: { code, state } });
+};
 
 // ================== Portfolio API Functions ==================
 

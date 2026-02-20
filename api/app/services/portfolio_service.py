@@ -3,6 +3,7 @@ Portfolio service for business logic
 """
 import math
 import logging
+import uuid
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from sqlmodel import Session
@@ -32,71 +33,67 @@ class PortfolioService:
         self.portfolio_repo = PortfolioRepository(session)
         self.transaction_repo = TransactionRepository(session)
     
-    def create_portfolio(self, name: str) -> Portfolio:
+    def create_portfolio(self, name: str, user_id: uuid.UUID) -> Portfolio:
         """Create a new portfolio with validation"""
-        # Business validation
         if not name or len(name.strip()) == 0:
             raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-        
+
         if len(name) > 255:
             raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
-        
-        return self.portfolio_repo.create(name.strip())
-    
-    def get_portfolio(self, portfolio_id: int) -> Portfolio:
-        """Get a portfolio by ID"""
-        portfolio = self.portfolio_repo.get_by_id(portfolio_id)
+
+        return self.portfolio_repo.create(name.strip(), user_id)
+
+    def get_portfolio(self, portfolio_id: int, user_id: uuid.UUID) -> Portfolio:
+        """Get a portfolio by ID (user-scoped)"""
+        portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
         return portfolio
-    
-    def get_all_portfolios(self) -> List[Portfolio]:
-        """Get all portfolios"""
-        return self.portfolio_repo.get_all()
-    
-    def update_portfolio(self, portfolio_id: int, name: str) -> Portfolio:
-        """Update a portfolio"""
-        # Business validation
+
+    def get_all_portfolios(self, user_id: uuid.UUID) -> List[Portfolio]:
+        """Get all portfolios for user"""
+        return self.portfolio_repo.get_all_for_user(user_id)
+
+    def update_portfolio(self, portfolio_id: int, name: str, user_id: uuid.UUID) -> Portfolio:
+        """Update a portfolio (user-scoped)"""
         if not name or len(name.strip()) == 0:
             raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-        
+
         if len(name) > 255:
             raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
-        
-        portfolio = self.portfolio_repo.update(portfolio_id, name.strip())
+
+        portfolio = self.portfolio_repo.update(portfolio_id, name.strip(), user_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
         return portfolio
-    
-    def delete_portfolio(self, portfolio_id: int) -> None:
-        """Delete a portfolio"""
-        if not self.portfolio_repo.delete(portfolio_id):
+
+    def delete_portfolio(self, portfolio_id: int, user_id: uuid.UUID) -> None:
+        """Delete a portfolio (user-scoped)"""
+        if not self.portfolio_repo.delete(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
-    
-    def portfolio_exists(self, portfolio_id: int) -> bool:
-        """Check if a portfolio exists"""
-        return self.portfolio_repo.exists(portfolio_id)
-    
-    def copy_portfolio(self, portfolio_id: int, new_name: str) -> Portfolio:
-        """Copy a portfolio with all its transactions"""
-        # Validate new name
+
+    def portfolio_exists(self, portfolio_id: int, user_id: uuid.UUID) -> bool:
+        """Check if a portfolio exists and belongs to user"""
+        return self.portfolio_repo.exists_for_user(portfolio_id, user_id)
+
+    def copy_portfolio(self, portfolio_id: int, new_name: str, user_id: uuid.UUID) -> Portfolio:
+        """Copy a portfolio with all its transactions (user-scoped)"""
         if not new_name or len(new_name.strip()) == 0:
             raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-        
+
         if len(new_name) > 255:
             raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
-        
-        # Copy the portfolio
+
         copied_portfolio = self.portfolio_repo.copy_with_transactions(
-            portfolio_id, new_name.strip()
+            portfolio_id, new_name.strip(), user_id
         )
-        
+
         if not copied_portfolio:
             raise PortfolioNotFoundException(portfolio_id)
-        
+
         return copied_portfolio
     
-    def calculate_portfolio_status(self, portfolio_id: int) -> PortfolioStatusResponse:
+    def calculate_portfolio_status(self, portfolio_id: int, user_id: uuid.UUID) -> PortfolioStatusResponse:
         """
         Calculate comprehensive portfolio status including holdings, cash, and performance metrics.
         
@@ -147,11 +144,11 @@ class PortfolioService:
             - Zero principal: Returns None for percentage-based metrics to avoid division by zero
             - Negative cash: Allowed (represents margin/borrowed funds)
         """
-        # Get portfolio
-        portfolio = self.portfolio_repo.get_by_id(portfolio_id)
+        # Get portfolio (user-scoped)
+        portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
-        
+
         # Get all transactions ordered by date
         transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
         
@@ -430,11 +427,12 @@ class PortfolioService:
         )
     
     def calculate_portfolio_status_at_date(
-        self, 
-        portfolio_id: int, 
+        self,
+        portfolio_id: int,
         target_date: datetime,
         historical_prices: Optional[Dict[str, float]] = None,
-        usd_to_eur_rate: Optional[float] = None
+        usd_to_eur_rate: Optional[float] = None,
+        user_id: Optional[uuid.UUID] = None
     ) -> tuple[float, Optional[float]]:
         """
         Calculate portfolio value (principal_eur and current_value_eur) at a specific date.
@@ -457,11 +455,14 @@ class PortfolioService:
         Raises:
             PortfolioNotFoundException: If portfolio_id does not exist
         """
-        # Get portfolio
-        portfolio = self.portfolio_repo.get_by_id(portfolio_id)
+        # Get portfolio (user-scoped if user_id provided)
+        if user_id is not None:
+            portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
+        else:
+            portfolio = self.portfolio_repo.get_by_id(portfolio_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
-        
+
         # Get all transactions up to and including target date
         all_transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
         transactions = [t for t in all_transactions if t.date.date() <= target_date.date()]
@@ -613,8 +614,9 @@ class PortfolioService:
         return (principal_eur, current_value_eur)
     
     def get_portfolio_performance(
-        self, 
+        self,
         portfolio_id: int,
+        user_id: uuid.UUID,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         num_points: int = 60
@@ -644,8 +646,8 @@ class PortfolioService:
         """
         # Clear session cache to ensure we use persistent cache + avoid redundant fetches in this request
         PriceService.clear_session_cache()
-                # Get portfolio
-        portfolio = self.portfolio_repo.get_by_id(portfolio_id)
+        # Get portfolio (user-scoped)
+        portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
         

@@ -1,6 +1,7 @@
 """
 Comprehensive test suite for Portfolio Tracker API
 """
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
@@ -10,40 +11,57 @@ from io import BytesIO
 from unittest.mock import patch, Mock
 
 from app.core import get_session
+from app.core.auth import current_active_user
 from main import app
 from app.models import Portfolio, Transaction, TransactionType
+from app.models.user import User
 
 
 @pytest.fixture(name="session")
 def session_fixture():
     """Create an in-memory SQLite database for testing"""
     from sqlalchemy import event
-    
+
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    
+
     # Enable foreign key support for SQLite
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
-    
+
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
 
 
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    """Create a test client with dependency override"""
-    def get_session_override():
-        return session
+@pytest.fixture(name="test_user")
+def test_user_fixture(session: Session):
+    """Create and persist a test user"""
+    user = User(
+        id=uuid.uuid4(),
+        email="test@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
-    app.dependency_overrides[get_session] = get_session_override
+
+@pytest.fixture(name="client")
+def client_fixture(session: Session, test_user: User):
+    """Create a test client with dependency overrides for session and auth"""
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[current_active_user] = lambda: test_user
     client = TestClient(app)
     yield client
     app.dependency_overrides.clear()
@@ -2148,3 +2166,60 @@ def test_root_endpoint(client: TestClient):
     data = response.json()
     assert data["message"] == "Portfolio Tracker API"
     assert data["status"] == "running"
+
+
+# ================== Auth Tests ==================
+
+def test_unauthenticated_returns_401(session: Session):
+    """Endpoints without auth override should return 401"""
+    # Only override session, not auth — so requests have no user
+    app.dependency_overrides[get_session] = lambda: session
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/portfolios/")
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_cross_user_portfolio_returns_404(session: Session):
+    """Accessing another user's portfolio should return 404"""
+    from sqlalchemy import event
+
+    # Create two users
+    user_a = User(
+        id=uuid.uuid4(),
+        email="user_a@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    user_b = User(
+        id=uuid.uuid4(),
+        email="user_b@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    session.add(user_a)
+    session.add(user_b)
+    session.commit()
+
+    # Create a portfolio owned by user_a
+    portfolio = Portfolio(name="User A Portfolio", user_id=user_a.id)
+    session.add(portfolio)
+    session.commit()
+    session.refresh(portfolio)
+    portfolio_id = portfolio.id
+
+    # Make request as user_b — should get 404 (not 403)
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[current_active_user] = lambda: user_b
+    try:
+        client = TestClient(app)
+        response = client.get(f"/portfolios/{portfolio_id}")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()

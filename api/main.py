@@ -25,6 +25,10 @@ from app.core import (
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
 from app.core.database import engine
+from app.core.auth import fastapi_users, auth_backend, google_oauth_client, OAUTH_STATE_SECRET
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+from app.schemas import UserRead, UserCreate, UserUpdate
 from sqlalchemy import text
 
 # Configure logging
@@ -43,13 +47,13 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
     # Startup
     logger.info("Starting Portfolio Tracker API...")
-    
+
     # Verify database connection before proceeding
     from app.core.database import verify_connection
     if not verify_connection():
         logger.error("Failed to connect to database")
         raise RuntimeError("Database connection failed")
-    
+
     create_db_and_tables()
     logger.info("Database initialized successfully")
     yield
@@ -128,6 +132,45 @@ app.include_router(portfolios_router)
 app.include_router(transactions_router)
 app.include_router(transaction_router)
 
+# Auth routers
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth/cookie",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_reset_password_router(),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_verify_router(UserRead),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/users",
+    tags=["users"],
+)
+app.include_router(
+    fastapi_users.get_oauth_router(
+        oauth_client=google_oauth_client,
+        backend=auth_backend,
+        state_secret=OAUTH_STATE_SECRET,
+        associate_by_email=True,
+        is_verified_by_default=True,
+        redirect_url=FRONTEND_URL,
+    ),
+    prefix="/auth/google",
+    tags=["auth"],
+)
+
 
 # ================== Health Check ==================
 
@@ -149,8 +192,7 @@ def health_check():
         "version": "1.0.0",
         "database": "unknown"
     }
-    
-    # Check database connectivity
+
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -160,5 +202,5 @@ def health_check():
         health_status["database"] = "error"
         logger.error(f"Health check failed - database error: {e}", exc_info=True)
         return JSONResponse(status_code=503, content=health_status)
-    
+
     return health_status

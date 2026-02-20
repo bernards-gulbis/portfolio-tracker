@@ -1,6 +1,9 @@
 """Pydantic schemas for request/response validation"""
 
 from .schemas import (
+    UserRead,
+    UserCreate,
+    UserUpdate,
     PortfolioCreate,
     PortfolioUpdate,
     PortfolioCopy,
@@ -18,6 +21,9 @@ from .schemas import (
 )
 
 __all__ = [
+    "UserRead",
+    "UserCreate",
+    "UserUpdate",
     "PortfolioCreate",
     "PortfolioUpdate",
     "PortfolioCopy",
