@@ -104,7 +104,7 @@ export const PerformanceChart = ({
         )}
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px]">
+        <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <LineChart
             accessibilityLayer
             data={chartData}
