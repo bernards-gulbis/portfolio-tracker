@@ -96,6 +96,9 @@ dist/
 dist-ssr/
 *.local
 
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
 # Claude Code
 .claude/settings.local.json
 
