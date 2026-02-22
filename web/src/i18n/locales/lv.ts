@@ -200,7 +200,6 @@ const lv: Translation = {
       updating: 'Atjaunina...',
       fields: {
         date: 'Datums',
-        datePlaceholder: 'GGGG-MM-DD',
         datePickerLabel: 'Izvēlēties datumu no kalendāra',
         time: 'Laiks',
         type: 'Darījuma veids',
@@ -218,8 +217,6 @@ const lv: Translation = {
         fxRate: 'Valūtas kurss',
         fxRatePlaceholder: 'piem., 1.0850',
         fxRateDescription: 'Valūtas konvertēšanai izmantotais kurss',
-        hourLabel: 'Stunda',
-        minuteLabel: 'Minūte',
       },
       types: {
         Deposit: 'Iemaksa',

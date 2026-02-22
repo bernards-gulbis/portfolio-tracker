@@ -198,7 +198,6 @@ const en = {
       updating: 'Updating...',
       fields: {
         date: 'Date',
-        datePlaceholder: 'YYYY-MM-DD',
         datePickerLabel: 'Pick date from calendar',
         time: 'Time',
         type: 'Transaction Type',
@@ -216,8 +215,6 @@ const en = {
         fxRate: 'FX Rate',
         fxRatePlaceholder: 'e.g., 1.0850',
         fxRateDescription: 'Exchange rate used for currency conversion',
-        hourLabel: 'Hour',
-        minuteLabel: 'Minute',
       },
       types: {
         Deposit: 'Deposit',

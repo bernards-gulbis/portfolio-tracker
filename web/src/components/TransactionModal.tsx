@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
 import i18n from '../i18n/index';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,6 +38,7 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
   InputGroupText,
 } from '@/components/ui/input-group';
@@ -147,11 +148,108 @@ const parseLocalDate = (str: string): Date | undefined => {
   return new Date(y, m - 1, d);
 };
 
-/** Formats "YYYY-MM-DD" for display in the calendar trigger */
-const formatDateDisplay = (str: string, locale: string = 'en-US'): string => {
-  const date = parseLocalDate(str);
-  if (!date) return str;
-  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+/** Formats a Date object as a locale-appropriate display string */
+const formatDateForDisplay = (date: Date | undefined, locale: string): string => {
+  if (!date) return '';
+  return date.toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' });
+};
+
+interface DatePickerFieldProps {
+  value: string; // "YYYY-MM-DD"
+  onChange: (value: string) => void;
+  invalid?: boolean;
+  locale: string;
+  id: string;
+  pickerAriaLabel: string;
+}
+
+const DatePickerField = ({ value, onChange, invalid, locale, id, pickerAriaLabel }: DatePickerFieldProps) => {
+  const [open, setOpen] = useState(false);
+  const [displayValue, setDisplayValue] = useState(() => formatDateForDisplay(parseLocalDate(value), locale));
+  const [month, setMonth] = useState<Date | undefined>(parseLocalDate(value));
+
+  // Tracks changes we triggered ourselves so we don't re-format during typing
+  const skipNextSyncRef = useRef(false);
+
+  useEffect(() => {
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
+    }
+    // External change (form reset or locale switch) — re-sync display
+    const date = parseLocalDate(value);
+    setDisplayValue(formatDateForDisplay(date, locale));
+    if (date) setMonth(date);
+  }, [value, locale]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const typed = e.target.value;
+    setDisplayValue(typed);
+    const parsed = new Date(typed);
+    if (!isNaN(parsed.getTime())) {
+      skipNextSyncRef.current = true;
+      onChange(toLocalDate(parsed));
+      setMonth(parsed);
+    }
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      skipNextSyncRef.current = true;
+      onChange(toLocalDate(date));
+      setDisplayValue(formatDateForDisplay(date, locale));
+      setMonth(date);
+    }
+    setOpen(false);
+  };
+
+  const placeholder = formatDateForDisplay(new Date(2025, 0, 1), locale);
+
+  return (
+    <InputGroup>
+      <InputGroupInput
+        id={id}
+        value={displayValue}
+        placeholder={placeholder}
+        onChange={handleInputChange}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        aria-invalid={invalid}
+        autoComplete="off"
+        className="rounded-l-md"
+      />
+      <InputGroupAddon align="inline-end" className="bg-background p-0">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <InputGroupButton aria-label={pickerAriaLabel}>
+              <CalendarIcon />
+            </InputGroupButton>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto overflow-hidden p-0" align="end" alignOffset={-8} sideOffset={10}>
+            <Calendar
+              mode="single"
+              selected={parseLocalDate(value)}
+              month={month}
+              onMonthChange={setMonth}
+              onSelect={handleCalendarSelect}
+              formatters={{
+                formatCaption: (date) =>
+                  date.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+                formatMonthDropdown: (date) =>
+                  date.toLocaleDateString(locale, { month: 'long' }),
+                formatWeekdayName: (weekday) =>
+                  weekday.toLocaleDateString(locale, { weekday: 'short' }),
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </InputGroupAddon>
+    </InputGroup>
+  );
 };
 
 
@@ -322,52 +420,21 @@ const TransactionModal = ({
 
             {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Date — text input (keyboard typeable) + Calendar popover */}
+              {/* Date */}
               <Controller
                 name="date"
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-date">{t('transaction.modal.fields.date')}</FieldLabel>
-                    <div className="flex">
-                      <Input
-                        {...field}
-                        id="tx-date"
-                        type="text"
-                        placeholder={t('transaction.modal.fields.datePlaceholder')}
-                        autoComplete="off"
-                        className="rounded-r-none"
-                        aria-invalid={fieldState.invalid}
-                      />
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            tabIndex={-1}
-                            className="rounded-l-none border-l-0 shrink-0 px-3"
-                            aria-label={t('transaction.modal.fields.datePickerLabel')}
-                          >
-                            <CalendarIcon className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                          <Calendar
-                            mode="single"
-                            selected={parseLocalDate(field.value)}
-                            onSelect={(date) =>
-                              field.onChange(date ? toLocalDate(date) : '')
-                            }
-                            initialFocus
-                          />
-                          {field.value && (
-                            <p className="px-3 pb-3 text-center text-sm text-muted-foreground">
-                              {formatDateDisplay(field.value, locale)}
-                            </p>
-                          )}
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                    <DatePickerField
+                      value={field.value}
+                      onChange={field.onChange}
+                      invalid={fieldState.invalid}
+                      locale={locale}
+                      id="tx-date"
+                      pickerAriaLabel={t('transaction.modal.fields.datePickerLabel')}
+                    />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

@@ -62,9 +62,30 @@ const InputGroupTextarea = React.forwardRef<
 ));
 InputGroupTextarea.displayName = 'InputGroupTextarea';
 
+const InputGroupButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, type = 'button', ...props }, ref) => (
+  <button
+    ref={ref}
+    type={type}
+    className={cn(
+      'inline-flex h-full w-9 cursor-pointer items-center justify-center transition-colors',
+      'text-muted-foreground hover:text-foreground',
+      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring',
+      'disabled:pointer-events-none disabled:opacity-50',
+      '[&_svg]:pointer-events-none [&_svg:not([class*="size-"])]:size-4 [&_svg]:shrink-0',
+      className
+    )}
+    {...props}
+  />
+));
+InputGroupButton.displayName = 'InputGroupButton';
+
 export {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
   InputGroupText,
   InputGroupTextarea,

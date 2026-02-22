@@ -1,7 +1,7 @@
 import {
   PieChart,
   Pie,
-  Cell,
+  Label,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
@@ -63,15 +63,16 @@ export const HoldingsAllocationChart = ({
     );
   }
 
-  const chartData: Array<{ name: string; value: number }> = [];
+  const chartData: Array<{ name: string; value: number; fill: string }> = [];
 
   if (cash > 0) {
-    chartData.push({ name: 'CASH', value: cash });
+    chartData.push({ name: 'CASH', value: cash, fill: COLORS[0] });
   }
 
   holdings.forEach((holding) => {
     if (holding.current_value && holding.current_value > 0) {
-      chartData.push({ name: holding.ticker, value: holding.current_value });
+      const index = chartData.length;
+      chartData.push({ name: holding.ticker, value: holding.current_value, fill: COLORS[index % COLORS.length] });
     }
   });
 
@@ -90,64 +91,81 @@ export const HoldingsAllocationChart = ({
 
   const total = chartData.reduce((sum, item) => sum + item.value, 0);
 
-  const chartConfig = chartData.reduce((acc, entry, index) => {
+  const chartConfig = chartData.reduce((acc, entry) => {
     acc[entry.name] = {
       label: entry.name,
-      color: COLORS[index % COLORS.length],
+      color: entry.fill,
     };
     return acc;
   }, {} as ChartConfig);
 
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader>
         <CardTitle>{t('chart.allocation.title')}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="relative">
-          <ChartContainer config={chartConfig} className="h-[240px]">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                innerRadius={72}
-                outerRadius={108}
-                dataKey="value"
-                strokeWidth={2}
-                stroke="var(--card)"
-              >
-                {chartData.map((_entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    hideLabel
-                    formatter={(value) => formatCurrency(value as number, 'EUR', locale)}
-                  />
-                }
+      <CardContent className="flex-1 pb-0">
+        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px]">
+          <PieChart>
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  hideLabel
+                  formatter={(value) => formatCurrency(value as number, 'EUR', locale)}
+                />
+              }
+            />
+            <Pie
+              data={chartData}
+              dataKey="value"
+              nameKey="name"
+              innerRadius={72}
+              outerRadius={108}
+              strokeWidth={2}
+              stroke="var(--card)"
+            >
+              <Label
+                content={({ viewBox }) => {
+                  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                    return (
+                      <text
+                        x={viewBox.cx}
+                        y={viewBox.cy}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) - 10}
+                          className="fill-foreground text-base font-bold"
+                        >
+                          {formatCurrency(total, 'EUR', locale)}
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 14}
+                          className="fill-muted-foreground text-xs"
+                        >
+                          {t('chart.allocation.marketValue')}
+                        </tspan>
+                      </text>
+                    );
+                  }
+                }}
               />
-            </PieChart>
-          </ChartContainer>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">{t('chart.allocation.marketValue')}</p>
-              <p className="text-base font-bold">{formatCurrency(total, 'EUR', locale)}</p>
-            </div>
-          </div>
-        </div>
+            </Pie>
+          </PieChart>
+        </ChartContainer>
         <div className="mt-3 space-y-1.5">
-          {chartData.map((entry, index) => {
+          {chartData.map((entry) => {
             const percentage = ((entry.value / total) * 100).toFixed(1);
             return (
               <div key={entry.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span
                     className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    style={{ backgroundColor: entry.fill }}
                   />
                   <span className="text-muted-foreground">{entry.name}</span>
                 </div>
