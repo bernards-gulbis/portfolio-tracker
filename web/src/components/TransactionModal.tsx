@@ -328,6 +328,7 @@ const TransactionModal = ({
                         id="tx-date"
                         type="text"
                         placeholder="YYYY-MM-DD"
+                        autoComplete="off"
                         className="rounded-r-none"
                         aria-invalid={fieldState.invalid}
                       />
@@ -373,13 +374,14 @@ const TransactionModal = ({
                   const [hh, mm] = (field.value || '00:00').split(':');
                   return (
                     <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel>Time</FieldLabel>
+                      <FieldLabel htmlFor="tx-time-hour">Time</FieldLabel>
                       <div className="flex items-center gap-1">
                         <Select
+                          name="tx-time-hour"
                           value={hh}
                           onValueChange={(h) => field.onChange(`${h}:${mm}`)}
                         >
-                          <SelectTrigger aria-label="Hour">
+                          <SelectTrigger id="tx-time-hour" aria-label="Hour">
                             <SelectValue placeholder="HH" />
                           </SelectTrigger>
                           <SelectContent className="max-h-48">
@@ -390,10 +392,11 @@ const TransactionModal = ({
                         </Select>
                         <span className="text-muted-foreground text-sm font-medium shrink-0">:</span>
                         <Select
+                          name="tx-time-minute"
                           value={mm}
                           onValueChange={(m) => field.onChange(`${hh}:${m}`)}
                         >
-                          <SelectTrigger aria-label="Minute">
+                          <SelectTrigger id="tx-time-minute" aria-label="Minute">
                             <SelectValue placeholder="MM" />
                           </SelectTrigger>
                           <SelectContent className="max-h-48">
@@ -416,15 +419,16 @@ const TransactionModal = ({
               control={form.control}
               render={({ field }) => (
                 <Field>
-                  <FieldLabel>Transaction Type</FieldLabel>
+                  <FieldLabel htmlFor="tx-type">Transaction Type</FieldLabel>
                   <Select
+                    name="tx-type"
                     value={field.value}
                     onValueChange={(value) => {
                       field.onChange(value);
                       clearErrors();
                     }}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="tx-type" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -453,6 +457,7 @@ const TransactionModal = ({
                       {...field}
                       id="tx-ticker"
                       placeholder="e.g., AAPL"
+                      autoComplete="off"
                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                       aria-invalid={fieldState.invalid}
                     />
@@ -477,6 +482,7 @@ const TransactionModal = ({
                       step="0.00000001"
                       min="0.00000001"
                       placeholder="Number of shares"
+                      autoComplete="off"
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -504,6 +510,7 @@ const TransactionModal = ({
                         step="0.01"
                         min="0.01"
                         placeholder="0.00"
+                        autoComplete="off"
                         aria-invalid={fieldState.invalid}
                       />
                     </InputGroup>
@@ -531,6 +538,7 @@ const TransactionModal = ({
                         type="number"
                         step="0.01"
                         placeholder="0.00"
+                        autoComplete="off"
                         aria-invalid={fieldState.invalid}
                       />
                     </InputGroup>
@@ -559,6 +567,7 @@ const TransactionModal = ({
                         step="0.01"
                         min="0.01"
                         placeholder="0.00"
+                        autoComplete="off"
                         aria-invalid={fieldState.invalid}
                       />
                     </InputGroup>
@@ -586,6 +595,7 @@ const TransactionModal = ({
                         type="number"
                         step="0.01"
                         placeholder="0.00"
+                        autoComplete="off"
                         aria-invalid={fieldState.invalid}
                       />
                       <InputGroupAddon align="inline-end">
@@ -613,6 +623,7 @@ const TransactionModal = ({
                       step="0.01"
                       min="0.01"
                       placeholder="e.g., 2 for 2-for-1 split"
+                      autoComplete="off"
                       aria-invalid={fieldState.invalid}
                     />
                     <FieldDescription>
@@ -639,6 +650,7 @@ const TransactionModal = ({
                       step="0.0001"
                       min="0.0001"
                       placeholder="e.g., 1.0850"
+                      autoComplete="off"
                       aria-invalid={fieldState.invalid}
                     />
                     <FieldDescription>Exchange rate used for currency conversion</FieldDescription>

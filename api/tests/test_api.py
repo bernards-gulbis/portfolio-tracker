@@ -1,6 +1,7 @@
 """
 Comprehensive test suite for Portfolio Tracker API
 """
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
@@ -10,40 +11,57 @@ from io import BytesIO
 from unittest.mock import patch, Mock
 
 from app.core import get_session
+from app.core.auth import current_active_user
 from main import app
 from app.models import Portfolio, Transaction, TransactionType
+from app.models.user import User
 
 
 @pytest.fixture(name="session")
 def session_fixture():
     """Create an in-memory SQLite database for testing"""
     from sqlalchemy import event
-    
+
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    
+
     # Enable foreign key support for SQLite
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
-    
+
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
 
 
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    """Create a test client with dependency override"""
-    def get_session_override():
-        return session
+@pytest.fixture(name="test_user")
+def test_user_fixture(session: Session):
+    """Create and persist a test user"""
+    user = User(
+        id=uuid.uuid4(),
+        email="test@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
-    app.dependency_overrides[get_session] = get_session_override
+
+@pytest.fixture(name="client")
+def client_fixture(session: Session, test_user: User):
+    """Create a test client with dependency overrides for session and auth"""
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[current_active_user] = lambda: test_user
     client = TestClient(app)
     yield client
     app.dependency_overrides.clear()
@@ -1773,12 +1791,12 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     expected_currency_gains_percent = (expected_currency_gains / 9000.0) * 100
     assert abs(data["currency_gains_percent"] - expected_currency_gains_percent) < 0.01
     
-    # Tax calculation: (current_value_eur - principal_eur - dividends_eur) * 0.25
+    # Tax calculation: (current_value_eur - principal_eur - dividends_eur) * 0.255
     # dividends_eur is None (no dividends), treated as 0
     capital_gains_eur = 8925.0 - 9000.0  # -75 EUR
     expected_tax = 0.0  # No tax on negative gains
     assert abs(data["capital_gains_eur"] - capital_gains_eur) < 0.1
-    assert data["capital_gains_tax_rate"] == 0.25
+    assert data["capital_gains_tax_rate"] == 0.255
     assert data["tax_eur"] == expected_tax
     
     # After-tax return: (current_value_eur - principal_eur) - tax_eur
@@ -1845,25 +1863,25 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     assert data["currency_gains_eur"] == 0.0
     assert data["currency_gains_percent"] == 0.0
     
-    # Tax calculation: (20000 - 10000 - 0) * 0.25 = 2500 EUR
+    # Tax calculation: (20000 - 10000 - 0) * 0.255 = 2550 EUR
     capital_gains_eur = 20000.0 - 10000.0 - 0.0
-    expected_tax = capital_gains_eur * 0.25
+    expected_tax = capital_gains_eur * 0.255
     assert data["capital_gains_eur"] == capital_gains_eur
     assert data["capital_gains_eur"] == 10000.0
-    assert data["capital_gains_tax_rate"] == 0.25
+    assert data["capital_gains_tax_rate"] == 0.255
     assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == 2500.0
+    assert data["tax_eur"] == 2550.0
     
-    # After-tax return: (20000 - 10000) - 2500 = 7500 EUR
-    expected_return = 20000.0 - 10000.0 - 2500.0
+    # After-tax return: (20000 - 10000) - 2550 = 7450 EUR
+    expected_return = 20000.0 - 10000.0 - 2550.0
     assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == 7500.0
-    assert data["total_return_after_tax_percent"] == 75.0  # 7500 / 10000 * 100
-    
-    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7500 = 17500 EUR
-    expected_value_after_tax = 10000.0 + 7500.0
+    assert data["total_return_after_tax_eur"] == 7450.0
+    assert data["total_return_after_tax_percent"] == 74.5  # 7450 / 10000 * 100
+
+    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7450 = 17450 EUR
+    expected_value_after_tax = 10000.0 + 7450.0
     assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == 17500.0
+    assert data["current_value_after_tax_eur"] == 17450.0
 
 
 def test_portfolio_status_tax_excludes_dividends(client: TestClient):
@@ -1932,24 +1950,24 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     
     # Total gain: 17000 - 10000 = 7000 (includes dividends)
     # Capital gains (for tax): 17000 - 10000 - 2000 = 5000 (excludes dividends)
-    # Tax: 5000 * 0.25 = 1250 EUR
+    # Tax: 5000 * 0.255 = 1275 EUR
     capital_gains_eur = 17000.0 - 10000.0 - 2000.0
-    expected_tax = capital_gains_eur * 0.25
+    expected_tax = capital_gains_eur * 0.255
     assert data["capital_gains_eur"] == capital_gains_eur
     assert data["capital_gains_eur"] == 5000.0
-    assert data["capital_gains_tax_rate"] == 0.25
+    assert data["capital_gains_tax_rate"] == 0.255
     assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == 1250.0
+    assert data["tax_eur"] == 1275.0
     
-    # After-tax return: (17000 - 10000) - 1250 = 5750 EUR
-    expected_return = 17000.0 - 10000.0 - 1250.0
+    # After-tax return: (17000 - 10000) - 1275 = 5725 EUR
+    expected_return = 17000.0 - 10000.0 - 1275.0
     assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == 5750.0
-    
-    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 5750 = 15750 EUR
-    expected_value_after_tax = 10000.0 + 5750.0
+    assert data["total_return_after_tax_eur"] == 5725.0
+
+    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 5725 = 15725 EUR
+    expected_value_after_tax = 10000.0 + 5725.0
     assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == 15750.0
+    assert data["current_value_after_tax_eur"] == 15725.0
 
 
 def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
@@ -2148,3 +2166,139 @@ def test_root_endpoint(client: TestClient):
     data = response.json()
     assert data["message"] == "Portfolio Tracker API"
     assert data["status"] == "running"
+
+
+# ================== Auth Tests ==================
+
+def test_unauthenticated_returns_401(session: Session):
+    """Endpoints without auth override should return 401"""
+    # Only override session, not auth — so requests have no user
+    app.dependency_overrides[get_session] = lambda: session
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/portfolios/")
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_cross_user_portfolio_returns_404(session: Session):
+    """Accessing another user's portfolio should return 404"""
+    from sqlalchemy import event
+
+    # Create two users
+    user_a = User(
+        id=uuid.uuid4(),
+        email="user_a@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    user_b = User(
+        id=uuid.uuid4(),
+        email="user_b@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    session.add(user_a)
+    session.add(user_b)
+    session.commit()
+
+    # Create a portfolio owned by user_a
+    portfolio = Portfolio(name="User A Portfolio", user_id=user_a.id)
+    session.add(portfolio)
+    session.commit()
+    session.refresh(portfolio)
+    portfolio_id = portfolio.id
+
+    # Make request as user_b — should get 404 (not 403)
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[current_active_user] = lambda: user_b
+    try:
+        client = TestClient(app)
+        response = client.get(f"/portfolios/{portfolio_id}")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_cross_user_portfolio_write_returns_404(session: Session):
+    """Updating or deleting another user's portfolio also returns 404"""
+    user_a = User(
+        id=uuid.uuid4(), email="ua@example.com", hashed_password="x",
+        is_active=True, is_superuser=False, is_verified=True,
+    )
+    user_b = User(
+        id=uuid.uuid4(), email="ub@example.com", hashed_password="x",
+        is_active=True, is_superuser=False, is_verified=True,
+    )
+    session.add(user_a)
+    session.add(user_b)
+    session.commit()
+
+    portfolio = Portfolio(name="User A Portfolio", user_id=user_a.id)
+    session.add(portfolio)
+    session.commit()
+    session.refresh(portfolio)
+
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[current_active_user] = lambda: user_b
+    try:
+        client = TestClient(app)
+        assert client.put(f"/portfolios/{portfolio.id}", json={"name": "Renamed"}).status_code == 404
+        assert client.delete(f"/portfolios/{portfolio.id}").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_register_new_user(session: Session):
+    """POST /auth/register creates a new user and returns UserRead"""
+    app.dependency_overrides[get_session] = lambda: session
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/auth/register",
+            json={"email": "newuser@example.com", "password": "securepassword123"},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["email"] == "newuser@example.com"
+        assert "id" in data
+        assert data["is_active"] is True
+        assert "hashed_password" not in data
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_register_duplicate_email_returns_400(session: Session):
+    """Registering with an already-registered email returns 400"""
+    app.dependency_overrides[get_session] = lambda: session
+    try:
+        client = TestClient(app)
+        client.post("/auth/register", json={"email": "dup@example.com", "password": "password123"})
+        response = client.post(
+            "/auth/register", json={"email": "dup@example.com", "password": "different123"}
+        )
+        assert response.status_code == 400
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_register_sets_user_active_by_default(session: Session):
+    """Newly registered users are active and not superusers"""
+    app.dependency_overrides[get_session] = lambda: session
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/auth/register",
+            json={"email": "active@example.com", "password": "securepassword123"},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["is_active"] is True
+        assert data["is_superuser"] is False
+    finally:
+        app.dependency_overrides.clear()

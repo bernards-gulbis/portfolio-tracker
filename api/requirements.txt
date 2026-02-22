@@ -7,3 +7,7 @@ httpx
 requests
 python-multipart
 python-dotenv
+fastapi-users[sqlalchemy]
+httpx-oauth
+python-jose[cryptography]
+passlib[bcrypt]

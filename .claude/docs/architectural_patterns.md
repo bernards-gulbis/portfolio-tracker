@@ -99,11 +99,32 @@ Context providers follow a consistent pattern (`web/src/context/PortfolioContext
 3. Export `Provider` component with state
 4. Export custom hook (`usePortfolioContext`, `useTheme`) that throws if used outside provider
 
-Provider nesting order in `web/src/App.tsx:57-63`: QueryClientProvider -> ThemeProvider -> PortfolioProvider
+Provider nesting order in `web/src/App.tsx`: `QueryClientProvider → ThemeProvider → AuthProvider → PortfolioProvider`
+
+`AuthProvider` receives `queryClient` as a prop so it can call `queryClient.clear()` on logout (prevents data leaking between users). `queryClient` is exported from module scope in `App.tsx` for this reason.
+
+### Authentication Architecture
+
+Auth is implemented with **FastAPI Users** on the backend and an `AuthContext` + `useAuth` hooks on the frontend.
+
+**Backend (`api/app/core/auth.py`):**
+- Two `AuthenticationBackend` instances: `auth_backend` (email/password — returns 200 + cookie) and `oauth_auth_backend` (Google OAuth — sets cookie + redirects to `FRONTEND_URL`)
+- `OAuthRedirectCookieTransport` subclasses `CookieTransport` to return a `RedirectResponse` (302) instead of 200 after OAuth login
+- `SyncSQLAlchemyUserDatabase` bridges sync SQLModel sessions to the FastAPI Users async interface
+- `UserManager.oauth_callback` is overridden to avoid accessing `user.oauth_accounts` (no ORM relationship on User)
+- `current_active_user = fastapi_users.current_user(active=True)` — inject into every protected router endpoint with `user: User = Depends(current_active_user)`
+
+**Frontend (`web/src/context/AuthContext.tsx`, `web/src/hooks/useAuth.ts`):**
+- `AuthContext` holds `user: UserRead | null`, `status: 'loading' | 'authenticated' | 'unauthenticated'`
+- On mount: calls `GET /users/me` to restore session from the httpOnly cookie
+- Listens for `auth:logout` CustomEvent (dispatched by the Axios 401 interceptor) to clear state on session expiry
+- `useLogin` / `useRegister` / `useLogout` — TanStack Query mutations wrapping auth API calls
+
+**Session cookie:** `pt_auth`, httpOnly, SameSite=Lax, 7-day lifetime. `withCredentials: true` is set on the Axios instance so cookies are sent with every API request.
 
 ### API Client Architecture
 
-All API communication flows through a single Axios instance configured in `web/src/api.ts:148-153`. This file also serves as the single source of truth for all TypeScript interfaces matching backend schemas.
+All API communication flows through a single Axios instance configured in `web/src/api.ts` with `withCredentials: true`. A response interceptor fires a `auth:logout` CustomEvent on any 401 response, which `AuthContext` listens for to clear user state. This file also serves as the single source of truth for all TypeScript interfaces matching backend schemas.
 
 Pattern: `api.ts` exports typed async functions (one per endpoint), hooks import and wrap them, components use hooks.
 

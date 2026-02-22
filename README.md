@@ -6,14 +6,15 @@ Built with FastAPI and React. Live market prices from Yahoo Finance with multi-l
 
 ## Features
 
+- **User Accounts & Authentication**: Email/password registration and Google OAuth login; sessions stored in httpOnly JWT cookies (7-day lifetime); per-user portfolio isolation
 - **Multi-Portfolio Management**: Create, copy, and manage separate investment portfolios
 - **Full Transaction Support**: Deposits, withdrawals, buy/sell, dividends, fees, and stock splits
 - **Real-Time Valuation**: Live market prices via Yahoo Finance with current holdings, cash balance, and unrealized gains
 - **EUR-Centric Multi-Currency**: Track transactions in any currency with automatic EUR amount and FX rate recording for tax reporting
-- **Gain/Loss & Tax Calculations**: Realized and unrealized gains with 25% capital gains tax estimates
-- **Performance Charts**: Time-series portfolio performance visualization
+- **Gain/Loss & Tax Calculations**: Realized and unrealized gains with 25.5% capital gains tax estimates
+- **Performance Charts**: Time-series portfolio performance visualization (lazy-loaded)
 - **CSV Import/Export**: Bulk import transaction history from brokers or other tools
-- **Responsive UI**: Mobile-friendly interface with light/dark theme, color-coded signed values, and paginated transaction history
+- **Responsive UI**: Mobile-friendly interface with light/dark theme (available on login page and app), color-coded signed values, and paginated transaction history
 - **Toast Notifications**: Sonner-powered toast feedback on all mutations (create, update, delete, import)
 - **shadcn/ui Design System**: Accessible component library built on Radix UI primitives with a neutral theme
 
@@ -46,15 +47,35 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. (Optional) Configure environment variables:
+4. Configure environment variables:
 ```bash
 cp .env.example .env
-# Edit .env to customize settings
+# Edit .env with your settings
 ```
 
-Available environment variables:
-- `DATABASE_ECHO`: Set to `true` to enable SQL query logging (default: `false`)
-  - ⚠️ **Warning**: Do not enable in production as it logs all SQL queries
+**Required for authentication:**
+```bash
+# Generate random secrets (run once):
+python -c "import secrets; print(secrets.token_hex(32))"
+
+SECRET_KEY=<generated-secret>
+OAUTH_STATE_SECRET=<generated-secret>
+```
+
+**Optional — Google OAuth login** (skip to use email/password only):
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create an OAuth 2.0 Client ID (Web application)
+3. Add `http://localhost:8000/auth/google/callback` as an Authorized Redirect URI
+4. Copy the credentials to `.env`:
+```bash
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+FRONTEND_URL=http://localhost:3000
+```
+
+Other notable variables:
+- `DATABASE_ECHO`: Set to `true` to enable SQL query logging (default: `false`) — do not enable in production
+- `COOKIE_SECURE`: Set to `true` in production when serving over HTTPS (default: `false`)
 
 5. Run the development server:
 ```bash
@@ -156,8 +177,22 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,curre
 
 ## Database Schema
 
+### User
+- `id`: Primary key (UUID)
+- `email`: User email (unique)
+- `hashed_password`: Bcrypt-hashed password
+- `is_active`, `is_superuser`, `is_verified`: FastAPI Users flags
+
+### OAuthAccount
+- `id`: Primary key (UUID)
+- `user_id`: Foreign key to User (CASCADE delete)
+- `oauth_name`: Provider name (e.g. `google`)
+- `account_id`, `account_email`: Provider account details
+- `access_token`, `refresh_token`, `expires_at`: OAuth tokens
+
 ### Portfolio
 - `id`: Primary key (auto-increment)
+- `user_id`: Foreign key to User (CASCADE delete) — portfolios are per-user
 - `name`: Portfolio name (required)
 - `created_at`: Timestamp
 
