@@ -171,11 +171,17 @@ const api = axios.create({
   },
 });
 
+// Tracks whether a session has been confirmed via getCurrentUser().
+// The 401 interceptor only fires auth:logout once a session is confirmed, preventing
+// spurious queryClient.clear() calls on the initial unauthenticated page probe.
+let sessionActive = false;
+
 // 401 interceptor — fires auth:logout event so AuthContext can react
 api.interceptors.response.use(
   (r) => r,
   (error) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
+    if (axios.isAxiosError(error) && error.response?.status === 401 && sessionActive) {
+      sessionActive = false;
       window.dispatchEvent(new CustomEvent('auth:logout'));
     }
     return Promise.reject(error);
@@ -200,23 +206,19 @@ export const register = async (credentials: RegisterCredentials): Promise<UserRe
 };
 
 export const logoutApi = async (): Promise<void> => {
+  sessionActive = false; // Clear before request so any 401 response doesn't re-trigger the event
   await api.post('/auth/cookie/logout');
 };
 
 export const getCurrentUser = async (): Promise<UserRead> => {
   const response = await api.get<UserRead>('/users/me');
+  sessionActive = true; // Session confirmed
   return response.data;
 };
 
-export const getGoogleAuthorizeUrl = async (redirectUri: string): Promise<string> => {
-  const response = await api.get<{ authorization_url: string }>('/auth/google/authorize', {
-    params: { redirect_uri: redirectUri },
-  });
+export const getGoogleAuthorizeUrl = async (): Promise<string> => {
+  const response = await api.get<{ authorization_url: string }>('/auth/google/authorize');
   return response.data.authorization_url;
-};
-
-export const handleGoogleCallback = async (code: string, state: string): Promise<void> => {
-  await api.get('/auth/google/callback', { params: { code, state } });
 };
 
 // ================== Portfolio API Functions ==================

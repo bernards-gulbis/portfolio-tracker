@@ -94,6 +94,7 @@ const EditPortfolioModal = ({
                     {...field}
                     id="edit-portfolio-name"
                     placeholder="e.g., My Investment Portfolio"
+                    autoComplete="off"
                     autoFocus
                     aria-invalid={fieldState.invalid}
                   />

@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { getErrorMessage } from '../api';
-import { PerformanceChart, TimePeriod } from './PerformanceChart';
-import { HoldingsAllocationChart } from './HoldingsAllocationChart';
+import type { TimePeriod } from './PerformanceChart';
+
+const PerformanceChart = lazy(() =>
+  import('./PerformanceChart').then((m) => ({ default: m.PerformanceChart }))
+);
+const HoldingsAllocationChart = lazy(() =>
+  import('./HoldingsAllocationChart').then((m) => ({ default: m.HoldingsAllocationChart }))
+);
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -196,7 +202,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
             </div>
 
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Est. Tax (25%)</p>
+              <p className="text-sm font-medium text-muted-foreground mb-1">Est. Tax (25.5%)</p>
               <p className="text-lg font-semibold">
                 {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR') : '-'}
               </p>
@@ -221,19 +227,28 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
           </div>
 
           {/* Charts Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
-            <PerformanceChart
-              data={performance?.data_points || []}
-              loading={performanceLoading}
-              selectedPeriod={timePeriod}
-              onPeriodChange={setTimePeriod}
-            />
-            <HoldingsAllocationChart
-              holdings={status.holdings}
-              cash={status.cash}
-              loading={isLoading}
-            />
-          </div>
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
+                <Skeleton className="h-[340px] w-full rounded-lg" />
+                <Skeleton className="h-[340px] w-full rounded-lg" />
+              </div>
+            }
+          >
+            <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
+              <PerformanceChart
+                data={performance?.data_points || []}
+                loading={performanceLoading}
+                selectedPeriod={timePeriod}
+                onPeriodChange={setTimePeriod}
+              />
+              <HoldingsAllocationChart
+                holdings={status.holdings}
+                cash={status.cash}
+                loading={isLoading}
+              />
+            </div>
+          </Suspense>
 
           {/* Holdings Table */}
           <div>

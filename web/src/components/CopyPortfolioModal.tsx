@@ -87,6 +87,7 @@ const CopyPortfolioModal = ({
                     {...field}
                     id="copy-portfolio-name"
                     placeholder="Enter new portfolio name"
+                    autoComplete="off"
                     autoFocus
                     aria-invalid={fieldState.invalid}
                   />

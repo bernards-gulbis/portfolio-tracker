@@ -26,7 +26,7 @@ export const useRegister = () => {
 export const useLogout = () => {
   const { logout } = useAuth();
   return useMutation({
-    mutationFn: logout,
+    mutationFn: () => logout(),
     onSuccess: () => {
       toast.success('Logged out');
     },

@@ -4,7 +4,6 @@ Portfolio repository for data access
 import uuid
 from sqlmodel import Session, select
 from typing import List, Optional
-from sqlalchemy.exc import SQLAlchemyError
 from app.models import Portfolio, Transaction
 
 
@@ -22,8 +21,8 @@ class PortfolioRepository:
         self.session.refresh(portfolio)
         return portfolio
 
-    def get_by_id(self, portfolio_id: int) -> Optional[Portfolio]:
-        """Get a portfolio by ID (no user check)"""
+    def _get_by_id(self, portfolio_id: int) -> Optional[Portfolio]:
+        """Get a portfolio by ID with no user ownership check. Internal use only."""
         return self.session.get(Portfolio, portfolio_id)
 
     def get_by_id_and_user(self, portfolio_id: int, user_id: uuid.UUID) -> Optional[Portfolio]:
@@ -34,8 +33,8 @@ class PortfolioRepository:
         )
         return self.session.exec(statement).first()
 
-    def get_all(self) -> List[Portfolio]:
-        """Get all portfolios (no user filter)"""
+    def _get_all(self) -> List[Portfolio]:
+        """Get all portfolios with no user filter. Internal use only."""
         statement = select(Portfolio)
         return list(self.session.exec(statement).all())
 

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
 
 from app.core import (
@@ -25,11 +25,10 @@ from app.core import (
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
 from app.core.database import engine
-from app.core.auth import fastapi_users, auth_backend, google_oauth_client, OAUTH_STATE_SECRET
-
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL
 from app.schemas import UserRead, UserCreate, UserUpdate
 from sqlalchemy import text
+from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
 
 # Configure logging
 logging.basicConfig(
@@ -126,6 +125,21 @@ async def file_upload_handler(request, exc: FileUploadException):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
+@app.exception_handler(OAuth2AuthorizeCallbackError)
+async def oauth_callback_error_handler(request: Request, exc: OAuth2AuthorizeCallbackError):
+    detail = exc.detail or "OAuth authentication failed"
+    if exc.response is not None:
+        try:
+            detail = exc.response.text or detail
+        except Exception:
+            pass
+    logger.error("OAuth callback error (status=%s): %s", exc.status_code, detail)
+    # Always redirect to the frontend — never show a raw error page to the user
+    from urllib.parse import urlencode
+    params = urlencode({"oauth_error": detail})
+    return RedirectResponse(url=f"{FRONTEND_URL}?{params}", status_code=302)
+
+
 # ================== Include Routers ==================
 
 app.include_router(portfolios_router)
@@ -161,11 +175,11 @@ app.include_router(
 app.include_router(
     fastapi_users.get_oauth_router(
         oauth_client=google_oauth_client,
-        backend=auth_backend,
+        backend=oauth_auth_backend,
         state_secret=OAUTH_STATE_SECRET,
         associate_by_email=True,
         is_verified_by_default=True,
-        redirect_url=FRONTEND_URL,
+        csrf_token_cookie_secure=COOKIE_SECURE,
     ),
     prefix="/auth/google",
     tags=["auth"],

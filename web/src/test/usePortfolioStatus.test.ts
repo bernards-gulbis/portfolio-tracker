@@ -48,7 +48,7 @@ const mockStatus: PortfolioStatus = {
   currency_gains_eur: 0,
   currency_gains_percent: 0,
   capital_gains_eur: 1840,
-  capital_gains_tax_rate: 0.25,
+  capital_gains_tax_rate: 0.255,
   tax_eur: 460,
   total_return_after_tax_eur: 1380,
   total_return_after_tax_percent: 18.75,

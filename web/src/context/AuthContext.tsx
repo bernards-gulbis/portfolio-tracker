@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { getCurrentUser, logoutApi, UserRead } from '../api';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -12,7 +14,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children, queryClient }: { children: ReactNode; queryClient: { clear: () => void } }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUserState] = useState<UserRead | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
 
@@ -33,6 +36,15 @@ export function AuthProvider({ children, queryClient }: { children: ReactNode; q
   }, [queryClient]);
 
   useEffect(() => {
+    // Show error toast if backend redirected back with ?oauth_error=
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = params.get('oauth_error');
+    if (oauthError) {
+      toast.error(`Google login failed: ${oauthError}`);
+      // Remove the query param without reloading the page
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     const init = async () => {
       try {
         const currentUser = await getCurrentUser();

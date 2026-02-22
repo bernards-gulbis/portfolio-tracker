@@ -22,6 +22,21 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          const pkg = id.split('node_modules/').pop()!.split('/')[0];
+          if (pkg === 'recharts' || pkg.startsWith('d3-') || pkg === 'victory-vendor') {
+            return 'vendor-charts';
+          }
+          if (['react', 'react-dom', 'react-is', 'scheduler'].includes(pkg)) {
+            return 'vendor-react';
+          }
+          if (pkg === '@tanstack') return 'vendor-query';
+          return 'vendor';
+        },
+      },
+    },
   },
 })

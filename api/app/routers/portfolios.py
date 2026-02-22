@@ -139,9 +139,8 @@ def get_portfolio_performance(
         raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
 
     try:
-        portfolio = service.get_portfolio(portfolio_id, user.id)
-
-        performance_data = service.get_portfolio_performance(
+        # get_portfolio_performance verifies ownership and returns (name, data_points)
+        portfolio_name, performance_data = service.get_portfolio_performance(
             portfolio_id,
             user_id=user.id,
             start_date=start_dt,
@@ -159,8 +158,8 @@ def get_portfolio_performance(
         ]
 
         return PortfolioPerformanceResponse(
-            portfolio_id=portfolio.id,
-            portfolio_name=portfolio.name,
+            portfolio_id=portfolio_id,
+            portfolio_name=portfolio_name,
             data_points=data_points
         )
     except ValueError as e:

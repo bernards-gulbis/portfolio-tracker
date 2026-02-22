@@ -3,9 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { toast } from 'sonner';
+import { Moon, Sun } from 'lucide-react';
 import { getGoogleAuthorizeUrl, getErrorMessage } from '../api';
 import { useLogin, useRegister } from '../hooks/useAuth';
-import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,8 +30,8 @@ type RegisterValues = z.infer<typeof registerSchema>;
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [googleLoading, setGoogleLoading] = useState(false);
-  useAuth();
 
+  const { theme, toggleTheme } = useTheme();
   const loginMutation = useLogin();
   const registerMutation = useRegister();
 
@@ -66,9 +67,7 @@ export function LoginPage() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
-      const redirectUri = `${apiBase}/auth/google/callback`;
-      const url = await getGoogleAuthorizeUrl(redirectUri);
+      const url = await getGoogleAuthorizeUrl();
       window.location.href = url;
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -76,18 +75,22 @@ export function LoginPage() {
     }
   };
 
-  const switchToRegister = () => {
-    loginForm.clearErrors();
-    setMode('register');
-  };
-
-  const switchToLogin = () => {
-    registerForm.clearErrors();
-    setMode('login');
-  };
+  // The forms use key="login"/"register" so they remount on mode switch,
+  // resetting all state automatically — no explicit clearErrors() needed.
+  const switchToRegister = () => setMode('register');
+  const switchToLogin = () => setMode('login');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggleTheme}
+        className="absolute top-4 right-4"
+        aria-label="Toggle theme"
+      >
+        {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </Button>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle>{mode === 'login' ? 'Sign In' : 'Create Account'}</CardTitle>
@@ -115,7 +118,7 @@ export function LoginPage() {
           </div>
 
           {mode === 'login' ? (
-            <form key="login" onSubmit={loginForm.handleSubmit(handleLogin)} className="flex flex-col gap-3">
+            <form key="login" noValidate onSubmit={loginForm.handleSubmit(handleLogin)} className="flex flex-col gap-3">
               <FieldGroup>
                 <Controller
                   name="email"
@@ -164,7 +167,7 @@ export function LoginPage() {
               </Button>
             </form>
           ) : (
-            <form key="register" onSubmit={registerForm.handleSubmit(handleRegister)} className="flex flex-col gap-3">
+            <form key="register" noValidate onSubmit={registerForm.handleSubmit(handleRegister)} className="flex flex-col gap-3">
               <FieldGroup>
                 <Controller
                   name="email"

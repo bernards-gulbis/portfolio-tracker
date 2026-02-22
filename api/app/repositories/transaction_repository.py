@@ -4,7 +4,6 @@ Transaction repository for data access
 import uuid
 from sqlmodel import Session, select, func
 from typing import List, Optional
-from sqlalchemy.exc import SQLAlchemyError
 from app.models import Transaction, Portfolio
 
 

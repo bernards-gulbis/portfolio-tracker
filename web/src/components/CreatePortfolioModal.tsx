@@ -80,6 +80,7 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
                     {...field}
                     id="create-portfolio-name"
                     placeholder="e.g., My Investment Portfolio"
+                    autoComplete="off"
                     autoFocus
                     aria-invalid={fieldState.invalid}
                   />
