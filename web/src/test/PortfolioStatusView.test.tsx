@@ -12,8 +12,20 @@ vi.mock('../hooks/usePortfolioPerformance', () => ({
   usePortfolioPerformance: vi.fn(),
 }));
 
+vi.mock('../hooks/usePortfolios', () => ({
+  useDeletePortfolio: vi.fn(),
+  useUpdatePortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useCopyPortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+}));
+
+vi.mock('../context/PortfolioContext', () => ({
+  usePortfolioContext: vi.fn(),
+}));
+
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
+import { useDeletePortfolio } from '../hooks/usePortfolios';
+import { usePortfolioContext } from '../context/PortfolioContext';
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -68,6 +80,7 @@ const mockStatus: PortfolioStatus = {
   total_return_after_tax_eur: 1380,
   total_return_after_tax_percent: 18.75,
   current_value_after_tax_eur: 8740,
+  missing_prices: [],
 };
 
 describe('PortfolioStatusView', () => {
@@ -78,6 +91,14 @@ describe('PortfolioStatusView', () => {
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof usePortfolioPerformance>);
+    vi.mocked(usePortfolioContext).mockReturnValue({
+      activePortfolioId: null,
+      setActivePortfolioId: vi.fn(),
+    });
+    vi.mocked(useDeletePortfolio).mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useDeletePortfolio>);
   });
 
   it('shows "Select a portfolio" message when portfolioId is null', () => {

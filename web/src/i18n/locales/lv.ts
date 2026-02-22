@@ -16,6 +16,12 @@ const lv: Translation = {
     },
   },
   auth: {
+    validation: {
+      invalidEmail: 'Nederīga e-pasta adrese',
+      passwordRequired: 'Parole ir obligāta',
+      passwordMinLength: 'Parolei jābūt vismaz 8 rakstzīmēm',
+      nameRequired: 'Vārds ir obligāts',
+    },
     signIn: {
       title: 'Ierakstīties',
       description: 'Ierakstieties, lai piekļūtu savam portfelim',
@@ -38,6 +44,8 @@ const lv: Translation = {
       redirecting: 'Novirza...',
     },
     fields: {
+      name: 'Vārds',
+      namePlaceholder: 'Jūsu vārds',
       email: 'E-pasts',
       emailPlaceholder: 'jus@piem.lv',
       password: 'Parole',
@@ -46,6 +54,7 @@ const lv: Translation = {
     toasts: {
       welcomeBack: 'Laipni atpakaļ!',
       loggedOut: 'Izrakstījāties',
+      googleLoginFailed: 'Google ierakstīšanās neizdevās: {{error}}',
     },
     separator: 'vai',
   },
@@ -55,6 +64,16 @@ const lv: Translation = {
     switchLabel: 'Valoda',
   },
   portfolio: {
+    toasts: {
+      created: 'Portfelis "{{name}}" izveidots',
+      renamed: 'Portfelis pārdēvēts par "{{name}}"',
+      deleted: 'Portfelis dzēsts',
+      copied: 'Portfelis nokopēts kā "{{name}}"',
+    },
+    validation: {
+      nameRequired: 'Portfeļa nosaukums ir obligāts',
+      nameTooLong: 'Nosaukumam jābūt ne garākam par 255 rakstzīmēm',
+    },
     list: {
       title: 'Portfeļi',
       newButton: 'Jauns',
@@ -110,6 +129,22 @@ const lv: Translation = {
     },
   },
   transaction: {
+    toasts: {
+      added: 'Darījums pievienots',
+      updated: 'Darījums atjaunināts',
+      deleted: 'Darījums dzēsts',
+      imported_one: 'Importēts {{count}} darījums',
+      imported_other: 'Importēti {{count}} darījumi',
+    },
+    validation: {
+      dateRequired: 'Datums ir obligāts',
+      timeRequired: 'Laiks ir obligāts',
+      tickerRequired: 'Tīkotāja simbols ir obligāts',
+      quantityPositive: 'Daudzumam jābūt lielākam par 0',
+      pricePositive: 'Cenai par akciju jābūt lielākai par 0',
+      splitRatioPositive: 'Sadalīšanas koeficientam jābūt lielākam par 0',
+      totalAmountPositive: 'Kopējai summai jābūt lielākai par 0',
+    },
     view: {
       noPortfolio: {
         title: 'Nav izvēlēts portfelis',
@@ -165,7 +200,6 @@ const lv: Translation = {
       updating: 'Atjaunina...',
       fields: {
         date: 'Datums',
-        datePlaceholder: 'GGGG-MM-DD',
         datePickerLabel: 'Izvēlēties datumu no kalendāra',
         time: 'Laiks',
         type: 'Darījuma veids',
@@ -183,8 +217,6 @@ const lv: Translation = {
         fxRate: 'Valūtas kurss',
         fxRatePlaceholder: 'piem., 1.0850',
         fxRateDescription: 'Valūtas konvertēšanai izmantotais kurss',
-        hourLabel: 'Stunda',
-        minuteLabel: 'Minūte',
       },
       types: {
         Deposit: 'Iemaksa',
@@ -197,10 +229,16 @@ const lv: Translation = {
       },
     },
     csv: {
+      validation: {
+        fileRequired: 'Lūdzu, atlasiet failu',
+        fileMustBeCsv: 'Lūdzu, atlasiet CSV failu',
+      },
       title: 'Augšupielādēt darījumu CSV',
       description: 'Forma CSV faila augšupielādei',
       fileLabel: 'CSV fails',
       fileDescription: 'Gaidāmais formāts: date, type, ticker, quantity, price_per_share, fee, total_amount, eur, split_ratio',
+      chooseFile: 'Izvēlēties failu',
+      noFileChosen: 'Nav izvēlētas datnes',
       selected: 'Izvēlēts',
       cancel: 'Atcelt',
       submit: 'Importēt',
@@ -211,6 +249,8 @@ const lv: Translation = {
     noPortfolio: 'Izvēlieties portfeli, lai skatītu tā statusu',
     noData: 'Nav pieejami statusa dati',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
+    fetchedAt: 'Atjaunināts {{time}}',
+    missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',
     netInvested: 'Neto ieguldīts',
@@ -241,6 +281,39 @@ const lv: Translation = {
       title: 'Sadalījums',
       noData: 'Nav pieejami sadalījuma dati',
       marketValue: 'Tirgus vērtība',
+    },
+  },
+  settings: {
+    menuItem: 'Iestatījumi',
+    title: 'Iestatījumi',
+    profile: {
+      tab: 'Profils',
+      nameLabel: 'Vārds',
+      namePlaceholder: 'Jūsu vārds',
+      emailLabel: 'E-pasts',
+      submit: 'Saglabāt izmaiņas',
+      submitting: 'Saglabā…',
+      cancel: 'Atcelt',
+    },
+    password: {
+      tab: 'Parole',
+      newPasswordLabel: 'Jaunā parole',
+      confirmPasswordLabel: 'Apstiprināt jauno paroli',
+      submit: 'Mainīt paroli',
+      submitOauth: 'Iestatīt paroli',
+      submitting: 'Saglabā…',
+      cancel: 'Atcelt',
+      oauthNote: 'Jūs ierakstījāties ar Google. Iestatot paroli, tiks iespējota arī e-pasta ierakstīšanās.',
+    },
+    validation: {
+      nameRequired: 'Vārds ir obligāts',
+      nameTooLong: 'Vārdam jābūt ne garākam par 255 rakstzīmēm',
+      passwordMinLength: 'Parolei jābūt vismaz 8 rakstzīmēm',
+      passwordsDoNotMatch: 'Paroles nesakrīt',
+    },
+    toasts: {
+      profileUpdated: 'Profils atjaunināts',
+      passwordChanged: 'Parole nomainīta',
     },
   },
 };

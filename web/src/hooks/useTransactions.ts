@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import {
   getPortfolio,
   getTransactions,
@@ -43,6 +44,7 @@ export const useTransactions = (
  */
 export const useCreateTransaction = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: ({ portfolioId, data }: { portfolioId: number; data: TransactionCreate }) =>
@@ -51,7 +53,7 @@ export const useCreateTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
-      toast.success('Transaction added');
+      toast.success(t('transaction.toasts.added'));
     },
   });
 };
@@ -61,6 +63,7 @@ export const useCreateTransaction = () => {
  */
 export const useUpdateTransaction = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: ({
@@ -79,7 +82,7 @@ export const useUpdateTransaction = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
-      toast.success('Transaction updated');
+      toast.success(t('transaction.toasts.updated'));
     },
   });
 };
@@ -89,6 +92,7 @@ export const useUpdateTransaction = () => {
  */
 export const useDeleteTransaction = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: ({ transactionId, portfolioId: _portfolioId }: { transactionId: number; portfolioId: number }) =>
@@ -100,7 +104,7 @@ export const useDeleteTransaction = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
-      toast.success('Transaction deleted');
+      toast.success(t('transaction.toasts.deleted'));
     },
   });
 };
@@ -110,6 +114,7 @@ export const useDeleteTransaction = () => {
  */
 export const useImportTransactionsCSV = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: ({ portfolioId, file }: { portfolioId: number; file: File }) =>
@@ -121,7 +126,7 @@ export const useImportTransactionsCSV = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
-      toast.success(`Imported ${result.imported_count} transaction${result.imported_count === 1 ? '' : 's'}`);
+      toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
     },
   });
 };

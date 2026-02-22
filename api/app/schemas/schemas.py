@@ -9,15 +9,16 @@ from fastapi_users import schemas as fu_schemas
 # ================== User Schemas ==================
 
 class UserRead(fu_schemas.BaseUser[uuid.UUID]):
-    pass
+    name: Optional[str] = None
+    oauth_providers: list[str] = Field(default_factory=list)
 
 
 class UserCreate(fu_schemas.BaseUserCreate):
-    pass
+    name: Optional[str] = None
 
 
 class UserUpdate(fu_schemas.BaseUserUpdate):
-    pass
+    name: Optional[str] = None
 
 
 # ================== Portfolio Schemas ==================
@@ -218,7 +219,8 @@ class PortfolioStatusResponse(BaseModel):
     total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
     total_return_after_tax_percent: Optional[float]  # Total return after tax percentage
     current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
-    
+    missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
+
     model_config = ConfigDict(from_attributes=True)
 
 

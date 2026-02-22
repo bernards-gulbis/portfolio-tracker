@@ -6,7 +6,7 @@ from typing import Dict, Optional, Tuple, List
 import requests
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Lock
+from threading import Lock, Semaphore
 from sqlmodel import Session, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -23,6 +23,7 @@ class PriceService:
     _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
     _cache_ttl: timedelta = timedelta(minutes=15)
     _cache_lock = Lock()  # Thread-safe cache access
+    _yahoo_semaphore = Semaphore(3)  # Max 3 concurrent outgoing Yahoo Finance requests
     
     # In-memory cache for historical prices (clears after request completes)
     _historical_cache: Dict[str, Dict[str, float]] = {}
@@ -235,52 +236,52 @@ class PriceService:
                     return cached_price
                 # Cache expired, will be updated below
         
-        # Fetch from API
-        try:
-            # Use Yahoo Finance v8 API (free, no API key needed)
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-            
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            
-            params = {
-                'interval': '1d',
-                'range': '1d'
-            }
-            
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            # Extract the current price from the response
-            result = data.get('chart', {}).get('result', [])
-            if result:
-                meta = result[0].get('meta', {})
-                current_price = meta.get('regularMarketPrice')
-                
-                if current_price is not None:
-                    price = float(current_price)
-                    # Cache the result (thread-safe)
-                    with PriceService._cache_lock:
-                        PriceService._price_cache[ticker] = (price, now)
-                    return price
-            
-            # Cache None result to avoid repeated failed requests (thread-safe)
-            with PriceService._cache_lock:
-                PriceService._price_cache[ticker] = (None, now)
-            return None
-            
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"Network error fetching price for {ticker}: {e}")
-            return None
-        except (KeyError, ValueError, IndexError) as e:
-            logger.warning(f"Error parsing price data for {ticker}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error fetching price for {ticker}: {e}", exc_info=True)
-            return None
+        # Fetch from API (semaphore caps total concurrent Yahoo Finance requests)
+        with PriceService._yahoo_semaphore:
+            try:
+                # Use Yahoo Finance v8 API (free, no API key needed)
+                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+
+                params = {
+                    'interval': '1d',
+                    'range': '1d'
+                }
+
+                response = requests.get(url, headers=headers, params=params, timeout=10)
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Extract the current price from the response
+                result = data.get('chart', {}).get('result', [])
+                fetched_price: Optional[float] = None
+                if result:
+                    meta = result[0].get('meta', {})
+                    current_price = meta.get('regularMarketPrice')
+                    if current_price is not None:
+                        fetched_price = float(current_price)
+
+                # Double-check locking: only write if cache is still stale.
+                # Another thread may have written a fresh value while we were fetching.
+                with PriceService._cache_lock:
+                    existing = PriceService._price_cache.get(ticker)
+                    if existing is None or (now - existing[1]) >= PriceService._cache_ttl:
+                        PriceService._price_cache[ticker] = (fetched_price, now)
+                return fetched_price
+
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Network error fetching price for {ticker}: {e}")
+                return None
+            except (KeyError, ValueError, IndexError) as e:
+                logger.warning(f"Error parsing price data for {ticker}: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Unexpected error fetching price for {ticker}: {e}", exc_info=True)
+                return None
     
     @staticmethod
     def get_usd_to_eur_rate() -> Optional[float]:
@@ -407,20 +408,21 @@ class PriceService:
                 fetch_end_utc = fetch_end.replace(tzinfo=timezone.utc) if fetch_end.tzinfo is None else fetch_end
                 period1 = int(fetch_start_utc.timestamp())
                 period2 = int(fetch_end_utc.timestamp())
-                
+
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-                
+
                 headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 }
-                
+
                 params = {
                     'period1': period1,
                     'period2': period2,
                     'interval': '1d'
                 }
-                
-                response = requests.get(url, headers=headers, params=params, timeout=10)
+
+                with PriceService._yahoo_semaphore:
+                    response = requests.get(url, headers=headers, params=params, timeout=10)
                 response.raise_for_status()
                 
                 data = response.json()

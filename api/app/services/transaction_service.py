@@ -2,7 +2,7 @@
 Transaction service for business logic
 """
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime
 import csv
 from io import StringIO
@@ -51,6 +51,13 @@ class TransactionService:
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
 
+        # Validate eur_amount sign matches total_amount sign
+        if eur_amount is not None and transaction_type != TransactionType.SPLIT:
+            if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
+                raise InvalidTransactionDataException(
+                    "eur_amount sign must match total_amount sign"
+                )
+
         self._validate_transaction_data(
             transaction_type, ticker, quantity, price_per_share, total_amount, fee
         )
@@ -87,7 +94,7 @@ class TransactionService:
 
     def get_transactions_by_portfolio_paginated(
         self, portfolio_id: int, user_id: uuid.UUID, page: int = 1, page_size: int = 20
-    ) -> tuple[List[Transaction], int]:
+    ) -> Tuple[List[Transaction], int]:
         """Get paginated transactions for a portfolio (user-scoped)"""
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
@@ -161,9 +168,17 @@ class TransactionService:
         val_price_per_share = price_per_share if price_per_share is not None else transaction.price_per_share
         val_total_amount = total_amount if total_amount is not None else transaction.total_amount
         val_fee = fee if fee is not None else transaction.fee
+        val_eur_amount = eur_amount if eur_amount is not None else transaction.eur_amount
 
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
+
+        # Validate eur_amount sign matches total_amount sign
+        if val_eur_amount is not None and val_type != TransactionType.SPLIT:
+            if (val_total_amount > 0 and val_eur_amount < 0) or (val_total_amount < 0 and val_eur_amount > 0):
+                raise InvalidTransactionDataException(
+                    "eur_amount sign must match total_amount sign"
+                )
 
         self._validate_transaction_data(
             val_type,
@@ -348,7 +363,8 @@ class TransactionService:
 
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
 
-        currency = row.get("currency", "").strip().upper() or None
+        currency_raw = row.get("currency", "").strip().upper()
+        currency = currency_raw or None
         if currency and len(currency) != 3:
             raise ValueError(f"Currency must be a 3-letter code, got: {currency}")
 

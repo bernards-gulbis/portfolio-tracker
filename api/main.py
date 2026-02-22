@@ -25,9 +25,14 @@ from app.core import (
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
 from app.core.database import engine
-from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL
+from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL, current_active_user
 from app.schemas import UserRead, UserCreate, UserUpdate
+from app.models.user import User
+from app.models.oauth_account import OAuthAccount
+from app.core.database import get_session
+from sqlmodel import Session, select
 from sqlalchemy import text
+from fastapi import Depends
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
 
 # Configure logging
@@ -167,11 +172,32 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
-app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
-    tags=["users"],
-)
+# Build the FastAPI Users users router, then replace its GET /me with our own
+# so there is exactly one handler for GET /users/me and no ordering ambiguity.
+_users_router = fastapi_users.get_users_router(UserRead, UserUpdate)
+_users_router.routes = [
+    r for r in _users_router.routes
+    if not (getattr(r, "path", None) == "/me" and "GET" in getattr(r, "methods", set()))
+]
+
+@_users_router.get("/me", tags=["users"])
+def get_current_user_me(
+    user: User = Depends(current_active_user),
+    session: Session = Depends(get_session),
+):
+    providers = list(session.exec(
+        select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
+    ).all())
+    user_data = UserRead.model_validate(user).model_dump()
+    user_data["oauth_providers"] = providers
+    return user_data
+
+# The decorator appends GET /me to the end of the routes list. Move it to position 0
+# so it is checked before GET /{id}, which would otherwise match the literal string
+# "me" as a path parameter and return 403 (/{id} requires superuser).
+_users_router.routes.insert(0, _users_router.routes.pop())
+
+app.include_router(_users_router, prefix="/users", tags=["users"])
 app.include_router(
     fastapi_users.get_oauth_router(
         oauth_client=google_oauth_client,

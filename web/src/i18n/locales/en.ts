@@ -14,6 +14,12 @@ const en = {
     },
   },
   auth: {
+    validation: {
+      invalidEmail: 'Invalid email address',
+      passwordRequired: 'Password is required',
+      passwordMinLength: 'Password must be at least 8 characters',
+      nameRequired: 'Name is required',
+    },
     signIn: {
       title: 'Sign In',
       description: 'Sign in to access your portfolio',
@@ -36,6 +42,8 @@ const en = {
       redirecting: 'Redirecting...',
     },
     fields: {
+      name: 'Name',
+      namePlaceholder: 'Your name',
       email: 'Email',
       emailPlaceholder: 'you@example.com',
       password: 'Password',
@@ -44,6 +52,7 @@ const en = {
     toasts: {
       welcomeBack: 'Welcome back!',
       loggedOut: 'Logged out',
+      googleLoginFailed: 'Google login failed: {{error}}',
     },
     separator: 'or',
   },
@@ -53,6 +62,16 @@ const en = {
     switchLabel: 'Language',
   },
   portfolio: {
+    toasts: {
+      created: 'Portfolio "{{name}}" created',
+      renamed: 'Portfolio renamed to "{{name}}"',
+      deleted: 'Portfolio deleted',
+      copied: 'Portfolio copied as "{{name}}"',
+    },
+    validation: {
+      nameRequired: 'Portfolio name is required',
+      nameTooLong: 'Name must be at most 255 characters',
+    },
     list: {
       title: 'Portfolios',
       newButton: 'New',
@@ -108,6 +127,22 @@ const en = {
     },
   },
   transaction: {
+    toasts: {
+      added: 'Transaction added',
+      updated: 'Transaction updated',
+      deleted: 'Transaction deleted',
+      imported_one: 'Imported {{count}} transaction',
+      imported_other: 'Imported {{count}} transactions',
+    },
+    validation: {
+      dateRequired: 'Date is required',
+      timeRequired: 'Time is required',
+      tickerRequired: 'Ticker symbol is required',
+      quantityPositive: 'Quantity must be greater than 0',
+      pricePositive: 'Price per share must be greater than 0',
+      splitRatioPositive: 'Split ratio must be greater than 0',
+      totalAmountPositive: 'Total amount must be greater than 0',
+    },
     view: {
       noPortfolio: {
         title: 'No Portfolio Selected',
@@ -163,7 +198,6 @@ const en = {
       updating: 'Updating...',
       fields: {
         date: 'Date',
-        datePlaceholder: 'YYYY-MM-DD',
         datePickerLabel: 'Pick date from calendar',
         time: 'Time',
         type: 'Transaction Type',
@@ -181,8 +215,6 @@ const en = {
         fxRate: 'FX Rate',
         fxRatePlaceholder: 'e.g., 1.0850',
         fxRateDescription: 'Exchange rate used for currency conversion',
-        hourLabel: 'Hour',
-        minuteLabel: 'Minute',
       },
       types: {
         Deposit: 'Deposit',
@@ -195,10 +227,16 @@ const en = {
       },
     },
     csv: {
+      validation: {
+        fileRequired: 'Please select a file',
+        fileMustBeCsv: 'Please select a CSV file',
+      },
       title: 'Upload Transactions CSV',
       description: 'Form to upload a CSV file of transactions',
       fileLabel: 'CSV File',
       fileDescription: 'Expected format: date, type, ticker, quantity, price_per_share, fee, total_amount, eur, split_ratio',
+      chooseFile: 'Choose file',
+      noFileChosen: 'No file chosen',
       selected: 'Selected',
       cancel: 'Cancel',
       submit: 'Import',
@@ -209,6 +247,8 @@ const en = {
     noPortfolio: 'Select a portfolio to view its status',
     noData: 'No status data available',
     error: 'Error loading portfolio status: {{message}}',
+    fetchedAt: 'Updated {{time}}',
+    missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
     marketValue: 'Market Value',
     unrealized: 'unrealized',
     netInvested: 'Net Invested',
@@ -239,6 +279,39 @@ const en = {
       title: 'Allocation',
       noData: 'No allocation data available',
       marketValue: 'Market Value',
+    },
+  },
+  settings: {
+    menuItem: 'Settings',
+    title: 'Settings',
+    profile: {
+      tab: 'Profile',
+      nameLabel: 'Name',
+      namePlaceholder: 'Your name',
+      emailLabel: 'Email',
+      submit: 'Save changes',
+      submitting: 'Saving…',
+      cancel: 'Cancel',
+    },
+    password: {
+      tab: 'Password',
+      newPasswordLabel: 'New password',
+      confirmPasswordLabel: 'Confirm new password',
+      submit: 'Change password',
+      submitOauth: 'Set password',
+      submitting: 'Saving…',
+      cancel: 'Cancel',
+      oauthNote: 'You signed in with Google. Setting a password will also enable email login.',
+    },
+    validation: {
+      nameRequired: 'Name is required',
+      nameTooLong: 'Name must be at most 255 characters',
+      passwordMinLength: 'Password must be at least 8 characters',
+      passwordsDoNotMatch: 'Passwords do not match',
+    },
+    toasts: {
+      profileUpdated: 'Profile updated',
+      passwordChanged: 'Password changed',
     },
   },
 };

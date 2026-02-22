@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import i18n from '../i18n/index';
 import { toast } from 'sonner';
 import { Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -16,14 +17,37 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
 
+const emailValidator = z.string().email();
+
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().superRefine((val, ctx) => {
+    if (!emailValidator.safeParse(val).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+    }
+  }),
+  password: z.string().superRefine((val, ctx) => {
+    if (val.length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordRequired') });
+    }
+  }),
 });
 
 const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  name: z.string().superRefine((val, ctx) => {
+    if (val.trim().length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.nameRequired') });
+    }
+  }),
+  email: z.string().superRefine((val, ctx) => {
+    if (!emailValidator.safeParse(val).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+    }
+  }),
+  password: z.string().superRefine((val, ctx) => {
+    if (val.length < 8) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordMinLength') });
+    }
+  }),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -45,7 +69,7 @@ export function LoginPage() {
 
   const registerForm = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { name: '', email: '', password: '' },
   });
 
   const handleLogin = async (values: LoginValues) => {
@@ -58,7 +82,7 @@ export function LoginPage() {
 
   const handleRegister = async (values: RegisterValues) => {
     try {
-      await registerMutation.mutateAsync({ email: values.email, password: values.password });
+      await registerMutation.mutateAsync({ name: values.name, email: values.email, password: values.password });
       toast.success(t('auth.register.successToast'));
       loginForm.reset({ email: values.email, password: '' });
       setMode('login');
@@ -173,6 +197,24 @@ export function LoginPage() {
             <form key="register" noValidate onSubmit={registerForm.handleSubmit(handleRegister)} className="flex flex-col gap-3">
               <FieldGroup>
                 <Controller
+                  name="name"
+                  control={registerForm.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid || undefined}>
+                      <FieldLabel htmlFor="register-name">{t('auth.fields.name')}</FieldLabel>
+                      <Input
+                        {...field}
+                        id="register-name"
+                        type="text"
+                        placeholder={t('auth.fields.namePlaceholder')}
+                        autoComplete="name"
+                        autoFocus
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller
                   name="email"
                   control={registerForm.control}
                   render={({ field, fieldState }) => (
@@ -184,7 +226,6 @@ export function LoginPage() {
                         type="email"
                         placeholder={t('auth.fields.emailPlaceholder')}
                         autoComplete="email"
-                        autoFocus
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>

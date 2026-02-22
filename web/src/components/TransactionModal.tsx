@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
+import i18n from '../i18n/index';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -37,6 +38,7 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
   InputGroupText,
 } from '@/components/ui/input-group';
@@ -45,8 +47,12 @@ import {
 
 const schema = z
   .object({
-    date: z.string().min(1, 'Date is required'),
-    time: z.string().min(1, 'Time is required'),
+    date: z.string().superRefine((val, ctx) => {
+      if (val.length < 1) ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.validation.dateRequired') });
+    }),
+    time: z.string().superRefine((val, ctx) => {
+      if (val.length < 1) ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.validation.timeRequired') });
+    }),
     type: z.nativeEnum(TransactionType),
     ticker: z.string().optional(),
     quantity: z.string().optional(),
@@ -72,7 +78,7 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['ticker'],
-          message: 'Ticker symbol is required',
+          message: i18n.t('transaction.validation.tickerRequired'),
         });
       }
     }
@@ -82,14 +88,14 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['quantity'],
-          message: 'Quantity must be greater than 0',
+          message: i18n.t('transaction.validation.quantityPositive'),
         });
       }
       if (!(parseFloat(data.pricePerShare || '0') > 0)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['pricePerShare'],
-          message: 'Price per share must be greater than 0',
+          message: i18n.t('transaction.validation.pricePositive'),
         });
       }
     }
@@ -99,7 +105,7 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['splitRatio'],
-          message: 'Split ratio must be greater than 0',
+          message: i18n.t('transaction.validation.splitRatioPositive'),
         });
       }
     }
@@ -109,7 +115,7 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['totalAmount'],
-          message: 'Total amount must be greater than 0',
+          message: i18n.t('transaction.validation.totalAmountPositive'),
         });
       }
     }
@@ -119,9 +125,6 @@ type FormValues = z.infer<typeof schema>;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
-
 /** Returns local date as "YYYY-MM-DD" */
 const toLocalDate = (date: Date): string => {
   const y = date.getFullYear();
@@ -130,25 +133,120 @@ const toLocalDate = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-/** Returns local time as "HH:mm" */
+/** Returns local time as "HH:mm:ss" */
 const toLocalTime = (date: Date): string => {
   const h = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${min}`;
+  const sec = String(date.getSeconds()).padStart(2, '0');
+  return `${h}:${min}:${sec}`;
 };
 
-/** Parses "YYYY-MM-DD" to a local Date without UTC shift */
+/** Parses "YYYY-MM-DD" as a local Date without UTC shift */
 const parseLocalDate = (str: string): Date | undefined => {
   if (!str || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return undefined;
   const [y, m, d] = str.split('-').map(Number);
   return new Date(y, m - 1, d);
 };
 
-/** Formats "YYYY-MM-DD" for display in the calendar trigger */
-const formatDateDisplay = (str: string, locale: string = 'en-US'): string => {
-  const date = parseLocalDate(str);
-  if (!date) return str;
-  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+interface DatePickerFieldProps {
+  value: string; // "YYYY-MM-DD"
+  onChange: (value: string) => void;
+  invalid?: boolean;
+  locale: string;
+  id: string;
+  pickerAriaLabel: string;
+}
+
+const DatePickerField = ({ value, onChange, invalid, locale, id, pickerAriaLabel }: DatePickerFieldProps) => {
+  const [open, setOpen] = useState(false);
+  // displayValue mirrors the form value in YYYY-MM-DD format so the input
+  // can be parsed back reliably regardless of the active locale.
+  const [displayValue, setDisplayValue] = useState(value ?? '');
+  const [month, setMonth] = useState<Date | undefined>(parseLocalDate(value));
+
+  // Tracks changes we triggered ourselves so we don't overwrite mid-typing
+  const skipNextSyncRef = useRef(false);
+
+  useEffect(() => {
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
+    }
+    // External change (form reset) — re-sync display
+    setDisplayValue(value ?? '');
+    const date = parseLocalDate(value);
+    if (date) setMonth(date);
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const typed = e.target.value;
+    setDisplayValue(typed);
+    const parsed = parseLocalDate(typed);
+    if (parsed) {
+      skipNextSyncRef.current = true;
+      onChange(toLocalDate(parsed));
+      setMonth(parsed);
+    }
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      const ymd = toLocalDate(date);
+      skipNextSyncRef.current = true;
+      onChange(ymd);
+      setDisplayValue(ymd);
+      setMonth(date);
+    }
+    setOpen(false);
+  };
+
+  const placeholder = 'YYYY-MM-DD';
+
+  return (
+    <InputGroup>
+      <InputGroupInput
+        id={id}
+        value={displayValue}
+        placeholder={placeholder}
+        onChange={handleInputChange}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        aria-invalid={invalid}
+        autoComplete="off"
+        className="rounded-l-md"
+      />
+      <InputGroupAddon align="inline-end" className="bg-background p-0">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <InputGroupButton aria-label={pickerAriaLabel}>
+              <CalendarIcon />
+            </InputGroupButton>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto overflow-hidden p-0" align="end" alignOffset={-8} sideOffset={10}>
+            <Calendar
+              mode="single"
+              selected={parseLocalDate(value)}
+              month={month}
+              onMonthChange={setMonth}
+              onSelect={handleCalendarSelect}
+              formatters={{
+                formatCaption: (date) =>
+                  date.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+                formatMonthDropdown: (date) =>
+                  date.toLocaleDateString(locale, { month: 'long' }),
+                formatWeekdayName: (weekday) =>
+                  weekday.toLocaleDateString(locale, { weekday: 'short' }),
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </InputGroupAddon>
+    </InputGroup>
+  );
 };
 
 
@@ -319,101 +417,44 @@ const TransactionModal = ({
 
             {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Date — text input (keyboard typeable) + Calendar popover */}
+              {/* Date */}
               <Controller
                 name="date"
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-date">{t('transaction.modal.fields.date')}</FieldLabel>
-                    <div className="flex">
-                      <Input
-                        {...field}
-                        id="tx-date"
-                        type="text"
-                        placeholder={t('transaction.modal.fields.datePlaceholder')}
-                        autoComplete="off"
-                        className="rounded-r-none"
-                        aria-invalid={fieldState.invalid}
-                      />
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            tabIndex={-1}
-                            className="rounded-l-none border-l-0 shrink-0 px-3"
-                            aria-label={t('transaction.modal.fields.datePickerLabel')}
-                          >
-                            <CalendarIcon className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                          <Calendar
-                            mode="single"
-                            selected={parseLocalDate(field.value)}
-                            onSelect={(date) =>
-                              field.onChange(date ? toLocalDate(date) : '')
-                            }
-                            initialFocus
-                          />
-                          {field.value && (
-                            <p className="px-3 pb-3 text-center text-sm text-muted-foreground">
-                              {formatDateDisplay(field.value, locale)}
-                            </p>
-                          )}
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                    <DatePickerField
+                      value={field.value}
+                      onChange={field.onChange}
+                      invalid={fieldState.invalid}
+                      locale={locale}
+                      id="tx-date"
+                      pickerAriaLabel={t('transaction.modal.fields.datePickerLabel')}
+                    />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
               />
 
-              {/* Time — hour + minute Selects (fully themed, no native popup) */}
+              {/* Time — native time input */}
               <Controller
                 name="time"
                 control={form.control}
-                render={({ field, fieldState }) => {
-                  const [hh, mm] = (field.value || '00:00').split(':');
-                  return (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="tx-time-hour">{t('transaction.modal.fields.time')}</FieldLabel>
-                      <div className="flex items-center gap-1">
-                        <Select
-                          name="tx-time-hour"
-                          value={hh}
-                          onValueChange={(h) => field.onChange(`${h}:${mm}`)}
-                        >
-                          <SelectTrigger id="tx-time-hour" aria-label={t('transaction.modal.fields.hourLabel')}>
-                            <SelectValue placeholder="HH" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48">
-                            {HOURS.map((h) => (
-                              <SelectItem key={h} value={h}>{h}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <span className="text-muted-foreground text-sm font-medium shrink-0">:</span>
-                        <Select
-                          name="tx-time-minute"
-                          value={mm}
-                          onValueChange={(m) => field.onChange(`${hh}:${m}`)}
-                        >
-                          <SelectTrigger id="tx-time-minute" aria-label={t('transaction.modal.fields.minuteLabel')}>
-                            <SelectValue placeholder="MM" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48">
-                            {MINUTES.map((m) => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  );
-                }}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid || undefined}>
+                    <FieldLabel htmlFor="tx-time">{t('transaction.modal.fields.time')}</FieldLabel>
+                    <Input
+                      {...field}
+                      id="tx-time"
+                      type="time"
+                      step="1"
+                      className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
               />
             </div>
 

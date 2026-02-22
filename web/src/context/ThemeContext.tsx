@@ -28,7 +28,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('Failed to access localStorage:', error);
     }
 
-    return 'dark';
+    // Fall back to the OS/browser preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   useEffect(() => {

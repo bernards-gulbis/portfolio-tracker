@@ -3,7 +3,6 @@ import {
   LineChart,
   Line,
   XAxis,
-  YAxis,
   CartesianGrid,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
@@ -83,17 +82,19 @@ export const PerformanceChart = ({
     );
   }
 
+  // Parse a YYYY-MM-DD string as a local date.
+  // new Date('YYYY-MM-DD') parses as UTC midnight and shifts the day in
+  // negative-offset timezones; new Date(y, m-1, d) uses local midnight.
+  const parseYMD = (value: string): Date => {
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
   const chartData = data.map((point) => ({
     date: point.date,
     principal: point.principal_eur,
     currentValue: point.current_value_eur,
   }));
-
-  const formatYAxis = (value: number) => {
-    if (value >= 1000000) return `€${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `€${(value / 1000).toFixed(2)}K`;
-    return `€${value.toFixed(0)}`;
-  };
 
   return (
     <Card>
@@ -111,25 +112,30 @@ export const PerformanceChart = ({
         )}
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px]">
-          <LineChart data={chartData} margin={{ top: 8, right: 72, left: 0, bottom: 0 }}>
-            <CartesianGrid
-              horizontal={true}
-              vertical={false}
-              strokeDasharray="2 6"
-              stroke="var(--border)"
-            />
-            <XAxis dataKey="date" hide={true} />
-            <YAxis
-              orientation="right"
-              tickFormatter={formatYAxis}
-              axisLine={false}
+        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+          <LineChart
+            accessibilityLayer
+            data={chartData}
+            margin={{ left: 12, right: 12 }}
+          >
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="date"
               tickLine={false}
-              width={68}
+              axisLine={false}
+              tickMargin={8}
+              tickFormatter={(value: string) =>
+                parseYMD(value).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+              }
+              minTickGap={50}
             />
             <ChartTooltip
+              cursor={false}
               content={
                 <ChartTooltipContent
+                  labelFormatter={(value) =>
+                    parseYMD(value as string).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })
+                  }
                   formatter={(value) =>
                     value != null ? formatCurrency(value as number, 'EUR', locale) : t('common.notAvailable')
                   }

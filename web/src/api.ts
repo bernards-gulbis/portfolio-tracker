@@ -18,6 +18,13 @@ export interface UserRead {
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
+  name: string | null;
+  oauth_providers: string[];
+}
+
+export interface UserUpdate {
+  name?: string;
+  password?: string;
 }
 
 export interface LoginCredentials {
@@ -28,6 +35,7 @@ export interface LoginCredentials {
 export interface RegisterCredentials {
   email: string;
   password: string;
+  name: string;
 }
 
 export interface Portfolio {
@@ -145,6 +153,7 @@ export interface PortfolioStatus {
   total_return_after_tax_eur: number | null;
   total_return_after_tax_percent: number | null;
   current_value_after_tax_eur: number | null;
+  missing_prices: string[];
 }
 
 export interface PerformanceDataPoint {
@@ -219,6 +228,11 @@ export const getCurrentUser = async (): Promise<UserRead> => {
 export const getGoogleAuthorizeUrl = async (): Promise<string> => {
   const response = await api.get<{ authorization_url: string }>('/auth/google/authorize');
   return response.data.authorization_url;
+};
+
+export const updateUser = async (data: UserUpdate): Promise<UserRead> => {
+  const response = await api.patch<UserRead>('/users/me', data);
+  return response.data;
 };
 
 // ================== Portfolio API Functions ==================
