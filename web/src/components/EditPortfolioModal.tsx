@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
 import { useUpdatePortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
@@ -19,9 +20,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 const schema = z.object({
-  name: z.string()
-    .min(1, 'Portfolio name is required')
-    .max(255, 'Name must be at most 255 characters'),
+  name: z.string().superRefine((val, ctx) => {
+    if (val.length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('portfolio.validation.nameRequired') });
+    } else if (val.length > 255) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('portfolio.validation.nameTooLong') });
+    }
+  }),
 });
 
 type FormValues = z.infer<typeof schema>;

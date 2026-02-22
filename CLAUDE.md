@@ -204,7 +204,14 @@ The app supports English (`en`) and Latvian (`lv`) via **i18next + react-i18next
 
 **Formatting with locale:** always call `useLocale()` in components that use `formatCurrency`, `formatDate`, or `toLocaleDateString`, and pass the returned locale string as the last argument. This ensures currency and date output switches immediately when the user changes language.
 
-**Validation messages** (Zod schema errors in `TransactionModal.tsx`, `CreatePortfolioModal.tsx`, `EditPortfolioModal.tsx`, `CopyPortfolioModal.tsx`) are kept in English only. Schemas are defined at module scope where `useTranslation` is unavailable, and error messages are only shown on validation failure — an edge case that doesn't justify the complexity and re-validation churn of making schemas reactive to language changes.
+**Validation messages** in Zod schemas are fully translated. Schemas are defined at module scope (not inside components), so they use the `i18n` singleton imported directly (`import i18n from '../i18n/index'`) instead of the `useTranslation` hook. Messages use the lazy function form so they are evaluated at validation time, not schema definition time:
+- `.refine(check, () => ({ message: i18n.t('key') }))` for simple field validations
+- `i18n.t('key')` directly inside `superRefine` callback bodies for cross-field validations
+- `z.custom(check, () => ({ message: i18n.t('key') }))` for custom type checks
+
+This keeps schemas at module scope (no re-creation or re-validation on language change) while ensuring error messages reflect the active language when validation runs. Translation keys live under `auth.validation.*`, `portfolio.validation.*`, `transaction.validation.*`, and `transaction.csv.validation.*`.
+
+**Note (Zod v4):** In Zod v4, the lazy-function form for `.refine()` and `z.custom()` messages (e.g. `() => ({ message: '...' })`) is silently ignored and falls back to "Invalid input". Always use `superRefine` for reactive i18n messages.
 
 ## Keeping Things in Sync
 

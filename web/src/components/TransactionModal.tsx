@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocale } from '../hooks/useLocale';
+import i18n from '../i18n/index';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -45,8 +46,12 @@ import {
 
 const schema = z
   .object({
-    date: z.string().min(1, 'Date is required'),
-    time: z.string().min(1, 'Time is required'),
+    date: z.string().superRefine((val, ctx) => {
+      if (val.length < 1) ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.validation.dateRequired') });
+    }),
+    time: z.string().superRefine((val, ctx) => {
+      if (val.length < 1) ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.validation.timeRequired') });
+    }),
     type: z.nativeEnum(TransactionType),
     ticker: z.string().optional(),
     quantity: z.string().optional(),
@@ -72,7 +77,7 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['ticker'],
-          message: 'Ticker symbol is required',
+          message: i18n.t('transaction.validation.tickerRequired'),
         });
       }
     }
@@ -82,14 +87,14 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['quantity'],
-          message: 'Quantity must be greater than 0',
+          message: i18n.t('transaction.validation.quantityPositive'),
         });
       }
       if (!(parseFloat(data.pricePerShare || '0') > 0)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['pricePerShare'],
-          message: 'Price per share must be greater than 0',
+          message: i18n.t('transaction.validation.pricePositive'),
         });
       }
     }
@@ -99,7 +104,7 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['splitRatio'],
-          message: 'Split ratio must be greater than 0',
+          message: i18n.t('transaction.validation.splitRatioPositive'),
         });
       }
     }
@@ -109,7 +114,7 @@ const schema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['totalAmount'],
-          message: 'Total amount must be greater than 0',
+          message: i18n.t('transaction.validation.totalAmountPositive'),
         });
       }
     }

@@ -14,6 +14,11 @@ const en = {
     },
   },
   auth: {
+    validation: {
+      invalidEmail: 'Invalid email address',
+      passwordRequired: 'Password is required',
+      passwordMinLength: 'Password must be at least 8 characters',
+    },
     signIn: {
       title: 'Sign In',
       description: 'Sign in to access your portfolio',
@@ -44,6 +49,7 @@ const en = {
     toasts: {
       welcomeBack: 'Welcome back!',
       loggedOut: 'Logged out',
+      googleLoginFailed: 'Google login failed: {{error}}',
     },
     separator: 'or',
   },
@@ -53,6 +59,16 @@ const en = {
     switchLabel: 'Language',
   },
   portfolio: {
+    toasts: {
+      created: 'Portfolio "{{name}}" created',
+      renamed: 'Portfolio renamed to "{{name}}"',
+      deleted: 'Portfolio deleted',
+      copied: 'Portfolio copied as "{{name}}"',
+    },
+    validation: {
+      nameRequired: 'Portfolio name is required',
+      nameTooLong: 'Name must be at most 255 characters',
+    },
     list: {
       title: 'Portfolios',
       newButton: 'New',
@@ -108,6 +124,22 @@ const en = {
     },
   },
   transaction: {
+    toasts: {
+      added: 'Transaction added',
+      updated: 'Transaction updated',
+      deleted: 'Transaction deleted',
+      imported_one: 'Imported {{count}} transaction',
+      imported_other: 'Imported {{count}} transactions',
+    },
+    validation: {
+      dateRequired: 'Date is required',
+      timeRequired: 'Time is required',
+      tickerRequired: 'Ticker symbol is required',
+      quantityPositive: 'Quantity must be greater than 0',
+      pricePositive: 'Price per share must be greater than 0',
+      splitRatioPositive: 'Split ratio must be greater than 0',
+      totalAmountPositive: 'Total amount must be greater than 0',
+    },
     view: {
       noPortfolio: {
         title: 'No Portfolio Selected',
@@ -195,10 +227,16 @@ const en = {
       },
     },
     csv: {
+      validation: {
+        fileRequired: 'Please select a file',
+        fileMustBeCsv: 'Please select a CSV file',
+      },
       title: 'Upload Transactions CSV',
       description: 'Form to upload a CSV file of transactions',
       fileLabel: 'CSV File',
       fileDescription: 'Expected format: date, type, ticker, quantity, price_per_share, fee, total_amount, eur, split_ratio',
+      chooseFile: 'Choose file',
+      noFileChosen: 'No file chosen',
       selected: 'Selected',
       cancel: 'Cancel',
       submit: 'Import',

@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
 import { useImportTransactionsCSV } from '../hooks/useTransactions';
 import { getErrorMessage } from '../api';
@@ -19,12 +20,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 const schema = z.object({
-  file: z
-    .custom<File>((v) => v instanceof File, 'Please select a file')
-    .refine((f) => f.name.toLowerCase().endsWith('.csv'), 'Please select a CSV file'),
+  file: z.any().superRefine((val, ctx) => {
+    if (!(val instanceof File)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.csv.validation.fileRequired') });
+      return;
+    }
+    if (!val.name.toLowerCase().endsWith('.csv')) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.csv.validation.fileMustBeCsv') });
+    }
+  }),
 });
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = { file: File };
 
 interface ImportCSVModalProps {
   isOpen: boolean;
@@ -35,6 +42,7 @@ interface ImportCSVModalProps {
 const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) => {
   const { t } = useTranslation();
   const importCSV = useImportTransactionsCSV();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
@@ -45,6 +53,7 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
   useEffect(() => {
     if (!isOpen) {
       reset();
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [isOpen, reset]);
 
@@ -81,17 +90,30 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
                 <Field data-invalid={fieldState.invalid || undefined}>
                   <FieldLabel htmlFor="csv-file">{t('transaction.csv.fileLabel')}</FieldLabel>
                   <Input
+                    ref={fileInputRef}
                     id="csv-file"
                     type="file"
                     accept=".csv"
+                    className="sr-only"
                     onChange={(e) => onChange(e.target.files?.[0])}
                     aria-invalid={fieldState.invalid}
                   />
-                  {file instanceof File && (
-                    <div className="p-3 bg-muted rounded-md text-sm">
-                      <strong>{t('transaction.csv.selected')}:</strong> {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={importCSV.isPending}
+                    >
+                      {t('transaction.csv.chooseFile')}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {file instanceof File
+                        ? `${file.name} (${(file.size / 1024).toFixed(2)} KB)`
+                        : t('transaction.csv.noFileChosen')}
+                    </span>
+                  </div>
                   <FieldDescription>
                     {t('transaction.csv.fileDescription')}
                   </FieldDescription>

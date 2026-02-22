@@ -16,6 +16,11 @@ const lv: Translation = {
     },
   },
   auth: {
+    validation: {
+      invalidEmail: 'Nederīga e-pasta adrese',
+      passwordRequired: 'Parole ir obligāta',
+      passwordMinLength: 'Parolei jābūt vismaz 8 rakstzīmēm',
+    },
     signIn: {
       title: 'Ierakstīties',
       description: 'Ierakstieties, lai piekļūtu savam portfelim',
@@ -46,6 +51,7 @@ const lv: Translation = {
     toasts: {
       welcomeBack: 'Laipni atpakaļ!',
       loggedOut: 'Izrakstījāties',
+      googleLoginFailed: 'Google ierakstīšanās neizdevās: {{error}}',
     },
     separator: 'vai',
   },
@@ -55,6 +61,16 @@ const lv: Translation = {
     switchLabel: 'Valoda',
   },
   portfolio: {
+    toasts: {
+      created: 'Portfelis "{{name}}" izveidots',
+      renamed: 'Portfelis pārdēvēts par "{{name}}"',
+      deleted: 'Portfelis dzēsts',
+      copied: 'Portfelis nokopēts kā "{{name}}"',
+    },
+    validation: {
+      nameRequired: 'Portfeļa nosaukums ir obligāts',
+      nameTooLong: 'Nosaukumam jābūt ne garākam par 255 rakstzīmēm',
+    },
     list: {
       title: 'Portfeļi',
       newButton: 'Jauns',
@@ -110,6 +126,22 @@ const lv: Translation = {
     },
   },
   transaction: {
+    toasts: {
+      added: 'Darījums pievienots',
+      updated: 'Darījums atjaunināts',
+      deleted: 'Darījums dzēsts',
+      imported_one: 'Importēts {{count}} darījums',
+      imported_other: 'Importēti {{count}} darījumi',
+    },
+    validation: {
+      dateRequired: 'Datums ir obligāts',
+      timeRequired: 'Laiks ir obligāts',
+      tickerRequired: 'Tīkotāja simbols ir obligāts',
+      quantityPositive: 'Daudzumam jābūt lielākam par 0',
+      pricePositive: 'Cenai par akciju jābūt lielākai par 0',
+      splitRatioPositive: 'Sadalīšanas koeficientam jābūt lielākam par 0',
+      totalAmountPositive: 'Kopējai summai jābūt lielākai par 0',
+    },
     view: {
       noPortfolio: {
         title: 'Nav izvēlēts portfelis',
@@ -197,10 +229,16 @@ const lv: Translation = {
       },
     },
     csv: {
+      validation: {
+        fileRequired: 'Lūdzu, atlasiet failu',
+        fileMustBeCsv: 'Lūdzu, atlasiet CSV failu',
+      },
       title: 'Augšupielādēt darījumu CSV',
       description: 'Forma CSV faila augšupielādei',
       fileLabel: 'CSV fails',
       fileDescription: 'Gaidāmais formāts: date, type, ticker, quantity, price_per_share, fee, total_amount, eur, split_ratio',
+      chooseFile: 'Izvēlēties failu',
+      noFileChosen: 'Nav izvēlētas datnes',
       selected: 'Izvēlēts',
       cancel: 'Atcelt',
       submit: 'Importēt',

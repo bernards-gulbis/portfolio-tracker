@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import i18n from '../i18n/index';
 import { toast } from 'sonner';
 import { Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -16,14 +17,32 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
 
+const emailValidator = z.string().email();
+
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().superRefine((val, ctx) => {
+    if (!emailValidator.safeParse(val).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+    }
+  }),
+  password: z.string().superRefine((val, ctx) => {
+    if (val.length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordRequired') });
+    }
+  }),
 });
 
 const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  email: z.string().superRefine((val, ctx) => {
+    if (!emailValidator.safeParse(val).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+    }
+  }),
+  password: z.string().superRefine((val, ctx) => {
+    if (val.length < 8) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordMinLength') });
+    }
+  }),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
