@@ -1,4 +1,7 @@
 const en = {
+  common: {
+    notAvailable: 'N/A',
+  },
   app: {
     title: 'Portfolio Tracker',
     header: {

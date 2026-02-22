@@ -1,6 +1,9 @@
 import type { Translation } from './en';
 
 const lv: Translation = {
+  common: {
+    notAvailable: 'N/A',
+  },
   app: {
     title: 'Portfeļa izsekotājs',
     header: {

@@ -131,7 +131,7 @@ export const PerformanceChart = ({
               content={
                 <ChartTooltipContent
                   formatter={(value) =>
-                    value != null ? formatCurrency(value as number, 'EUR', locale) : 'N/A'
+                    value != null ? formatCurrency(value as number, 'EUR', locale) : t('common.notAvailable')
                   }
                 />
               }
