@@ -32,6 +32,7 @@ const mockUser: UserRead = {
   is_active: true,
   is_superuser: false,
   is_verified: true,
+  name: null,
 };
 
 const createWrapper = () => {
@@ -118,11 +119,12 @@ describe('useRegister', () => {
 
     const { result } = renderHook(() => useRegister(), { wrapper: createWrapper() });
     const data = await result.current.mutateAsync({
+      name: 'New User',
       email: 'new@example.com',
       password: 'pass123',
     });
 
-    expect(api.register).toHaveBeenCalledWith({ email: 'new@example.com', password: 'pass123' });
+    expect(api.register).toHaveBeenCalledWith({ name: 'New User', email: 'new@example.com', password: 'pass123' });
     expect(data).toEqual(mockUser);
   });
 
@@ -131,7 +133,7 @@ describe('useRegister', () => {
 
     const { result } = renderHook(() => useRegister(), { wrapper: createWrapper() });
     await expect(
-      result.current.mutateAsync({ email: 'taken@example.com', password: 'pass123' })
+      result.current.mutateAsync({ name: 'Taken User', email: 'taken@example.com', password: 'pass123' })
     ).rejects.toThrow('Email already in use');
   });
 });

@@ -9,15 +9,15 @@ from fastapi_users import schemas as fu_schemas
 # ================== User Schemas ==================
 
 class UserRead(fu_schemas.BaseUser[uuid.UUID]):
-    pass
+    name: Optional[str] = None
 
 
 class UserCreate(fu_schemas.BaseUserCreate):
-    pass
+    name: Optional[str] = None
 
 
 class UserUpdate(fu_schemas.BaseUserUpdate):
-    pass
+    name: Optional[str] = None
 
 
 # ================== Portfolio Schemas ==================

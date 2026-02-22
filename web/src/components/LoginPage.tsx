@@ -33,6 +33,11 @@ const loginSchema = z.object({
 });
 
 const registerSchema = z.object({
+  name: z.string().superRefine((val, ctx) => {
+    if (val.trim().length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.nameRequired') });
+    }
+  }),
   email: z.string().superRefine((val, ctx) => {
     if (!emailValidator.safeParse(val).success) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
@@ -64,7 +69,7 @@ export function LoginPage() {
 
   const registerForm = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { name: '', email: '', password: '' },
   });
 
   const handleLogin = async (values: LoginValues) => {
@@ -77,7 +82,7 @@ export function LoginPage() {
 
   const handleRegister = async (values: RegisterValues) => {
     try {
-      await registerMutation.mutateAsync({ email: values.email, password: values.password });
+      await registerMutation.mutateAsync({ name: values.name, email: values.email, password: values.password });
       toast.success(t('auth.register.successToast'));
       loginForm.reset({ email: values.email, password: '' });
       setMode('login');
@@ -192,6 +197,24 @@ export function LoginPage() {
             <form key="register" noValidate onSubmit={registerForm.handleSubmit(handleRegister)} className="flex flex-col gap-3">
               <FieldGroup>
                 <Controller
+                  name="name"
+                  control={registerForm.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid || undefined}>
+                      <FieldLabel htmlFor="register-name">{t('auth.fields.name')}</FieldLabel>
+                      <Input
+                        {...field}
+                        id="register-name"
+                        type="text"
+                        placeholder={t('auth.fields.namePlaceholder')}
+                        autoComplete="name"
+                        autoFocus
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller
                   name="email"
                   control={registerForm.control}
                   render={({ field, fieldState }) => (
@@ -203,7 +226,6 @@ export function LoginPage() {
                         type="email"
                         placeholder={t('auth.fields.emailPlaceholder')}
                         autoComplete="email"
-                        autoFocus
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>

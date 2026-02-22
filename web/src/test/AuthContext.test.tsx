@@ -24,6 +24,7 @@ const mockUser: UserRead = {
   is_active: true,
   is_superuser: false,
   is_verified: true,
+  name: null,
 };
 
 // Renders AuthProvider with a simple consumer component

@@ -20,6 +20,7 @@ const lv: Translation = {
       invalidEmail: 'Nederīga e-pasta adrese',
       passwordRequired: 'Parole ir obligāta',
       passwordMinLength: 'Parolei jābūt vismaz 8 rakstzīmēm',
+      nameRequired: 'Vārds ir obligāts',
     },
     signIn: {
       title: 'Ierakstīties',
@@ -43,6 +44,8 @@ const lv: Translation = {
       redirecting: 'Novirza...',
     },
     fields: {
+      name: 'Vārds',
+      namePlaceholder: 'Jūsu vārds',
       email: 'E-pasts',
       emailPlaceholder: 'jus@piem.lv',
       password: 'Parole',

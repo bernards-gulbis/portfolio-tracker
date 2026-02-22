@@ -80,14 +80,17 @@ function AppContent() {
               <Button variant="ghost" className="h-8 w-8 rounded-full p-0" aria-label={t('app.header.userMenu')}>
                 <Avatar>
                   <AvatarFallback>
-                    {user?.email ? user.email.slice(0, 2).toUpperCase() : '??'}
+                    {user?.name
+                      ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+                      : user?.email?.slice(0, 2).toUpperCase() ?? '??'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="font-normal">
-                <p className="text-sm font-medium truncate">{user?.email}</p>
+                {user?.name && <p className="text-sm font-medium truncate">{user.name}</p>}
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem

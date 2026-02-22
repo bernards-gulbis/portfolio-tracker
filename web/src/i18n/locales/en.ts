@@ -18,6 +18,7 @@ const en = {
       invalidEmail: 'Invalid email address',
       passwordRequired: 'Password is required',
       passwordMinLength: 'Password must be at least 8 characters',
+      nameRequired: 'Name is required',
     },
     signIn: {
       title: 'Sign In',
@@ -41,6 +42,8 @@ const en = {
       redirecting: 'Redirecting...',
     },
     fields: {
+      name: 'Name',
+      namePlaceholder: 'Your name',
       email: 'Email',
       emailPlaceholder: 'you@example.com',
       password: 'Password',

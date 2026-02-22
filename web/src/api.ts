@@ -18,6 +18,7 @@ export interface UserRead {
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
+  name: string | null;
 }
 
 export interface LoginCredentials {
@@ -28,6 +29,7 @@ export interface LoginCredentials {
 export interface RegisterCredentials {
   email: string;
   password: string;
+  name: string;
 }
 
 export interface Portfolio {
