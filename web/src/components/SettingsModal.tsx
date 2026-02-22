@@ -129,8 +129,8 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
         <Tabs defaultValue="profile">
           <TabsList>
-            <TabsTrigger value="profile">{t('settings.profile.tab')}</TabsTrigger>
-            <TabsTrigger value="password">{t('settings.password.tab')}</TabsTrigger>
+            <TabsTrigger value="profile" onClick={() => passwordForm.clearErrors()}>{t('settings.profile.tab')}</TabsTrigger>
+            <TabsTrigger value="password" onClick={() => profileForm.clearErrors()}>{t('settings.password.tab')}</TabsTrigger>
           </TabsList>
 
           {/* Profile tab */}

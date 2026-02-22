@@ -3,7 +3,8 @@ Transaction repository for data access
 """
 import uuid
 from sqlmodel import Session, select, func
-from typing import List, Optional
+from typing import List, Optional, Tuple
+from sqlalchemy.exc import SQLAlchemyError
 from app.models import Transaction, Portfolio
 
 
@@ -51,7 +52,7 @@ class TransactionRepository:
         statement = select(Transaction).where(Transaction.portfolio_id == portfolio_id)
         return list(self.session.exec(statement).all())
 
-    def get_by_portfolio_id_paginated(self, portfolio_id: int, page: int = 1, page_size: int = 20) -> tuple[List[Transaction], int]:
+    def get_by_portfolio_id_paginated(self, portfolio_id: int, page: int = 1, page_size: int = 20) -> Tuple[List[Transaction], int]:
         """Get paginated transactions for a specific portfolio"""
         count_statement = select(func.count()).select_from(Transaction).where(Transaction.portfolio_id == portfolio_id)
         total = self.session.exec(count_statement).one()

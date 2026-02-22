@@ -30,8 +30,12 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 if SECRET_KEY == _DEFAULT_SECRET:
+    if COOKIE_SECURE:
+        raise RuntimeError("SECRET_KEY must be set when COOKIE_SECURE=true. Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\"")
     logger.warning("SECRET_KEY is not set — using insecure default. Set SECRET_KEY in .env before deploying.")
 if OAUTH_STATE_SECRET == _DEFAULT_SECRET:
+    if COOKIE_SECURE:
+        raise RuntimeError("OAUTH_STATE_SECRET must be set when COOKIE_SECURE=true. Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\"")
     logger.warning("OAUTH_STATE_SECRET is not set — using insecure default. Set OAUTH_STATE_SECRET in .env before deploying.")
 
 

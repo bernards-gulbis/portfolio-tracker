@@ -80,6 +80,7 @@ const mockStatus: PortfolioStatus = {
   total_return_after_tax_eur: 1380,
   total_return_after_tax_percent: 18.75,
   current_value_after_tax_eur: 8740,
+  missing_prices: [],
 };
 
 describe('PortfolioStatusView', () => {

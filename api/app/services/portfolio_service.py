@@ -3,9 +3,10 @@ Portfolio service for business logic
 """
 import math
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field as dc_field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from sqlmodel import Session
 from app.models import Portfolio, Transaction, TransactionType
@@ -21,8 +22,8 @@ from app.services.price_service import PriceService
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
 HOLDINGS_EPSILON = 1e-6
 
-# Tax rate applied to capital gains
-TAX_RATE = 0.255
+# Tax rate applied to capital gains — overridable via TAX_RATE env var
+TAX_RATE = float(os.getenv('TAX_RATE', '0.255'))
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +241,7 @@ class PortfolioService:
 
         holdings_value = 0.0
         unrealized_gains = 0.0
+        missing_prices: List[str] = []
 
         for ticker, holding_data in state.holdings.items():
             quantity = holding_data['quantity']
@@ -258,6 +260,8 @@ class PortfolioService:
                     unrealized_gain_loss_percent = (unrealized_gain_loss / total_cost) * 100
                 holdings_value += current_value
                 unrealized_gains += unrealized_gain_loss
+            else:
+                missing_prices.append(ticker)
 
             holdings_list.append(HoldingResponse(
                 ticker=ticker,
@@ -361,6 +365,7 @@ class PortfolioService:
             total_return_after_tax_eur=_n(total_return_after_tax_eur),
             total_return_after_tax_percent=_n(total_return_after_tax_percent),
             current_value_after_tax_eur=_n(current_value_after_tax_eur),
+            missing_prices=missing_prices,
         )
 
     def calculate_portfolio_status_at_date(
@@ -370,7 +375,7 @@ class PortfolioService:
         historical_prices: Optional[Dict[str, float]] = None,
         usd_to_eur_rate: Optional[float] = None,
         user_id: uuid.UUID = None,  # type: ignore[assignment]
-    ) -> tuple[float, Optional[float]]:
+    ) -> Tuple[float, Optional[float]]:
         """
         Calculate portfolio value (principal_eur, current_value_eur) at a specific date.
 

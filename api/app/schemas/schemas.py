@@ -219,7 +219,8 @@ class PortfolioStatusResponse(BaseModel):
     total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
     total_return_after_tax_percent: Optional[float]  # Total return after tax percentage
     current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
-    
+    missing_prices: List[str] = []  # Tickers for which current price could not be fetched
+
     model_config = ConfigDict(from_attributes=True)
 
 

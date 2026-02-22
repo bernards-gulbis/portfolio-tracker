@@ -248,6 +248,7 @@ const en = {
     noData: 'No status data available',
     error: 'Error loading portfolio status: {{message}}',
     fetchedAt: 'Updated {{time}}',
+    missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
     marketValue: 'Market Value',
     unrealized: 'unrealized',
     netInvested: 'Net Invested',

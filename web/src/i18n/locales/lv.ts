@@ -250,6 +250,7 @@ const lv: Translation = {
     noData: 'Nav pieejami statusa dati',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
     fetchedAt: 'Atjaunināts {{time}}',
+    missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',
     netInvested: 'Neto ieguldīts',

@@ -153,6 +153,7 @@ export interface PortfolioStatus {
   total_return_after_tax_eur: number | null;
   total_return_after_tax_percent: number | null;
   current_value_after_tax_eur: number | null;
+  missing_prices: string[];
 }
 
 export interface PerformanceDataPoint {

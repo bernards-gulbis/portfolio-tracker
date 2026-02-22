@@ -19,6 +19,7 @@ const HoldingsAllocationChart = lazy(() =>
   import('./HoldingsAllocationChart').then((m) => ({ default: m.HoldingsAllocationChart }))
 );
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,7 +49,7 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon } from 'lucide-react';
+import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon } from 'lucide-react';
 
 interface PortfolioStatusProps {
   portfolioId: number | null;
@@ -301,7 +302,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
                 <p className="text-lg font-semibold">
                   {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR', locale) : '-'}
                 </p>
-                {status.capital_gains_eur !== null && (
+                {status.capital_gains_eur !== null && status.tax_eur !== null && (
                   <p className="text-xs mt-0.5 text-muted-foreground">
                     {t('status.on')} {formatCurrency(status.capital_gains_eur, 'EUR', locale)}
                   </p>
@@ -348,6 +349,14 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
             {/* Holdings Table */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('status.positions')}</h3>
+              {status.missing_prices.length > 0 && (
+                <Alert variant="destructive" className="mb-3">
+                  <AlertTriangleIcon className="h-4 w-4" />
+                  <AlertDescription>
+                    {t('status.missingPrices', { tickers: status.missing_prices.join(', ') })}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
