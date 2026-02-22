@@ -105,6 +105,10 @@ const lv: Translation = {
       submitting: 'Kopē...',
       defaultName: '{{name}} (Kopija)',
     },
+    validation: {
+      nameRequired: 'Portfeļa nosaukums ir obligāts',
+      nameTooLong: 'Nosaukumam jābūt ne vairāk kā 255 rakstzīmēm',
+    },
   },
   transaction: {
     view: {

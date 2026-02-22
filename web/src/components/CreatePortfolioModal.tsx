@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -18,14 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 
-const schema = z.object({
-  name: z
-    .string()
-    .min(1, 'Portfolio name is required')
-    .max(255, 'Name must be at most 255 characters'),
-});
-
-type FormValues = z.infer<typeof schema>;
+type FormValues = { name: string };
 
 interface CreatePortfolioModalProps {
   isOpen: boolean;
@@ -34,6 +27,11 @@ interface CreatePortfolioModalProps {
 
 const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) => {
   const { t } = useTranslation();
+  const schema = useMemo(() => z.object({
+    name: z.string()
+      .min(1, t('portfolio.validation.nameRequired'))
+      .max(255, t('portfolio.validation.nameTooLong')),
+  }), [t]);
   const createPortfolio = useCreatePortfolio();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
