@@ -124,9 +124,6 @@ type FormValues = z.infer<typeof schema>;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
-
 /** Returns local date as "YYYY-MM-DD" */
 const toLocalDate = (date: Date): string => {
   const y = date.getFullYear();
@@ -135,11 +132,12 @@ const toLocalDate = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-/** Returns local time as "HH:mm" */
+/** Returns local time as "HH:mm:ss" */
 const toLocalTime = (date: Date): string => {
   const h = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${min}`;
+  const sec = String(date.getSeconds()).padStart(2, '0');
+  return `${h}:${min}:${sec}`;
 };
 
 /** Parses "YYYY-MM-DD" to a local Date without UTC shift */
@@ -375,50 +373,24 @@ const TransactionModal = ({
                 )}
               />
 
-              {/* Time — hour + minute Selects (fully themed, no native popup) */}
+              {/* Time — native time input */}
               <Controller
                 name="time"
                 control={form.control}
-                render={({ field, fieldState }) => {
-                  const [hh, mm] = (field.value || '00:00').split(':');
-                  return (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="tx-time-hour">{t('transaction.modal.fields.time')}</FieldLabel>
-                      <div className="flex items-center gap-1">
-                        <Select
-                          name="tx-time-hour"
-                          value={hh}
-                          onValueChange={(h) => field.onChange(`${h}:${mm}`)}
-                        >
-                          <SelectTrigger id="tx-time-hour" aria-label={t('transaction.modal.fields.hourLabel')}>
-                            <SelectValue placeholder="HH" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48">
-                            {HOURS.map((h) => (
-                              <SelectItem key={h} value={h}>{h}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <span className="text-muted-foreground text-sm font-medium shrink-0">:</span>
-                        <Select
-                          name="tx-time-minute"
-                          value={mm}
-                          onValueChange={(m) => field.onChange(`${hh}:${m}`)}
-                        >
-                          <SelectTrigger id="tx-time-minute" aria-label={t('transaction.modal.fields.minuteLabel')}>
-                            <SelectValue placeholder="MM" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48">
-                            {MINUTES.map((m) => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  );
-                }}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid || undefined}>
+                    <FieldLabel htmlFor="tx-time">{t('transaction.modal.fields.time')}</FieldLabel>
+                    <Input
+                      {...field}
+                      id="tx-time"
+                      type="time"
+                      step="1"
+                      className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
               />
             </div>
 
