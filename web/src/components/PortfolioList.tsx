@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '../hooks/useLocale';
 import { usePortfolios, useDeletePortfolio } from '../hooks/usePortfolios';
 import { usePortfolioContext } from '../context/PortfolioContext';
 import { Portfolio, getErrorMessage } from '../api';
@@ -41,6 +43,8 @@ import {
 } from '@/components/ui/empty';
 
 const PortfolioList = () => {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const { data: portfolios, isLoading, error } = usePortfolios();
   const { activePortfolioId, setActivePortfolioId } = usePortfolioContext();
   const deletePortfolio = useDeletePortfolio();
@@ -69,7 +73,7 @@ const PortfolioList = () => {
         setActivePortfolioId(null);
       }
     } catch (error) {
-      toast.error(`Failed to delete portfolio: ${getErrorMessage(error)}`);
+      toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(error) }));
     } finally {
       setDeleteConfirm({ open: false, portfolioId: null });
     }
@@ -87,7 +91,7 @@ const PortfolioList = () => {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Portfolios</CardTitle>
+          <CardTitle>{t('portfolio.list.title')}</CardTitle>
         </CardHeader>
         <Separator />
         <CardContent className="p-0">
@@ -111,12 +115,12 @@ const PortfolioList = () => {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Portfolios</CardTitle>
+          <CardTitle>{t('portfolio.list.title')}</CardTitle>
         </CardHeader>
         <Separator />
         <CardContent>
           <p className="text-destructive text-sm text-center py-8">
-            Error loading portfolios: {getErrorMessage(error)}
+            {t('portfolio.list.error', { message: getErrorMessage(error) })}
           </p>
         </CardContent>
       </Card>
@@ -127,10 +131,10 @@ const PortfolioList = () => {
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Portfolios</CardTitle>
+          <CardTitle>{t('portfolio.list.title')}</CardTitle>
           <Button size="sm" onClick={() => setIsModalOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
-            New
+            {t('portfolio.list.newButton')}
           </Button>
         </CardHeader>
         <Separator />
@@ -142,15 +146,15 @@ const PortfolioList = () => {
                 <EmptyMedia variant="icon">
                   <FolderOpenIcon />
                 </EmptyMedia>
-                <EmptyTitle>No Portfolios Yet</EmptyTitle>
+                <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
                 <EmptyDescription>
-                  Get started by creating your first portfolio.
+                  {t('portfolio.list.empty.description')}
                 </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
                 <Button onClick={() => setIsModalOpen(true)}>
                   <Plus className="h-4 w-4 mr-1" />
-                  New Portfolio
+                  {t('portfolio.list.empty.newButton')}
                 </Button>
               </EmptyContent>
             </Empty>
@@ -168,7 +172,7 @@ const PortfolioList = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{portfolio.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Created {new Date(portfolio.created_at).toLocaleDateString()}
+                      {t('portfolio.list.item.created')} {new Date(portfolio.created_at).toLocaleDateString(locale)}
                     </p>
                   </div>
                   <DropdownMenu>
@@ -179,7 +183,7 @@ const PortfolioList = () => {
                         className="h-8 w-8 shrink-0"
                         onClick={(e) => e.stopPropagation()}
                         disabled={deletePortfolio.isPending}
-                        aria-label={`Actions for ${portfolio.name}`}
+                        aria-label={t('portfolio.list.item.actionsLabel', { name: portfolio.name })}
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
@@ -188,11 +192,11 @@ const PortfolioList = () => {
                       <DropdownMenuGroup>
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(portfolio); }}>
                           <PencilIcon />
-                          Rename
+                          {t('portfolio.list.item.rename')}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopy(portfolio); }}>
                           <CopyIcon />
-                          Copy
+                          {t('portfolio.list.item.copy')}
                         </DropdownMenuItem>
                       </DropdownMenuGroup>
                       <DropdownMenuSeparator />
@@ -203,7 +207,7 @@ const PortfolioList = () => {
                           disabled={deletePortfolio.isPending}
                         >
                           <TrashIcon />
-                          Delete
+                          {t('portfolio.list.item.delete')}
                         </DropdownMenuItem>
                       </DropdownMenuGroup>
                     </DropdownMenuContent>
@@ -247,15 +251,15 @@ const PortfolioList = () => {
             <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
               <Trash2Icon />
             </AlertDialogMedia>
-            <AlertDialogTitle>Delete portfolio?</AlertDialogTitle>
+            <AlertDialogTitle>{t('portfolio.delete.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this portfolio and all its transactions. This action cannot be undone.
+              {t('portfolio.delete.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel variant="outline">Cancel</AlertDialogCancel>
+            <AlertDialogCancel variant="outline">{t('portfolio.delete.cancel')}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
-              Delete
+              {t('portfolio.delete.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

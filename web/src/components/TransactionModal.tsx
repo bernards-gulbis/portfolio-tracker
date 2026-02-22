@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { useLocale } from '../hooks/useLocale';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { useTranslation } from 'react-i18next';
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
 import { Transaction, TransactionType, TransactionCreate, getErrorMessage } from '../api';
 import {
@@ -143,10 +145,10 @@ const parseLocalDate = (str: string): Date | undefined => {
 };
 
 /** Formats "YYYY-MM-DD" for display in the calendar trigger */
-const formatDateDisplay = (str: string): string => {
+const formatDateDisplay = (str: string, locale: string = 'en-US'): string => {
   const date = parseLocalDate(str);
   if (!date) return str;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 
@@ -249,6 +251,8 @@ const TransactionModal = ({
   portfolioId,
   transaction,
 }: TransactionModalProps) => {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const isEdit = !!transaction;
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
@@ -304,9 +308,9 @@ const TransactionModal = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
+          <DialogTitle>{isEdit ? t('transaction.modal.editTitle') : t('transaction.modal.addTitle')}</DialogTitle>
           <DialogDescription className="sr-only">
-            {isEdit ? 'Form to edit an existing transaction' : 'Form to add a new transaction'}
+            {isEdit ? t('transaction.modal.editDescription') : t('transaction.modal.addDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -321,13 +325,13 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-date">Date</FieldLabel>
+                    <FieldLabel htmlFor="tx-date">{t('transaction.modal.fields.date')}</FieldLabel>
                     <div className="flex">
                       <Input
                         {...field}
                         id="tx-date"
                         type="text"
-                        placeholder="YYYY-MM-DD"
+                        placeholder={t('transaction.modal.fields.datePlaceholder')}
                         autoComplete="off"
                         className="rounded-r-none"
                         aria-invalid={fieldState.invalid}
@@ -339,7 +343,7 @@ const TransactionModal = ({
                             variant="outline"
                             tabIndex={-1}
                             className="rounded-l-none border-l-0 shrink-0 px-3"
-                            aria-label="Pick date from calendar"
+                            aria-label={t('transaction.modal.fields.datePickerLabel')}
                           >
                             <CalendarIcon className="h-4 w-4" />
                           </Button>
@@ -355,7 +359,7 @@ const TransactionModal = ({
                           />
                           {field.value && (
                             <p className="px-3 pb-3 text-center text-sm text-muted-foreground">
-                              {formatDateDisplay(field.value)}
+                              {formatDateDisplay(field.value, locale)}
                             </p>
                           )}
                         </PopoverContent>
@@ -374,14 +378,14 @@ const TransactionModal = ({
                   const [hh, mm] = (field.value || '00:00').split(':');
                   return (
                     <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="tx-time-hour">Time</FieldLabel>
+                      <FieldLabel htmlFor="tx-time-hour">{t('transaction.modal.fields.time')}</FieldLabel>
                       <div className="flex items-center gap-1">
                         <Select
                           name="tx-time-hour"
                           value={hh}
                           onValueChange={(h) => field.onChange(`${h}:${mm}`)}
                         >
-                          <SelectTrigger id="tx-time-hour" aria-label="Hour">
+                          <SelectTrigger id="tx-time-hour" aria-label={t('transaction.modal.fields.hourLabel')}>
                             <SelectValue placeholder="HH" />
                           </SelectTrigger>
                           <SelectContent className="max-h-48">
@@ -396,7 +400,7 @@ const TransactionModal = ({
                           value={mm}
                           onValueChange={(m) => field.onChange(`${hh}:${m}`)}
                         >
-                          <SelectTrigger id="tx-time-minute" aria-label="Minute">
+                          <SelectTrigger id="tx-time-minute" aria-label={t('transaction.modal.fields.minuteLabel')}>
                             <SelectValue placeholder="MM" />
                           </SelectTrigger>
                           <SelectContent className="max-h-48">
@@ -419,7 +423,7 @@ const TransactionModal = ({
               control={form.control}
               render={({ field }) => (
                 <Field>
-                  <FieldLabel htmlFor="tx-type">Transaction Type</FieldLabel>
+                  <FieldLabel htmlFor="tx-type">{t('transaction.modal.fields.type')}</FieldLabel>
                   <Select
                     name="tx-type"
                     value={field.value}
@@ -432,13 +436,13 @@ const TransactionModal = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={TransactionType.DEPOSIT}>Deposit</SelectItem>
-                      <SelectItem value={TransactionType.WITHDRAW}>Withdraw</SelectItem>
-                      <SelectItem value={TransactionType.BUY}>Buy</SelectItem>
-                      <SelectItem value={TransactionType.SELL}>Sell</SelectItem>
-                      <SelectItem value={TransactionType.DIVIDEND}>Dividend</SelectItem>
-                      <SelectItem value={TransactionType.FEE}>Fee</SelectItem>
-                      <SelectItem value={TransactionType.SPLIT}>Split</SelectItem>
+                      <SelectItem value={TransactionType.DEPOSIT}>{t('transaction.modal.types.Deposit')}</SelectItem>
+                      <SelectItem value={TransactionType.WITHDRAW}>{t('transaction.modal.types.Withdraw')}</SelectItem>
+                      <SelectItem value={TransactionType.BUY}>{t('transaction.modal.types.Buy')}</SelectItem>
+                      <SelectItem value={TransactionType.SELL}>{t('transaction.modal.types.Sell')}</SelectItem>
+                      <SelectItem value={TransactionType.DIVIDEND}>{t('transaction.modal.types.Dividend')}</SelectItem>
+                      <SelectItem value={TransactionType.FEE}>{t('transaction.modal.types.Fee')}</SelectItem>
+                      <SelectItem value={TransactionType.SPLIT}>{t('transaction.modal.types.Split')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -452,11 +456,11 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-ticker">Ticker</FieldLabel>
+                    <FieldLabel htmlFor="tx-ticker">{t('transaction.modal.fields.ticker')}</FieldLabel>
                     <Input
                       {...field}
                       id="tx-ticker"
-                      placeholder="e.g., AAPL"
+                      placeholder={t('transaction.modal.fields.tickerPlaceholder')}
                       autoComplete="off"
                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                       aria-invalid={fieldState.invalid}
@@ -474,14 +478,14 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-quantity">Quantity</FieldLabel>
+                    <FieldLabel htmlFor="tx-quantity">{t('transaction.modal.fields.quantity')}</FieldLabel>
                     <Input
                       {...field}
                       id="tx-quantity"
                       type="number"
                       step="0.00000001"
                       min="0.00000001"
-                      placeholder="Number of shares"
+                      placeholder={t('transaction.modal.fields.quantityPlaceholder')}
                       autoComplete="off"
                       aria-invalid={fieldState.invalid}
                     />
@@ -498,7 +502,7 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-price">Price per Share</FieldLabel>
+                    <FieldLabel htmlFor="tx-price">{t('transaction.modal.fields.pricePerShare')}</FieldLabel>
                     <InputGroup>
                       <InputGroupAddon>
                         <InputGroupText>$</InputGroupText>
@@ -527,7 +531,7 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-fee">Fee</FieldLabel>
+                    <FieldLabel htmlFor="tx-fee">{t('transaction.modal.fields.fee')}</FieldLabel>
                     <InputGroup>
                       <InputGroupAddon>
                         <InputGroupText>$</InputGroupText>
@@ -555,7 +559,7 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-total">Total Amount</FieldLabel>
+                    <FieldLabel htmlFor="tx-total">{t('transaction.modal.fields.totalAmount')}</FieldLabel>
                     <InputGroup>
                       <InputGroupAddon>
                         <InputGroupText>$</InputGroupText>
@@ -584,7 +588,7 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-eur">Amount in EUR</FieldLabel>
+                    <FieldLabel htmlFor="tx-eur">{t('transaction.modal.fields.amountInEur')}</FieldLabel>
                     <InputGroup>
                       <InputGroupAddon>
                         <InputGroupText>€</InputGroupText>
@@ -615,19 +619,19 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-split">Split Ratio</FieldLabel>
+                    <FieldLabel htmlFor="tx-split">{t('transaction.modal.fields.splitRatio')}</FieldLabel>
                     <Input
                       {...field}
                       id="tx-split"
                       type="number"
                       step="0.01"
                       min="0.01"
-                      placeholder="e.g., 2 for 2-for-1 split"
+                      placeholder={t('transaction.modal.fields.splitRatioPlaceholder')}
                       autoComplete="off"
                       aria-invalid={fieldState.invalid}
                     />
                     <FieldDescription>
-                      Enter the split ratio (e.g., 2 for a 2-for-1 split)
+                      {t('transaction.modal.fields.splitRatioDescription')}
                     </FieldDescription>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -642,18 +646,18 @@ const TransactionModal = ({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-fx">FX Rate</FieldLabel>
+                    <FieldLabel htmlFor="tx-fx">{t('transaction.modal.fields.fxRate')}</FieldLabel>
                     <Input
                       {...field}
                       id="tx-fx"
                       type="number"
                       step="0.0001"
                       min="0.0001"
-                      placeholder="e.g., 1.0850"
+                      placeholder={t('transaction.modal.fields.fxRatePlaceholder')}
                       autoComplete="off"
                       aria-invalid={fieldState.invalid}
                     />
-                    <FieldDescription>Exchange rate used for currency conversion</FieldDescription>
+                    <FieldDescription>{t('transaction.modal.fields.fxRateDescription')}</FieldDescription>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -670,12 +674,12 @@ const TransactionModal = ({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
-            Cancel
+            {t('transaction.modal.cancel')}
           </Button>
           <Button type="submit" form="transaction-form" disabled={isPending}>
             {isPending
-              ? isEdit ? 'Updating...' : 'Adding...'
-              : isEdit ? 'Update' : 'Add Transaction'}
+              ? isEdit ? t('transaction.modal.updating') : t('transaction.modal.adding')
+              : isEdit ? t('transaction.modal.update') : t('transaction.modal.add')}
           </Button>
         </DialogFooter>
       </DialogContent>

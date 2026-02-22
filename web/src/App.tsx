@@ -23,6 +23,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sun, Moon, LogOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 export const queryClient = new QueryClient({
@@ -39,6 +41,7 @@ function AppContent() {
   const { theme, toggleTheme } = useTheme();
   const { status, user } = useAuth();
   const logoutMutation = useLogout();
+  const { t } = useTranslation();
 
   if (status === 'loading') {
     return (
@@ -55,24 +58,26 @@ function AppContent() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b px-6 py-3 flex justify-between items-center">
-        <h1 className="text-lg font-semibold">Portfolio Tracker</h1>
+        <h1 className="text-lg font-semibold">{t('app.title')}</h1>
         <div className="flex items-center gap-2">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+                <Button variant="outline" size="icon" onClick={toggleTheme} aria-label={t('app.header.toggleTheme')}>
                   {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                Switch to {theme === 'light' ? 'dark' : 'light'} mode
+                {theme === 'light' ? t('app.header.switchToDark') : t('app.header.switchToLight')}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
+          <LanguageSwitcher />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 rounded-full p-0" aria-label="User menu">
+              <Button variant="ghost" className="h-8 w-8 rounded-full p-0" aria-label={t('app.header.userMenu')}>
                 <Avatar>
                   <AvatarFallback>
                     {user?.email ? user.email.slice(0, 2).toUpperCase() : '??'}
@@ -90,7 +95,7 @@ function AppContent() {
                 disabled={logoutMutation.isPending}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                {logoutMutation.isPending ? 'Signing out…' : 'Sign out'}
+                {logoutMutation.isPending ? t('app.header.signingOut') : t('app.header.signOut')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

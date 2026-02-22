@@ -5,7 +5,7 @@ Self-hosted investment portfolio tracker for European retail investors. Multi-cu
 ## Tech Stack
 
 **Backend (api/):** Python, FastAPI, SQLModel (SQLAlchemy + Pydantic), SQLite (dev) / PostgreSQL (prod), Pytest
-**Frontend (web/):** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui, Tailwind CSS v4, sonner (toasts), Vitest
+**Frontend (web/):** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui, Tailwind CSS v4, sonner (toasts), i18next + react-i18next (localization), Vitest
 
 ## Project Structure
 
@@ -41,12 +41,17 @@ web/
   src/
     api.ts                   # Axios client (withCredentials), 401 interceptor, API functions
     App.tsx                  # Root component; QueryClient exported for AuthContext.clear()
-    components/              # 12 React app components (views, modals, charts, LoginPage)
+    components/              # 13 React app components (views, modals, charts, LoginPage, LanguageSwitcher)
     components/ui/           # 23 shadcn/ui primitives (copied into repo, not a package)
-    hooks/                   # TanStack Query wrappers + useLogin/useRegister/useLogout
+    hooks/                   # TanStack Query wrappers + useLogin/useRegister/useLogout + useLocale
     context/                 # PortfolioContext, ThemeContext, AuthContext (user/status/logout)
+    i18n/
+      index.ts               # i18next init: LanguageDetector, supportedLngs ['en','lv'], localStorage key 'pt_language'
+      i18next.d.ts           # Module augmentation — typed t() via CustomTypeOptions
+      locales/en.ts          # English strings (master); exports Translation type
+      locales/lv.ts          # Latvian strings typed as Translation — compiler enforces completeness
     lib/utils.ts             # cn() utility — clsx + tailwind-merge
-    utils/formatters.ts      # Currency, date, number formatting
+    utils/formatters.ts      # Currency, date, number formatting; formatCurrency/formatDate accept locale param
     constants/pagination.ts  # Page size config (default: 20)
 ```
 
@@ -184,6 +189,23 @@ Backend routes have no path prefix. The Vite dev server proxies `/api/*` → `lo
 - **Tax rate:** 25.5% capital gains — `TAX_RATE` constant at `api/app/services/portfolio_service.py:24`
 - **Holdings epsilon:** Floating-point threshold `HOLDINGS_EPSILON = 1e-6` at `api/app/services/portfolio_service.py:20`
 
+## Localization
+
+The app supports English (`en`) and Latvian (`lv`) via **i18next + react-i18next**.
+
+- Translation strings live in `web/src/i18n/locales/en.ts` (master) and `web/src/i18n/locales/lv.ts`.
+- `lv.ts` is typed as `lv: Translation` — TypeScript catches missing or misspelled keys at compile time.
+- Language is auto-detected from `localStorage` key `pt_language`, then browser `navigator.language`, falling back to `en`.
+- Language switcher (`LanguageSwitcher.tsx`) is rendered in the `App.tsx` header between the theme toggle and user menu.
+
+**Adding a new string:** add the key to both `en.ts` and `lv.ts`. TypeScript will error at compile time if `lv.ts` is missing it.
+
+**Adding a new language:** add the locale file, import it in `i18n/index.ts`, add the BCP 47 mapping to `useLocale.ts`, and add the display name to both locale files under `language.*`.
+
+**Formatting with locale:** always call `useLocale()` in components that use `formatCurrency`, `formatDate`, or `toLocaleDateString`, and pass the returned locale string as the last argument. This ensures currency and date output switches immediately when the user changes language.
+
+**Validation messages** (Zod schema errors in `TransactionModal.tsx`) are kept in English only — they are at module scope where `useTranslation` is unavailable.
+
 ## Keeping Things in Sync
 
 The `TransactionType` enum is duplicated in backend and frontend — both must match:
@@ -193,6 +215,8 @@ The `TransactionType` enum is duplicated in backend and frontend — both must m
 TypeScript interfaces in `api.ts` mirror Pydantic schemas in `schemas.py`. When modifying response shapes, update both.
 
 `UserRead` (frontend: `web/src/api.ts`, backend: `api/app/schemas/schemas.py`) must stay in sync — it drives the `user` object in `AuthContext`.
+
+Translation files `en.ts` and `lv.ts` must stay in sync — add every new UI string to both files at the same time.
 
 ## Environment Variables
 

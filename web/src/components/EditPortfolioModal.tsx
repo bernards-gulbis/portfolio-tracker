@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { useTranslation } from 'react-i18next';
 import { useUpdatePortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import {
@@ -39,6 +40,7 @@ const EditPortfolioModal = ({
   portfolioId,
   currentName,
 }: EditPortfolioModalProps) => {
+  const { t } = useTranslation();
   const updatePortfolio = useUpdatePortfolio();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -76,9 +78,9 @@ const EditPortfolioModal = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Rename Portfolio</DialogTitle>
+          <DialogTitle>{t('portfolio.edit.title')}</DialogTitle>
           <DialogDescription className="sr-only">
-            Form to rename this portfolio
+            {t('portfolio.edit.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -89,11 +91,11 @@ const EditPortfolioModal = ({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid || undefined}>
-                  <FieldLabel htmlFor="edit-portfolio-name">Portfolio Name</FieldLabel>
+                  <FieldLabel htmlFor="edit-portfolio-name">{t('portfolio.edit.nameLabel')}</FieldLabel>
                   <Input
                     {...field}
                     id="edit-portfolio-name"
-                    placeholder="e.g., My Investment Portfolio"
+                    placeholder={t('portfolio.edit.namePlaceholder')}
                     autoComplete="off"
                     autoFocus
                     aria-invalid={fieldState.invalid}
@@ -117,14 +119,14 @@ const EditPortfolioModal = ({
             onClick={handleClose}
             disabled={updatePortfolio.isPending}
           >
-            Cancel
+            {t('portfolio.edit.cancel')}
           </Button>
           <Button
             type="submit"
             form="edit-portfolio-form"
             disabled={updatePortfolio.isPending}
           >
-            {updatePortfolio.isPending ? 'Updating...' : 'Update Portfolio'}
+            {updatePortfolio.isPending ? t('portfolio.edit.submitting') : t('portfolio.edit.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

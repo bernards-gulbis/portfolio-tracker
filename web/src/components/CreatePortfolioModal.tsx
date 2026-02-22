@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { useTranslation } from 'react-i18next';
 import { useCreatePortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import {
@@ -32,6 +33,7 @@ interface CreatePortfolioModalProps {
 }
 
 const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) => {
+  const { t } = useTranslation();
   const createPortfolio = useCreatePortfolio();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -62,9 +64,9 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create New Portfolio</DialogTitle>
+          <DialogTitle>{t('portfolio.create.title')}</DialogTitle>
           <DialogDescription className="sr-only">
-            Form to create a new portfolio
+            {t('portfolio.create.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -75,11 +77,11 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid || undefined}>
-                  <FieldLabel htmlFor="create-portfolio-name">Portfolio Name</FieldLabel>
+                  <FieldLabel htmlFor="create-portfolio-name">{t('portfolio.create.nameLabel')}</FieldLabel>
                   <Input
                     {...field}
                     id="create-portfolio-name"
-                    placeholder="e.g., My Investment Portfolio"
+                    placeholder={t('portfolio.create.namePlaceholder')}
                     autoComplete="off"
                     autoFocus
                     aria-invalid={fieldState.invalid}
@@ -103,14 +105,14 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
             onClick={handleClose}
             disabled={createPortfolio.isPending}
           >
-            Cancel
+            {t('portfolio.create.cancel')}
           </Button>
           <Button
             type="submit"
             form="create-portfolio-form"
             disabled={createPortfolio.isPending}
           >
-            {createPortfolio.isPending ? 'Creating...' : 'Create Portfolio'}
+            {createPortfolio.isPending ? t('portfolio.create.submitting') : t('portfolio.create.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

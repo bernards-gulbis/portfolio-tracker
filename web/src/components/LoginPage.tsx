@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import { Moon, Sun } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getGoogleAuthorizeUrl, getErrorMessage } from '../api';
 import { useLogin, useRegister } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
@@ -31,6 +32,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const loginMutation = useLogin();
   const registerMutation = useRegister();
@@ -56,7 +58,7 @@ export function LoginPage() {
   const handleRegister = async (values: RegisterValues) => {
     try {
       await registerMutation.mutateAsync({ email: values.email, password: values.password });
-      toast.success('Account created! Please log in.');
+      toast.success(t('auth.register.successToast'));
       loginForm.reset({ email: values.email, password: '' });
       setMode('login');
     } catch (err) {
@@ -87,17 +89,15 @@ export function LoginPage() {
         size="icon"
         onClick={toggleTheme}
         className="absolute top-4 right-4"
-        aria-label="Toggle theme"
+        aria-label={t('app.header.toggleTheme')}
       >
         {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
       </Button>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>{mode === 'login' ? 'Sign In' : 'Create Account'}</CardTitle>
+          <CardTitle>{mode === 'login' ? t('auth.signIn.title') : t('auth.register.title')}</CardTitle>
           <CardDescription>
-            {mode === 'login'
-              ? 'Sign in to access your portfolio'
-              : 'Create an account to get started'}
+            {mode === 'login' ? t('auth.signIn.description') : t('auth.register.description')}
           </CardDescription>
         </CardHeader>
 
@@ -108,12 +108,12 @@ export function LoginPage() {
             disabled={googleLoading}
             className="w-full"
           >
-            {googleLoading ? 'Redirecting...' : 'Continue with Google'}
+            {googleLoading ? t('auth.google.redirecting') : t('auth.google.continue')}
           </Button>
 
           <div className="flex items-center gap-2">
             <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">or</span>
+            <span className="text-xs text-muted-foreground">{t('auth.separator')}</span>
             <Separator className="flex-1" />
           </div>
 
@@ -125,12 +125,12 @@ export function LoginPage() {
                   control={loginForm.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="login-email">Email</FieldLabel>
+                      <FieldLabel htmlFor="login-email">{t('auth.fields.email')}</FieldLabel>
                       <Input
                         {...field}
                         id="login-email"
                         type="email"
-                        placeholder="you@example.com"
+                        placeholder={t('auth.fields.emailPlaceholder')}
                         autoComplete="email"
                         autoFocus
                       />
@@ -143,12 +143,12 @@ export function LoginPage() {
                   control={loginForm.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="login-password">Password</FieldLabel>
+                      <FieldLabel htmlFor="login-password">{t('auth.fields.password')}</FieldLabel>
                       <Input
                         {...field}
                         id="login-password"
                         type="password"
-                        placeholder="••••••••"
+                        placeholder={t('auth.fields.passwordPlaceholder')}
                         autoComplete="current-password"
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -163,7 +163,7 @@ export function LoginPage() {
               </FieldGroup>
 
               <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
-                {loginMutation.isPending ? 'Signing in...' : 'Sign In'}
+                {loginMutation.isPending ? t('auth.signIn.submitting') : t('auth.signIn.submit')}
               </Button>
             </form>
           ) : (
@@ -174,12 +174,12 @@ export function LoginPage() {
                   control={registerForm.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="register-email">Email</FieldLabel>
+                      <FieldLabel htmlFor="register-email">{t('auth.fields.email')}</FieldLabel>
                       <Input
                         {...field}
                         id="register-email"
                         type="email"
-                        placeholder="you@example.com"
+                        placeholder={t('auth.fields.emailPlaceholder')}
                         autoComplete="email"
                         autoFocus
                       />
@@ -192,12 +192,12 @@ export function LoginPage() {
                   control={registerForm.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="register-password">Password</FieldLabel>
+                      <FieldLabel htmlFor="register-password">{t('auth.fields.password')}</FieldLabel>
                       <Input
                         {...field}
                         id="register-password"
                         type="password"
-                        placeholder="••••••••"
+                        placeholder={t('auth.fields.passwordPlaceholder')}
                         autoComplete="new-password"
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -212,7 +212,7 @@ export function LoginPage() {
               </FieldGroup>
 
               <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
-                {registerMutation.isPending ? 'Creating account...' : 'Create Account'}
+                {registerMutation.isPending ? t('auth.register.submitting') : t('auth.register.submit')}
               </Button>
             </form>
           )}
@@ -220,24 +220,24 @@ export function LoginPage() {
           <p className="text-center text-sm text-muted-foreground">
             {mode === 'login' ? (
               <>
-                Don't have an account?{' '}
+                {t('auth.signIn.switchPrompt')}{' '}
                 <button
                   type="button"
                   onClick={switchToRegister}
                   className="underline underline-offset-4 hover:text-foreground"
                 >
-                  Sign up
+                  {t('auth.signIn.switchLink')}
                 </button>
               </>
             ) : (
               <>
-                Already have an account?{' '}
+                {t('auth.register.switchPrompt')}{' '}
                 <button
                   type="button"
                   onClick={switchToLogin}
                   className="underline underline-offset-4 hover:text-foreground"
                 >
-                  Sign in
+                  {t('auth.register.switchLink')}
                 </button>
               </>
             )}

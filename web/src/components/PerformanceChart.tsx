@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -5,7 +6,9 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
+import { useLocale } from '../hooks/useLocale';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -31,23 +34,26 @@ interface PerformanceChartProps {
   onPeriodChange?: (period: TimePeriod) => void;
 }
 
-const chartConfig = {
-  principal: {
-    label: 'Principal (EUR)',
-    color: 'var(--chart-2)',
-  },
-  currentValue: {
-    label: 'Current Value (EUR)',
-    color: 'var(--chart-1)',
-  },
-} satisfies ChartConfig;
-
 export const PerformanceChart = ({
   data,
   loading,
   selectedPeriod = 'all',
   onPeriodChange,
 }: PerformanceChartProps) => {
+  const { t } = useTranslation();
+  const locale = useLocale();
+
+  const chartConfig = useMemo(() => ({
+    principal: {
+      label: t('chart.performance.principal'),
+      color: 'var(--chart-2)',
+    },
+    currentValue: {
+      label: t('chart.performance.currentValue'),
+      color: 'var(--chart-1)',
+    },
+  }) satisfies ChartConfig, [t]);
+
   if (loading) {
     return (
       <Card>
@@ -68,10 +74,10 @@ export const PerformanceChart = ({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Performance</CardTitle>
+          <CardTitle>{t('chart.performance.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No performance data available</p>
+          <p className="text-sm text-muted-foreground">{t('chart.performance.noData')}</p>
         </CardContent>
       </Card>
     );
@@ -92,7 +98,7 @@ export const PerformanceChart = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Performance</CardTitle>
+        <CardTitle>{t('chart.performance.title')}</CardTitle>
         {onPeriodChange && (
           <CardAction>
             <Tabs value={selectedPeriod} onValueChange={(v) => onPeriodChange(v as TimePeriod)}>
@@ -125,7 +131,7 @@ export const PerformanceChart = ({
               content={
                 <ChartTooltipContent
                   formatter={(value) =>
-                    value != null ? formatCurrency(value as number, 'EUR') : 'N/A'
+                    value != null ? formatCurrency(value as number, 'EUR', locale) : 'N/A'
                   }
                 />
               }

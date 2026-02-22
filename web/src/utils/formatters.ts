@@ -1,10 +1,10 @@
-import { Transaction, TransactionType } from '../api';
+import { Transaction } from '../api';
 
 /**
- * Format currency value
+ * Format currency value. Pass the locale returned by useLocale() for reactive formatting.
  */
-export const formatCurrency = (value: number, currency: string = 'USD'): string => {
-  return new Intl.NumberFormat('en-US', {
+export const formatCurrency = (value: number, currency: string = 'USD', locale: string = 'en-US'): string => {
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
@@ -28,10 +28,10 @@ export const getDisplayValue = (transaction: Transaction): number => {
 };
 
 /**
- * Format date
+ * Format date. Pass the locale returned by useLocale() for reactive formatting.
  */
-export const formatDate = (date: string): string => {
-  return new Date(date).toLocaleDateString('en-US', {
+export const formatDate = (date: string, locale: string = 'en-US'): string => {
+  return new Date(date).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -53,11 +53,4 @@ export const getValueColor = (value: number | null | undefined): string => {
     return 'negative';
   }
   return 'neutral';
-};
-
-/**
- * Format transaction type for display
- */
-export const formatTransactionType = (type: TransactionType): string => {
-  return type.toString();
 };

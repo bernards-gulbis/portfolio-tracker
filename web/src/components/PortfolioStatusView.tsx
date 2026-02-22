@@ -1,7 +1,9 @@
 import { useState, lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { formatCurrency, formatNumber } from '../utils/formatters';
+import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage } from '../api';
 import type { TimePeriod } from './PerformanceChart';
 
@@ -26,10 +28,10 @@ interface PortfolioStatusProps {
   portfolioId: number | null;
 }
 
-const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD'): string => {
+const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
   if (value == null) return '-';
   const sign = value > 0 ? '+' : '';
-  return `${sign}${formatCurrency(value, currency)}`;
+  return `${sign}${formatCurrency(value, currency, locale)}`;
 };
 
 const formatSignedPercent = (value: number | null | undefined): string => {
@@ -46,10 +48,11 @@ const getValueClass = (value: number | null | undefined): string => {
 const formatCurrencyWithPercent = (
   currencyValue: number | null | undefined,
   percentValue: number | null | undefined,
-  currency: string = 'USD'
+  currency: string = 'USD',
+  locale: string = 'en-US'
 ): JSX.Element | string => {
   if (currencyValue == null) return '-';
-  const formattedCurrency = formatSignedCurrency(currencyValue, currency);
+  const formattedCurrency = formatSignedCurrency(currencyValue, currency, locale);
   const formattedPercent = percentValue != null ? formatSignedPercent(percentValue) : '';
   const percentClass = currencyValue >= 0 ? 'text-green-600' : 'text-red-600';
   return (
@@ -61,6 +64,8 @@ const formatCurrencyWithPercent = (
 };
 
 export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('1month');
   const { data: status, isLoading, error } = usePortfolioStatus(portfolioId);
 
@@ -94,7 +99,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
     return (
       <Card className="mb-6">
         <CardContent className="py-8">
-          <p className="text-center text-muted-foreground">Select a portfolio to view its status</p>
+          <p className="text-center text-muted-foreground">{t('status.noPortfolio')}</p>
         </CardContent>
       </Card>
     );
@@ -143,7 +148,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
     return (
       <Card className="mb-6">
         <CardContent className="py-8">
-          <p className="text-center text-destructive">Error loading portfolio status: {getErrorMessage(error)}</p>
+          <p className="text-center text-destructive">{t('status.error', { message: getErrorMessage(error) })}</p>
         </CardContent>
       </Card>
     );
@@ -153,7 +158,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
     return (
       <Card className="mb-6">
         <CardContent className="py-8">
-          <p className="text-center text-muted-foreground">No status data available</p>
+          <p className="text-center text-muted-foreground">{t('status.noData')}</p>
         </CardContent>
       </Card>
     );
@@ -168,60 +173,61 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
         <CardContent>
           {/* Portfolio Value */}
           <div className="mb-6">
-            <p className="text-sm text-muted-foreground mb-1">Market Value</p>
+            <p className="text-sm text-muted-foreground mb-1">{t('status.marketValue')}</p>
             <p className="text-3xl font-bold">
-              {status.current_value_eur !== null ? formatCurrency(status.current_value_eur, 'EUR') : '-'}
+              {status.current_value_eur !== null ? formatCurrency(status.current_value_eur, 'EUR', locale) : '-'}
             </p>
             <p className={`text-sm mt-1 ${getValueClass(status.unrealized_gains_eur)}`}>
               {formatCurrencyWithPercent(
                 status.unrealized_gains_eur,
                 status.unrealized_gains_percent,
-                'EUR'
+                'EUR',
+                locale
               )}
-              <span className="text-muted-foreground ml-2 font-normal">unrealized</span>
+              <span className="text-muted-foreground ml-2 font-normal">{t('status.unrealized')}</span>
             </p>
           </div>
 
           {/* Financial Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Net Invested</p>
-              <p className="text-lg font-semibold">{formatCurrency(status.principal_eur, 'EUR')}</p>
+              <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
+              <p className="text-lg font-semibold">{formatCurrency(status.principal_eur, 'EUR', locale)}</p>
               {status.currency_gains_eur !== null && (
                 <p className={`text-xs mt-0.5 ${getValueClass(status.currency_gains_eur)}`}>
-                  FX: {formatSignedCurrency(status.currency_gains_eur, 'EUR')}
+                  {t('status.fx')}: {formatSignedCurrency(status.currency_gains_eur, 'EUR', locale)}
                 </p>
               )}
             </div>
 
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Dividends</p>
+              <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.dividends')}</p>
               <p className="text-lg font-semibold">
-                {status.dividends_eur !== null ? formatCurrency(status.dividends_eur, 'EUR') : '-'}
+                {status.dividends_eur !== null ? formatCurrency(status.dividends_eur, 'EUR', locale) : '-'}
               </p>
             </div>
 
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Est. Tax (25.5%)</p>
+              <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax')}</p>
               <p className="text-lg font-semibold">
-                {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR') : '-'}
+                {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR', locale) : '-'}
               </p>
               {status.capital_gains_eur !== null && (
                 <p className="text-xs mt-0.5 text-muted-foreground">
-                  on {formatCurrency(status.capital_gains_eur, 'EUR')}
+                  {t('status.on')} {formatCurrency(status.capital_gains_eur, 'EUR', locale)}
                 </p>
               )}
             </div>
 
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">After-tax Value</p>
+              <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
               <p className="text-lg font-semibold">
                 {status.current_value_after_tax_eur !== null
-                  ? formatCurrency(status.current_value_after_tax_eur, 'EUR')
+                  ? formatCurrency(status.current_value_after_tax_eur, 'EUR', locale)
                   : '-'}
               </p>
               <p className={`text-xs mt-0.5 ${getValueClass(status.total_return_after_tax_eur)}`}>
-                {formatSignedCurrency(status.total_return_after_tax_eur, 'EUR')}
+                {formatSignedCurrency(status.total_return_after_tax_eur, 'EUR', locale)}
               </p>
             </div>
           </div>
@@ -252,18 +258,18 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
 
           {/* Holdings Table */}
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Positions</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('status.positions')}</h3>
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Ticker</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Avg cost</TableHead>
-                    <TableHead>Total cost</TableHead>
-                    <TableHead>Current price</TableHead>
-                    <TableHead>Market value</TableHead>
-                    <TableHead>Unrealized G/L</TableHead>
+                    <TableHead>{t('status.columns.ticker')}</TableHead>
+                    <TableHead>{t('status.columns.quantity')}</TableHead>
+                    <TableHead>{t('status.columns.avgCost')}</TableHead>
+                    <TableHead>{t('status.columns.totalCost')}</TableHead>
+                    <TableHead>{t('status.columns.currentPrice')}</TableHead>
+                    <TableHead>{t('status.columns.marketValue')}</TableHead>
+                    <TableHead>{t('status.columns.unrealizedGL')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -273,27 +279,27 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
                     <TableCell>-</TableCell>
                     <TableCell>-</TableCell>
                     <TableCell>-</TableCell>
-                    <TableCell>{formatCurrency(status.cash)}</TableCell>
+                    <TableCell>{formatCurrency(status.cash, 'USD', locale)}</TableCell>
                     <TableCell>-</TableCell>
                   </TableRow>
                   {status.holdings.map((holding) => (
                     <TableRow key={holding.ticker}>
                       <TableCell className="font-semibold">{holding.ticker}</TableCell>
                       <TableCell>{formatNumber(holding.quantity, 8)}</TableCell>
-                      <TableCell>{formatCurrency(holding.average_cost)}</TableCell>
-                      <TableCell>{formatCurrency(holding.total_cost)}</TableCell>
+                      <TableCell>{formatCurrency(holding.average_cost, 'USD', locale)}</TableCell>
+                      <TableCell>{formatCurrency(holding.total_cost, 'USD', locale)}</TableCell>
                       <TableCell>
-                        {holding.current_price != null ? formatCurrency(holding.current_price) : '-'}
+                        {holding.current_price != null ? formatCurrency(holding.current_price, 'USD', locale) : '-'}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {holding.current_value != null ? formatCurrency(holding.current_value) : '-'}
+                        {holding.current_value != null ? formatCurrency(holding.current_value, 'USD', locale) : '-'}
                       </TableCell>
                       <TableCell>
                         {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_percent != null
                           ? (
                             <div className="flex flex-col">
                               <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
-                                {formatSignedCurrency(holding.unrealized_gain_loss)}
+                                {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
                               </span>
                               <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
                                 {holding.unrealized_gain_loss_percent >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_percent).toFixed(2)}%
