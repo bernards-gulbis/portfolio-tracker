@@ -204,7 +204,7 @@ The app supports English (`en`) and Latvian (`lv`) via **i18next + react-i18next
 
 **Formatting with locale:** always call `useLocale()` in components that use `formatCurrency`, `formatDate`, or `toLocaleDateString`, and pass the returned locale string as the last argument. This ensures currency and date output switches immediately when the user changes language.
 
-**Validation messages** (Zod schema errors in `TransactionModal.tsx`) are kept in English only — they are at module scope where `useTranslation` is unavailable.
+**Validation messages** (Zod schema errors in `TransactionModal.tsx`, `CreatePortfolioModal.tsx`, `EditPortfolioModal.tsx`, `CopyPortfolioModal.tsx`) are kept in English only. Schemas are defined at module scope where `useTranslation` is unavailable, and error messages are only shown on validation failure — an edge case that doesn't justify the complexity and re-validation churn of making schemas reactive to language changes.
 
 ## Keeping Things in Sync
 

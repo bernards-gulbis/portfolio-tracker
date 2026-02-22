@@ -106,10 +106,6 @@ const en = {
       submitting: 'Copying...',
       defaultName: '{{name}} (Copy)',
     },
-    validation: {
-      nameRequired: 'Portfolio name is required',
-      nameTooLong: 'Name must be at most 255 characters',
-    },
   },
   transaction: {
     view: {
