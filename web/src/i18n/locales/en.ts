@@ -279,6 +279,39 @@ const en = {
       marketValue: 'Market Value',
     },
   },
+  settings: {
+    menuItem: 'Settings',
+    title: 'Settings',
+    profile: {
+      tab: 'Profile',
+      nameLabel: 'Name',
+      namePlaceholder: 'Your name',
+      emailLabel: 'Email',
+      submit: 'Save changes',
+      submitting: 'Saving…',
+      cancel: 'Cancel',
+    },
+    password: {
+      tab: 'Password',
+      newPasswordLabel: 'New password',
+      confirmPasswordLabel: 'Confirm new password',
+      submit: 'Change password',
+      submitOauth: 'Set password',
+      submitting: 'Saving…',
+      cancel: 'Cancel',
+      oauthNote: 'You signed in with Google. Setting a password will also enable email login.',
+    },
+    validation: {
+      nameRequired: 'Name is required',
+      nameTooLong: 'Name must be at most 255 characters',
+      passwordMinLength: 'Password must be at least 8 characters',
+      passwordsDoNotMatch: 'Passwords do not match',
+    },
+    toasts: {
+      profileUpdated: 'Profile updated',
+      passwordChanged: 'Password changed',
+    },
+  },
 };
 
 export type Translation = typeof en;

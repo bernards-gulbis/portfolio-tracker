@@ -25,9 +25,14 @@ from app.core import (
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
 from app.core.database import engine
-from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL
+from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL, current_active_user
 from app.schemas import UserRead, UserCreate, UserUpdate
+from app.models.user import User
+from app.models.oauth_account import OAuthAccount
+from app.core.database import get_session
+from sqlmodel import Session, select
 from sqlalchemy import text
+from fastapi import Depends
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
 
 # Configure logging
@@ -167,6 +172,19 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
+@app.get("/users/me", tags=["users"])
+def get_current_user_me(
+    user: User = Depends(current_active_user),
+    session: Session = Depends(get_session),
+):
+    providers = list(session.exec(
+        select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
+    ).all())
+    user_data = UserRead.model_validate(user).model_dump()
+    user_data["oauth_providers"] = providers
+    return user_data
+
+
 app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
     prefix="/users",

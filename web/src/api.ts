@@ -19,6 +19,12 @@ export interface UserRead {
   is_superuser: boolean;
   is_verified: boolean;
   name: string | null;
+  oauth_providers: string[];
+}
+
+export interface UserUpdate {
+  name?: string;
+  password?: string;
 }
 
 export interface LoginCredentials {
@@ -221,6 +227,11 @@ export const getCurrentUser = async (): Promise<UserRead> => {
 export const getGoogleAuthorizeUrl = async (): Promise<string> => {
   const response = await api.get<{ authorization_url: string }>('/auth/google/authorize');
   return response.data.authorization_url;
+};
+
+export const updateUser = async (data: UserUpdate): Promise<UserRead> => {
+  const response = await api.patch<UserRead>('/users/me', data);
+  return response.data;
 };
 
 // ================== Portfolio API Functions ==================

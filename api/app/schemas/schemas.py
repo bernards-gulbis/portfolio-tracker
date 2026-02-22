@@ -10,6 +10,7 @@ from fastapi_users import schemas as fu_schemas
 
 class UserRead(fu_schemas.BaseUser[uuid.UUID]):
     name: Optional[str] = None
+    oauth_providers: list[str] = []
 
 
 class UserCreate(fu_schemas.BaseUserCreate):

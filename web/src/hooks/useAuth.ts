@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import { login, register, getCurrentUser, LoginCredentials, RegisterCredentials } from '../api';
+import { login, register, getCurrentUser, updateUser, LoginCredentials, RegisterCredentials } from '../api';
 import { useAuth } from '../context/AuthContext';
 
 export const useLogin = () => {
@@ -32,6 +32,28 @@ export const useLogout = () => {
     mutationFn: () => logout(),
     onSuccess: () => {
       toast.success(t('auth.toasts.loggedOut'));
+    },
+  });
+};
+
+export const useUpdateProfile = () => {
+  const { setUser } = useAuth();
+  const { t } = useTranslation();
+  return useMutation({
+    mutationFn: (data: { name: string }) => updateUser({ name: data.name }),
+    onSuccess: (user) => {
+      setUser(user);
+      toast.success(t('settings.toasts.profileUpdated'));
+    },
+  });
+};
+
+export const useChangePassword = () => {
+  const { t } = useTranslation();
+  return useMutation({
+    mutationFn: (data: { password: string }) => updateUser({ password: data.password }),
+    onSuccess: () => {
+      toast.success(t('settings.toasts.passwordChanged'));
     },
   });
 };

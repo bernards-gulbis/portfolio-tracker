@@ -281,6 +281,39 @@ const lv: Translation = {
       marketValue: 'Tirgus vērtība',
     },
   },
+  settings: {
+    menuItem: 'Iestatījumi',
+    title: 'Iestatījumi',
+    profile: {
+      tab: 'Profils',
+      nameLabel: 'Vārds',
+      namePlaceholder: 'Jūsu vārds',
+      emailLabel: 'E-pasts',
+      submit: 'Saglabāt izmaiņas',
+      submitting: 'Saglabā…',
+      cancel: 'Atcelt',
+    },
+    password: {
+      tab: 'Parole',
+      newPasswordLabel: 'Jaunā parole',
+      confirmPasswordLabel: 'Apstiprināt jauno paroli',
+      submit: 'Mainīt paroli',
+      submitOauth: 'Iestatīt paroli',
+      submitting: 'Saglabā…',
+      cancel: 'Atcelt',
+      oauthNote: 'Jūs ierakstījāties ar Google. Iestatot paroli, tiks iespējota arī e-pasta ierakstīšanās.',
+    },
+    validation: {
+      nameRequired: 'Vārds ir obligāts',
+      nameTooLong: 'Vārdam jābūt ne garākam par 255 rakstzīmēm',
+      passwordMinLength: 'Parolei jābūt vismaz 8 rakstzīmēm',
+      passwordsDoNotMatch: 'Paroles nesakrīt',
+    },
+    toasts: {
+      profileUpdated: 'Profils atjaunināts',
+      passwordChanged: 'Parole nomainīta',
+    },
+  },
 };
 
 export default lv;

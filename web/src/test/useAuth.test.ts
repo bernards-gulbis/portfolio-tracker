@@ -33,6 +33,7 @@ const mockUser: UserRead = {
   is_superuser: false,
   is_verified: true,
   name: null,
+  oauth_providers: [],
 };
 
 const createWrapper = () => {

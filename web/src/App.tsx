@@ -30,9 +30,11 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Sun, Moon, LogOut } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import SettingsModal from './components/SettingsModal';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 export const queryClient = new QueryClient({
@@ -50,6 +52,7 @@ function AppContent() {
   const { status, user } = useAuth();
   const logoutMutation = useLogout();
   const { t } = useTranslation();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (status === 'loading') {
     return (
@@ -111,6 +114,11 @@ function AppContent() {
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  {t('settings.menuItem')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
@@ -128,6 +136,7 @@ function AppContent() {
           <TransactionView />
         </main>
       </SidebarInset>
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </SidebarProvider>
   );
 }
