@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { useTranslation } from 'react-i18next';
 import { useCopyPortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import {
@@ -18,8 +19,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 const schema = z.object({
-  name: z
-    .string()
+  name: z.string()
     .min(1, 'Portfolio name is required')
     .max(255, 'Name must be at most 255 characters'),
 });
@@ -39,17 +39,19 @@ const CopyPortfolioModal = ({
   portfolioId,
   portfolioName,
 }: CopyPortfolioModalProps) => {
+  const { t } = useTranslation();
   const copyPortfolio = useCopyPortfolio();
+  const defaultName = t('portfolio.copy.defaultName', { name: portfolioName });
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: `${portfolioName} (Copy)` },
+    defaultValues: { name: defaultName },
   });
 
   const { reset } = form;
 
   useEffect(() => {
-    if (isOpen) reset({ name: `${portfolioName} (Copy)` });
-  }, [isOpen, portfolioName, reset]);
+    if (isOpen) reset({ name: t('portfolio.copy.defaultName', { name: portfolioName }) });
+  }, [isOpen, portfolioName, reset, t]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -61,7 +63,7 @@ const CopyPortfolioModal = ({
   };
 
   const handleClose = () => {
-    reset({ name: `${portfolioName} (Copy)` });
+    reset({ name: t('portfolio.copy.defaultName', { name: portfolioName }) });
     onClose();
   };
 
@@ -69,9 +71,9 @@ const CopyPortfolioModal = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Copy Portfolio</DialogTitle>
+          <DialogTitle>{t('portfolio.copy.title')}</DialogTitle>
           <DialogDescription className="sr-only">
-            Form to copy this portfolio with all its transactions
+            {t('portfolio.copy.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -82,17 +84,17 @@ const CopyPortfolioModal = ({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid || undefined}>
-                  <FieldLabel htmlFor="copy-portfolio-name">New Portfolio Name</FieldLabel>
+                  <FieldLabel htmlFor="copy-portfolio-name">{t('portfolio.copy.nameLabel')}</FieldLabel>
                   <Input
                     {...field}
                     id="copy-portfolio-name"
-                    placeholder="Enter new portfolio name"
+                    placeholder={t('portfolio.copy.namePlaceholder')}
                     autoComplete="off"
                     autoFocus
                     aria-invalid={fieldState.invalid}
                   />
                   <FieldDescription>
-                    This will copy &ldquo;{portfolioName}&rdquo; with all its transactions.
+                    {t('portfolio.copy.nameDescription', { name: portfolioName })}
                   </FieldDescription>
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -113,14 +115,14 @@ const CopyPortfolioModal = ({
             onClick={handleClose}
             disabled={copyPortfolio.isPending}
           >
-            Cancel
+            {t('portfolio.copy.cancel')}
           </Button>
           <Button
             type="submit"
             form="copy-portfolio-form"
             disabled={copyPortfolio.isPending}
           >
-            {copyPortfolio.isPending ? 'Copying...' : 'Copy Portfolio'}
+            {copyPortfolio.isPending ? t('portfolio.copy.submitting') : t('portfolio.copy.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

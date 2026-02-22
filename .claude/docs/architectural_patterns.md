@@ -240,6 +240,49 @@ Global defaults set in `web/src/App.tsx:12-19`:
 - `staleTime: 5 minutes` - reduces unnecessary refetches
 - `retry: 1` - single retry on failure
 
+### Localization (i18n)
+
+i18next is initialized once in `web/src/i18n/index.ts` and imported as a side-effect at the top of `web/src/main.tsx` before React renders. No React Provider is needed — the module singleton is shared across the entire app.
+
+**Hook vs singleton access:**
+
+`useTranslation()` from react-i18next subscribes the component to language changes. Use it in every component that renders translated text:
+
+```tsx
+const { t } = useTranslation();
+return <p>{t('portfolio.list.title')}</p>;
+```
+
+Never read `i18n.language` directly from the singleton outside a hook — components won't re-render on language change.
+
+**Locale-aware number and date formatting:**
+
+`formatCurrency` and `formatDate` in `web/src/utils/formatters.ts` accept a `locale` parameter (BCP 47 string, e.g. `'lv-LV'`). Always obtain this from `useLocale()` in the component and pass it through:
+
+```tsx
+const locale = useLocale(); // reactive — re-renders on language change
+return <span>{formatCurrency(value, 'EUR', locale)}</span>;
+```
+
+`useLocale()` reads `i18n.language` through `useTranslation()`, which subscribes the component to language change events. The mapping `en → 'en-US'`, `lv → 'lv-LV'` is defined inside the hook.
+
+**Type safety:**
+
+`web/src/i18n/i18next.d.ts` augments i18next's `CustomTypeOptions` with the `Translation` type from `en.ts`. This makes `t('key.path')` fully type-checked — mistyped or missing keys are compile errors.
+
+`lv.ts` is typed as `lv: Translation`, so any key present in `en.ts` but missing in `lv.ts` is a TypeScript error.
+
+**Transaction type labels in tables:**
+
+When displaying `TransactionType` values in a table row (e.g. `TransactionTable`), use a `useMemo` lookup object rather than a dynamic template-literal key. This preserves type-checking and avoids calling `t()` with an unverified key:
+
+```tsx
+const labels = useMemo<Record<TransactionType, string>>(() => ({
+  [TransactionType.DEPOSIT]: t('transaction.modal.types.Deposit'),
+  // ... all 7 types
+}), [t]);
+```
+
 ## Cross-Cutting Patterns
 
 ### Pagination

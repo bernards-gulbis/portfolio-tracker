@@ -14,6 +14,8 @@ Built with FastAPI and React. Live market prices from Yahoo Finance with multi-l
 - **Gain/Loss & Tax Calculations**: Realized and unrealized gains with 25.5% capital gains tax estimates
 - **Performance Charts**: Time-series portfolio performance visualization (lazy-loaded)
 - **CSV Import/Export**: Bulk import transaction history from brokers or other tools
+- **UI Localization**: English and Latvian language support via i18next; language switcher in the app header; preference persisted to `localStorage`
+- **Locale-Aware Formatting**: Currency and date values formatted using `Intl.NumberFormat` / `toLocaleDateString` with the active locale (e.g. comma vs period decimal separator)
 - **Responsive UI**: Mobile-friendly interface with light/dark theme (available on login page and app), color-coded signed values, and paginated transaction history
 - **Toast Notifications**: Sonner-powered toast feedback on all mutations (create, update, delete, import)
 - **shadcn/ui Design System**: Accessible component library built on Radix UI primitives with a neutral theme
@@ -107,7 +109,7 @@ npm run dev
 
 The web application will be available at `http://localhost:3000`
 
-**Frontend stack:** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui (Radix UI + Tailwind CSS v4), sonner (toasts)
+**Frontend stack:** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui (Radix UI + Tailwind CSS v4), sonner (toasts), i18next + react-i18next (localization)
 
 To add a new shadcn/ui component:
 ```bash

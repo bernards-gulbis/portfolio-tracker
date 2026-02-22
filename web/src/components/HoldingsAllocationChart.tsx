@@ -3,7 +3,9 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
+import { useLocale } from '../hooks/useLocale';
 import { Holding } from '../api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,6 +40,9 @@ export const HoldingsAllocationChart = ({
   cash,
   loading,
 }: HoldingsAllocationChartProps) => {
+  const { t } = useTranslation();
+  const locale = useLocale();
+
   if (loading) {
     return (
       <Card>
@@ -74,10 +79,10 @@ export const HoldingsAllocationChart = ({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Allocation</CardTitle>
+          <CardTitle>{t('chart.allocation.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No allocation data available</p>
+          <p className="text-sm text-muted-foreground">{t('chart.allocation.noData')}</p>
         </CardContent>
       </Card>
     );
@@ -96,7 +101,7 @@ export const HoldingsAllocationChart = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Allocation</CardTitle>
+        <CardTitle>{t('chart.allocation.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="relative">
@@ -121,7 +126,7 @@ export const HoldingsAllocationChart = ({
                 content={
                   <ChartTooltipContent
                     hideLabel
-                    formatter={(value) => formatCurrency(value as number, 'EUR')}
+                    formatter={(value) => formatCurrency(value as number, 'EUR', locale)}
                   />
                 }
               />
@@ -129,8 +134,8 @@ export const HoldingsAllocationChart = ({
           </ChartContainer>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Market Value</p>
-              <p className="text-base font-bold">{formatCurrency(total, 'EUR')}</p>
+              <p className="text-xs text-muted-foreground">{t('chart.allocation.marketValue')}</p>
+              <p className="text-base font-bold">{formatCurrency(total, 'EUR', locale)}</p>
             </div>
           </div>
         </div>
@@ -147,7 +152,7 @@ export const HoldingsAllocationChart = ({
                   <span className="text-muted-foreground">{entry.name}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">{formatCurrency(entry.value, 'EUR')}</span>
+                  <span className="text-muted-foreground">{formatCurrency(entry.value, 'EUR', locale)}</span>
                   <span className="font-semibold w-12 text-right">{percentage}%</span>
                 </div>
               </div>

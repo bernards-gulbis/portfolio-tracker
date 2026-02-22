@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
 import { usePortfolioContext } from '../context/PortfolioContext';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
@@ -21,6 +22,7 @@ import {
 import { Plus, MoreVertical, UploadIcon, DownloadIcon } from 'lucide-react';
 
 const TransactionView = () => {
+  const { t } = useTranslation();
   const { activePortfolioId } = usePortfolioContext();
   const [currentPage, setCurrentPage] = useState(1);
   const { data: paginatedData, isLoading, error } = useTransactions(activePortfolioId, currentPage, DEFAULT_PAGE_SIZE);
@@ -72,7 +74,7 @@ const TransactionView = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setExportError(`Error exporting transactions: ${getErrorMessage(err)}`);
+      setExportError(t('transaction.view.exportError', { message: getErrorMessage(err) }));
     } finally {
       setIsExporting(false);
     }
@@ -83,8 +85,8 @@ const TransactionView = () => {
       <Card>
         <CardContent className="py-12">
           <div className="text-center text-muted-foreground">
-            <h2 className="text-lg font-medium mb-1">No Portfolio Selected</h2>
-            <p className="text-sm">Select a portfolio from the list to view its transactions.</p>
+            <h2 className="text-lg font-medium mb-1">{t('transaction.view.noPortfolio.title')}</h2>
+            <p className="text-sm">{t('transaction.view.noPortfolio.description')}</p>
           </div>
         </CardContent>
       </Card>
@@ -95,7 +97,7 @@ const TransactionView = () => {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-normal">Transactions</CardTitle>
+          <CardTitle className="text-lg font-normal">{t('transaction.view.title')}</CardTitle>
         </CardHeader>
         <Separator />
         <CardContent className="pt-4">
@@ -114,11 +116,11 @@ const TransactionView = () => {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-normal">Transactions</CardTitle>
+          <CardTitle className="text-lg font-normal">{t('transaction.view.title')}</CardTitle>
         </CardHeader>
         <Separator />
         <CardContent className="py-8">
-          <p className="text-center text-destructive text-sm">Error loading transactions: {getErrorMessage(error)}</p>
+          <p className="text-center text-destructive text-sm">{t('transaction.view.error', { message: getErrorMessage(error) })}</p>
         </CardContent>
       </Card>
     );
@@ -127,15 +129,15 @@ const TransactionView = () => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-normal">Transactions</CardTitle>
+        <CardTitle className="text-lg font-normal">{t('transaction.view.title')}</CardTitle>
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={handleAddTransaction}>
             <Plus className="h-4 w-4 mr-1" />
-            Add Transaction
+            {t('transaction.view.addButton')}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Transaction table actions menu">
+              <Button variant="outline" size="icon" className="h-8 w-8" aria-label={t('transaction.view.actionsMenu')}>
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -143,14 +145,14 @@ const TransactionView = () => {
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={() => setIsImportModalOpen(true)}>
                   <UploadIcon />
-                  Import CSV
+                  {t('transaction.view.importCsv')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleExport}
                   disabled={isExporting || !transactions || transactions.length === 0}
                 >
                   <DownloadIcon />
-                  {isExporting ? 'Exporting...' : 'Export CSV'}
+                  {isExporting ? t('transaction.view.exporting') : t('transaction.view.exportCsv')}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>

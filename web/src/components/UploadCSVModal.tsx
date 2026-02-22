@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { useTranslation } from 'react-i18next';
 import { useImportTransactionsCSV } from '../hooks/useTransactions';
 import { getErrorMessage } from '../api';
 import {
@@ -32,6 +33,7 @@ interface ImportCSVModalProps {
 }
 
 const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) => {
+  const { t } = useTranslation();
   const importCSV = useImportTransactionsCSV();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -64,9 +66,9 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload Transactions CSV</DialogTitle>
+          <DialogTitle>{t('transaction.csv.title')}</DialogTitle>
           <DialogDescription className="sr-only">
-            Form to upload a CSV file of transactions
+            {t('transaction.csv.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -77,7 +79,7 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
               control={form.control}
               render={({ field: { onChange }, fieldState }) => (
                 <Field data-invalid={fieldState.invalid || undefined}>
-                  <FieldLabel htmlFor="csv-file">CSV File</FieldLabel>
+                  <FieldLabel htmlFor="csv-file">{t('transaction.csv.fileLabel')}</FieldLabel>
                   <Input
                     id="csv-file"
                     type="file"
@@ -87,12 +89,11 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
                   />
                   {file instanceof File && (
                     <div className="p-3 bg-muted rounded-md text-sm">
-                      <strong>Selected:</strong> {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                      <strong>{t('transaction.csv.selected')}:</strong> {file.name} ({(file.size / 1024).toFixed(2)} KB)
                     </div>
                   )}
                   <FieldDescription>
-                    Expected format: date, type, ticker, quantity, price_per_share, fee,
-                    total_amount, eur, split_ratio
+                    {t('transaction.csv.fileDescription')}
                   </FieldDescription>
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -113,14 +114,14 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
             onClick={handleClose}
             disabled={importCSV.isPending}
           >
-            Cancel
+            {t('transaction.csv.cancel')}
           </Button>
           <Button
             type="submit"
             form="upload-csv-form"
             disabled={importCSV.isPending}
           >
-            {importCSV.isPending ? 'Importing...' : 'Import'}
+            {importCSV.isPending ? t('transaction.csv.submitting') : t('transaction.csv.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>
