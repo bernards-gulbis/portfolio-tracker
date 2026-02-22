@@ -249,6 +249,7 @@ const lv: Translation = {
     noPortfolio: 'Izvēlieties portfeli, lai skatītu tā statusu',
     noData: 'Nav pieejami statusa dati',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
+    fetchedAt: 'Atjaunināts {{time}}',
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',
     netInvested: 'Neto ieguldīts',

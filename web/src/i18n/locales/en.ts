@@ -247,6 +247,7 @@ const en = {
     noPortfolio: 'Select a portfolio to view its status',
     noData: 'No status data available',
     error: 'Error loading portfolio status: {{message}}',
+    fetchedAt: 'Updated {{time}}',
     marketValue: 'Market Value',
     unrealized: 'unrealized',
     netInvested: 'Net Invested',

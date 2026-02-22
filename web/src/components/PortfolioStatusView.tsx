@@ -18,7 +18,7 @@ const PerformanceChart = lazy(() =>
 const HoldingsAllocationChart = lazy(() =>
   import('./HoldingsAllocationChart').then((m) => ({ default: m.HoldingsAllocationChart }))
 );
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import {
@@ -100,7 +100,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
   const { setActivePortfolioId } = usePortfolioContext();
   const deletePortfolio = useDeletePortfolio();
 
-  const { data: status, isLoading, error } = usePortfolioStatus(portfolioId);
+  const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
   const getPerformanceParams = () => {
     if (timePeriod === '1month') {
@@ -215,6 +215,13 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
         <Card>
           <CardHeader>
             <CardTitle>{status.portfolio_name}</CardTitle>
+            {dataUpdatedAt > 0 && (
+              <CardDescription>
+                {t('status.fetchedAt', {
+                  time: new Date(dataUpdatedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                })}
+              </CardDescription>
+            )}
             <CardAction>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
