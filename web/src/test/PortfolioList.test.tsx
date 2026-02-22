@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import PortfolioList from '../components/PortfolioList';
 import type { Portfolio } from '../api';
-import { toast } from 'sonner';
+import { SidebarProvider } from '../components/ui/sidebar';
 
 vi.mock('../hooks/usePortfolios', () => ({
   usePortfolios: vi.fn(),
-  useDeletePortfolio: vi.fn(),
   useCreatePortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useUpdatePortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useCopyPortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
@@ -18,14 +17,7 @@ vi.mock('../context/PortfolioContext', () => ({
   usePortfolioContext: vi.fn(),
 }));
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-import { usePortfolios, useDeletePortfolio } from '../hooks/usePortfolios';
+import { usePortfolios } from '../hooks/usePortfolios';
 import { usePortfolioContext } from '../context/PortfolioContext';
 
 const createTestQueryClient = () =>
@@ -40,7 +32,9 @@ const renderComponent = () => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <PortfolioList />
+      <SidebarProvider>
+        <PortfolioList />
+      </SidebarProvider>
     </QueryClientProvider>
   );
 };
@@ -59,10 +53,6 @@ describe('PortfolioList', () => {
       activePortfolioId: null,
       setActivePortfolioId: mockSetActivePortfolioId,
     });
-    vi.mocked(useDeletePortfolio).mockReturnValue({
-      mutateAsync: vi.fn(),
-      isPending: false,
-    } as unknown as ReturnType<typeof useDeletePortfolio>);
   });
 
   it('shows skeleton rows while loading', () => {
@@ -74,7 +64,6 @@ describe('PortfolioList', () => {
 
     renderComponent();
 
-    // Loading shows skeleton table rows
     const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
     expect(skeletons.length).toBeGreaterThan(0);
   });
@@ -103,7 +92,7 @@ describe('PortfolioList', () => {
     expect(screen.getByText('No Portfolios Yet')).toBeInTheDocument();
   });
 
-  it('renders portfolio names in the table', () => {
+  it('renders portfolio names in the list', () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -144,34 +133,5 @@ describe('PortfolioList', () => {
     await userEvent.click(screen.getByText('Growth Fund'));
 
     expect(mockSetActivePortfolioId).toHaveBeenCalledWith(1);
-  });
-
-  it('shows error toast when portfolio delete fails', async () => {
-    vi.mocked(usePortfolios).mockReturnValue({
-      data: mockPortfolios,
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolios>);
-
-    vi.mocked(useDeletePortfolio).mockReturnValue({
-      mutateAsync: vi.fn().mockRejectedValueOnce(new Error('Server error')),
-      isPending: false,
-    } as unknown as ReturnType<typeof useDeletePortfolio>);
-
-    renderComponent();
-
-    // Open dropdown for "Growth Fund"
-    await userEvent.click(screen.getByLabelText('Actions for Growth Fund'));
-
-    // Click "Delete" in the dropdown
-    await userEvent.click(await screen.findByText('Delete'));
-
-    // Confirm in the AlertDialog
-    const dialog = await screen.findByRole('alertdialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to delete portfolio: Server error');
-    });
   });
 });
