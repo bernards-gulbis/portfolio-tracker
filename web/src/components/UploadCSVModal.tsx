@@ -31,7 +31,7 @@ const schema = z.object({
   }),
 });
 
-type FormValues = { file: File };
+type FormValues = { file: File | undefined };
 
 interface ImportCSVModalProps {
   isOpen: boolean;
@@ -58,6 +58,9 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
   }, [isOpen, reset]);
 
   const onSubmit = async (values: FormValues) => {
+    // Zod superRefine guarantees file is a File by the time onSubmit is called,
+    // but TypeScript doesn't know that — narrow here so the type is File.
+    if (!values.file) return;
     try {
       await importCSV.mutateAsync({ portfolioId, file: values.file });
       onClose();

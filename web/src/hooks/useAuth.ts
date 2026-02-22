@@ -40,7 +40,12 @@ export const useUpdateProfile = () => {
   const { setUser } = useAuth();
   const { t } = useTranslation();
   return useMutation({
-    mutationFn: (data: { name: string }) => updateUser({ name: data.name }),
+    mutationFn: async (data: { name: string }) => {
+      await updateUser({ name: data.name });
+      // Re-fetch via the custom GET /users/me so oauth_providers is always populated.
+      // The FastAPI Users PATCH response does not go through our custom handler.
+      return getCurrentUser();
+    },
     onSuccess: (user) => {
       setUser(user);
       toast.success(t('settings.toasts.profileUpdated'));

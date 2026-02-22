@@ -141,17 +141,11 @@ const toLocalTime = (date: Date): string => {
   return `${h}:${min}:${sec}`;
 };
 
-/** Parses "YYYY-MM-DD" to a local Date without UTC shift */
+/** Parses "YYYY-MM-DD" as a local Date without UTC shift */
 const parseLocalDate = (str: string): Date | undefined => {
   if (!str || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return undefined;
   const [y, m, d] = str.split('-').map(Number);
   return new Date(y, m - 1, d);
-};
-
-/** Formats a Date object as a locale-appropriate display string */
-const formatDateForDisplay = (date: Date | undefined, locale: string): string => {
-  if (!date) return '';
-  return date.toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' });
 };
 
 interface DatePickerFieldProps {
@@ -165,10 +159,12 @@ interface DatePickerFieldProps {
 
 const DatePickerField = ({ value, onChange, invalid, locale, id, pickerAriaLabel }: DatePickerFieldProps) => {
   const [open, setOpen] = useState(false);
-  const [displayValue, setDisplayValue] = useState(() => formatDateForDisplay(parseLocalDate(value), locale));
+  // displayValue mirrors the form value in YYYY-MM-DD format so the input
+  // can be parsed back reliably regardless of the active locale.
+  const [displayValue, setDisplayValue] = useState(value ?? '');
   const [month, setMonth] = useState<Date | undefined>(parseLocalDate(value));
 
-  // Tracks changes we triggered ourselves so we don't re-format during typing
+  // Tracks changes we triggered ourselves so we don't overwrite mid-typing
   const skipNextSyncRef = useRef(false);
 
   useEffect(() => {
@@ -176,17 +172,17 @@ const DatePickerField = ({ value, onChange, invalid, locale, id, pickerAriaLabel
       skipNextSyncRef.current = false;
       return;
     }
-    // External change (form reset or locale switch) — re-sync display
+    // External change (form reset) — re-sync display
+    setDisplayValue(value ?? '');
     const date = parseLocalDate(value);
-    setDisplayValue(formatDateForDisplay(date, locale));
     if (date) setMonth(date);
-  }, [value, locale]);
+  }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typed = e.target.value;
     setDisplayValue(typed);
-    const parsed = new Date(typed);
-    if (!isNaN(parsed.getTime())) {
+    const parsed = parseLocalDate(typed);
+    if (parsed) {
       skipNextSyncRef.current = true;
       onChange(toLocalDate(parsed));
       setMonth(parsed);
@@ -195,15 +191,16 @@ const DatePickerField = ({ value, onChange, invalid, locale, id, pickerAriaLabel
 
   const handleCalendarSelect = (date: Date | undefined) => {
     if (date) {
+      const ymd = toLocalDate(date);
       skipNextSyncRef.current = true;
-      onChange(toLocalDate(date));
-      setDisplayValue(formatDateForDisplay(date, locale));
+      onChange(ymd);
+      setDisplayValue(ymd);
       setMonth(date);
     }
     setOpen(false);
   };
 
-  const placeholder = formatDateForDisplay(new Date(2025, 0, 1), locale);
+  const placeholder = 'YYYY-MM-DD';
 
   return (
     <InputGroup>

@@ -10,7 +10,7 @@ from fastapi_users import schemas as fu_schemas
 
 class UserRead(fu_schemas.BaseUser[uuid.UUID]):
     name: Optional[str] = None
-    oauth_providers: list[str] = []
+    oauth_providers: list[str] = Field(default_factory=list)
 
 
 class UserCreate(fu_schemas.BaseUserCreate):
@@ -219,7 +219,7 @@ class PortfolioStatusResponse(BaseModel):
     total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
     total_return_after_tax_percent: Optional[float]  # Total return after tax percentage
     current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
-    missing_prices: List[str] = []  # Tickers for which current price could not be fetched
+    missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
 
     model_config = ConfigDict(from_attributes=True)
 

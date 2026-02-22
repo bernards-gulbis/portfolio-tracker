@@ -112,7 +112,7 @@ export const HoldingsAllocationChart = ({
               content={
                 <ChartTooltipContent
                   hideLabel
-                  formatter={(value) => formatCurrency(value as number, 'EUR', locale)}
+                  formatter={(value) => formatCurrency(value as number, 'USD', locale)}
                 />
               }
             />
@@ -140,7 +140,7 @@ export const HoldingsAllocationChart = ({
                           y={(viewBox.cy || 0) - 10}
                           className="fill-foreground text-base font-bold"
                         >
-                          {formatCurrency(total, 'EUR', locale)}
+                          {formatCurrency(total, 'USD', locale)}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
@@ -170,7 +170,7 @@ export const HoldingsAllocationChart = ({
                   <span className="text-muted-foreground">{entry.name}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">{formatCurrency(entry.value, 'EUR', locale)}</span>
+                  <span className="text-muted-foreground">{formatCurrency(entry.value, 'USD', locale)}</span>
                   <span className="font-semibold w-12 text-right">{percentage}%</span>
                 </div>
               </div>

@@ -82,6 +82,14 @@ export const PerformanceChart = ({
     );
   }
 
+  // Parse a YYYY-MM-DD string as a local date.
+  // new Date('YYYY-MM-DD') parses as UTC midnight and shifts the day in
+  // negative-offset timezones; new Date(y, m-1, d) uses local midnight.
+  const parseYMD = (value: string): Date => {
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
   const chartData = data.map((point) => ({
     date: point.date,
     principal: point.principal_eur,
@@ -117,7 +125,7 @@ export const PerformanceChart = ({
               axisLine={false}
               tickMargin={8}
               tickFormatter={(value: string) =>
-                new Date(value).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+                parseYMD(value).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
               }
               minTickGap={50}
             />
@@ -125,6 +133,9 @@ export const PerformanceChart = ({
               cursor={false}
               content={
                 <ChartTooltipContent
+                  labelFormatter={(value) =>
+                    parseYMD(value as string).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })
+                  }
                   formatter={(value) =>
                     value != null ? formatCurrency(value as number, 'EUR', locale) : t('common.notAvailable')
                   }
