@@ -276,7 +276,31 @@ current_active_user = fastapi_users.current_user(active=True)
 
 # ================== Google OAuth ==================
 
-google_oauth_client = GoogleOAuth2(
+USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo"
+
+
+class CustomGoogleOAuth2(GoogleOAuth2):
+    """
+    Override get_id_email to use the standard OIDC userinfo endpoint instead of
+    the People API.  The People API requires explicit enablement in Google Cloud
+    Console; the OIDC endpoint works with just the basic userinfo scopes.
+    """
+
+    async def get_id_email(self, token: str) -> tuple[str, Optional[str]]:
+        async with self.get_httpx_client() as client:
+            response = await client.get(
+                USERINFO_ENDPOINT,
+                headers={**self.request_headers, "Authorization": f"Bearer {token}"},
+            )
+            if response.status_code >= 400:
+                from httpx_oauth.exceptions import GetIdEmailError
+                raise GetIdEmailError(response=response)
+
+            data = response.json()
+            return data["sub"], data.get("email")
+
+
+google_oauth_client = CustomGoogleOAuth2(
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
 )
