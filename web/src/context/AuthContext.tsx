@@ -32,11 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore logout errors — clear state regardless
     }
-    setUserState(null);
-    setStatus('unauthenticated');
-    queryClient.clear();
     window.dispatchEvent(new CustomEvent('auth:logout'));
-  }, [queryClient]);
+  }, []);
 
   useEffect(() => {
     // Show error toast if backend redirected back with ?oauth_error=

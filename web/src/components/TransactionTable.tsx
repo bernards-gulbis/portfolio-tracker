@@ -4,7 +4,7 @@ import { Transaction, TransactionType, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
-import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
+import { MAX_VISIBLE_PAGES } from '../constants/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,8 @@ interface TransactionTableProps {
   currentPage: number;
   totalPages: number;
   total: number;
+  responsePage: number;
+  responsePageSize: number;
   onPageChange: (page: number) => void;
   isLoading: boolean;
   tickerSearch: string;
@@ -80,6 +82,8 @@ const TransactionTable = ({
   currentPage,
   totalPages,
   total,
+  responsePage,
+  responsePageSize,
   onPageChange,
   isLoading,
   tickerSearch,
@@ -170,7 +174,7 @@ const TransactionTable = ({
 
   const hasActiveFilters = tickerSearch !== '' || typeFilter.length > 0;
 
-  const startIndex = (currentPage - 1) * DEFAULT_PAGE_SIZE;
+  const startIndex = (responsePage - 1) * responsePageSize;
   const endIndex = Math.min(startIndex + (transactions.length || 0), total);
 
   const filterBar = (
@@ -182,6 +186,7 @@ const TransactionTable = ({
           value={tickerSearch}
           onChange={(e) => onTickerSearchChange(e.target.value)}
           placeholder={t('transaction.table.filters.tickerPlaceholder')}
+          aria-label={t('transaction.table.filters.tickerPlaceholder')}
           className="pl-8"
         />
       </div>

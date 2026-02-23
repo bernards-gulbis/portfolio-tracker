@@ -44,6 +44,8 @@ const TransactionView = () => {
   const transactions = paginatedData?.transactions || [];
   const totalPages = paginatedData?.total_pages || 1;
   const total = paginatedData?.total || 0;
+  const responsePage = paginatedData?.page || 1;
+  const responsePageSize = paginatedData?.page_size || DEFAULT_PAGE_SIZE;
 
   // Reset filters and page when portfolio changes
   useEffect(() => {
@@ -57,7 +59,7 @@ const TransactionView = () => {
   const typeFilterKey = typeFilter.join(',');
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedTicker, typeFilterKey]);
+  }, [debouncedTicker, typeFilterKey, sortOrder]);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -192,6 +194,8 @@ const TransactionView = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           total={total}
+          responsePage={responsePage}
+          responsePageSize={responsePageSize}
           onPageChange={setCurrentPage}
           isLoading={isFetching}
           tickerSearch={tickerSearch}
