@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,8 +23,8 @@ const LanguageSwitcher = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" aria-label={t('language.switchLabel')} className="min-w-[42px] px-2 font-medium">
-          {currentLang.toUpperCase()}
+        <Button variant="outline" size="icon" aria-label={t('language.switchLabel')}>
+          <Languages className="h-[1.2rem] w-[1.2rem]" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
