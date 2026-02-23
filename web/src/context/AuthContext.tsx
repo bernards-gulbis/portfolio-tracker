@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserState(null);
     setStatus('unauthenticated');
     queryClient.clear();
+    window.dispatchEvent(new CustomEvent('auth:logout'));
   }, [queryClient]);
 
   useEffect(() => {
