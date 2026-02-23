@@ -2,6 +2,7 @@
 Service for fetching current stock prices
 """
 import logging
+import os
 from typing import Dict, Optional, Tuple, List
 import requests
 from datetime import datetime, timedelta, timezone
@@ -21,7 +22,7 @@ class PriceService:
     
     # Class-level cache: ticker -> (price, timestamp)
     _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
-    _cache_ttl: timedelta = timedelta(minutes=15)
+    _cache_ttl: timedelta = timedelta(minutes=int(os.getenv('PRICE_CACHE_TTL', '15')))
     _cache_lock = Lock()  # Thread-safe cache access
     _yahoo_semaphore = Semaphore(3)  # Max 3 concurrent outgoing Yahoo Finance requests
     
@@ -138,7 +139,7 @@ class PriceService:
         )
     
     @classmethod
-    def get_current_prices(cls, tickers: List[str], max_workers: int = 5) -> Dict[str, Optional[float]]:
+    def get_current_prices(cls, tickers: List[str], max_workers: int = 3) -> Dict[str, Optional[float]]:
         """
         Fetch current prices for a list of tickers from Yahoo Finance in parallel
 
@@ -183,7 +184,7 @@ class PriceService:
             Current price or None if not found
         """
         # Check cache first (thread-safe)
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         with cls._cache_lock:
             if ticker in cls._price_cache:
                 cached_price, cached_time = cls._price_cache[ticker]
@@ -432,7 +433,7 @@ class PriceService:
         tickers: List[str],
         start_date: datetime,
         end_date: datetime,
-        max_workers: int = 5
+        max_workers: int = 3
     ) -> Dict[str, Dict[str, float]]:
         """
         Fetch historical prices for multiple tickers in parallel

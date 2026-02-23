@@ -48,8 +48,12 @@ class TransactionRepository:
         return self.session.exec(statement).first()
 
     def get_by_portfolio_id(self, portfolio_id: int) -> List[Transaction]:
-        """Get all transactions for a specific portfolio"""
-        statement = select(Transaction).where(Transaction.portfolio_id == portfolio_id)
+        """Get all transactions for a specific portfolio, ordered chronologically"""
+        statement = (
+            select(Transaction)
+            .where(Transaction.portfolio_id == portfolio_id)
+            .order_by(Transaction.date, Transaction.id)
+        )
         return list(self.session.exec(statement).all())
 
     def get_by_portfolio_id_paginated(
