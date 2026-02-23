@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
@@ -104,7 +104,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
 
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
-  const getPerformanceParams = () => {
+  const params = useMemo(() => {
     if (timePeriod === '1month') {
       const endDate = new Date();
       const startDate = new Date();
@@ -112,17 +112,15 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
       return {
         startDate: startDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0],
-        numPoints: 30
+        numPoints: 30,
       };
     }
     return {
       startDate: undefined,
       endDate: undefined,
-      numPoints: 60
+      numPoints: 60,
     };
-  };
-
-  const params = getPerformanceParams();
+  }, [timePeriod]);
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
     portfolioId,
     params.startDate,

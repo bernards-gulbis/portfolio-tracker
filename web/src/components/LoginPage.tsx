@@ -265,24 +265,26 @@ export function LoginPage() {
             {mode === 'login' ? (
               <>
                 {t('auth.signIn.switchPrompt')}{' '}
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={switchToRegister}
-                  className="underline underline-offset-4 hover:text-foreground"
+                  className="h-auto p-0 underline underline-offset-4"
                 >
                   {t('auth.signIn.switchLink')}
-                </button>
+                </Button>
               </>
             ) : (
               <>
                 {t('auth.register.switchPrompt')}{' '}
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={switchToLogin}
-                  className="underline underline-offset-4 hover:text-foreground"
+                  className="h-auto p-0 underline underline-offset-4"
                 >
                   {t('auth.register.switchLink')}
-                </button>
+                </Button>
               </>
             )}
           </p>
