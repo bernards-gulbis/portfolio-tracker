@@ -190,7 +190,7 @@ class HoldingResponse(BaseModel):
     current_price: Optional[float] = None
     current_value: Optional[float] = None
     unrealized_gain_loss: Optional[float] = None
-    unrealized_gain_loss_percent: Optional[float] = None
+    unrealized_gain_loss_pct: Optional[float] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -210,16 +210,16 @@ class PortfolioStatusResponse(BaseModel):
     holdings_cost: float  # Sum of all holdings cost basis
     holdings_value: float  # Sum of current market value of all holdings
     unrealized_gains: float  # Total unrealized gains/losses
-    unrealized_gains_percent: Optional[float]  # Total unrealized gains/losses percentage
+    unrealized_gains_pct: Optional[float]  # Total unrealized gains/losses percentage
     unrealized_gains_eur: Optional[float]  # Unrealized gains in EUR
     realized_gains: float  # Gains/losses from sells
     currency_gains_eur: Optional[float]  # FX gains/losses on principal (principal@current_rate - principal_eur)
-    currency_gains_percent: Optional[float]  # FX gains/losses percentage (currency_gains_eur / principal_eur * 100)
+    currency_gains_pct: Optional[float]  # FX gains/losses percentage (currency_gains_eur / principal_eur * 100)
     capital_gains_eur: Optional[float]  # Capital gains before tax (current_value_eur - principal_eur - dividends_eur)
     capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
     tax_eur: Optional[float]  # Tax amount in EUR: capital_gains_tax_rate * capital_gains_eur
     total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
-    total_return_after_tax_percent: Optional[float]  # Total return after tax percentage
+    total_return_after_tax_pct: Optional[float]  # Total return after tax percentage
     current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
     missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
 
@@ -231,7 +231,8 @@ class PerformanceDataPoint(BaseModel):
     date: str  # YYYY-MM-DD format
     principal_eur: float
     current_value_eur: Optional[float]
-    return_pct: Optional[float] = None  # ((current_value_eur - principal_eur) / principal_eur) * 100
+    return_pct: Optional[float] = None  # ((current_value_eur - principal_eur) / deposits_eur) * 100
+    sp500_return_pct: Optional[float] = None  # S&P 500 return % from first data point
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -6,15 +6,17 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from unittest.mock import patch, Mock
 
 from app.core import get_session
 from app.core.auth import current_active_user
 from main import app
+from decimal import Decimal
 from app.models import Portfolio, Transaction, TransactionType
 from app.models.user import User
+from app.services.portfolio_service import _apply_transaction, _TxState
 
 
 @pytest.fixture(name="session")
@@ -1535,7 +1537,7 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     assert aapl_holding["current_price"] == 180.0
     assert aapl_holding["current_value"] == 1800.0  # 10 * 180
     assert aapl_holding["unrealized_gain_loss"] == 300.0  # 1800 - 1500
-    assert abs(aapl_holding["unrealized_gain_loss_percent"] - 20.0) < 0.01
+    assert abs(aapl_holding["unrealized_gain_loss_pct"] - 20.0) < 0.01
     
     # Check MSFT holding with price data
     msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
@@ -1545,7 +1547,7 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     assert msft_holding["current_price"] == 270.0
     assert msft_holding["current_value"] == 1350.0  # 5 * 270
     assert msft_holding["unrealized_gain_loss"] == -150.0  # 1350 - 1500
-    assert abs(msft_holding["unrealized_gain_loss_percent"] - (-10.0)) < 0.01
+    assert abs(msft_holding["unrealized_gain_loss_pct"] - (-10.0)) < 0.01
     
     # Check portfolio totals
     assert data["holdings_cost"] == 3000.0
@@ -1622,7 +1624,7 @@ def test_portfolio_status_with_missing_prices(client: TestClient):
     assert unknown_holding["current_price"] is None
     assert unknown_holding["current_value"] is None
     assert unknown_holding["unrealized_gain_loss"] is None
-    assert unknown_holding["unrealized_gain_loss_percent"] is None
+    assert unknown_holding["unrealized_gain_loss_pct"] is None
     
     # Totals should only include holdings with prices
     assert data["holdings_value"] == 1800.0  # Only AAPL
@@ -1719,7 +1721,7 @@ def test_portfolio_status_price_service_exception(client: TestClient):
     assert aapl_holding["current_price"] is None
     assert aapl_holding["current_value"] is None
     assert aapl_holding["unrealized_gain_loss"] is None
-    assert aapl_holding["unrealized_gain_loss_percent"] is None
+    assert aapl_holding["unrealized_gain_loss_pct"] is None
 
 
 def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
@@ -1799,15 +1801,15 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
     # Check individual holdings
     winner = next(h for h in data["holdings"] if h["ticker"] == "WINNER")
     assert winner["unrealized_gain_loss"] == 2500.0  # +2500
-    assert abs(winner["unrealized_gain_loss_percent"] - 50.0) < 0.01
+    assert abs(winner["unrealized_gain_loss_pct"] - 50.0) < 0.01
     
     loser = next(h for h in data["holdings"] if h["ticker"] == "LOSER")
     assert loser["unrealized_gain_loss"] == -1500.0  # -1500
-    assert abs(loser["unrealized_gain_loss_percent"] - (-30.0)) < 0.01
+    assert abs(loser["unrealized_gain_loss_pct"] - (-30.0)) < 0.01
     
     flat = next(h for h in data["holdings"] if h["ticker"] == "FLAT")
     assert flat["unrealized_gain_loss"] == 0.0  # 0
-    assert abs(flat["unrealized_gain_loss_percent"]) < 0.01
+    assert abs(flat["unrealized_gain_loss_pct"]) < 0.01
     
     # Total unrealized gains: 2500 - 1500 + 0 = 1000
     assert data["unrealized_gains"] == 1000.0
@@ -1884,9 +1886,9 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     expected_currency_gains = principal_at_current_rate - 9000.0
     assert abs(data["currency_gains_eur"] - expected_currency_gains) < 0.1
     assert abs(data["currency_gains_eur"] - (-500.0)) < 0.1
-    # currency_gains_percent = -500 / 9000 * 100 ≈ -5.56%
-    expected_currency_gains_percent = (expected_currency_gains / 9000.0) * 100
-    assert abs(data["currency_gains_percent"] - expected_currency_gains_percent) < 0.01
+    # currency_gains_pct = -500 / 9000 * 100 ≈ -5.56%
+    expected_currency_gains_pct = (expected_currency_gains / 9000.0) * 100
+    assert abs(data["currency_gains_pct"] - expected_currency_gains_pct) < 0.01
     
     # Tax calculation: (current_value_eur - principal_eur - dividends_eur) * 0.255
     # dividends_eur is None (no dividends), treated as 0
@@ -1899,7 +1901,7 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     # After-tax return: (current_value_eur - principal_eur) - tax_eur
     expected_return = 8925.0 - 9000.0 - expected_tax
     assert abs(data["total_return_after_tax_eur"] - expected_return) < 0.1
-    assert abs(data["total_return_after_tax_percent"] - (expected_return / 9000.0 * 100)) < 0.01
+    assert abs(data["total_return_after_tax_pct"] - (expected_return / 9000.0 * 100)) < 0.01
 
 
 def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
@@ -1958,7 +1960,7 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     
     # Currency gains: FX rate unchanged (1.0 deposit, 1.0 current) = 0 currency gains
     assert data["currency_gains_eur"] == 0.0
-    assert data["currency_gains_percent"] == 0.0
+    assert data["currency_gains_pct"] == 0.0
     
     # Tax calculation: (20000 - 10000 - 0) * 0.255 = 2550 EUR
     capital_gains_eur = 20000.0 - 10000.0 - 0.0
@@ -1973,7 +1975,7 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     expected_return = 20000.0 - 10000.0 - 2550.0
     assert data["total_return_after_tax_eur"] == expected_return
     assert data["total_return_after_tax_eur"] == 7450.0
-    assert data["total_return_after_tax_percent"] == 74.5  # 7450 / 10000 * 100
+    assert data["total_return_after_tax_pct"] == 74.5  # 7450 / 10000 * 100
 
     # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7450 = 17450 EUR
     expected_value_after_tax = 10000.0 + 7450.0
@@ -2134,7 +2136,7 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
     
     # After-tax metrics should also be None
     assert data["total_return_after_tax_eur"] is None
-    assert data["total_return_after_tax_percent"] is None
+    assert data["total_return_after_tax_pct"] is None
     assert data["current_value_after_tax_eur"] is None
 
 
@@ -2191,7 +2193,7 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
     assert data["unrealized_gains_eur"] is None
     assert data["tax_eur"] is None
     assert data["total_return_after_tax_eur"] is None
-    assert data["total_return_after_tax_percent"] is None
+    assert data["total_return_after_tax_pct"] is None
     assert data["current_value_after_tax_eur"] is None
     
     # Historical EUR values should still be available
@@ -2469,7 +2471,6 @@ def test_performance_chart_split_adjusted_prices(client: TestClient):
     # Mock Yahoo prices: split-adjusted $150 on all dates, EURUSD=X ≈ 1.0
     # (close price is always the post-split equivalent)
     def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
-        from datetime import timedelta
         result = {}
         for ticker in tickers:
             prices = {}
@@ -2577,7 +2578,6 @@ def test_performance_chart_multiple_splits(client: TestClient):
 
     # Yahoo price: split-adjusted = 1200 / 3 / 2 = $200 on all dates
     def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
-        from datetime import timedelta
         result = {}
         for ticker in tickers:
             prices = {}
@@ -2651,7 +2651,6 @@ def test_performance_chart_no_splits(client: TestClient):
 
     # Yahoo price: $250 (no split, just the actual price)
     def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
-        from datetime import timedelta
         result = {}
         for ticker in tickers:
             prices = {}
@@ -2740,7 +2739,6 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
 
     # Mock: GOOD has prices ($100), DELIST has NO prices (empty dict — simulates delisted ticker)
     def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
-        from datetime import timedelta
         result = {}
         for ticker in tickers:
             prices = {}
@@ -2787,3 +2785,373 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
             assert abs(ret) < 5.0, (
                 f"date={pt['date']}: return_pct={ret}%, expected ≈0% with cost basis fallback"
             )
+
+
+# ================== Sell Bug Tests (non-strict mode) ==================
+
+def test_sell_non_strict_unknown_ticker():
+    """Invalid sell of unknown ticker in non-strict mode should NOT inflate cash."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="UNKNOWN",
+        quantity=10.0,
+        total_amount=1500.0,
+    )
+    _apply_transaction(state, tx, strict=False)
+
+    # Cash should remain unchanged — the sell was skipped entirely
+    assert state.cash == Decimal('5000')
+
+
+def test_sell_non_strict_oversell():
+    """Oversell in non-strict mode should NOT inflate cash."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+    state.holdings['AAPL'] = {'quantity': Decimal('5'), 'total_cost': Decimal('500')}
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="AAPL",
+        quantity=20.0,
+        total_amount=3000.0,
+    )
+    _apply_transaction(state, tx, strict=False)
+
+    # Cash should remain unchanged — the oversell was skipped entirely
+    assert state.cash == Decimal('5000')
+    # Holdings should remain untouched
+    assert state.holdings['AAPL']['quantity'] == Decimal('5')
+
+
+def test_sell_without_ticker():
+    """Sell with no ticker should still credit cash (cash-only adjustment)."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker=None,
+        quantity=None,
+        total_amount=1500.0,
+    )
+    _apply_transaction(state, tx, strict=False)
+
+    # Cash should increase by total_amount
+    assert state.cash == Decimal('6500')
+
+
+# ================== Performance Last Known Price Fallback Tests ==================
+
+def test_performance_last_known_price_gap(client: TestClient):
+    """CRC-type gap: ticker has some Yahoo data, then a gap period.
+    The gap period should use last known price, not cost basis."""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Price Gap Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 100 shares of CRC at $50 = $5,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "CRC",
+            "quantity": 100.0,
+            "price_per_share": 50.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 50 shares of GOOD at $100 = $5,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "GOOD",
+            "quantity": 50.0,
+            "price_per_share": 100.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Mock: CRC has prices Jan-Mar ($60), then gap Apr onward.
+    # GOOD has prices throughout ($100).
+    gap_start = datetime(2024, 4, 1)
+
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0
+                    elif ticker == 'GOOD':
+                        prices[date_str] = 100.0
+                    elif ticker == 'CRC' and current < gap_start:
+                        prices[date_str] = 60.0  # $60 before gap
+                    # CRC after gap_start: no data (simulates Yahoo 400)
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ), patch(
+        'app.services.price_service.PriceService.get_last_known_price',
+        return_value=None,  # No DB cache either
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"start_date": "2024-01-01", "end_date": "2024-06-01", "num_points": 6},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+
+    for pt in points:
+        val = pt["current_value_eur"]
+        if val is None:
+            continue
+        date_str = pt["date"]
+        # Skip points before all buys are applied (buys on Jan 2 and Jan 3)
+        if date_str < "2024-01-04":
+            continue
+        if date_str < "2024-04-01":
+            # CRC at $60 (100 shares = $6000) + GOOD at $100 (50 shares = $5000) = $11,000
+            assert val == pytest.approx(11000.0, rel=0.01), (
+                f"date={date_str}: value={val}, expected ≈11000 (CRC has Yahoo data)"
+            )
+        else:
+            # CRC gap: last known price from loop = $60, so still $11,000
+            # (last known price is stored during the Jan-Mar iteration)
+            assert val == pytest.approx(11000.0, rel=0.01), (
+                f"date={date_str}: value={val}, expected ≈11000 (CRC using last known price)"
+            )
+
+
+def test_performance_delisted_db_fallback(client: TestClient):
+    """TWTR-type ticker: Yahoo returns zero data. DB has a cached price.
+    Should use DB-cached price instead of cost basis."""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Delisted DB Fallback Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 100 shares of TWTR at $50 = $5,000 (cost basis)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "TWTR",
+            "quantity": 100.0,
+            "price_per_share": 50.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 50 shares of GOOD at $100 = $5,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "GOOD",
+            "quantity": 50.0,
+            "price_per_share": 100.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Mock: TWTR has NO Yahoo data at all, GOOD has prices ($100)
+    # DB has a cached last known price for TWTR of $54.20
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0
+                    elif ticker == 'GOOD':
+                        prices[date_str] = 100.0
+                    # TWTR: empty — no Yahoo data at all
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ), patch(
+        'app.services.price_service.PriceService.get_last_known_price',
+        side_effect=lambda t: 54.20 if t == 'TWTR' else None,
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 5},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+
+    for pt in points:
+        val = pt["current_value_eur"]
+        if val is None:
+            continue
+        # Skip points before all buys are applied (buys on Jan 2 and Jan 3)
+        if pt["date"] < "2024-01-04":
+            continue
+        # TWTR: 100 × $54.20 = $5,420 (DB-cached price)
+        # GOOD: 50 × $100 = $5,000
+        # Total = $10,420
+        assert val == pytest.approx(10420.0, rel=0.01), (
+            f"date={pt['date']}: value={val}, expected ≈10420 (TWTR using DB-cached $54.20)"
+        )
+
+
+def test_performance_delisted_no_cache(client: TestClient):
+    """Fully missing ticker: no Yahoo data, no DB cache.
+    Should gracefully fall back to cost basis."""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "No Cache Fallback Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 100 shares of GONE at $50 = $5,000 (cost basis)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "GONE",
+            "quantity": 100.0,
+            "price_per_share": 50.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 50 shares of GOOD at $100 = $5,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "GOOD",
+            "quantity": 50.0,
+            "price_per_share": 100.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Mock: GONE has NO Yahoo data, NO DB cache. GOOD has prices.
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0
+                    elif ticker == 'GOOD':
+                        prices[date_str] = 100.0
+                    # GONE: empty
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ), patch(
+        'app.services.price_service.PriceService.get_last_known_price',
+        return_value=None,  # No DB cache
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 5},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+
+    for pt in points:
+        val = pt["current_value_eur"]
+        if val is None:
+            continue
+        # Skip points before all buys are applied (buys on Jan 2 and Jan 3)
+        if pt["date"] < "2024-01-04":
+            continue
+        # GONE: no price → cost basis $5,000
+        # GOOD: 50 × $100 = $5,000
+        # Total = $10,000
+        assert val == pytest.approx(10000.0, rel=0.01), (
+            f"date={pt['date']}: value={val}, expected ≈10000 (GONE using cost basis)"
+        )

@@ -139,6 +139,25 @@ class PriceService:
         )
     
     @classmethod
+    def get_last_known_price(cls, ticker: str) -> Optional[float]:
+        """Return the most recent cached price for a ticker, regardless of date range.
+
+        Uses the HistoricalPrice table (composite PK on ticker+date), so
+        ORDER BY date DESC LIMIT 1 is index-friendly.
+        """
+        with Session(engine) as session:
+            statement = (
+                select(HistoricalPrice)
+                .where(HistoricalPrice.ticker == ticker)
+                .order_by(HistoricalPrice.date.desc())
+                .limit(1)
+            )
+            result = session.exec(statement).first()
+            if result:
+                return result.price
+            return None
+
+    @classmethod
     def get_current_prices(cls, tickers: List[str], max_workers: int = 3) -> Dict[str, Optional[float]]:
         """
         Fetch current prices for a list of tickers from Yahoo Finance in parallel

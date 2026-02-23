@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { PerformanceChart } from '../components/PerformanceChart';
 
 const mockData = [
-  { date: '2024-01-01', principal_eur: 10000, current_value_eur: 10500, return_pct: 5.0 },
-  { date: '2024-01-02', principal_eur: 10000, current_value_eur: 10800, return_pct: 8.0 },
+  { date: '2024-01-01', principal_eur: 10000, current_value_eur: 10500, return_pct: 5.0, sp500_return_pct: 0 },
+  { date: '2024-01-02', principal_eur: 10000, current_value_eur: 10800, return_pct: 8.0, sp500_return_pct: 1.2 },
 ];
 
 describe('PerformanceChart', () => {

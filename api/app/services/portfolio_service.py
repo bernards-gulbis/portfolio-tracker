@@ -26,15 +26,16 @@ HOLDINGS_EPSILON = Decimal('1e-6')
 # Tax rate applied to capital gains — overridable via TAX_RATE env var
 TAX_RATE = Decimal(os.getenv('TAX_RATE', '0.255'))
 
-# Shorthand for Decimal zero
+# Shorthand for Decimal constants
 _ZERO = Decimal('0')
+_ONE = Decimal('1')
 
 logger = logging.getLogger(__name__)
 
 
 # ================== Transaction state helpers ==================
 
-def _to_decimal(value) -> Decimal:
+def _to_decimal(value: object) -> Decimal:
     """Convert a value to Decimal, handling None and float inputs."""
     if value is None:
         return _ZERO
@@ -47,6 +48,37 @@ def _to_decimal(value) -> Decimal:
 def _normalize_zero(value: Decimal) -> float:
     """Convert very small Decimal values and -0 to 0.0, otherwise return as float."""
     return 0.0 if abs(value) < HOLDINGS_EPSILON else float(value)
+
+
+def _compute_forward_split_factors(
+    transactions: List[Transaction],
+    cutoff_date: Optional[datetime] = None,
+) -> Dict[str, Decimal]:
+    """Compute the product of all future split ratios per ticker.
+
+    Yahoo Finance close prices are split-adjusted: for dates before a split,
+    the price is divided by the split ratio.  The state's quantity, however,
+    only reflects splits that have been replayed so far.  To compensate, we
+    track a per-ticker "forward split factor" — the product of all split
+    ratios not yet applied to the state — and multiply it into the price
+    lookup so that  qty_pre_split × price_adjusted × forward_factor  equals
+    the correct historical value.
+
+    Args:
+        transactions: Full list of transactions (sorted chronologically).
+        cutoff_date:  If given, only include splits *after* this date.
+                      If None, include all splits (caller will decrement as
+                      splits are replayed).
+    """
+    factors: Dict[str, Decimal] = {}
+    for tx in transactions:
+        if tx.type != TransactionType.SPLIT or not tx.ticker or not tx.split_ratio:
+            continue
+        if cutoff_date is not None and tx.date.date() <= cutoff_date.date():
+            continue
+        ratio = _to_decimal(tx.split_ratio)
+        factors[tx.ticker] = factors.get(tx.ticker, _ONE) * ratio
+    return factors
 
 
 @dataclass
@@ -108,7 +140,6 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
             h['total_cost'] += cost
 
     elif tx_type == TransactionType.SELL:
-        state.cash += total
         ticker = tx.ticker
         quantity = _to_decimal(tx.quantity or 0)
         if ticker:
@@ -124,6 +155,7 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
                         f"only {h['quantity']} available"
                     )
                 return
+            state.cash += total
             # Proportional cost removal: avoids intermediate avg_cost rounding
             cost_basis = h['total_cost'] * (quantity / h['quantity']) if h['quantity'] > 0 else _ZERO
             state.realized_gains += total - cost_basis
@@ -131,6 +163,8 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
             h['total_cost'] -= cost_basis
             if h['quantity'] < HOLDINGS_EPSILON:
                 del state.holdings[ticker]
+        else:
+            state.cash += total
 
     elif tx_type == TransactionType.DIVIDEND:
         state.cash += total
@@ -256,14 +290,14 @@ class PortfolioService:
             current_price = current_prices.get(ticker)
             current_value_h: Optional[Decimal] = None
             unrealized_gain_loss: Optional[Decimal] = None
-            unrealized_gain_loss_percent: Optional[Decimal] = None
+            unrealized_gain_loss_pct: Optional[Decimal] = None
 
             if current_price is not None and current_price > 0:
                 current_price_d = _to_decimal(current_price)
                 current_value_h = quantity * current_price_d
                 unrealized_gain_loss = current_value_h - total_cost
                 if total_cost > 0:
-                    unrealized_gain_loss_percent = (unrealized_gain_loss / total_cost) * 100
+                    unrealized_gain_loss_pct = (unrealized_gain_loss / total_cost) * 100
                 holdings_value += current_value_h
                 unrealized_gains += unrealized_gain_loss
             else:
@@ -277,7 +311,7 @@ class PortfolioService:
                 current_price=current_price,
                 current_value=float(current_value_h) if current_value_h is not None else None,
                 unrealized_gain_loss=float(unrealized_gain_loss) if unrealized_gain_loss is not None else None,
-                unrealized_gain_loss_percent=float(unrealized_gain_loss_percent) if unrealized_gain_loss_percent is not None else None,
+                unrealized_gain_loss_pct=float(unrealized_gain_loss_pct) if unrealized_gain_loss_pct is not None else None,
             ))
             holdings_cost += total_cost
 
@@ -285,14 +319,14 @@ class PortfolioService:
 
         current_value = state.cash + holdings_value
 
-        unrealized_gains_percent: Optional[Decimal] = None
+        unrealized_gains_pct: Optional[Decimal] = None
         if holdings_cost > 0:
-            unrealized_gains_percent = (unrealized_gains / holdings_cost) * 100
+            unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
 
         current_value_eur: Optional[Decimal] = None
         unrealized_gains_eur: Optional[Decimal] = None
         currency_gains_eur: Optional[Decimal] = None
-        currency_gains_percent: Optional[Decimal] = None
+        currency_gains_pct: Optional[Decimal] = None
         try:
             usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
             if usd_to_eur_rate is not None:
@@ -303,7 +337,7 @@ class PortfolioService:
                 principal_at_current_rate = state.principal * usd_to_eur_d
                 currency_gains_eur = principal_at_current_rate - state.principal_eur
                 if state.deposits_eur > 0:
-                    currency_gains_percent = (currency_gains_eur / state.deposits_eur) * 100
+                    currency_gains_pct = (currency_gains_eur / state.deposits_eur) * 100
         except Exception as e:
             logger.error(
                 "Error fetching USD to EUR exchange rate for portfolio %s: %s",
@@ -329,17 +363,17 @@ class PortfolioService:
                 tax_eur = capital_gains_eur * TAX_RATE if capital_gains_eur > 0 else _ZERO
 
         total_return_after_tax_eur: Optional[Decimal] = None
-        total_return_after_tax_percent: Optional[Decimal] = None
+        total_return_after_tax_pct: Optional[Decimal] = None
         if current_value_eur is not None and tax_eur is not None:
             total_return_after_tax_eur = (current_value_eur - state.principal_eur) - tax_eur
             if state.deposits_eur > 0:
-                total_return_after_tax_percent = (total_return_after_tax_eur / state.deposits_eur) * 100
+                total_return_after_tax_pct = (total_return_after_tax_eur / state.deposits_eur) * 100
 
         current_value_after_tax_eur: Optional[Decimal] = None
         if current_value_eur is not None and tax_eur is not None:
             current_value_after_tax_eur = current_value_eur - tax_eur
 
-        def _n(v) -> Optional[float]:
+        def _n(v: Optional[Decimal]) -> Optional[float]:
             """Normalize a Decimal to float, converting near-zero to 0.0."""
             return _normalize_zero(v) if v is not None else None
 
@@ -357,16 +391,16 @@ class PortfolioService:
             holdings_cost=_normalize_zero(holdings_cost),
             holdings_value=_normalize_zero(holdings_value),
             unrealized_gains=_normalize_zero(unrealized_gains),
-            unrealized_gains_percent=_n(unrealized_gains_percent),
+            unrealized_gains_pct=_n(unrealized_gains_pct),
             unrealized_gains_eur=_n(unrealized_gains_eur),
             realized_gains=_normalize_zero(state.realized_gains),
             currency_gains_eur=_n(currency_gains_eur),
-            currency_gains_percent=_n(currency_gains_percent),
+            currency_gains_pct=_n(currency_gains_pct),
             capital_gains_eur=_n(capital_gains_eur),
             capital_gains_tax_rate=float(TAX_RATE),
             tax_eur=_n(tax_eur),
             total_return_after_tax_eur=_n(total_return_after_tax_eur),
-            total_return_after_tax_percent=_n(total_return_after_tax_percent),
+            total_return_after_tax_pct=_n(total_return_after_tax_pct),
             current_value_after_tax_eur=_n(current_value_after_tax_eur),
             missing_prices=missing_prices,
         )
@@ -435,24 +469,30 @@ class PortfolioService:
             else:
                 historical_prices = {}
 
-        # Forward split factor: compensate for Yahoo's split-adjusted prices
-        # by multiplying in the split ratios not yet applied at target_date.
-        forward_split_factors: Dict[str, Decimal] = {}
-        for tx in all_transactions:
-            if (tx.type == TransactionType.SPLIT and tx.ticker and tx.split_ratio
-                    and tx.date.date() > target_date.date()):
-                factor = _to_decimal(tx.split_ratio)
-                forward_split_factors[tx.ticker] = forward_split_factors.get(tx.ticker, _ZERO + 1) * factor
+        forward_split_factors = _compute_forward_split_factors(all_transactions, cutoff_date=target_date)
 
         holdings_value = _ZERO
         for ticker, holding_data in state.holdings.items():
             price = historical_prices.get(ticker) if historical_prices else None
             if price is not None and price > 0:
-                split_factor = forward_split_factors.get(ticker, _ZERO + 1)
+                split_factor = forward_split_factors.get(ticker, _ONE)
                 holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
             else:
-                # No market price — fall back to cost basis
-                holdings_value += holding_data['total_cost']
+                # Try last known price from DB cache before falling back to cost basis
+                db_price = PriceService.get_last_known_price(ticker)
+                if db_price is not None and db_price > 0:
+                    split_factor = forward_split_factors.get(ticker, _ONE)
+                    holdings_value += holding_data['quantity'] * _to_decimal(db_price) * split_factor
+                    logger.debug(
+                        "Status at %s: using last known price %.4f for %s",
+                        target_date.strftime('%Y-%m-%d'), db_price, ticker,
+                    )
+                else:
+                    holdings_value += holding_data['total_cost']
+                    logger.warning(
+                        "Status at %s: no price data for %s (using cost basis)",
+                        target_date.strftime('%Y-%m-%d'), ticker,
+                    )
 
         current_value_usd = state.cash + holdings_value
 
@@ -521,7 +561,7 @@ class PortfolioService:
 
         total_days = (end_date - start_date).days
         if total_days == 0:
-            date_points = [start_date]
+            date_points = [start_date, end_date]
         elif total_days < num_points:
             date_points = [start_date + timedelta(days=i) for i in range(total_days + 1)]
         else:
@@ -540,8 +580,10 @@ class PortfolioService:
             if tx.ticker and tx.ticker not in ticker_first_date:
                 ticker_first_date[tx.ticker] = tx.date - timedelta(days=5)
 
-        # Fetch ticker prices AND FX rate (EURUSD=X) in a single parallel batch
-        fetch_tickers = list(all_tickers | {'EURUSD=X'})
+        # Fetch ticker prices, FX rate (EURUSD=X), and S&P 500 (^GSPC) in a
+        # single parallel batch.  EURUSD=X and ^GSPC are absent from
+        # ticker_first_date, so they fall back to the default start_date.
+        fetch_tickers = list(all_tickers | {'EURUSD=X', '^GSPC'})
         historical_data = PriceService.get_historical_prices_for_multiple_tickers(
             fetch_tickers,
             start_date - timedelta(days=5),
@@ -557,11 +599,28 @@ class PortfolioService:
             if rate and rate > 0
         }
 
+        # Extract S&P 500 prices for benchmark comparison
+        sp500_prices = historical_data.pop('^GSPC', {})
+
         # Pre-sort date keys for each ticker's historical data for O(log n) lookups
         sorted_dates_map: Dict[str, List[str]] = {}
         for ticker, data in historical_data.items():
             sorted_dates_map[ticker] = sorted(data.keys())
         sorted_fx_dates = sorted(fx_rates.keys())
+        sorted_sp500_dates = sorted(sp500_prices.keys())
+        sp500_base_price_eur: Optional[float] = None  # First S&P 500 price in EUR for return % calc
+
+        # Seed last known prices from DB for tickers with no Yahoo data
+        ticker_last_price: Dict[str, float] = {}
+        for ticker in all_tickers:
+            if not historical_data.get(ticker):
+                db_price = PriceService.get_last_known_price(ticker)
+                if db_price is not None:
+                    ticker_last_price[ticker] = db_price
+                    logger.info(
+                        "Seeded last known price for %s: %.4f (from DB cache)",
+                        ticker, db_price,
+                    )
 
         def get_value_for_date(sorted_dates: List[str], data: Dict[str, float], date_str: str) -> Optional[float]:
             """Look up value for a date using bisect, falling back to the most recent earlier date."""
@@ -570,18 +629,8 @@ class PortfolioService:
             idx = bisect_right(sorted_dates, date_str) - 1
             return data[sorted_dates[idx]] if idx >= 0 else None
 
-        # Yahoo Finance close prices are split-adjusted: for dates before a split,
-        # the price is divided by the split ratio.  The state's quantity, however,
-        # only reflects splits that have been replayed so far.  To compensate, we
-        # track a per-ticker "forward split factor" — the product of all split
-        # ratios not yet applied to the state — and multiply it into the price
-        # lookup so that  qty_pre_split × price_adjusted × forward_factor  equals
-        # the correct historical value.
-        forward_split_factors: Dict[str, Decimal] = {}
-        for tx in transactions:
-            if tx.type == TransactionType.SPLIT and tx.ticker and tx.split_ratio:
-                factor = _to_decimal(tx.split_ratio)
-                forward_split_factors[tx.ticker] = forward_split_factors.get(tx.ticker, _ZERO + 1) * factor
+        # All splits up-front; decremented as each split is replayed in the loop.
+        forward_split_factors = _compute_forward_split_factors(transactions)
 
         performance_data = []
         state = _TxState()
@@ -605,49 +654,71 @@ class PortfolioService:
                 tx_index += 1
 
             holdings_value = _ZERO
-            missing_tickers: List[str] = []
+            last_known_tickers: List[str] = []
+            cost_basis_tickers: List[str] = []
             for ticker, holding_data in state.holdings.items():
                 ticker_dates = sorted_dates_map.get(ticker, [])
                 price = get_value_for_date(ticker_dates, historical_data.get(ticker, {}), date_str)
                 if price is not None and price > 0:
-                    split_factor = forward_split_factors.get(ticker, _ZERO + 1)
+                    split_factor = forward_split_factors.get(ticker, _ONE)
                     holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
+                    ticker_last_price[ticker] = price  # store raw Yahoo price
+                elif ticker in ticker_last_price:
+                    # Use last known raw price × current split factor
+                    split_factor = forward_split_factors.get(ticker, _ONE)
+                    holdings_value += holding_data['quantity'] * _to_decimal(ticker_last_price[ticker]) * split_factor
+                    last_known_tickers.append(ticker)
                 else:
-                    # No market price available (ticker not yet listed, delisted,
-                    # or Yahoo API error).  Fall back to cost basis so the holding
-                    # isn't silently valued at $0.
+                    # No price ever seen — fall back to cost basis (last resort)
                     holdings_value += holding_data['total_cost']
-                    missing_tickers.append(ticker)
+                    cost_basis_tickers.append(ticker)
 
-            if missing_tickers:
+            if last_known_tickers:
                 logger.debug(
-                    "Performance %s: no price data for held tickers %s "
-                    "(using cost basis as fallback)",
-                    date_str, missing_tickers,
+                    "Performance %s: using last known price for %s",
+                    date_str, last_known_tickers,
+                )
+            if cost_basis_tickers:
+                logger.warning(
+                    "Performance %s: no price data for %s (using cost basis as fallback)",
+                    date_str, cost_basis_tickers,
                 )
 
             current_value_usd = state.cash + holdings_value
             fx_rate = get_value_for_date(sorted_fx_dates, fx_rates, date_str)
             current_value_eur = float(current_value_usd * _to_decimal(fx_rate)) if fx_rate is not None else None
 
+            # Return on total capital deployed:
+            # (current_value - net_invested) / total_deposits * 100
             return_pct = None
             if current_value_eur is not None and state.deposits_eur > 0:
                 cv_d = _to_decimal(current_value_eur)
                 return_pct = float((cv_d - state.principal_eur) / state.deposits_eur * Decimal('100'))
 
+            # S&P 500 benchmark return % in EUR (consistent with portfolio return_pct).
+            # Convert S&P 500 USD price to EUR using the same fx_rate, so the
+            # benchmark captures both market performance and USD/EUR movement.
+            sp500_return_pct = None
+            sp500_price = get_value_for_date(sorted_sp500_dates, sp500_prices, date_str)
+            if sp500_price is not None and sp500_price > 0 and fx_rate is not None:
+                sp500_price_eur = sp500_price * fx_rate
+                if sp500_base_price_eur is None:
+                    sp500_base_price_eur = sp500_price_eur
+                sp500_return_pct = (sp500_price_eur / sp500_base_price_eur - 1.0) * 100.0
+
             if return_pct is not None and return_pct < -50:
-                logger.debug(
+                logger.warning(
                     "Performance %s: large negative return %.2f%% — "
                     "cash=%.2f holdings=%.2f fx=%.6f "
                     "value_usd=%.2f value_eur=%s "
                     "principal_eur=%.2f deposits_eur=%.2f "
-                    "held=%s missing=%s",
+                    "held=%s last_known=%s cost_basis=%s",
                     date_str, return_pct,
                     float(state.cash), float(holdings_value),
                     fx_rate if fx_rate is not None else 0,
                     float(current_value_usd), current_value_eur,
                     float(state.principal_eur), float(state.deposits_eur),
-                    list(state.holdings.keys()), missing_tickers,
+                    list(state.holdings.keys()), last_known_tickers, cost_basis_tickers,
                 )
 
             performance_data.append({
@@ -655,6 +726,7 @@ class PortfolioService:
                 'principal_eur': float(state.principal_eur),
                 'current_value_eur': current_value_eur,
                 'return_pct': return_pct,
+                'sp500_return_pct': sp500_return_pct,
             })
 
         return portfolio.name, performance_data

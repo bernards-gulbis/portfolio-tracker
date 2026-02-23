@@ -28,9 +28,10 @@ interface PerformanceDataPoint {
   principal_eur: number;
   current_value_eur: number | null;
   return_pct: number | null;
+  sp500_return_pct: number | null;
 }
 
-export type TimePeriod = '1month' | '3month' | '6month' | 'ytd' | '1year' | 'all';
+type TimePeriod = '1month' | '3month' | '6month' | 'ytd' | '1year' | 'all';
 
 type ViewMode = 'eur' | 'pct';
 
@@ -53,6 +54,18 @@ const formatCompactEur = (value: number): string => {
   return `€${value.toFixed(0)}`;
 };
 
+/** Subtract months from a date, clamping to the last day of the target month
+ *  (e.g. March 31 minus 1 month → Feb 28, not March 3). */
+const subtractMonths = (date: Date, months: number): Date => {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() - months);
+  // If the day overflowed (e.g. 31 → 3), clamp to last day of target month
+  if (result.getDate() !== date.getDate()) {
+    result.setDate(0);
+  }
+  return result;
+};
+
 /** Get the cutoff date string (YYYY-MM-DD) for a given period. */
 const getCutoffDate = (period: TimePeriod): string | null => {
   if (period === 'all') return null;
@@ -60,23 +73,19 @@ const getCutoffDate = (period: TimePeriod): string | null => {
   let cutoff: Date;
   switch (period) {
     case '1month':
-      cutoff = new Date(now);
-      cutoff.setMonth(cutoff.getMonth() - 1);
+      cutoff = subtractMonths(now, 1);
       break;
     case '3month':
-      cutoff = new Date(now);
-      cutoff.setMonth(cutoff.getMonth() - 3);
+      cutoff = subtractMonths(now, 3);
       break;
     case '6month':
-      cutoff = new Date(now);
-      cutoff.setMonth(cutoff.getMonth() - 6);
+      cutoff = subtractMonths(now, 6);
       break;
     case 'ytd':
       cutoff = new Date(now.getFullYear(), 0, 1);
       break;
     case '1year':
-      cutoff = new Date(now);
-      cutoff.setFullYear(cutoff.getFullYear() - 1);
+      cutoff = subtractMonths(now, 12);
       break;
   }
   return cutoff.toISOString().split('T')[0];
@@ -106,6 +115,10 @@ export const PerformanceChart = ({
           label: t('chart.performance.returnPct'),
           color: 'var(--chart-1)',
         },
+        sp500ReturnPct: {
+          label: t('chart.performance.sp500'),
+          color: 'var(--chart-4)',
+        },
       }) satisfies ChartConfig,
     [t],
   );
@@ -114,12 +127,26 @@ export const PerformanceChart = ({
   const chartData = useMemo(() => {
     const cutoff = getCutoffDate(timePeriod);
     const filtered = cutoff ? data.filter((p) => p.date >= cutoff) : data;
-    return filtered.map((point) => ({
-      date: point.date,
-      principal: point.principal_eur,
-      currentValue: point.current_value_eur,
-      returnPct: point.return_pct,
-    }));
+
+    // Rebase S&P 500 return % so it starts at 0% at the first visible point.
+    // Backend returns return % from portfolio inception; we convert:
+    // rebased = ((1 + pct/100) / (1 + basePct/100) - 1) * 100
+    const firstSp500 = filtered.find((p) => p.sp500_return_pct != null)?.sp500_return_pct;
+    const baseFactor = firstSp500 != null ? 1 + firstSp500 / 100 : null;
+
+    return filtered.map((point) => {
+      let sp500Rebased: number | null = null;
+      if (point.sp500_return_pct != null && baseFactor != null && baseFactor !== 0) {
+        sp500Rebased = ((1 + point.sp500_return_pct / 100) / baseFactor - 1) * 100;
+      }
+      return {
+        date: point.date,
+        principal: point.principal_eur,
+        currentValue: point.current_value_eur,
+        returnPct: point.return_pct,
+        sp500ReturnPct: sp500Rebased,
+      };
+    });
   }, [data, timePeriod]);
 
   if (loading) {
@@ -184,7 +211,7 @@ export const PerformanceChart = ({
             margin={{ left: 12, right: 12 }}
           >
             <defs>
-              <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="fillPerformanceValue" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="var(--color-currentValue)" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="var(--color-currentValue)" stopOpacity={0.05} />
               </linearGradient>
@@ -227,10 +254,29 @@ export const PerformanceChart = ({
                       year: 'numeric',
                     })
                   }
-                  formatter={(value, name) => {
-                    if (value == null) return t('common.notAvailable');
-                    if (name === 'returnPct') return `${(value as number).toFixed(2)}%`;
-                    return formatCurrency(value as number, 'EUR', locale);
+                  formatter={(value, name, item) => {
+                    const formatted =
+                      value == null
+                        ? t('common.notAvailable')
+                        : name === 'returnPct' || name === 'sp500ReturnPct'
+                          ? `${(value as number).toFixed(2)}%`
+                          : formatCurrency(value as number, 'EUR', locale);
+                    return (
+                      <>
+                        <div
+                          className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <div className="flex flex-1 justify-between items-center leading-none">
+                          <span className="text-muted-foreground">
+                            {chartConfig[name as keyof typeof chartConfig]?.label || name}
+                          </span>
+                          <span className="font-mono font-medium tabular-nums ml-2">
+                            {formatted}
+                          </span>
+                        </div>
+                      </>
+                    );
                   }}
                 />
               }
@@ -241,7 +287,7 @@ export const PerformanceChart = ({
                 <Area
                   type="monotone"
                   dataKey="currentValue"
-                  fill="url(#fillValue)"
+                  fill="url(#fillPerformanceValue)"
                   stroke="var(--color-currentValue)"
                   strokeWidth={2}
                   dot={false}
@@ -264,6 +310,15 @@ export const PerformanceChart = ({
                   dataKey="returnPct"
                   stroke="var(--color-returnPct)"
                   strokeWidth={2}
+                  dot={false}
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="sp500ReturnPct"
+                  stroke="var(--color-sp500ReturnPct)"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 3"
                   dot={false}
                   connectNulls
                 />

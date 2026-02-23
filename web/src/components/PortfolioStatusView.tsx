@@ -102,9 +102,9 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
 
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
-  // Fetch full history once with max resolution — period filtering happens client-side in PerformanceChart
+  // Fetch full history once status is loaded — period filtering happens client-side in PerformanceChart
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
-    portfolioId,
+    status ? portfolioId : null,
     undefined,
     undefined,
     365
@@ -251,7 +251,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
               <p className={`text-sm mt-1 ${getValueClass(status.unrealized_gains_eur)}`}>
                 {formatCurrencyWithPercent(
                   status.unrealized_gains_eur,
-                  status.unrealized_gains_percent,
+                  status.unrealized_gains_pct,
                   'EUR',
                   locale
                 )}
@@ -384,14 +384,14 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
                           {holding.current_value != null ? formatCurrency(holding.current_value, 'USD', locale) : '-'}
                         </TableCell>
                         <TableCell>
-                          {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_percent != null
+                          {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
                             ? (
                               <div className="flex flex-col">
                                 <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
                                   {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
                                 </span>
                                 <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
-                                  {holding.unrealized_gain_loss_percent >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_percent).toFixed(2)}%
+                                  {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
                                 </span>
                               </div>
                             )

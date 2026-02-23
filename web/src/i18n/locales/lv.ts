@@ -279,6 +279,7 @@ const lv: Translation = {
       principal: 'Pamatsumma (EUR)',
       currentValue: 'Pašreizējā vērtība (EUR)',
       returnPct: 'Ienesīgums (%)',
+      sp500: 'S&P 500 (%)',
     },
     allocation: {
       title: 'Sadalījums',

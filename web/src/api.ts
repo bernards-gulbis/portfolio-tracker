@@ -126,7 +126,7 @@ export interface Holding {
   current_price?: number | null;
   current_value?: number | null;
   unrealized_gain_loss?: number | null;
-  unrealized_gain_loss_percent?: number | null;
+  unrealized_gain_loss_pct?: number | null;
 }
 
 export interface PortfolioStatus {
@@ -143,16 +143,16 @@ export interface PortfolioStatus {
   holdings_cost: number;
   holdings_value: number;
   unrealized_gains: number;
-  unrealized_gains_percent: number | null;
+  unrealized_gains_pct: number | null;
   unrealized_gains_eur: number | null;
   realized_gains: number;
   currency_gains_eur: number | null;
-  currency_gains_percent: number | null;
+  currency_gains_pct: number | null;
   capital_gains_eur: number | null;
   capital_gains_tax_rate: number;
   tax_eur: number | null;
   total_return_after_tax_eur: number | null;
-  total_return_after_tax_percent: number | null;
+  total_return_after_tax_pct: number | null;
   current_value_after_tax_eur: number | null;
   missing_prices: string[];
 }
@@ -162,6 +162,7 @@ export interface PerformanceDataPoint {
   principal_eur: number;
   current_value_eur: number | null;
   return_pct: number | null;
+  sp500_return_pct: number | null;
 }
 
 export interface PortfolioPerformance {

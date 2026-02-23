@@ -277,6 +277,7 @@ const en = {
       principal: 'Principal (EUR)',
       currentValue: 'Current Value (EUR)',
       returnPct: 'Return (%)',
+      sp500: 'S&P 500 (%)',
     },
     allocation: {
       title: 'Allocation',
