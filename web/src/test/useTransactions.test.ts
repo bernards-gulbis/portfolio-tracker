@@ -88,7 +88,7 @@ describe('useTransactions', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.getTransactions).toHaveBeenCalledWith(1, 2, 10, undefined, undefined, 'desc');
+    expect(api.getTransactions).toHaveBeenCalledWith(1, 2, 10, undefined, [], 'desc');
     expect(result.current.data).toEqual(mockPaginatedResponse);
   });
 
@@ -99,7 +99,7 @@ describe('useTransactions', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.getTransactions).toHaveBeenCalledWith(1, 1, expect.any(Number), undefined, undefined, 'desc');
+    expect(api.getTransactions).toHaveBeenCalledWith(1, 1, expect.any(Number), undefined, [], 'desc');
   });
 });
 
