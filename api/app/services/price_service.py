@@ -348,11 +348,22 @@ class PriceService:
 
         # Fetch missing data from API for each range
         for fetch_start, fetch_end in ranges_to_fetch:
+            # Skip ranges where start date is past end date (can happen when
+            # per-ticker start dates have time-of-day components that shift
+            # the start past a midnight-based end boundary).
+            if fetch_start.date() > fetch_end.date():
+                continue
             try:
-                fetch_start_utc = fetch_start.replace(tzinfo=timezone.utc) if fetch_start.tzinfo is None else fetch_start
-                fetch_end_utc = fetch_end.replace(tzinfo=timezone.utc) if fetch_end.tzinfo is None else fetch_end
-                period1 = int(fetch_start_utc.timestamp())
-                period2 = int(fetch_end_utc.timestamp())
+                # Normalize to midnight UTC boundaries — Yahoo API uses
+                # calendar-day resolution and requires period1 < period2.
+                # period2 is set to the day *after* fetch_end so the last
+                # requested day is included (period2 is exclusive).
+                period1 = int(datetime.combine(
+                    fetch_start.date(), datetime.min.time()
+                ).replace(tzinfo=timezone.utc).timestamp())
+                period2 = int(datetime.combine(
+                    fetch_end.date() + timedelta(days=1), datetime.min.time()
+                ).replace(tzinfo=timezone.utc).timestamp())
 
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
 
@@ -396,6 +407,20 @@ class PriceService:
 
                 cached_prices.update(new_prices)
 
+            except requests.exceptions.HTTPError as e:
+                # 400/404 are expected for delisted or pre-IPO tickers — log
+                # concisely without a traceback so production logs stay clean.
+                status = e.response.status_code if e.response is not None else None
+                if status in (400, 404):
+                    logger.warning(
+                        "No Yahoo data for %s (%s to %s): HTTP %s",
+                        ticker, fetch_start.date(), fetch_end.date(), status,
+                    )
+                else:
+                    logger.error(
+                        "Error fetching historical prices for %s (%s to %s): %s",
+                        ticker, fetch_start.date(), fetch_end.date(), e, exc_info=True,
+                    )
             except Exception as e:
                 logger.error("Error fetching historical prices for %s (%s to %s): %s", ticker, fetch_start.date(), fetch_end.date(), e, exc_info=True)
 
@@ -433,30 +458,41 @@ class PriceService:
         tickers: List[str],
         start_date: datetime,
         end_date: datetime,
-        max_workers: int = 5
+        max_workers: int = 5,
+        per_ticker_start: Optional[Dict[str, datetime]] = None,
     ) -> Dict[str, Dict[str, float]]:
         """
         Fetch historical prices for multiple tickers in parallel
-        
+
         Args:
             tickers: List of ticker symbols
-            start_date: Start date (inclusive)
+            start_date: Default start date (inclusive)
             end_date: End date (inclusive)
-            max_workers: Maximum number of concurrent API requests (default: 3)
+            max_workers: Maximum number of concurrent API requests (default: 5)
+            per_ticker_start: Optional dict mapping ticker → earliest start date.
+                              Prevents asking Yahoo for data before a stock existed
+                              (IPO date), which would otherwise return 400.
 
         Returns:
             Dictionary mapping ticker symbols to date-price dictionaries (only trading days)
         """
         if not tickers:
             return {}
-        
+
         all_prices = {}
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_ticker = {
-                executor.submit(cls.get_historical_prices, ticker, start_date, end_date): ticker
-                for ticker in tickers
-            }
+            future_to_ticker = {}
+            for ticker in tickers:
+                ticker_start = start_date
+                if per_ticker_start and ticker in per_ticker_start:
+                    ticker_start = max(start_date, per_ticker_start[ticker])
+                if ticker_start >= end_date:
+                    all_prices[ticker] = {}
+                    continue
+                future_to_ticker[
+                    executor.submit(cls.get_historical_prices, ticker, ticker_start, end_date)
+                ] = ticker
 
             for future in as_completed(future_to_ticker):
                 ticker = future_to_ticker[future]
@@ -465,5 +501,10 @@ class PriceService:
                 except Exception as e:
                     logger.error("Error fetching historical prices for %s: %s", ticker, e, exc_info=True)
                     all_prices[ticker] = {}
+
+        # Ensure every requested ticker has an entry
+        for ticker in tickers:
+            if ticker not in all_prices:
+                all_prices[ticker] = {}
 
         return all_prices

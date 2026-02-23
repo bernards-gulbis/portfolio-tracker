@@ -435,11 +435,24 @@ class PortfolioService:
             else:
                 historical_prices = {}
 
+        # Forward split factor: compensate for Yahoo's split-adjusted prices
+        # by multiplying in the split ratios not yet applied at target_date.
+        forward_split_factors: Dict[str, Decimal] = {}
+        for tx in all_transactions:
+            if (tx.type == TransactionType.SPLIT and tx.ticker and tx.split_ratio
+                    and tx.date.date() > target_date.date()):
+                factor = _to_decimal(tx.split_ratio)
+                forward_split_factors[tx.ticker] = forward_split_factors.get(tx.ticker, _ZERO + 1) * factor
+
         holdings_value = _ZERO
         for ticker, holding_data in state.holdings.items():
             price = historical_prices.get(ticker) if historical_prices else None
             if price is not None and price > 0:
-                holdings_value += holding_data['quantity'] * _to_decimal(price)
+                split_factor = forward_split_factors.get(ticker, _ZERO + 1)
+                holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
+            else:
+                # No market price — fall back to cost basis
+                holdings_value += holding_data['total_cost']
 
         current_value_usd = state.cash + holdings_value
 
@@ -520,12 +533,20 @@ class PortfolioService:
 
         all_tickers = {tx.ticker for tx in transactions if tx.ticker}
 
+        # Compute per-ticker earliest transaction date so we don't ask Yahoo
+        # for prices before a stock existed (pre-IPO → 400 error).
+        ticker_first_date: Dict[str, datetime] = {}
+        for tx in transactions:
+            if tx.ticker and tx.ticker not in ticker_first_date:
+                ticker_first_date[tx.ticker] = tx.date - timedelta(days=5)
+
         # Fetch ticker prices AND FX rate (EURUSD=X) in a single parallel batch
         fetch_tickers = list(all_tickers | {'EURUSD=X'})
         historical_data = PriceService.get_historical_prices_for_multiple_tickers(
             fetch_tickers,
             start_date - timedelta(days=5),
-            end_date + timedelta(days=1)
+            end_date + timedelta(days=1),
+            per_ticker_start=ticker_first_date,
         )
 
         # Extract and invert FX rates from the batch result
@@ -549,6 +570,19 @@ class PortfolioService:
             idx = bisect_right(sorted_dates, date_str) - 1
             return data[sorted_dates[idx]] if idx >= 0 else None
 
+        # Yahoo Finance close prices are split-adjusted: for dates before a split,
+        # the price is divided by the split ratio.  The state's quantity, however,
+        # only reflects splits that have been replayed so far.  To compensate, we
+        # track a per-ticker "forward split factor" — the product of all split
+        # ratios not yet applied to the state — and multiply it into the price
+        # lookup so that  qty_pre_split × price_adjusted × forward_factor  equals
+        # the correct historical value.
+        forward_split_factors: Dict[str, Decimal] = {}
+        for tx in transactions:
+            if tx.type == TransactionType.SPLIT and tx.ticker and tx.split_ratio:
+                factor = _to_decimal(tx.split_ratio)
+                forward_split_factors[tx.ticker] = forward_split_factors.get(tx.ticker, _ZERO + 1) * factor
+
         performance_data = []
         state = _TxState()
         tx_index = 0
@@ -560,15 +594,37 @@ class PortfolioService:
                 tx_index < len(transactions)
                 and transactions[tx_index].date.date() <= date_point.date()
             ):
-                _apply_transaction(state, transactions[tx_index], strict=False)
+                tx = transactions[tx_index]
+                _apply_transaction(state, tx, strict=False)
+                # Once a split is applied to the state quantity, remove its
+                # contribution from the forward factor.
+                if tx.type == TransactionType.SPLIT and tx.ticker and tx.split_ratio:
+                    factor = _to_decimal(tx.split_ratio)
+                    if tx.ticker in forward_split_factors:
+                        forward_split_factors[tx.ticker] /= factor
                 tx_index += 1
 
             holdings_value = _ZERO
+            missing_tickers: List[str] = []
             for ticker, holding_data in state.holdings.items():
                 ticker_dates = sorted_dates_map.get(ticker, [])
                 price = get_value_for_date(ticker_dates, historical_data.get(ticker, {}), date_str)
                 if price is not None and price > 0:
-                    holdings_value += holding_data['quantity'] * _to_decimal(price)
+                    split_factor = forward_split_factors.get(ticker, _ZERO + 1)
+                    holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
+                else:
+                    # No market price available (ticker not yet listed, delisted,
+                    # or Yahoo API error).  Fall back to cost basis so the holding
+                    # isn't silently valued at $0.
+                    holdings_value += holding_data['total_cost']
+                    missing_tickers.append(ticker)
+
+            if missing_tickers:
+                logger.debug(
+                    "Performance %s: no price data for held tickers %s "
+                    "(using cost basis as fallback)",
+                    date_str, missing_tickers,
+                )
 
             current_value_usd = state.cash + holdings_value
             fx_rate = get_value_for_date(sorted_fx_dates, fx_rates, date_str)
@@ -578,6 +634,21 @@ class PortfolioService:
             if current_value_eur is not None and state.deposits_eur > 0:
                 cv_d = _to_decimal(current_value_eur)
                 return_pct = float((cv_d - state.principal_eur) / state.deposits_eur * Decimal('100'))
+
+            if return_pct is not None and return_pct < -50:
+                logger.debug(
+                    "Performance %s: large negative return %.2f%% — "
+                    "cash=%.2f holdings=%.2f fx=%.6f "
+                    "value_usd=%.2f value_eur=%s "
+                    "principal_eur=%.2f deposits_eur=%.2f "
+                    "held=%s missing=%s",
+                    date_str, return_pct,
+                    float(state.cash), float(holdings_value),
+                    fx_rate if fx_rate is not None else 0,
+                    float(current_value_usd), current_value_eur,
+                    float(state.principal_eur), float(state.deposits_eur),
+                    list(state.holdings.keys()), missing_tickers,
+                )
 
             performance_data.append({
                 'date': date_str,

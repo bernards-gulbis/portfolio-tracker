@@ -2399,3 +2399,391 @@ def test_register_sets_user_active_by_default(session: Session):
         assert data["is_superuser"] is False
     finally:
         app.dependency_overrides.clear()
+
+
+# ================== Performance Chart with Stock Split Tests ==================
+
+def test_performance_chart_split_adjusted_prices(client: TestClient):
+    """
+    Verify the performance chart correctly handles Yahoo Finance split-adjusted
+    prices.  Yahoo returns close prices divided by the cumulative split ratio
+    for all dates, so pre-split date points would be drastically undervalued
+    without the forward-split-factor correction.
+
+    Scenario:
+      - 2024-01-01: Deposit $6 000
+      - 2024-01-02: Buy 10 shares of AAPL at $600 (total = -$6 000)
+      - 2024-06-01: 4:1 stock split (quantity 10 → 40, total_amount = 0)
+
+    Yahoo split-adjusted prices: $150 on every date (600 / 4).
+
+    Without the fix, the pre-split value = 10 × $150 = $1 500 instead of $6 000.
+    With the fix, the forward factor of 4 compensates: 10 × $150 × 4 = $6 000.
+    """
+    # Create portfolio
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Split Performance Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $6 000 with EUR conversion at 1.0 for simplicity
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 6000.0,
+            "eur_amount": 6000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 10 shares of AAPL at $600 each
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10.0,
+            "price_per_share": 600.0,
+            "total_amount": -6000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # 4:1 stock split on 2024-06-01
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Split",
+            "ticker": "AAPL",
+            "split_ratio": 4.0,
+            "total_amount": 0.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Mock Yahoo prices: split-adjusted $150 on all dates, EURUSD=X ≈ 1.0
+    # (close price is always the post-split equivalent)
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        from datetime import timedelta
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:  # trading days only
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0  # 1 EUR = 1 USD
+                    else:
+                        prices[date_str] = 150.0  # split-adjusted price
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 10},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    points = data["data_points"]
+
+    # There should be data points spanning 2024-01 through today
+    assert len(points) > 0
+
+    for pt in points:
+        val = pt["current_value_eur"]
+        if val is None:
+            continue
+        # Portfolio is fully invested in one stock — value should always
+        # equal the deposit amount ($6 000) regardless of whether the date
+        # is before or after the split.  Any value far below deposit
+        # would indicate the split-adjustment bug.
+        assert val == pytest.approx(6000.0, rel=0.01), (
+            f"date={pt['date']}: current_value_eur={val}, expected ≈6000 "
+            f"(return_pct={pt['return_pct']})"
+        )
+
+
+def test_performance_chart_multiple_splits(client: TestClient):
+    """Verify forward-split-factor works with two successive splits."""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Multi-Split Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 12000.0,
+            "eur_amount": 12000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 10 shares at $1 200
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "TSLA",
+            "quantity": 10.0,
+            "price_per_share": 1200.0,
+            "total_amount": -12000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # First split 3:1 on 2024-04-01  (10 → 30 shares)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-04-01T10:00:00",
+            "type": "Split",
+            "ticker": "TSLA",
+            "split_ratio": 3.0,
+            "total_amount": 0.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Second split 2:1 on 2024-08-01  (30 → 60 shares)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-08-01T10:00:00",
+            "type": "Split",
+            "ticker": "TSLA",
+            "split_ratio": 2.0,
+            "total_amount": 0.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Yahoo price: split-adjusted = 1200 / 3 / 2 = $200 on all dates
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        from datetime import timedelta
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0
+                    else:
+                        prices[date_str] = 200.0  # 1200 / 6
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 10},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+
+    for pt in points:
+        val = pt["current_value_eur"]
+        if val is None:
+            continue
+        # 10 × $200 × 6 = 12 000 before both splits
+        # 30 × $200 × 2 = 12 000 between splits
+        # 60 × $200 × 1 = 12 000 after both splits
+        assert val == pytest.approx(12000.0, rel=0.01), (
+            f"date={pt['date']}: current_value_eur={val}, expected ≈12000"
+        )
+
+
+def test_performance_chart_no_splits(client: TestClient):
+    """Verify that the forward-split-factor is a no-op when there are no splits."""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "No Split Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "eur_amount": 5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "MSFT",
+            "quantity": 20.0,
+            "price_per_share": 250.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Yahoo price: $250 (no split, just the actual price)
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        from datetime import timedelta
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0
+                    else:
+                        prices[date_str] = 250.0
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 5},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+
+    for pt in points:
+        val = pt["current_value_eur"]
+        if val is None:
+            continue
+        # 20 × $250 = $5 000 — no split factor needed
+        assert val == pytest.approx(5000.0, rel=0.01), (
+            f"date={pt['date']}: current_value_eur={val}, expected ≈5000"
+        )
+
+
+def test_performance_chart_missing_price_fallback(client: TestClient):
+    """When Yahoo has no price data for a ticker (delisted/pre-IPO), fall back to cost basis
+    instead of valuing the holding at $0."""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Missing Price Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10 000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 50 shares of GOOD at $100 = $5 000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "GOOD",
+            "quantity": 50.0,
+            "price_per_share": 100.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Buy 25 shares of DELIST at $200 = $5 000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-03T10:00:00",
+            "type": "Buy",
+            "ticker": "DELIST",
+            "quantity": 25.0,
+            "price_per_share": 200.0,
+            "total_amount": -5000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Mock: GOOD has prices ($100), DELIST has NO prices (empty dict — simulates delisted ticker)
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        from datetime import timedelta
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0  # 1:1 USD/EUR
+                    elif ticker == 'GOOD':
+                        prices[date_str] = 100.0
+                    # DELIST: no prices — empty dict
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 5},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+
+    for pt in points:
+        val = pt["current_value_eur"]
+        if val is None:
+            continue
+        # GOOD: 50 × $100 = $5 000
+        # DELIST: no price → cost basis fallback = $5 000
+        # Total = $10 000 ≈ principal
+        # Without the fallback, DELIST would be $0, giving $5 000 — a 50% loss
+        assert val == pytest.approx(10000.0, rel=0.01), (
+            f"date={pt['date']}: current_value_eur={val}, expected ≈10000 "
+            f"(cost basis fallback for DELIST)"
+        )
+        # return_pct should be ~0% (no gain/loss)
+        ret = pt["return_pct"]
+        if ret is not None:
+            assert abs(ret) < 5.0, (
+                f"date={pt['date']}: return_pct={ret}%, expected ≈0% with cost basis fallback"
+            )
