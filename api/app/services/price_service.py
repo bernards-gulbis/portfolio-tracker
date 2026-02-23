@@ -24,7 +24,7 @@ class PriceService:
     _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
     _cache_ttl: timedelta = timedelta(minutes=int(os.getenv('PRICE_CACHE_TTL', '15')))
     _cache_lock = Lock()  # Thread-safe cache access
-    _yahoo_semaphore = Semaphore(3)  # Max 3 concurrent outgoing Yahoo Finance requests
+    _yahoo_semaphore = Semaphore(5)  # Max 5 concurrent outgoing Yahoo Finance requests
     
     # In-memory cache for historical prices (clears after request completes)
     _historical_cache: Dict[str, Dict[str, float]] = {}
@@ -433,7 +433,7 @@ class PriceService:
         tickers: List[str],
         start_date: datetime,
         end_date: datetime,
-        max_workers: int = 3
+        max_workers: int = 5
     ) -> Dict[str, Dict[str, float]]:
         """
         Fetch historical prices for multiple tickers in parallel

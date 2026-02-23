@@ -161,6 +161,7 @@ export interface PerformanceDataPoint {
   date: string;
   principal_eur: number;
   current_value_eur: number | null;
+  return_pct: number | null;
 }
 
 export interface PortfolioPerformance {

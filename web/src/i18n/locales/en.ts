@@ -276,6 +276,7 @@ const en = {
       noData: 'No performance data available',
       principal: 'Principal (EUR)',
       currentValue: 'Current Value (EUR)',
+      returnPct: 'Return (%)',
     },
     allocation: {
       title: 'Allocation',

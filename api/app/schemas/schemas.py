@@ -231,7 +231,8 @@ class PerformanceDataPoint(BaseModel):
     date: str  # YYYY-MM-DD format
     principal_eur: float
     current_value_eur: Optional[float]
-    
+    return_pct: Optional[float] = None  # ((current_value_eur - principal_eur) / principal_eur) * 100
+
     model_config = ConfigDict(from_attributes=True)
 
 

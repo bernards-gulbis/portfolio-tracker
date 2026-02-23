@@ -152,7 +152,8 @@ def get_portfolio_performance(
             PerformanceDataPoint(
                 date=dp['date'],
                 principal_eur=dp['principal_eur'],
-                current_value_eur=dp['current_value_eur']
+                current_value_eur=dp['current_value_eur'],
+                return_pct=dp.get('return_pct'),
             )
             for dp in performance_data
         ]

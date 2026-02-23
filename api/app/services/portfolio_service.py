@@ -55,6 +55,7 @@ class _TxState:
     cash: Decimal = _ZERO
     principal: Decimal = _ZERO        # Net deposits - withdrawals in native currency
     principal_eur: Decimal = _ZERO    # Net deposits - withdrawals in EUR (historical rates)
+    deposits_eur: Decimal = _ZERO     # Cumulative deposits in EUR (inflows only, for return % denominator)
     dividends: Decimal = _ZERO
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
@@ -87,7 +88,9 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
     if tx_type == TransactionType.DEPOSIT:
         state.cash += total
         state.principal += total
-        state.principal_eur += _eur_from_tx(tx, total)
+        eur = _eur_from_tx(tx, total)
+        state.principal_eur += eur
+        state.deposits_eur += eur
 
     elif tx_type == TransactionType.WITHDRAW:
         state.cash += total           # total is negative
@@ -299,8 +302,8 @@ class PortfolioService:
 
                 principal_at_current_rate = state.principal * usd_to_eur_d
                 currency_gains_eur = principal_at_current_rate - state.principal_eur
-                if state.principal_eur != 0:
-                    currency_gains_percent = (currency_gains_eur / state.principal_eur) * 100
+                if state.deposits_eur > 0:
+                    currency_gains_percent = (currency_gains_eur / state.deposits_eur) * 100
         except Exception as e:
             logger.error(
                 "Error fetching USD to EUR exchange rate for portfolio %s: %s",
@@ -329,8 +332,8 @@ class PortfolioService:
         total_return_after_tax_percent: Optional[Decimal] = None
         if current_value_eur is not None and tax_eur is not None:
             total_return_after_tax_eur = (current_value_eur - state.principal_eur) - tax_eur
-            if state.principal_eur != 0:
-                total_return_after_tax_percent = (total_return_after_tax_eur / state.principal_eur) * 100
+            if state.deposits_eur > 0:
+                total_return_after_tax_percent = (total_return_after_tax_eur / state.deposits_eur) * 100
 
         current_value_after_tax_eur: Optional[Decimal] = None
         if current_value_eur is not None and tax_eur is not None:
@@ -485,8 +488,6 @@ class PortfolioService:
             PortfolioNotFoundException: If portfolio_id does not exist.
             ValueError: If start_date >= end_date or num_points < 2.
         """
-        PriceService.clear_session_cache()
-
         portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
@@ -507,7 +508,7 @@ class PortfolioService:
 
         total_days = (end_date - start_date).days
         if total_days == 0:
-            date_points = [start_date, end_date]
+            date_points = [start_date]
         elif total_days < num_points:
             date_points = [start_date + timedelta(days=i) for i in range(total_days + 1)]
         else:
@@ -519,19 +520,21 @@ class PortfolioService:
 
         all_tickers = {tx.ticker for tx in transactions if tx.ticker}
 
-        if all_tickers:
-            historical_data = PriceService.get_historical_prices_for_multiple_tickers(
-                list(all_tickers),
-                start_date - timedelta(days=5),
-                end_date + timedelta(days=1)
-            )
-        else:
-            historical_data = {}
-
-        fx_rates = PriceService.get_historical_usd_to_eur_rates(
+        # Fetch ticker prices AND FX rate (EURUSD=X) in a single parallel batch
+        fetch_tickers = list(all_tickers | {'EURUSD=X'})
+        historical_data = PriceService.get_historical_prices_for_multiple_tickers(
+            fetch_tickers,
             start_date - timedelta(days=5),
             end_date + timedelta(days=1)
         )
+
+        # Extract and invert FX rates from the batch result
+        eur_usd_prices = historical_data.pop('EURUSD=X', {})
+        fx_rates = {
+            date_str: 1.0 / rate
+            for date_str, rate in eur_usd_prices.items()
+            if rate and rate > 0
+        }
 
         # Pre-sort date keys for each ticker's historical data for O(log n) lookups
         sorted_dates_map: Dict[str, List[str]] = {}
@@ -571,10 +574,16 @@ class PortfolioService:
             fx_rate = get_value_for_date(sorted_fx_dates, fx_rates, date_str)
             current_value_eur = float(current_value_usd * _to_decimal(fx_rate)) if fx_rate is not None else None
 
+            return_pct = None
+            if current_value_eur is not None and state.deposits_eur > 0:
+                cv_d = _to_decimal(current_value_eur)
+                return_pct = float((cv_d - state.principal_eur) / state.deposits_eur * Decimal('100'))
+
             performance_data.append({
                 'date': date_str,
                 'principal_eur': float(state.principal_eur),
                 'current_value_eur': current_value_eur,
+                'return_pct': return_pct,
             })
 
         return portfolio.name, performance_data

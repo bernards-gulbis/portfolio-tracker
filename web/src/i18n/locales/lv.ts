@@ -278,6 +278,7 @@ const lv: Translation = {
       noData: 'Nav pieejami snieguma dati',
       principal: 'Pamatsumma (EUR)',
       currentValue: 'Pašreizējā vērtība (EUR)',
+      returnPct: 'Ienesīgums (%)',
     },
     allocation: {
       title: 'Sadalījums',
