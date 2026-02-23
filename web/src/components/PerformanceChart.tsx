@@ -128,22 +128,29 @@ export const PerformanceChart = ({
     const cutoff = getCutoffDate(timePeriod);
     const filtered = cutoff ? data.filter((p) => p.date >= cutoff) : data;
 
-    // Rebase S&P 500 return % so it starts at 0% at the first visible point.
-    // Backend returns return % from portfolio inception; we convert:
+    // Rebase return % so both portfolio and S&P 500 start at 0% at the first
+    // visible point. Backend returns return % from portfolio inception; we convert:
     // rebased = ((1 + pct/100) / (1 + basePct/100) - 1) * 100
+    const firstReturn = filtered.find((p) => p.return_pct != null)?.return_pct;
+    const baseReturnFactor = firstReturn != null ? 1 + firstReturn / 100 : null;
+
     const firstSp500 = filtered.find((p) => p.sp500_return_pct != null)?.sp500_return_pct;
-    const baseFactor = firstSp500 != null ? 1 + firstSp500 / 100 : null;
+    const baseSp500Factor = firstSp500 != null ? 1 + firstSp500 / 100 : null;
 
     return filtered.map((point) => {
+      let returnRebased: number | null = null;
+      if (point.return_pct != null && baseReturnFactor != null && baseReturnFactor !== 0) {
+        returnRebased = ((1 + point.return_pct / 100) / baseReturnFactor - 1) * 100;
+      }
       let sp500Rebased: number | null = null;
-      if (point.sp500_return_pct != null && baseFactor != null && baseFactor !== 0) {
-        sp500Rebased = ((1 + point.sp500_return_pct / 100) / baseFactor - 1) * 100;
+      if (point.sp500_return_pct != null && baseSp500Factor != null && baseSp500Factor !== 0) {
+        sp500Rebased = ((1 + point.sp500_return_pct / 100) / baseSp500Factor - 1) * 100;
       }
       return {
         date: point.date,
         principal: point.principal_eur,
         currentValue: point.current_value_eur,
-        returnPct: point.return_pct,
+        returnPct: returnRebased,
         sp500ReturnPct: sp500Rebased,
       };
     });
