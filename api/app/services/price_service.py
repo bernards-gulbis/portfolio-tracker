@@ -145,7 +145,7 @@ class PriceService:
 
         Args:
             tickers: List of ticker symbols
-            max_workers: Maximum number of concurrent API requests (default: 5)
+            max_workers: Maximum number of concurrent API requests (default: 3)
 
         Returns:
             Dictionary mapping ticker symbols to their current prices (None if not found)
@@ -442,8 +442,8 @@ class PriceService:
             tickers: List of ticker symbols
             start_date: Start date (inclusive)
             end_date: End date (inclusive)
-            max_workers: Maximum number of concurrent API requests (default: 5)
-            
+            max_workers: Maximum number of concurrent API requests (default: 3)
+
         Returns:
             Dictionary mapping ticker symbols to date-price dictionaries (only trading days)
         """

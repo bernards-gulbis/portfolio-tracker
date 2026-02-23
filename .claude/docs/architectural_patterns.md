@@ -292,6 +292,6 @@ Server-side pagination is implemented in `api/app/repositories/transaction_repos
 ### Multi-Level Caching (Price Service)
 
 Stock prices use three cache layers:
-1. **In-memory class-level cache** with 15-min TTL and thread locks (`api/app/services/price_service.py:23-25`)
+1. **In-memory class-level cache** with configurable TTL (`PRICE_CACHE_TTL` env var, default 15 min) and thread locks (`api/app/services/price_service.py:23-27`)
 2. **Database cache** via HistoricalPrice/FxRate models for historical data
 3. **Session cache** cleared per-request to avoid stale data within a calculation

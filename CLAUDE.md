@@ -186,8 +186,10 @@ Backend routes have no path prefix. The Vite dev server proxies `/api/*` → `lo
 - **Transaction types:** Deposit, Buy, Sell, Withdraw, Dividend, Fee, Split
 - **Sign convention:** Buy/Withdraw/Fee = negative `total_amount`; Deposit/Sell/Dividend = positive; Split = 0
 - **EUR tracking:** Every transaction can store `eur_amount`, `fx_rate`, and `currency` for multi-currency EUR-based reporting
-- **Tax rate:** 25.5% capital gains — `TAX_RATE` constant at `api/app/services/portfolio_service.py:24`
-- **Holdings epsilon:** Floating-point threshold `HOLDINGS_EPSILON = 1e-6` at `api/app/services/portfolio_service.py:20`
+- **Decimal precision:** All financial calculations (cost basis, gains, tax) use Python `Decimal` in `portfolio_service.py`. Transaction values are converted to `Decimal` at the service boundary; response DTOs convert back to `float`. This eliminates floating-point accumulation errors across buy/sell sequences.
+- **Cost basis method:** Weighted average cost with proportional removal — on sell, `cost_basis = total_cost * (sell_qty / held_qty)` rather than `avg_cost * sell_qty`. This avoids intermediate division rounding.
+- **Tax rate:** 25.5% capital gains — `TAX_RATE = Decimal('0.255')` at `api/app/services/portfolio_service.py:27`
+- **Holdings epsilon:** Precision threshold `HOLDINGS_EPSILON = Decimal('1e-6')` at `api/app/services/portfolio_service.py:24`
 
 ## Localization
 
