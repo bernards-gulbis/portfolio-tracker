@@ -289,12 +289,14 @@ const TransactionTable = ({
                 </TableCell>
                 <TableCell>{transaction.ticker || '-'}</TableCell>
                 <TableCell>
-                  {transaction.quantity != null && transaction.price_per_share != null
-                    ? t('transaction.table.columns.detailsFormat', {
-                        qty: parseFloat(transaction.quantity.toFixed(8)),
-                        price: formatCurrency(transaction.price_per_share, 'USD', locale),
-                      })
-                    : '-'}
+                  {transaction.type === TransactionType.SPLIT && transaction.split_ratio != null
+                    ? t('transaction.table.columns.splitFormat', { ratio: transaction.split_ratio })
+                    : transaction.quantity != null && transaction.price_per_share != null
+                      ? t('transaction.table.columns.detailsFormat', {
+                          qty: parseFloat(transaction.quantity.toFixed(8)),
+                          price: formatCurrency(transaction.price_per_share, 'USD', locale),
+                        })
+                      : '-'}
                 </TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(getDisplayValue(transaction), 'USD', locale)}

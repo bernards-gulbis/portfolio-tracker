@@ -180,6 +180,7 @@ const lv: Translation = {
         ticker: 'Tīkotājs',
         details: 'Daudz. un Cena',
         detailsFormat: '{{qty}} akcijas par {{price}}',
+        splitFormat: 'Sadalīts 1:{{ratio}}',
         totalAmount: 'Kopējā summa',
         actions: 'Darbības',
       },

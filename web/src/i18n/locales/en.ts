@@ -178,6 +178,7 @@ const en = {
         ticker: 'Ticker',
         details: 'Qty and Price',
         detailsFormat: '{{qty}} shares at {{price}}',
+        splitFormat: 'Split 1:{{ratio}}',
         totalAmount: 'Total Amount',
         actions: 'Actions',
       },
