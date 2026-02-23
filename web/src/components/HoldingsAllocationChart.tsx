@@ -78,7 +78,7 @@ export const HoldingsAllocationChart = ({
       }
     });
 
-    const t = data.reduce((sum, item) => sum + item.value, 0);
+    const total = data.reduce((sum, item) => sum + item.value, 0);
 
     const config = data.reduce((acc, entry) => {
       acc[entry.name] = {
@@ -88,7 +88,7 @@ export const HoldingsAllocationChart = ({
       return acc;
     }, {} as ChartConfig);
 
-    return { chartData: data, total: t, chartConfig: config };
+    return { chartData: data, total, chartConfig: config };
   }, [holdings, cash]);
 
   if (chartData.length === 0) {

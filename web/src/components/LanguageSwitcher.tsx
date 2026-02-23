@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Languages } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -32,7 +33,7 @@ const LanguageSwitcher = () => {
           <DropdownMenuItem
             key={lang}
             onClick={() => handleSelect(lang)}
-            className={lang === currentLang ? 'font-semibold' : ''}
+            className={cn(lang === currentLang && 'font-semibold')}
           >
             {t(`language.${lang}`)}
           </DropdownMenuItem>

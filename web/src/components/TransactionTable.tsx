@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, TransactionType, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate, getDisplayValue } from '../utils/formatters';
+import { formatCurrency, formatDate } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { DEFAULT_PAGE_SIZE, MAX_VISIBLE_PAGES } from '../constants/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -105,10 +105,6 @@ const TransactionTable = ({
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; transactionId: number | null }>({ open: false, transactionId: null });
-
-  const toggleMenu = (transactionId: number) => {
-    setOpenMenuId(openMenuId === transactionId ? null : transactionId);
-  };
 
   const closeMenu = () => {
     setOpenMenuId(null);
@@ -307,13 +303,10 @@ const TransactionTable = ({
                       : '-'}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(getDisplayValue(transaction), 'USD', locale)}
+                  {formatCurrency(transaction.total_amount, 'USD', locale)}
                 </TableCell>
                 <TableCell className="text-center">
-                  <DropdownMenu open={openMenuId === transaction.id} onOpenChange={(open) => {
-                    if (open) toggleMenu(transaction.id);
-                    else closeMenu();
-                  }}>
+                  <DropdownMenu open={openMenuId === transaction.id} onOpenChange={(open) => setOpenMenuId(open ? transaction.id : null)}>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"

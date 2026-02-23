@@ -56,8 +56,8 @@ const CopyPortfolioModal = ({
   const { reset } = form;
 
   useEffect(() => {
-    if (isOpen) reset({ name: t('portfolio.copy.defaultName', { name: portfolioName }) });
-  }, [isOpen, portfolioName, reset, t]);
+    if (isOpen) reset({ name: defaultName });
+  }, [isOpen, defaultName, reset]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -69,7 +69,7 @@ const CopyPortfolioModal = ({
   };
 
   const handleClose = () => {
-    reset({ name: t('portfolio.copy.defaultName', { name: portfolioName }) });
+    reset({ name: defaultName });
     onClose();
   };
 

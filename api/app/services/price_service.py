@@ -105,9 +105,9 @@ class PriceService:
                 session.execute(stmt)
                 session.commit()
             
-            logger.debug(f"Saved {len(prices)} historical prices for {ticker} to cache")
+            logger.debug("Saved %d historical prices for %s to cache", len(prices), ticker)
         except Exception as e:
-            logger.error(f"Failed to save {len(prices)} historical prices for {ticker}: {e}", exc_info=True)
+            logger.error("Failed to save %d historical prices for %s: %s", len(prices), ticker, e, exc_info=True)
             # Don't raise - caching failure shouldn't break the request
             # Data will be refetched next time
     
@@ -173,9 +173,9 @@ class PriceService:
                 session.execute(stmt)
                 session.commit()
             
-            logger.debug(f"Saved {len(rates)} FX rates to cache")
+            logger.debug("Saved %d FX rates to cache", len(rates))
         except Exception as e:
-            logger.error(f"Failed to save {len(rates)} FX rates: {e}", exc_info=True)
+            logger.error("Failed to save %d FX rates: %s", len(rates), e, exc_info=True)
             # Don't raise - caching failure shouldn't break the request
     
     @staticmethod
@@ -210,7 +210,7 @@ class PriceService:
                     price = future.result()
                     prices[ticker] = price
                 except Exception as e:
-                    logger.error(f"Error fetching price for {ticker}: {e}", exc_info=True)
+                    logger.error("Error fetching price for %s: %s", ticker, e, exc_info=True)
                     prices[ticker] = None
         
         return prices
@@ -232,7 +232,7 @@ class PriceService:
             if ticker in PriceService._price_cache:
                 cached_price, cached_time = PriceService._price_cache[ticker]
                 if now - cached_time < PriceService._cache_ttl:
-                    logger.debug(f"Cache hit for {ticker}: {cached_price}")
+                    logger.debug("Cache hit for %s: %s", ticker, cached_price)
                     return cached_price
                 # Cache expired, will be updated below
         
@@ -274,13 +274,13 @@ class PriceService:
                 return fetched_price
 
             except requests.exceptions.RequestException as e:
-                logger.warning(f"Network error fetching price for {ticker}: {e}")
+                logger.warning("Network error fetching price for %s: %s", ticker, e)
                 return None
             except (KeyError, ValueError, IndexError) as e:
-                logger.warning(f"Error parsing price data for {ticker}: {e}")
+                logger.warning("Error parsing price data for %s: %s", ticker, e)
                 return None
             except Exception as e:
-                logger.error(f"Unexpected error fetching price for {ticker}: {e}", exc_info=True)
+                logger.error("Unexpected error fetching price for %s: %s", ticker, e, exc_info=True)
                 return None
     
     @staticmethod
@@ -327,7 +327,7 @@ class PriceService:
         cache_key = f"{ticker}:{start_date.date()}:{end_date.date()}"
         with PriceService._historical_cache_lock:
             if cache_key in PriceService._historical_cache:
-                logger.debug(f"In-memory cache hit for {ticker}")
+                logger.debug("In-memory cache hit for %s", ticker)
                 return PriceService._historical_cache[cache_key].copy()
         
         # Determine if we need to fetch from API
@@ -354,7 +354,7 @@ class PriceService:
                 # Need to fetch from start_date to day before earliest cached
                 fetch_end_before = datetime.combine(earliest_cached_date, datetime.min.time()) - timedelta(days=1)
                 ranges_to_fetch.append((start_date, fetch_end_before))
-                logger.debug(f"Need data before cache for {ticker}: {start_date.date()} to {fetch_end_before.date()}")
+                logger.debug("Need data before cache for %s: %s to %s", ticker, start_date.date(), fetch_end_before.date())
             
             # Check if we need data AFTER the cached range
             if end_date.date() > latest_cached_date:
@@ -364,28 +364,28 @@ class PriceService:
                     # Fetch missing portion
                     fetch_start_after = datetime.combine(latest_cached_date, datetime.min.time()) + timedelta(days=1)
                     ranges_to_fetch.append((fetch_start_after, end_date))
-                    logger.debug(f"Need historical data after cache for {ticker}: {fetch_start_after.date()} to {end_date.date()}")
+                    logger.debug("Need historical data after cache for %s: %s to %s", ticker, fetch_start_after.date(), end_date.date())
                 elif end_date.date() <= yesterday:
                     # Requesting up to yesterday - fetch if not cached
                     fetch_start_after = datetime.combine(latest_cached_date, datetime.min.time()) + timedelta(days=1)
                     ranges_to_fetch.append((fetch_start_after, end_date))
-                    logger.debug(f"Need data up to yesterday for {ticker}: {fetch_start_after.date()} to {end_date.date()}")
+                    logger.debug("Need data up to yesterday for %s: %s to %s", ticker, fetch_start_after.date(), end_date.date())
                 elif latest_cached_date >= yesterday:
                     # Cache has yesterday's data, don't fetch today (market may not be closed)
-                    logger.debug(f"Cache has recent data for {ticker} up to {latest_cached_date}, skipping today")
+                    logger.debug("Cache has recent data for %s up to %s, skipping today", ticker, latest_cached_date)
                 else:
                     # Cache is older than yesterday, fetch up to yesterday (not today)
                     fetch_start_after = datetime.combine(latest_cached_date, datetime.min.time()) + timedelta(days=1)
                     fetch_end_recent = datetime.combine(yesterday, datetime.max.time())
                     ranges_to_fetch.append((fetch_start_after, fetch_end_recent))
-                    logger.debug(f"Need recent data for {ticker}: {fetch_start_after.date()} to {fetch_end_recent.date()}")
+                    logger.debug("Need recent data for %s: %s to %s", ticker, fetch_start_after.date(), fetch_end_recent.date())
             elif end_date.date() <= cutoff_date:
                 # Cache fully covers the historical range
-                logger.debug(f"Cache fully covers historical range for {ticker} ({len(cached_prices)} days)")
+                logger.debug("Cache fully covers historical range for %s (%d days)", ticker, len(cached_prices))
         else:
             # No cache - fetch entire range
             ranges_to_fetch.append((start_date, end_date))
-            logger.debug(f"No cache for {ticker}, fetching full range")
+            logger.debug("No cache for %s, fetching full range", ticker)
         
         # If no ranges to fetch, return cached data
         if not ranges_to_fetch:
@@ -395,7 +395,7 @@ class PriceService:
                 if len(PriceService._historical_cache) >= PriceService._HISTORICAL_CACHE_MAX_SIZE:
                     first_key = next(iter(PriceService._historical_cache))
                     PriceService._historical_cache.pop(first_key)
-                    logger.debug(f"Evicted cache entry: {first_key}")
+                    logger.debug("Evicted cache entry: %s", first_key)
                 PriceService._historical_cache[cache_key] = cached_prices.copy()
             return cached_prices
         
@@ -451,13 +451,13 @@ class PriceService:
                                        if datetime.strptime(k, '%Y-%m-%d').date() < today}
                     if historical_prices:
                         PriceService._save_historical_prices(ticker, historical_prices)
-                        logger.debug(f"Cached {len(historical_prices)} historical prices for {ticker}")
+                        logger.debug("Cached %d historical prices for %s", len(historical_prices), ticker)
                 
                 # Merge with cached prices
                 cached_prices.update(new_prices)
                 
             except Exception as e:
-                logger.error(f"Error fetching historical prices for {ticker} ({fetch_start.date()} to {fetch_end.date()}): {e}", exc_info=True)
+                logger.error("Error fetching historical prices for %s (%s to %s): %s", ticker, fetch_start.date(), fetch_end.date(), e, exc_info=True)
                 # Continue with other ranges or return what we have
         
         # Store in in-memory cache
@@ -467,7 +467,7 @@ class PriceService:
                 # Remove first entry (FIFO eviction) - deterministic in Python 3.7+
                 first_key = next(iter(PriceService._historical_cache))
                 PriceService._historical_cache.pop(first_key)
-                logger.debug(f"Evicted cache entry: {first_key}")
+                logger.debug("Evicted cache entry: %s", first_key)
             PriceService._historical_cache[cache_key] = cached_prices.copy()
         
         return cached_prices
@@ -544,7 +544,7 @@ class PriceService:
                     prices = future.result()
                     all_prices[ticker] = prices
                 except Exception as e:
-                    logger.error(f"Error fetching historical prices for {ticker}: {e}", exc_info=True)
+                    logger.error("Error fetching historical prices for %s: %s", ticker, e, exc_info=True)
                     all_prices[ticker] = {}
         
         return all_prices

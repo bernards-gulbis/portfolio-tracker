@@ -302,6 +302,12 @@ export const getPortfolioStatus = async (portfolioId: number): Promise<Portfolio
   return response.data;
 };
 
+interface PerformanceParams {
+  start_date?: string;
+  end_date?: string;
+  num_points?: number;
+}
+
 /**
  * Get portfolio performance over time
  */
@@ -311,12 +317,6 @@ export const getPortfolioPerformance = async (
   endDate?: string,
   numPoints?: number
 ): Promise<PortfolioPerformance> => {
-  interface PerformanceParams {
-    start_date?: string;
-    end_date?: string;
-    num_points?: number;
-  }
-
   const params: PerformanceParams = {};
   if (startDate) params.start_date = startDate;
   if (endDate) params.end_date = endDate;

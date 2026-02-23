@@ -200,7 +200,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = SECRET_KEY
 
     async def on_after_register(self, user: User, request=None):
-        logger.info(f"User {user.id} registered with email {user.email}")
+        logger.info("User %s registered", user.id)
 
     async def oauth_callback(
         self,

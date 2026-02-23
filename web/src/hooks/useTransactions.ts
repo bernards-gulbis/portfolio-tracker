@@ -71,15 +71,11 @@ export const useUpdateTransaction = () => {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: ({
-      transactionId,
-      data,
-      portfolioId: _portfolioId,
-    }: {
+    mutationFn: (variables: {
       transactionId: number;
       data: TransactionUpdate;
       portfolioId: number;
-    }) => updateTransaction(transactionId, data),
+    }) => updateTransaction(variables.transactionId, variables.data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
@@ -101,8 +97,8 @@ export const useDeleteTransaction = () => {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: ({ transactionId, portfolioId: _portfolioId }: { transactionId: number; portfolioId: number }) =>
-      deleteTransaction(transactionId),
+    mutationFn: (variables: { transactionId: number; portfolioId: number }) =>
+      deleteTransaction(variables.transactionId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],

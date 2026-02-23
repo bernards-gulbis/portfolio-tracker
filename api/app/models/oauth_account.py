@@ -2,7 +2,7 @@
 import uuid
 from typing import Optional
 from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, ForeignKey, String, Integer
+from sqlalchemy import Column, ForeignKey
 import sqlalchemy as sa
 
 
