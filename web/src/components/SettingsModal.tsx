@@ -20,6 +20,8 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Spinner } from '@/components/ui/spinner';
+import { Info } from 'lucide-react';
 
 // ================== Profile schema ==================
 
@@ -183,7 +185,8 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 form="settings-profile-form"
                 disabled={updateProfile.isPending}
               >
-                {updateProfile.isPending ? t('settings.profile.submitting') : t('settings.profile.submit')}
+                {updateProfile.isPending && <Spinner />}
+                {t('settings.profile.submit')}
               </Button>
             </DialogFooter>
           </TabsContent>
@@ -191,9 +194,10 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
           {/* Password tab */}
           <TabsContent value="password">
             {isOauthUser && (
-              <p className="text-sm text-muted-foreground mt-4">
-                {t('settings.password.oauthNote')}
-              </p>
+              <Alert className="mt-4">
+                <Info />
+                <AlertDescription>{t('settings.password.oauthNote')}</AlertDescription>
+              </Alert>
             )}
             <form id="settings-password-form" onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
               <FieldGroup className="py-4">
@@ -250,11 +254,8 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 form="settings-password-form"
                 disabled={changePassword.isPending}
               >
-                {changePassword.isPending
-                  ? t('settings.password.submitting')
-                  : isOauthUser
-                    ? t('settings.password.submitOauth')
-                    : t('settings.password.submit')}
+                {changePassword.isPending && <Spinner />}
+                {isOauthUser ? t('settings.password.submitOauth') : t('settings.password.submit')}
               </Button>
             </DialogFooter>
           </TabsContent>

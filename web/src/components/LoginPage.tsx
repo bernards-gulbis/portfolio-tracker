@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
+import { Spinner } from '@/components/ui/spinner';
 
 const emailValidator = z.string().email();
 
@@ -190,7 +191,8 @@ export function LoginPage() {
               </FieldGroup>
 
               <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
-                {loginMutation.isPending ? t('auth.signIn.submitting') : t('auth.signIn.submit')}
+                {loginMutation.isPending && <Spinner />}
+                {t('auth.signIn.submit')}
               </Button>
             </form>
           ) : (
@@ -256,7 +258,8 @@ export function LoginPage() {
               </FieldGroup>
 
               <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
-                {registerMutation.isPending ? t('auth.register.submitting') : t('auth.register.submit')}
+                {registerMutation.isPending && <Spinner />}
+                {t('auth.register.submit')}
               </Button>
             </form>
           )}

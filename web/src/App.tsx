@@ -30,6 +30,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
@@ -124,8 +125,8 @@ function AppContent() {
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {logoutMutation.isPending ? t('app.header.signingOut') : t('app.header.signOut')}
+                  {logoutMutation.isPending ? <Spinner className="mr-2" /> : <LogOut className="mr-2 h-4 w-4" />}
+                  {t('app.header.signOut')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { CalendarIcon } from 'lucide-react';
 import {
   Field,
@@ -718,9 +719,8 @@ const TransactionModal = ({
             {t('transaction.modal.cancel')}
           </Button>
           <Button type="submit" form="transaction-form" disabled={isPending}>
-            {isPending
-              ? isEdit ? t('transaction.modal.updating') : t('transaction.modal.adding')
-              : isEdit ? t('transaction.modal.update') : t('transaction.modal.add')}
+            {isPending && <Spinner />}
+            {isEdit ? t('transaction.modal.update') : t('transaction.modal.add')}
           </Button>
         </DialogFooter>
       </DialogContent>

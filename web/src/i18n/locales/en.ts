@@ -10,7 +10,6 @@ const en = {
       switchToLight: 'Switch to light mode',
       userMenu: 'User menu',
       signOut: 'Sign out',
-      signingOut: 'Signing out…',
     },
   },
   auth: {
@@ -24,7 +23,6 @@ const en = {
       title: 'Sign In',
       description: 'Sign in to access your portfolio',
       submit: 'Sign In',
-      submitting: 'Signing in...',
       switchPrompt: "Don't have an account?",
       switchLink: 'Sign up',
     },
@@ -32,7 +30,6 @@ const en = {
       title: 'Create Account',
       description: 'Create an account to get started',
       submit: 'Create Account',
-      submitting: 'Creating account...',
       switchPrompt: 'Already have an account?',
       switchLink: 'Sign in',
       successToast: 'Account created! Please log in.',
@@ -103,7 +100,6 @@ const en = {
       namePlaceholder: 'e.g., My Investment Portfolio',
       cancel: 'Cancel',
       submit: 'Create Portfolio',
-      submitting: 'Creating...',
     },
     edit: {
       title: 'Rename Portfolio',
@@ -112,7 +108,6 @@ const en = {
       namePlaceholder: 'e.g., My Investment Portfolio',
       cancel: 'Cancel',
       submit: 'Update Portfolio',
-      submitting: 'Updating...',
     },
     copy: {
       title: 'Copy Portfolio',
@@ -122,7 +117,6 @@ const en = {
       nameDescription: 'This will copy "{{name}}" with all its transactions.',
       cancel: 'Cancel',
       submit: 'Copy Portfolio',
-      submitting: 'Copying...',
       defaultName: '{{name}} (Copy)',
     },
   },
@@ -203,9 +197,7 @@ const en = {
       editDescription: 'Form to edit an existing transaction',
       cancel: 'Cancel',
       add: 'Add Transaction',
-      adding: 'Adding...',
       update: 'Update',
-      updating: 'Updating...',
       fields: {
         date: 'Date',
         datePickerLabel: 'Pick date from calendar',
@@ -250,7 +242,6 @@ const en = {
       selected: 'Selected',
       cancel: 'Cancel',
       submit: 'Import',
-      submitting: 'Importing...',
     },
   },
   status: {
@@ -301,7 +292,6 @@ const en = {
       namePlaceholder: 'Your name',
       emailLabel: 'Email',
       submit: 'Save changes',
-      submitting: 'Saving…',
       cancel: 'Cancel',
     },
     password: {
@@ -310,7 +300,6 @@ const en = {
       confirmPasswordLabel: 'Confirm new password',
       submit: 'Change password',
       submitOauth: 'Set password',
-      submitting: 'Saving…',
       cancel: 'Cancel',
       oauthNote: 'You signed in with Google. Setting a password will also enable email login.',
     },

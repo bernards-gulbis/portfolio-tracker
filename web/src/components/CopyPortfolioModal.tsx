@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Spinner } from '@/components/ui/spinner';
 
 const schema = z.object({
   name: z.string().superRefine((val, ctx) => {
@@ -127,7 +128,8 @@ const CopyPortfolioModal = ({
             form="copy-portfolio-form"
             disabled={copyPortfolio.isPending}
           >
-            {copyPortfolio.isPending ? t('portfolio.copy.submitting') : t('portfolio.copy.submit')}
+            {copyPortfolio.isPending && <Spinner />}
+            {t('portfolio.copy.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

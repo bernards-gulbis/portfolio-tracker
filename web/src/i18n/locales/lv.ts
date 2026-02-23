@@ -12,7 +12,6 @@ const lv: Translation = {
       switchToLight: 'Pārslēgties uz gaišo motīvu',
       userMenu: 'Lietotāja izvēlne',
       signOut: 'Izrakstīties',
-      signingOut: 'Izrakstās…',
     },
   },
   auth: {
@@ -26,7 +25,6 @@ const lv: Translation = {
       title: 'Ierakstīties',
       description: 'Ierakstieties, lai piekļūtu savam portfelim',
       submit: 'Ierakstīties',
-      submitting: 'Ierakstās...',
       switchPrompt: 'Nav konta?',
       switchLink: 'Reģistrēties',
     },
@@ -34,7 +32,6 @@ const lv: Translation = {
       title: 'Izveidot kontu',
       description: 'Izveidojiet kontu, lai sāktu darbu',
       submit: 'Izveidot kontu',
-      submitting: 'Izveido kontu...',
       switchPrompt: 'Jau ir konts?',
       switchLink: 'Ierakstīties',
       successToast: 'Konts izveidots! Lūdzu, ierakstieties.',
@@ -105,7 +102,6 @@ const lv: Translation = {
       namePlaceholder: 'piem., Mans ieguldījumu portfelis',
       cancel: 'Atcelt',
       submit: 'Izveidot portfeli',
-      submitting: 'Izveido...',
     },
     edit: {
       title: 'Pārdēvēt portfeli',
@@ -114,7 +110,6 @@ const lv: Translation = {
       namePlaceholder: 'piem., Mans ieguldījumu portfelis',
       cancel: 'Atcelt',
       submit: 'Atjaunināt portfeli',
-      submitting: 'Atjaunina...',
     },
     copy: {
       title: 'Kopēt portfeli',
@@ -124,7 +119,6 @@ const lv: Translation = {
       nameDescription: 'Tiks kopēts "{{name}}" ar visiem tā darījumiem.',
       cancel: 'Atcelt',
       submit: 'Kopēt portfeli',
-      submitting: 'Kopē...',
       defaultName: '{{name}} (Kopija)',
     },
   },
@@ -205,9 +199,7 @@ const lv: Translation = {
       editDescription: 'Forma esošā darījuma rediģēšanai',
       cancel: 'Atcelt',
       add: 'Pievienot darījumu',
-      adding: 'Pievieno...',
       update: 'Atjaunināt',
-      updating: 'Atjaunina...',
       fields: {
         date: 'Datums',
         datePickerLabel: 'Izvēlēties datumu no kalendāra',
@@ -252,7 +244,6 @@ const lv: Translation = {
       selected: 'Izvēlēts',
       cancel: 'Atcelt',
       submit: 'Importēt',
-      submitting: 'Importē...',
     },
   },
   status: {
@@ -303,7 +294,6 @@ const lv: Translation = {
       namePlaceholder: 'Jūsu vārds',
       emailLabel: 'E-pasts',
       submit: 'Saglabāt izmaiņas',
-      submitting: 'Saglabā…',
       cancel: 'Atcelt',
     },
     password: {
@@ -312,7 +302,6 @@ const lv: Translation = {
       confirmPasswordLabel: 'Apstiprināt jauno paroli',
       submit: 'Mainīt paroli',
       submitOauth: 'Iestatīt paroli',
-      submitting: 'Saglabā…',
       cancel: 'Atcelt',
       oauthNote: 'Jūs ierakstījāties ar Google. Iestatot paroli, tiks iespējota arī e-pasta ierakstīšanās.',
     },
