@@ -290,7 +290,10 @@ const TransactionTable = ({
                 <TableCell>{transaction.ticker || '-'}</TableCell>
                 <TableCell>
                   {transaction.quantity != null && transaction.price_per_share != null
-                    ? `${parseFloat(transaction.quantity.toFixed(8))} shares at ${formatCurrency(transaction.price_per_share, 'USD', locale)}`
+                    ? t('transaction.table.columns.detailsFormat', {
+                        qty: parseFloat(transaction.quantity.toFixed(8)),
+                        price: formatCurrency(transaction.price_per_share, 'USD', locale),
+                      })
                     : '-'}
                 </TableCell>
                 <TableCell className="text-right">
