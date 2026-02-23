@@ -19,3 +19,4 @@ class User(SQLModel, table=True):
     is_superuser: bool = Field(default=False)
     is_verified: bool = Field(default=False)
     name: Optional[str] = Field(default=None, max_length=255)
+    picture: Optional[str] = Field(default=None, max_length=2048)

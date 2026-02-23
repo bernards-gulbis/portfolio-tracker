@@ -25,6 +25,7 @@ const mockUser: UserRead = {
   is_superuser: false,
   is_verified: true,
   name: null,
+  picture: null,
   oauth_providers: [],
 };
 

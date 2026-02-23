@@ -10,7 +10,7 @@ import PortfolioList from './components/PortfolioList';
 import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -100,6 +100,7 @@ function AppContent() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 rounded-full p-0" aria-label={t('app.header.userMenu')}>
                   <Avatar>
+                    {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? user.email} />}
                     <AvatarFallback>
                       {user?.name
                         ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()

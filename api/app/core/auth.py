@@ -241,12 +241,16 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     raise exceptions.UserAlreadyExists()
                 user = await self.user_db.add_oauth_account(user, oauth_account_dict)
             except exceptions.UserNotExists:
-                # Create new user
+                # Create new user, pulling profile info from the OAuth provider
                 password = self.password_helper.generate()
+                profile_name = getattr(google_oauth_client, "_last_profile_name", None)
+                profile_picture = getattr(google_oauth_client, "_last_profile_picture", None)
                 user_dict = {
                     "email": account_email,
                     "hashed_password": self.password_helper.hash(password),
                     "is_verified": is_verified_by_default,
+                    **({"name": profile_name} if profile_name else {}),
+                    **({"picture": profile_picture} if profile_picture else {}),
                 }
                 user = await self.user_db.create(user_dict)
                 user = await self.user_db.add_oauth_account(user, oauth_account_dict)
@@ -256,6 +260,16 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             user = await self.user_db.update_oauth_account_by_ids(
                 user, oauth_name, account_id, oauth_account_dict
             )
+            # Backfill/refresh profile fields from OAuth provider
+            update_fields: dict = {}
+            profile_name = getattr(google_oauth_client, "_last_profile_name", None)
+            profile_picture = getattr(google_oauth_client, "_last_profile_picture", None)
+            if profile_name and not getattr(user, "name", None):
+                update_fields["name"] = profile_name
+            if profile_picture and profile_picture != getattr(user, "picture", None):
+                update_fields["picture"] = profile_picture
+            if update_fields:
+                user = await self.user_db.update(user, update_fields)
 
         return user
 
@@ -284,7 +298,12 @@ class CustomGoogleOAuth2(GoogleOAuth2):
     Override get_id_email to use the standard OIDC userinfo endpoint instead of
     the People API.  The People API requires explicit enablement in Google Cloud
     Console; the OIDC endpoint works with just the basic userinfo scopes.
+
+    Also caches the profile name and picture so UserManager.oauth_callback can use them.
     """
+
+    _last_profile_name: Optional[str] = None
+    _last_profile_picture: Optional[str] = None
 
     async def get_id_email(self, token: str) -> tuple[str, Optional[str]]:
         async with self.get_httpx_client() as client:
@@ -297,6 +316,8 @@ class CustomGoogleOAuth2(GoogleOAuth2):
                 raise GetIdEmailError(response=response)
 
             data = response.json()
+            self._last_profile_name = data.get("name")
+            self._last_profile_picture = data.get("picture")
             return data["sub"], data.get("email")
 
 

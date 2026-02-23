@@ -19,6 +19,7 @@ export interface UserRead {
   is_superuser: boolean;
   is_verified: boolean;
   name: string | null;
+  picture: string | null;
   oauth_providers: string[];
 }
 
