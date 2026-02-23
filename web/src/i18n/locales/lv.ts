@@ -264,6 +264,7 @@ const lv: Translation = {
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',
     netInvested: 'Neto ieguldīts',
+    netInvestedTooltip: 'Iemaksas mīnus izmaksas. EUR konvertācijas kursa izmaiņas ietekmē peļņu.',
     fx: 'Valūta',
     dividends: 'Dividendes',
     estTax: 'Aplēstais nodoklis (25,5%)',

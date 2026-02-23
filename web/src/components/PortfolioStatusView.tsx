@@ -49,7 +49,8 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
 interface PortfolioStatusProps {
   portfolioId: number | null;
@@ -281,7 +282,19 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
             {/* Financial Summary */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                  {t('status.netInvested')}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InfoIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('status.netInvestedTooltip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </p>
                 <p className="text-lg font-semibold">{formatCurrency(status.principal_eur, 'EUR', locale)}</p>
                 {status.currency_gains_eur !== null && (
                   <p className={`text-xs mt-0.5 ${getValueClass(status.currency_gains_eur)}`}>

@@ -201,7 +201,15 @@ const TransactionTable = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          {Object.values(TransactionType).map((type) => (
+          {[
+            TransactionType.DEPOSIT,
+            TransactionType.WITHDRAW,
+            TransactionType.BUY,
+            TransactionType.SELL,
+            TransactionType.DIVIDEND,
+            TransactionType.FEE,
+            TransactionType.SPLIT,
+          ].map((type) => (
             <DropdownMenuCheckboxItem
               key={type}
               checked={typeFilter.includes(type)}

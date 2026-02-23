@@ -262,6 +262,7 @@ const en = {
     marketValue: 'Market Value',
     unrealized: 'unrealized',
     netInvested: 'Net Invested',
+    netInvestedTooltip: 'Deposits minus withdrawals. EUR conversion rate changes affect gains.',
     fx: 'FX',
     dividends: 'Dividends',
     estTax: 'Est. Tax (25.5%)',
