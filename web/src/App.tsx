@@ -10,7 +10,7 @@ import PortfolioList from './components/PortfolioList';
 import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +30,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
@@ -100,6 +101,7 @@ function AppContent() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 rounded-full p-0" aria-label={t('app.header.userMenu')}>
                   <Avatar>
+                    {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? user.email} />}
                     <AvatarFallback>
                       {user?.name
                         ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -123,8 +125,8 @@ function AppContent() {
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {logoutMutation.isPending ? t('app.header.signingOut') : t('app.header.signOut')}
+                  {logoutMutation.isPending ? <Spinner className="mr-2" /> : <LogOut className="mr-2 h-4 w-4" />}
+                  {t('app.header.signOut')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

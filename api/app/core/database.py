@@ -2,7 +2,7 @@ from sqlmodel import SQLModel, create_engine, Session
 from typing import Generator
 import os
 import logging
-from sqlalchemy import event
+from sqlalchemy import event, text
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ try:
             pool_size=pool_size,
             max_overflow=max_overflow
         )
-        logger.info(f"PostgreSQL engine created (pool_size={pool_size}, max_overflow={max_overflow})")
+        logger.info("PostgreSQL engine created (pool_size=%d, max_overflow=%d)", pool_size, max_overflow)
     else:
         # SQLite configuration
         connect_args = {
@@ -57,7 +57,7 @@ try:
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 except Exception as e:
-    logger.error(f"Failed to create database engine: {e}")
+    logger.error("Failed to create database engine: %s", e)
     raise RuntimeError(f"Database configuration error: {e}") from e
 
 
@@ -67,20 +67,19 @@ def create_db_and_tables():
         SQLModel.metadata.create_all(engine)
         logger.info("Database tables created successfully")
     except Exception as e:
-        logger.error(f"Failed to create database tables: {e}")
+        logger.error("Failed to create database tables: %s", e)
         raise
 
 
 def verify_connection():
     """Verify database connection is working"""
     try:
-        from sqlalchemy import text
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         logger.info("Database connection verified")
         return True
     except Exception as e:
-        logger.error(f"Database connection failed: {e}")
+        logger.error("Database connection failed: %s", e)
         return False
 
 

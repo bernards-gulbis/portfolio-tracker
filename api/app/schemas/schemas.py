@@ -10,6 +10,7 @@ from fastapi_users import schemas as fu_schemas
 
 class UserRead(fu_schemas.BaseUser[uuid.UUID]):
     name: Optional[str] = None
+    picture: Optional[str] = None
     oauth_providers: list[str] = Field(default_factory=list)
 
 
@@ -19,6 +20,7 @@ class UserCreate(fu_schemas.BaseUserCreate):
 
 class UserUpdate(fu_schemas.BaseUserUpdate):
     name: Optional[str] = None
+    picture: Optional[str] = None
 
 
 # ================== Portfolio Schemas ==================

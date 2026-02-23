@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
-from typing import List
+from typing import List, Optional
 from io import BytesIO
 import math
 
@@ -53,13 +53,17 @@ def list_transactions(
     portfolio_id: int,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    ticker: Optional[str] = Query(default=None, description="Filter by ticker (partial, case-insensitive)"),
+    type: Optional[List[str]] = Query(default=None, description="Filter by transaction type(s)"),
+    sort_order: str = Query(default="desc", pattern="^(asc|desc)$", description="Sort by date: asc or desc"),
     session: Session = Depends(get_session),
     user: User = Depends(current_active_user),
 ):
     """Get paginated transactions for a specific portfolio"""
     service = TransactionService(session)
     transactions, total = service.get_transactions_by_portfolio_paginated(
-        portfolio_id, user.id, page, page_size
+        portfolio_id, user.id, page, page_size, ticker=ticker, transaction_types=type,
+        sort_order=sort_order
     )
     total_pages = math.ceil(total / page_size) if total > 0 else 1
 

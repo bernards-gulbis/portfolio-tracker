@@ -11,6 +11,7 @@ from fastapi_users import exceptions
 from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
 from fastapi_users.db import BaseUserDatabase
 from httpx_oauth.clients.google import GoogleOAuth2
+import httpx
 from sqlmodel import Session, select
 from sqlalchemy import func as sa_func
 
@@ -200,7 +201,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = SECRET_KEY
 
     async def on_after_register(self, user: User, request=None):
-        logger.info(f"User {user.id} registered with email {user.email}")
+        logger.info("User %s registered", user.id)
 
     async def oauth_callback(
         self,
@@ -231,6 +232,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             "refresh_token": refresh_token,
         }
 
+        # Fetch profile data using this request's own access token
+        profile = await fetch_google_profile(access_token) if oauth_name == "google" else {}
+        profile_name = profile.get("name")
+        profile_picture = profile.get("picture")
+
         try:
             user = await self.get_by_oauth_account(oauth_name, account_id)
         except exceptions.UserNotExists:
@@ -241,12 +247,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     raise exceptions.UserAlreadyExists()
                 user = await self.user_db.add_oauth_account(user, oauth_account_dict)
             except exceptions.UserNotExists:
-                # Create new user
+                # Create new user, pulling profile info from the OAuth provider
                 password = self.password_helper.generate()
                 user_dict = {
                     "email": account_email,
                     "hashed_password": self.password_helper.hash(password),
                     "is_verified": is_verified_by_default,
+                    **({"name": profile_name} if profile_name else {}),
+                    **({"picture": profile_picture} if profile_picture else {}),
                 }
                 user = await self.user_db.create(user_dict)
                 user = await self.user_db.add_oauth_account(user, oauth_account_dict)
@@ -256,6 +264,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             user = await self.user_db.update_oauth_account_by_ids(
                 user, oauth_name, account_id, oauth_account_dict
             )
+            # Backfill/refresh profile fields from OAuth provider
+            update_fields: dict = {}
+            if profile_name and not getattr(user, "name", None):
+                update_fields["name"] = profile_name
+            if profile_picture and profile_picture != getattr(user, "picture", None):
+                update_fields["picture"] = profile_picture
+            if update_fields:
+                user = await self.user_db.update(user, update_fields)
 
         return user
 
@@ -276,7 +292,48 @@ current_active_user = fastapi_users.current_user(active=True)
 
 # ================== Google OAuth ==================
 
-google_oauth_client = GoogleOAuth2(
+USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo"
+
+
+class CustomGoogleOAuth2(GoogleOAuth2):
+    """
+    Override get_id_email to use the standard OIDC userinfo endpoint instead of
+    the People API.  The People API requires explicit enablement in Google Cloud
+    Console; the OIDC endpoint works with just the basic userinfo scopes.
+    """
+
+    async def get_id_email(self, token: str) -> tuple[str, Optional[str]]:
+        async with self.get_httpx_client() as client:
+            response = await client.get(
+                USERINFO_ENDPOINT,
+                headers={**self.request_headers, "Authorization": f"Bearer {token}"},
+            )
+            if response.status_code >= 400:
+                from httpx_oauth.exceptions import GetIdEmailError
+                raise GetIdEmailError(response=response)
+
+            data = response.json()
+            return data["sub"], data.get("email")
+
+
+google_oauth_client = CustomGoogleOAuth2(
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
 )
+
+
+async def fetch_google_profile(access_token: str) -> dict:
+    """Fetch profile name and picture from Google using the given access token."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            USERINFO_ENDPOINT,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code >= 400:
+            logger.warning("Failed to fetch Google profile: %s", response.status_code)
+            return {}
+        data = response.json()
+        return {
+            "name": data.get("name"),
+            "picture": data.get("picture"),
+        }

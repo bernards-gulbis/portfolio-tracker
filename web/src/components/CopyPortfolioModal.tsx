@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Spinner } from '@/components/ui/spinner';
 
 const schema = z.object({
   name: z.string().superRefine((val, ctx) => {
@@ -55,8 +56,8 @@ const CopyPortfolioModal = ({
   const { reset } = form;
 
   useEffect(() => {
-    if (isOpen) reset({ name: t('portfolio.copy.defaultName', { name: portfolioName }) });
-  }, [isOpen, portfolioName, reset, t]);
+    if (isOpen) reset({ name: defaultName });
+  }, [isOpen, defaultName, reset]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -68,7 +69,7 @@ const CopyPortfolioModal = ({
   };
 
   const handleClose = () => {
-    reset({ name: t('portfolio.copy.defaultName', { name: portfolioName }) });
+    reset({ name: defaultName });
     onClose();
   };
 
@@ -127,7 +128,8 @@ const CopyPortfolioModal = ({
             form="copy-portfolio-form"
             disabled={copyPortfolio.isPending}
           >
-            {copyPortfolio.isPending ? t('portfolio.copy.submitting') : t('portfolio.copy.submit')}
+            {copyPortfolio.isPending && <Spinner />}
+            {t('portfolio.copy.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

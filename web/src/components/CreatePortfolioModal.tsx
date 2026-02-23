@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Spinner } from '@/components/ui/spinner';
 
 const schema = z.object({
   name: z.string().superRefine((val, ctx) => {
@@ -116,7 +117,8 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
             form="create-portfolio-form"
             disabled={createPortfolio.isPending}
           >
-            {createPortfolio.isPending ? t('portfolio.create.submitting') : t('portfolio.create.submit')}
+            {createPortfolio.isPending && <Spinner />}
+            {t('portfolio.create.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

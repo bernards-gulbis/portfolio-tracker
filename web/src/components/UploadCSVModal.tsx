@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Spinner } from '@/components/ui/spinner';
 
 const schema = z.object({
   file: z.any().superRefine((val, ctx) => {
@@ -146,7 +147,8 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
             form="upload-csv-form"
             disabled={importCSV.isPending}
           >
-            {importCSV.isPending ? t('transaction.csv.submitting') : t('transaction.csv.submit')}
+            {importCSV.isPending && <Spinner />}
+            {t('transaction.csv.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

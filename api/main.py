@@ -5,6 +5,7 @@ import logging
 import sys
 import os
 from datetime import datetime
+from urllib.parse import urlencode
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -24,12 +25,11 @@ from app.core import (
     FileUploadException,
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
-from app.core.database import engine
+from app.core.database import engine, get_session
 from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL, current_active_user
 from app.schemas import UserRead, UserCreate, UserUpdate
 from app.models.user import User
 from app.models.oauth_account import OAuthAccount
-from app.core.database import get_session
 from sqlmodel import Session, select
 from sqlalchemy import text
 from fastapi import Depends
@@ -141,7 +141,6 @@ async def oauth_callback_error_handler(request: Request, exc: OAuth2AuthorizeCal
             pass
     logger.error("OAuth callback error (status=%s): %s", exc.status_code, detail)
     # Always redirect to the frontend — never show a raw error page to the user
-    from urllib.parse import urlencode
     params = urlencode({"oauth_error": detail})
     return RedirectResponse(url=f"{FRONTEND_URL}?{params}", status_code=302)
 
@@ -241,7 +240,7 @@ def health_check():
     except Exception as e:
         health_status["status"] = "unhealthy"
         health_status["database"] = "error"
-        logger.error(f"Health check failed - database error: {e}", exc_info=True)
+        logger.error("Health check failed - database error: %s", e, exc_info=True)
         return JSONResponse(status_code=503, content=health_status)
 
     return health_status

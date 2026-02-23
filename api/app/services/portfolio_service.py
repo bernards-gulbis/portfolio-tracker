@@ -374,7 +374,7 @@ class PortfolioService:
         target_date: datetime,
         historical_prices: Optional[Dict[str, float]] = None,
         usd_to_eur_rate: Optional[float] = None,
-        user_id: uuid.UUID = None,  # type: ignore[assignment]
+        user_id: Optional[uuid.UUID] = None,
     ) -> Tuple[float, Optional[float]]:
         """
         Calculate portfolio value (principal_eur, current_value_eur) at a specific date.

@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Spinner } from '@/components/ui/spinner';
 
 const schema = z.object({
   name: z.string().superRefine((val, ctx) => {
@@ -130,7 +131,8 @@ const EditPortfolioModal = ({
             form="edit-portfolio-form"
             disabled={updatePortfolio.isPending}
           >
-            {updatePortfolio.isPending ? t('portfolio.edit.submitting') : t('portfolio.edit.submit')}
+            {updatePortfolio.isPending && <Spinner />}
+            {t('portfolio.edit.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

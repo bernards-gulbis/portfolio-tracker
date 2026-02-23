@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,12 +30,17 @@ export const usePortfolio = (portfolioId: number | null) => {
 export const useTransactions = (
   portfolioId: number | null,
   page: number = 1,
-  pageSize: number = DEFAULT_PAGE_SIZE
+  pageSize: number = DEFAULT_PAGE_SIZE,
+  ticker?: string,
+  types?: string[],
+  sortOrder: 'asc' | 'desc' = 'desc'
 ) => {
+  const normalizedTypes = types ? [...types].sort() : [];
   return useQuery({
-    queryKey: ['transactions', portfolioId, page, pageSize],
-    queryFn: () => getTransactions(portfolioId!, page, pageSize),
+    queryKey: ['transactions', portfolioId, page, pageSize, ticker ?? '', normalizedTypes, sortOrder],
+    queryFn: () => getTransactions(portfolioId!, page, pageSize, ticker, normalizedTypes, sortOrder),
     enabled: portfolioId !== null,
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -53,6 +58,7 @@ export const useCreateTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.added'));
     },
   });
@@ -66,15 +72,11 @@ export const useUpdateTransaction = () => {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: ({
-      transactionId,
-      data,
-      portfolioId: _portfolioId,
-    }: {
+    mutationFn: (variables: {
       transactionId: number;
       data: TransactionUpdate;
       portfolioId: number;
-    }) => updateTransaction(transactionId, data),
+    }) => updateTransaction(variables.transactionId, variables.data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
@@ -82,6 +84,7 @@ export const useUpdateTransaction = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.updated'));
     },
   });
@@ -95,8 +98,8 @@ export const useDeleteTransaction = () => {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: ({ transactionId, portfolioId: _portfolioId }: { transactionId: number; portfolioId: number }) =>
-      deleteTransaction(transactionId),
+    mutationFn: (variables: { transactionId: number; portfolioId: number }) =>
+      deleteTransaction(variables.transactionId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
@@ -104,6 +107,7 @@ export const useDeleteTransaction = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.deleted'));
     },
   });
@@ -126,6 +130,7 @@ export const useImportTransactionsCSV = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
     },
   });

@@ -80,7 +80,7 @@ describe('PortfolioList', () => {
     expect(screen.getByText(/Error loading portfolios/)).toBeInTheDocument();
   });
 
-  it('shows empty state when portfolios list is empty', () => {
+  it('shows "New Portfolio" sub-button when portfolios list is empty', () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: [],
       isLoading: false,
@@ -89,7 +89,7 @@ describe('PortfolioList', () => {
 
     renderComponent();
 
-    expect(screen.getByText('No Portfolios Yet')).toBeInTheDocument();
+    expect(screen.getByText('New Portfolio')).toBeInTheDocument();
   });
 
   it('renders portfolio names in the list', () => {
@@ -105,7 +105,7 @@ describe('PortfolioList', () => {
     expect(screen.getByText('Dividend Portfolio')).toBeInTheDocument();
   });
 
-  it('clicking "New" button opens CreatePortfolioModal', async () => {
+  it('clicking add button opens CreatePortfolioModal', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -121,7 +121,7 @@ describe('PortfolioList', () => {
     });
   });
 
-  it('clicking a row calls setActivePortfolioId', async () => {
+  it('clicking a portfolio sub-item calls setActivePortfolioId', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -133,5 +133,38 @@ describe('PortfolioList', () => {
     await userEvent.click(screen.getByText('Growth Fund'));
 
     expect(mockSetActivePortfolioId).toHaveBeenCalledWith(1);
+  });
+
+  it('highlights the active portfolio', () => {
+    vi.mocked(usePortfolioContext).mockReturnValue({
+      activePortfolioId: 2,
+      setActivePortfolioId: mockSetActivePortfolioId,
+    });
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: mockPortfolios,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderComponent();
+
+    const activeItem = screen.getByText('Dividend Portfolio').closest('[data-active]');
+    expect(activeItem).toHaveAttribute('data-active', 'true');
+  });
+
+  it('clicking "New Portfolio" in empty state opens CreatePortfolioModal', async () => {
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderComponent();
+
+    await userEvent.click(screen.getByText('New Portfolio'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Portfolio')).toBeInTheDocument();
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   PieChart,
   Pie,
@@ -63,18 +64,32 @@ export const HoldingsAllocationChart = ({
     );
   }
 
-  const chartData: Array<{ name: string; value: number; fill: string }> = [];
+  const { chartData, total, chartConfig } = useMemo(() => {
+    const data: Array<{ name: string; value: number; fill: string }> = [];
 
-  if (cash > 0) {
-    chartData.push({ name: 'CASH', value: cash, fill: COLORS[0] });
-  }
-
-  holdings.forEach((holding) => {
-    if (holding.current_value && holding.current_value > 0) {
-      const index = chartData.length;
-      chartData.push({ name: holding.ticker, value: holding.current_value, fill: COLORS[index % COLORS.length] });
+    if (cash > 0) {
+      data.push({ name: 'CASH', value: cash, fill: COLORS[0] });
     }
-  });
+
+    holdings.forEach((holding) => {
+      if (holding.current_value && holding.current_value > 0) {
+        const index = data.length;
+        data.push({ name: holding.ticker, value: holding.current_value, fill: COLORS[index % COLORS.length] });
+      }
+    });
+
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+
+    const config = data.reduce((acc, entry) => {
+      acc[entry.name] = {
+        label: entry.name,
+        color: entry.fill,
+      };
+      return acc;
+    }, {} as ChartConfig);
+
+    return { chartData: data, total, chartConfig: config };
+  }, [holdings, cash]);
 
   if (chartData.length === 0) {
     return (
@@ -88,16 +103,6 @@ export const HoldingsAllocationChart = ({
       </Card>
     );
   }
-
-  const total = chartData.reduce((sum, item) => sum + item.value, 0);
-
-  const chartConfig = chartData.reduce((acc, entry) => {
-    acc[entry.name] = {
-      label: entry.name,
-      color: entry.fill,
-    };
-    return acc;
-  }, {} as ChartConfig);
 
   return (
     <Card className="flex flex-col">

@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
@@ -49,7 +49,8 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
 interface PortfolioStatusProps {
   portfolioId: number | null;
@@ -103,7 +104,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
 
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
-  const getPerformanceParams = () => {
+  const params = useMemo(() => {
     if (timePeriod === '1month') {
       const endDate = new Date();
       const startDate = new Date();
@@ -111,17 +112,15 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
       return {
         startDate: startDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0],
-        numPoints: 30
+        numPoints: 30,
       };
     }
     return {
       startDate: undefined,
       endDate: undefined,
-      numPoints: 60
+      numPoints: 60,
     };
-  };
-
-  const params = getPerformanceParams();
+  }, [timePeriod]);
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
     portfolioId,
     params.startDate,
@@ -281,7 +280,19 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
             {/* Financial Summary */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                  {t('status.netInvested')}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InfoIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('status.netInvestedTooltip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </p>
                 <p className="text-lg font-semibold">{formatCurrency(status.principal_eur, 'EUR', locale)}</p>
                 {status.currency_gains_eur !== null && (
                   <p className={`text-xs mt-0.5 ${getValueClass(status.currency_gains_eur)}`}>

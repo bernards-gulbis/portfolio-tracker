@@ -71,12 +71,20 @@ const createTestQueryClient = () =>
 describe('TransactionTable', () => {
   const mockOnEdit = vi.fn();
   const mockOnPageChange = vi.fn();
+  const mockOnTickerSearchChange = vi.fn();
+  const mockOnTypeFilterChange = vi.fn();
   const defaultProps = {
     currentPage: 1,
     totalPages: 1,
     total: mockTransactions.length,
     onPageChange: mockOnPageChange,
     isLoading: false,
+    tickerSearch: '',
+    onTickerSearchChange: mockOnTickerSearchChange,
+    typeFilter: [],
+    onTypeFilterChange: mockOnTypeFilterChange,
+    sortOrder: 'desc' as const,
+    onSortOrderChange: vi.fn(),
   };
 
   beforeEach(() => {
@@ -184,11 +192,10 @@ describe('TransactionTable', () => {
 
     expect(screen.getByText('$3,000.00')).toBeInTheDocument();
     expect(screen.getByText('-$2,755.35')).toBeInTheDocument();
-    expect(screen.getByText('$183.69')).toBeInTheDocument();
     expect(screen.getByText('$50.00')).toBeInTheDocument();
   });
 
-  it('displays units with 8 decimal places', () => {
+  it('displays combined quantity and price per share', () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -202,7 +209,7 @@ describe('TransactionTable', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByText('15.00000001')).toBeInTheDocument();
+    expect(screen.getByText('15.00000001 shares at $183.69')).toBeInTheDocument();
   });
 
   it('shows error toast when transaction delete fails', async () => {
