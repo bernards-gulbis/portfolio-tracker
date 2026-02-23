@@ -266,9 +266,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             )
             # Backfill/refresh profile fields from OAuth provider
             update_fields: dict = {}
-            if profile_name and not getattr(user, "name", None):
+            if profile_name and not user.name:
                 update_fields["name"] = profile_name
-            if profile_picture and profile_picture != getattr(user, "picture", None):
+            if profile_picture and profile_picture != user.picture:
                 update_fields["picture"] = profile_picture
             if update_fields:
                 user = await self.user_db.update(user, update_fields)

@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { PortfolioProvider } from './context/PortfolioContext';
-import { usePortfolioContext } from './context/PortfolioContext';
+import { PortfolioProvider, usePortfolioContext } from './context/PortfolioContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './components/LoginPage';

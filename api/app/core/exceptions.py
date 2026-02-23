@@ -1,11 +1,11 @@
 """
 Custom exception classes for Portfolio Tracker API
 """
+from typing import Optional
 
 
 class PortfolioTrackerException(Exception):
     """Base exception for all portfolio tracker errors"""
-    pass
 
 
 class PortfolioNotFoundException(PortfolioTrackerException):
@@ -30,7 +30,7 @@ class InvalidPortfolioNameException(PortfolioTrackerException):
 
 class InvalidCSVFormatException(PortfolioTrackerException):
     """Raised when CSV format is invalid"""
-    def __init__(self, message: str, line_number: int = None):
+    def __init__(self, message: str, line_number: Optional[int] = None):
         if line_number:
             super().__init__(f"CSV error on line {line_number}: {message}")
         else:

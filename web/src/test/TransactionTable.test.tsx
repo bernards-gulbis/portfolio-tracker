@@ -77,6 +77,8 @@ describe('TransactionTable', () => {
     currentPage: 1,
     totalPages: 1,
     total: mockTransactions.length,
+    responsePage: 1,
+    responsePageSize: 20,
     onPageChange: mockOnPageChange,
     isLoading: false,
     tickerSearch: '',

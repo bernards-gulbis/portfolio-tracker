@@ -1,7 +1,6 @@
 """
 Portfolio service for business logic
 """
-import math
 import logging
 import os
 import uuid
@@ -112,10 +111,7 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
             state.realized_gains += total - cost_basis
             h['quantity'] -= quantity
             h['total_cost'] -= cost_basis
-            if (
-                math.isclose(h['quantity'], 0.0, abs_tol=HOLDINGS_EPSILON)
-                or h['quantity'] < HOLDINGS_EPSILON
-            ):
+            if h['quantity'] < HOLDINGS_EPSILON:
                 del state.holdings[ticker]
 
     elif tx_type == TransactionType.DIVIDEND:
@@ -148,15 +144,19 @@ class PortfolioService:
         self.portfolio_repo = PortfolioRepository(session)
         self.transaction_repo = TransactionRepository(session)
 
-    def create_portfolio(self, name: str, user_id: uuid.UUID) -> Portfolio:
-        """Create a new portfolio with validation"""
-        if not name or len(name.strip()) == 0:
+    @staticmethod
+    def _validate_name(name: str) -> str:
+        """Validate and return stripped portfolio name."""
+        stripped = name.strip() if name else ""
+        if not stripped:
             raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-
         if len(name) > 255:
             raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
+        return stripped
 
-        return self.portfolio_repo.create(name.strip(), user_id)
+    def create_portfolio(self, name: str, user_id: uuid.UUID) -> Portfolio:
+        """Create a new portfolio with validation"""
+        return self.portfolio_repo.create(self._validate_name(name), user_id)
 
     def get_portfolio(self, portfolio_id: int, user_id: uuid.UUID) -> Portfolio:
         """Get a portfolio by ID (user-scoped)"""
@@ -171,13 +171,7 @@ class PortfolioService:
 
     def update_portfolio(self, portfolio_id: int, name: str, user_id: uuid.UUID) -> Portfolio:
         """Update a portfolio (user-scoped)"""
-        if not name or len(name.strip()) == 0:
-            raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-
-        if len(name) > 255:
-            raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
-
-        portfolio = self.portfolio_repo.update(portfolio_id, name.strip(), user_id)
+        portfolio = self.portfolio_repo.update(portfolio_id, self._validate_name(name), user_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
         return portfolio
@@ -193,14 +187,8 @@ class PortfolioService:
 
     def copy_portfolio(self, portfolio_id: int, new_name: str, user_id: uuid.UUID) -> Portfolio:
         """Copy a portfolio with all its transactions (user-scoped)"""
-        if not new_name or len(new_name.strip()) == 0:
-            raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-
-        if len(new_name) > 255:
-            raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
-
         copied_portfolio = self.portfolio_repo.copy_with_transactions(
-            portfolio_id, new_name.strip(), user_id
+            portfolio_id, self._validate_name(new_name), user_id
         )
 
         if not copied_portfolio:
@@ -306,13 +294,8 @@ class PortfolioService:
         # Normalize dividends_eur:
         # - dividends exist but no EUR conversion available → None (can't compute accurate tax)
         # - no dividends at all → None
-        dividends_eur: Optional[float]
-        if state.dividends > 0.0 and state.dividends_eur == 0.0:
-            dividends_eur = None
-        elif state.dividends == 0.0:
-            dividends_eur = None
-        else:
-            dividends_eur = state.dividends_eur
+        has_valid_eur = state.dividends > 0.0 and state.dividends_eur > 0.0
+        dividends_eur: Optional[float] = state.dividends_eur if has_valid_eur else None
 
         # Tax on capital gains (excludes dividends which may have different tax treatment)
         tax_eur = None
@@ -473,7 +456,7 @@ class PortfolioService:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         num_points: int = 60
-    ) -> tuple[str, List[Dict]]:
+    ) -> Tuple[str, List[Dict]]:
         """
         Get portfolio performance over time as a time series.
 
@@ -536,20 +519,14 @@ class PortfolioService:
             end_date + timedelta(days=1)
         )
 
-        def get_price_for_date(ticker: str, date_str: str) -> Optional[float]:
-            date_prices = historical_data.get(ticker, {})
-            if not date_prices:
+        def get_value_for_date(data: Dict[str, float], date_str: str) -> Optional[float]:
+            """Look up value for a date, falling back to the most recent earlier date."""
+            if not data:
                 return None
-            if date_str in date_prices:
-                return date_prices[date_str]
-            available = sorted([d for d in date_prices if d <= date_str], reverse=True)
-            return date_prices[available[0]] if available else None
-
-        def get_fx_rate_for_date(date_str: str) -> Optional[float]:
-            if date_str in fx_rates:
-                return fx_rates[date_str]
-            available = sorted([d for d in fx_rates if d <= date_str], reverse=True)
-            return fx_rates[available[0]] if available else None
+            if date_str in data:
+                return data[date_str]
+            available = sorted([d for d in data if d <= date_str], reverse=True)
+            return data[available[0]] if available else None
 
         performance_data = []
         state = _TxState()
@@ -568,10 +545,10 @@ class PortfolioService:
             holdings_value = sum(
                 holding_data['quantity'] * price
                 for ticker, holding_data in state.holdings.items()
-                if (price := get_price_for_date(ticker, date_str)) is not None and price > 0
+                if (price := get_value_for_date(historical_data.get(ticker, {}), date_str)) is not None and price > 0
             )
             current_value_usd = state.cash + holdings_value
-            fx_rate = get_fx_rate_for_date(date_str)
+            fx_rate = get_value_for_date(fx_rates, date_str)
             current_value_eur = current_value_usd * fx_rate if fx_rate is not None else None
 
             performance_data.append({
