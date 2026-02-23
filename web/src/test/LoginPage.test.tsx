@@ -139,19 +139,21 @@ describe('LoginPage', () => {
 
   // ── Register form ───────────────────────────────────────────────
 
-  it('calls register mutation with email and password', async () => {
+  it('calls register mutation with name, email and password', async () => {
     mockRegisterMutateAsync.mockResolvedValueOnce({
       id: '1', email: 'new@example.com', is_active: true, is_superuser: false, is_verified: false,
     });
     renderPage();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'New User');
     await userEvent.type(screen.getByLabelText('Email'), 'new@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'password123');
     await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
 
     await waitFor(() =>
       expect(mockRegisterMutateAsync).toHaveBeenCalledWith({
+        name: 'New User',
         email: 'new@example.com',
         password: 'password123',
       })
@@ -179,6 +181,7 @@ describe('LoginPage', () => {
     renderPage();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'New User');
     await userEvent.type(screen.getByLabelText('Email'), 'new@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'password123');
     await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
@@ -196,6 +199,7 @@ describe('LoginPage', () => {
     renderPage();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'New User');
     await userEvent.type(screen.getByLabelText('Email'), 'new@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'password123');
     await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
@@ -209,6 +213,7 @@ describe('LoginPage', () => {
     renderPage();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Taken User');
     await userEvent.type(screen.getByLabelText('Email'), 'taken@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'password123');
     await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));

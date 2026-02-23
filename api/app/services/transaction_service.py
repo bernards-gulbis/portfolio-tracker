@@ -93,12 +93,17 @@ class TransactionService:
         return self.transaction_repo.get_by_portfolio_id(portfolio_id)
 
     def get_transactions_by_portfolio_paginated(
-        self, portfolio_id: int, user_id: uuid.UUID, page: int = 1, page_size: int = 20
+        self, portfolio_id: int, user_id: uuid.UUID, page: int = 1, page_size: int = 20,
+        ticker: Optional[str] = None, transaction_types: Optional[List[str]] = None,
+        sort_order: str = "desc"
     ) -> Tuple[List[Transaction], int]:
         """Get paginated transactions for a portfolio (user-scoped)"""
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
-        return self.transaction_repo.get_by_portfolio_id_paginated(portfolio_id, page, page_size)
+        return self.transaction_repo.get_by_portfolio_id_paginated(
+            portfolio_id, page, page_size, ticker=ticker, transaction_types=transaction_types,
+            sort_order=sort_order
+        )
 
     def export_transactions_to_csv(self, portfolio_id: int, user_id: uuid.UUID) -> str:
         """Export all transactions for a portfolio to CSV format (user-scoped)"""

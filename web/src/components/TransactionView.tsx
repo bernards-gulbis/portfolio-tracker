@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
+import { useDebounce } from '../hooks/useDebounce';
 import { usePortfolioContext } from '../context/PortfolioContext';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
 import TransactionTable from './TransactionTable';
@@ -25,7 +26,15 @@ const TransactionView = () => {
   const { t } = useTranslation();
   const { activePortfolioId } = usePortfolioContext();
   const [currentPage, setCurrentPage] = useState(1);
-  const { data: paginatedData, isLoading, error } = useTransactions(activePortfolioId, currentPage, DEFAULT_PAGE_SIZE);
+  const [tickerSearch, setTickerSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const debouncedTicker = useDebounce(tickerSearch, 300);
+  const { data: paginatedData, isLoading, isFetching, error } = useTransactions(
+    activePortfolioId, currentPage, DEFAULT_PAGE_SIZE,
+    debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
+    sortOrder
+  );
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
@@ -36,10 +45,19 @@ const TransactionView = () => {
   const totalPages = paginatedData?.total_pages || 1;
   const total = paginatedData?.total || 0;
 
-  // Reset to page 1 when portfolio changes
+  // Reset filters and page when portfolio changes
   useEffect(() => {
     setCurrentPage(1);
+    setTickerSearch('');
+    setTypeFilter([]);
+    setSortOrder('desc');
   }, [activePortfolioId]);
+
+  // Reset to page 1 when filters change
+  const typeFilterKey = typeFilter.join(',');
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedTicker, typeFilterKey]);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -93,7 +111,7 @@ const TransactionView = () => {
     );
   }
 
-  if (isLoading) {
+  if (isLoading && !paginatedData) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -175,7 +193,13 @@ const TransactionView = () => {
           totalPages={totalPages}
           total={total}
           onPageChange={setCurrentPage}
-          isLoading={isLoading}
+          isLoading={isFetching}
+          tickerSearch={tickerSearch}
+          onTickerSearchChange={setTickerSearch}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+          sortOrder={sortOrder}
+          onSortOrderChange={setSortOrder}
         />
       </CardContent>
 

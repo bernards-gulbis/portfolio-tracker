@@ -266,6 +266,103 @@ def test_list_transactions(client: TestClient):
     assert data["transactions"][1]["type"] == "Deposit"
 
 
+def test_list_transactions_filter_by_ticker(client: TestClient):
+    """Test filtering transactions by ticker (partial, case-insensitive)"""
+    portfolio_response = client.post("/portfolios/", json={"name": "Filter Test"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:14:40", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10, "price_per_share": 200, "total_amount": -2000, "fee": 0
+    })
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:15:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 5, "price_per_share": 150, "total_amount": -750, "fee": 0
+    })
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:16:00", "type": "Deposit", "total_amount": 5000, "fee": 0
+    })
+
+    # Exact ticker match
+    response = client.get(f"/portfolios/{portfolio_id}/transactions", params={"ticker": "MSFT"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["transactions"][0]["ticker"] == "MSFT"
+
+    # Case-insensitive partial match
+    response = client.get(f"/portfolios/{portfolio_id}/transactions", params={"ticker": "ms"})
+    data = response.json()
+    assert data["total"] == 1
+    assert data["transactions"][0]["ticker"] == "MSFT"
+
+    # No match
+    response = client.get(f"/portfolios/{portfolio_id}/transactions", params={"ticker": "GOOG"})
+    data = response.json()
+    assert data["total"] == 0
+    assert len(data["transactions"]) == 0
+
+
+def test_list_transactions_filter_by_type(client: TestClient):
+    """Test filtering transactions by type"""
+    portfolio_response = client.post("/portfolios/", json={"name": "Type Filter Test"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:14:40", "type": "Deposit", "total_amount": 5000, "fee": 0
+    })
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:15:00", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10, "price_per_share": 200, "total_amount": -2000, "fee": 0
+    })
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:16:00", "type": "Deposit", "total_amount": 3000, "fee": 0
+    })
+
+    # Filter by Buy
+    response = client.get(f"/portfolios/{portfolio_id}/transactions", params={"type": "Buy"})
+    data = response.json()
+    assert data["total"] == 1
+    assert data["transactions"][0]["type"] == "Buy"
+
+    # Filter by Deposit
+    response = client.get(f"/portfolios/{portfolio_id}/transactions", params={"type": "Deposit"})
+    data = response.json()
+    assert data["total"] == 2
+    assert all(t["type"] == "Deposit" for t in data["transactions"])
+
+
+def test_list_transactions_filter_combined(client: TestClient):
+    """Test filtering transactions by ticker and type together"""
+    portfolio_response = client.post("/portfolios/", json={"name": "Combined Filter Test"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:14:40", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10, "price_per_share": 200, "total_amount": -2000, "fee": 0
+    })
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:15:00", "type": "Dividend", "ticker": "MSFT",
+        "total_amount": 50
+    })
+    client.post(f"/portfolios/{portfolio_id}/transactions/", json={
+        "date": "2020-12-02T20:16:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 5, "price_per_share": 150, "total_amount": -750, "fee": 0
+    })
+
+    # Filter by ticker MSFT + type Buy
+    response = client.get(f"/portfolios/{portfolio_id}/transactions", params={"ticker": "MSFT", "type": "Buy"})
+    data = response.json()
+    assert data["total"] == 1
+    assert data["transactions"][0]["ticker"] == "MSFT"
+    assert data["transactions"][0]["type"] == "Buy"
+
+    # Filter by ticker MSFT (both types)
+    response = client.get(f"/portfolios/{portfolio_id}/transactions", params={"ticker": "MSFT"})
+    data = response.json()
+    assert data["total"] == 2
+
+
 def test_update_transaction(client: TestClient):
     """Test updating a transaction"""
     # Create portfolio and transaction

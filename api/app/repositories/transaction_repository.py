@@ -52,16 +52,29 @@ class TransactionRepository:
         statement = select(Transaction).where(Transaction.portfolio_id == portfolio_id)
         return list(self.session.exec(statement).all())
 
-    def get_by_portfolio_id_paginated(self, portfolio_id: int, page: int = 1, page_size: int = 20) -> Tuple[List[Transaction], int]:
+    def get_by_portfolio_id_paginated(
+        self, portfolio_id: int, page: int = 1, page_size: int = 20,
+        ticker: Optional[str] = None, transaction_types: Optional[List[str]] = None,
+        sort_order: str = "desc"
+    ) -> Tuple[List[Transaction], int]:
         """Get paginated transactions for a specific portfolio"""
-        count_statement = select(func.count()).select_from(Transaction).where(Transaction.portfolio_id == portfolio_id)
+        conditions = [Transaction.portfolio_id == portfolio_id]
+        if ticker:
+            conditions.append(Transaction.ticker.ilike(f"%{ticker}%"))
+        if transaction_types:
+            conditions.append(Transaction.type.in_(transaction_types))
+
+        count_statement = select(func.count()).select_from(Transaction).where(*conditions)
         total = self.session.exec(count_statement).one()
+
+        date_col = Transaction.date.asc() if sort_order == "asc" else Transaction.date.desc()
+        id_col = Transaction.id.asc() if sort_order == "asc" else Transaction.id.desc()
 
         offset = (page - 1) * page_size
         statement = (
             select(Transaction)
-            .where(Transaction.portfolio_id == portfolio_id)
-            .order_by(Transaction.date.desc(), Transaction.id.desc())
+            .where(*conditions)
+            .order_by(date_col, id_col)
             .offset(offset)
             .limit(page_size)
         )

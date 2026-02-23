@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,12 +30,16 @@ export const usePortfolio = (portfolioId: number | null) => {
 export const useTransactions = (
   portfolioId: number | null,
   page: number = 1,
-  pageSize: number = DEFAULT_PAGE_SIZE
+  pageSize: number = DEFAULT_PAGE_SIZE,
+  ticker?: string,
+  types?: string[],
+  sortOrder: 'asc' | 'desc' = 'desc'
 ) => {
   return useQuery({
-    queryKey: ['transactions', portfolioId, page, pageSize],
-    queryFn: () => getTransactions(portfolioId!, page, pageSize),
+    queryKey: ['transactions', portfolioId, page, pageSize, ticker ?? '', types ?? [], sortOrder],
+    queryFn: () => getTransactions(portfolioId!, page, pageSize, ticker, types, sortOrder),
     enabled: portfolioId !== null,
+    placeholderData: keepPreviousData,
   });
 };
 

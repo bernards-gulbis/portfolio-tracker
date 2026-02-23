@@ -158,17 +158,25 @@ const en = {
       exportError: 'Error exporting transactions: {{message}}',
     },
     table: {
+      filters: {
+        tickerPlaceholder: 'Search ticker...',
+        typeAll: 'All types',
+        typeCount: '{{count}} types',
+      },
       empty: {
         title: 'No Transactions Yet',
         description: 'Upload a CSV file or add transactions manually using the button above.',
+      },
+      emptyFiltered: {
+        title: 'No Matching Transactions',
+        description: 'No transactions match your current filters.',
       },
       showing: 'Showing {{from}}-{{to}} of {{total}} transactions',
       columns: {
         date: 'Date',
         type: 'Type',
         ticker: 'Ticker',
-        quantity: 'Quantity',
-        pricePerShare: 'Price per Share',
+        details: 'Qty × Price',
         totalAmount: 'Total Amount',
         actions: 'Actions',
       },

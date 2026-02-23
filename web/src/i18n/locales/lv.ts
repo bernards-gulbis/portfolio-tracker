@@ -160,17 +160,25 @@ const lv: Translation = {
       exportError: 'Kļūda eksportējot darījumus: {{message}}',
     },
     table: {
+      filters: {
+        tickerPlaceholder: 'Meklēt tīkeru...',
+        typeAll: 'Visi veidi',
+        typeCount: '{{count}} veidi',
+      },
       empty: {
         title: 'Vēl nav darījumu',
         description: 'Augšupielādējiet CSV failu vai pievienojiet darījumus manuāli, izmantojot pogu augšā.',
+      },
+      emptyFiltered: {
+        title: 'Nav atbilstošu darījumu',
+        description: 'Neviens darījums neatbilst filtriem.',
       },
       showing: 'Rāda {{from}}-{{to}} no {{total}} darījumiem',
       columns: {
         date: 'Datums',
         type: 'Veids',
         ticker: 'Tīkotājs',
-        quantity: 'Daudzums',
-        pricePerShare: 'Cena par akciju',
+        details: 'Daudz. × Cena',
         totalAmount: 'Kopējā summa',
         actions: 'Darbības',
       },
