@@ -147,7 +147,7 @@ describe('PortfolioStatusView', () => {
     expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Dividends').length).toBeGreaterThan(0);
-    expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();
+    expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();  // dynamic rate from status.capital_gains_tax_rate
     expect(screen.getByText('After-tax Value')).toBeInTheDocument();
   });
 

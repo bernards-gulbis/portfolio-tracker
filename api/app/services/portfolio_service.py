@@ -248,7 +248,7 @@ class PortfolioService:
 
         return copied_portfolio
 
-    def calculate_portfolio_status(self, portfolio_id: int, user_id: uuid.UUID) -> PortfolioStatusResponse:
+    def calculate_portfolio_status(self, portfolio_id: int, user_id: uuid.UUID, tax_rate: Decimal = TAX_RATE) -> PortfolioStatusResponse:
         """
         Calculate comprehensive portfolio status including holdings, cash, and performance metrics.
 
@@ -360,7 +360,7 @@ class PortfolioService:
             else:
                 dividends_for_tax = dividends_eur if dividends_eur is not None else _ZERO
                 capital_gains_eur = current_value_eur - state.principal_eur - dividends_for_tax
-                tax_eur = capital_gains_eur * TAX_RATE if capital_gains_eur > 0 else _ZERO
+                tax_eur = capital_gains_eur * tax_rate if capital_gains_eur > 0 else _ZERO
 
         total_return_after_tax_eur: Optional[Decimal] = None
         total_return_after_tax_pct: Optional[Decimal] = None
@@ -397,7 +397,7 @@ class PortfolioService:
             currency_gains_eur=_n(currency_gains_eur),
             currency_gains_pct=_n(currency_gains_pct),
             capital_gains_eur=_n(capital_gains_eur),
-            capital_gains_tax_rate=float(TAX_RATE),
+            capital_gains_tax_rate=float(tax_rate),
             tax_eur=_n(tax_eur),
             total_return_after_tax_eur=_n(total_return_after_tax_eur),
             total_return_after_tax_pct=_n(total_return_after_tax_pct),

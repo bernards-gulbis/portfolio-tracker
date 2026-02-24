@@ -3155,3 +3155,91 @@ def test_performance_delisted_no_cache(client: TestClient):
         assert val == pytest.approx(10000.0, rel=0.01), (
             f"date={pt['date']}: value={val}, expected ≈10000 (GONE using cost basis)"
         )
+
+
+# ================== Tax Rate Tests ==================
+
+def test_user_default_tax_rate(session: Session):
+    """New users should have default tax_rate of 0.255"""
+    user = User(
+        id=uuid.uuid4(),
+        email="taxdefault@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    assert float(user.tax_rate) == 0.255
+
+
+def test_user_custom_tax_rate(session: Session):
+    """Users can have a custom tax_rate"""
+    user = User(
+        id=uuid.uuid4(),
+        email="taxcustom@example.com",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+        tax_rate=Decimal('0.15'),
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    assert float(user.tax_rate) == 0.15
+
+
+def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: User, session: Session):
+    """Portfolio status should use the user's custom tax_rate"""
+    # Set a custom tax rate on the test user
+    test_user.tax_rate = Decimal('0.15')
+    session.add(test_user)
+    session.commit()
+    session.refresh(test_user)
+
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Custom Tax Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+
+    # Buy AAPL at $100 (100 shares)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0
+        }
+    )
+
+    # Mock current price at $200 (100% gain), FX rate 1.0
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value={'AAPL': 200.0}), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Tax at 15%: capital_gains_eur = 10000, tax = 10000 * 0.15 = 1500
+    assert data["capital_gains_tax_rate"] == 0.15
+    assert data["tax_eur"] == 1500.0

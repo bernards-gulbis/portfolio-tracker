@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { SettingsLayout, ProfileSection, PasswordSection, AccountSection } from '../components/SettingsPage';
+import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from '../components/SettingsPage';
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -12,11 +12,12 @@ vi.mock('../context/AuthContext', () => ({
 vi.mock('../hooks/useAuth', () => ({
   useUpdateProfile: vi.fn(),
   useChangePassword: vi.fn(),
+  useUpdateTaxRate: vi.fn(),
   useCloseAccount: vi.fn(),
 }));
 
 import { useAuth } from '../context/AuthContext';
-import { useUpdateProfile, useChangePassword, useCloseAccount } from '../hooks/useAuth';
+import { useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -43,6 +44,7 @@ const defaultUser = {
   email: 'test@example.com',
   oauth_providers: [] as string[],
   picture: null,
+  tax_rate: 0.255,
 };
 
 // ================== SettingsLayout ==================
@@ -62,6 +64,7 @@ describe('SettingsLayout', () => {
             <Route path="settings" element={<SettingsLayout />}>
               <Route path="profile" element={<div>Profile Content</div>} />
               <Route path="password" element={<div>Password Content</div>} />
+              <Route path="tax" element={<div>Tax Content</div>} />
               <Route path="account" element={<div>Account Content</div>} />
             </Route>
           </Routes>
@@ -77,7 +80,7 @@ describe('SettingsLayout', () => {
     expect(screen.getByText('Manage your account settings and preferences.')).toBeInTheDocument();
   });
 
-  it('renders three navigation links', () => {
+  it('renders four navigation links', () => {
     renderLayout();
 
     const profileLink = screen.getByText('Profile').closest('a');
@@ -85,6 +88,9 @@ describe('SettingsLayout', () => {
 
     const passwordLink = screen.getByText('Password').closest('a');
     expect(passwordLink).toHaveAttribute('href', '/settings/password');
+
+    const taxLink = screen.getByText('Tax').closest('a');
+    expect(taxLink).toHaveAttribute('href', '/settings/tax');
 
     const accountLink = screen.getByText('Account').closest('a');
     expect(accountLink).toHaveAttribute('href', '/settings/account');
@@ -296,6 +302,89 @@ describe('PasswordSection', () => {
     renderWithProviders(<PasswordSection />);
 
     expect(screen.getByRole('button', { name: /Change password/ })).toBeDisabled();
+  });
+});
+
+// ================== TaxSection ==================
+
+describe('TaxSection', () => {
+  const mockMutateAsync = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as ReturnType<typeof useAuth>);
+    vi.mocked(useUpdateTaxRate).mockReturnValue({
+      mutateAsync: mockMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTaxRate>);
+  });
+
+  it('renders tax rate input pre-filled with user value', () => {
+    renderWithProviders(<TaxSection />);
+
+    expect(screen.getByLabelText('Tax rate (%)')).toHaveValue(25.5);
+  });
+
+  it('renders description text', () => {
+    renderWithProviders(<TaxSection />);
+
+    expect(screen.getByText('Configure the tax rate applied to capital gains calculations.')).toBeInTheDocument();
+  });
+
+  it('calls updateTaxRate.mutateAsync with decimal value on submit', async () => {
+    mockMutateAsync.mockResolvedValueOnce(undefined);
+    renderWithProviders(<TaxSection />);
+
+    const input = screen.getByLabelText('Tax rate (%)');
+    await userEvent.clear(input);
+    await userEvent.type(input, '15');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save tax rate' }));
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({ tax_rate: 0.15 });
+    });
+  });
+
+  it('shows validation error for value over 100', async () => {
+    renderWithProviders(<TaxSection />);
+
+    const input = screen.getByLabelText('Tax rate (%)');
+    await userEvent.clear(input);
+    await userEvent.type(input, '150');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save tax rate' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Tax rate cannot exceed 100%')).toBeInTheDocument();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows API error on mutation failure', async () => {
+    mockMutateAsync.mockRejectedValueOnce(new Error('Server error'));
+    renderWithProviders(<TaxSection />);
+
+    const input = screen.getByLabelText('Tax rate (%)');
+    await userEvent.clear(input);
+    await userEvent.type(input, '20');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save tax rate' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Server error')).toBeInTheDocument();
+    });
+  });
+
+  it('disables submit button while pending', () => {
+    vi.mocked(useUpdateTaxRate).mockReturnValue({
+      mutateAsync: mockMutateAsync,
+      isPending: true,
+    } as unknown as ReturnType<typeof useUpdateTaxRate>);
+
+    renderWithProviders(<TaxSection />);
+
+    expect(screen.getByRole('button', { name: /Save tax rate/ })).toBeDisabled();
   });
 });
 

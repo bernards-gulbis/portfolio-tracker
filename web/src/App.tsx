@@ -37,12 +37,13 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, LayoutDashboard } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import CreatePortfolioModal from './components/CreatePortfolioModal';
-import { SettingsLayout, ProfileSection, PasswordSection, AccountSection } from './components/SettingsPage';
+import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 export const queryClient = new QueryClient({
@@ -201,6 +202,8 @@ function AppLayout() {
 
 function PortfolioRedirect() {
   const { data: portfolios, isLoading } = usePortfolios();
+  const { t } = useTranslation();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -214,7 +217,28 @@ function PortfolioRedirect() {
     return <Navigate to={`/portfolios/${portfolios[0].id}`} replace />;
   }
 
-  return <PortfolioPage />;
+  return (
+    <>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia>
+            <Briefcase />
+          </EmptyMedia>
+          <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
+          <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            {t('portfolio.list.empty.newButton')}
+          </Button>
+        </EmptyContent>
+      </Empty>
+      <CreatePortfolioModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
+    </>
+  );
 }
 
 function PortfolioPage() {
@@ -241,6 +265,7 @@ function App() {
                     <Route index element={<Navigate to="profile" replace />} />
                     <Route path="profile" element={<ProfileSection />} />
                     <Route path="password" element={<PasswordSection />} />
+                    <Route path="tax" element={<TaxSection />} />
                     <Route path="account" element={<AccountSection />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />

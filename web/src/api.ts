@@ -21,11 +21,13 @@ export interface UserRead {
   name: string | null;
   picture: string | null;
   oauth_providers: string[];
+  tax_rate: number;
 }
 
 export interface UserUpdate {
   name?: string;
   password?: string;
+  tax_rate?: number;
 }
 
 export interface CloseAccountRequest {

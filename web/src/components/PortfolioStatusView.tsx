@@ -100,9 +100,9 @@ export const PortfolioStatusView = () => {
 
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
-  // Fetch full history once status is loaded — period filtering happens client-side in PerformanceChart
+  // Fetch full history — period filtering happens client-side in PerformanceChart
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
-    status ? portfolioId : null,
+    portfolioId,
     undefined,
     undefined,
     365
@@ -289,7 +289,7 @@ export const PortfolioStatusView = () => {
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: (status.capital_gains_tax_rate * 100).toFixed(1) })}</p>
                 <p className="text-lg font-semibold">
                   {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR', locale) : '-'}
                 </p>

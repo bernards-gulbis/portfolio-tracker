@@ -4,7 +4,7 @@ import * as z from 'zod';
 import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useUpdateProfile, useChangePassword, useCloseAccount } from '../hooks/useAuth';
+import { useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
-import { User, KeyRound, ShieldAlert, Info } from 'lucide-react';
+import { User, KeyRound, ShieldAlert, Receipt, Info } from 'lucide-react';
 
 // ================== Schemas ==================
 
@@ -86,6 +86,7 @@ export const SettingsLayout = () => {
   const navItems = [
     { to: '/settings/profile', label: t('settings.profile.tab'), icon: User },
     { to: '/settings/password', label: t('settings.password.tab'), icon: KeyRound },
+    { to: '/settings/tax', label: t('settings.tax.tab'), icon: Receipt },
     { to: '/settings/account', label: t('settings.account.tab'), icon: ShieldAlert },
   ];
 
@@ -265,6 +266,80 @@ export const PasswordSection = () => {
           <Button type="submit" disabled={changePassword.isPending}>
             {changePassword.isPending && <Spinner />}
             {isOauthUser ? t('settings.password.submitOauth') : t('settings.password.submit')}
+          </Button>
+        </FieldGroup>
+      </form>
+    </div>
+  );
+};
+
+// ================== Tax section ==================
+
+const taxSchema = z.object({
+  taxRate: z.coerce.number().superRefine((val, ctx) => {
+    if (Number.isNaN(val) || val < 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.taxRateMin') });
+    } else if (val > 100) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.taxRateMax') });
+    }
+  }),
+});
+
+type TaxFormValues = z.infer<typeof taxSchema>;
+
+export const TaxSection = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const updateTaxRate = useUpdateTaxRate();
+
+  const form = useForm<TaxFormValues>({
+    resolver: zodResolver(taxSchema),
+    defaultValues: { taxRate: (user?.tax_rate ?? 0.255) * 100 },
+  });
+
+  const onSubmit = async (values: TaxFormValues) => {
+    try {
+      await updateTaxRate.mutateAsync({ tax_rate: values.taxRate / 100 });
+    } catch (err) {
+      form.setError('root', { message: getErrorMessage(err) });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-medium">{t('settings.tax.tab')}</h2>
+        <p className="text-sm text-muted-foreground">{t('settings.tax.description')}</p>
+      </div>
+      <Separator />
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FieldGroup>
+          <Controller
+            name="taxRate"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid || undefined}>
+                <FieldLabel htmlFor="settings-tax-rate">{t('settings.tax.rateLabel')}</FieldLabel>
+                <Input
+                  {...field}
+                  id="settings-tax-rate"
+                  type="number"
+                  step="0.1"
+                  className="max-w-md"
+                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+          {form.formState.errors.root && (
+            <Alert variant="destructive">
+              <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" disabled={updateTaxRate.isPending}>
+            {updateTaxRate.isPending && <Spinner />}
+            {t('settings.tax.submit')}
           </Button>
         </FieldGroup>
       </form>

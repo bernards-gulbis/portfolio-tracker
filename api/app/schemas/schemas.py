@@ -12,6 +12,7 @@ class UserRead(fu_schemas.BaseUser[uuid.UUID]):
     name: Optional[str] = None
     picture: Optional[str] = None
     oauth_providers: list[str] = Field(default_factory=list)
+    tax_rate: float = 0.255
 
 
 class UserCreate(fu_schemas.BaseUserCreate):
@@ -21,6 +22,7 @@ class UserCreate(fu_schemas.BaseUserCreate):
 class UserUpdate(fu_schemas.BaseUserUpdate):
     name: Optional[str] = None
     picture: Optional[str] = None
+    tax_rate: Optional[float] = Field(None, ge=0, le=1)
 
 
 class CloseAccountRequest(BaseModel):
