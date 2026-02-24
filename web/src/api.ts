@@ -28,6 +28,11 @@ export interface UserUpdate {
   password?: string;
 }
 
+export interface CloseAccountRequest {
+  password?: string;
+  confirmation?: string;
+}
+
 export interface LoginCredentials {
   username: string; // FastAPI Users uses "username" field (which is the email)
   password: string;
@@ -236,6 +241,10 @@ export const getGoogleAuthorizeUrl = async (): Promise<string> => {
 export const updateUser = async (data: UserUpdate): Promise<UserRead> => {
   const response = await api.patch<UserRead>('/users/me', data);
   return response.data;
+};
+
+export const closeAccount = async (data: CloseAccountRequest): Promise<void> => {
+  await api.delete('/users/me', { data });
 };
 
 // ================== Portfolio API Functions ==================

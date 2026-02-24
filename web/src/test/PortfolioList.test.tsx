@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import PortfolioList from '../components/PortfolioList';
 import type { Portfolio } from '../api';
 import { SidebarProvider } from '../components/ui/sidebar';
@@ -13,12 +13,7 @@ vi.mock('../hooks/usePortfolios', () => ({
   useCopyPortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('../context/PortfolioContext', () => ({
-  usePortfolioContext: vi.fn(),
-}));
-
 import { usePortfolios } from '../hooks/usePortfolios';
-import { usePortfolioContext } from '../context/PortfolioContext';
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -28,13 +23,16 @@ const createTestQueryClient = () =>
     },
   });
 
-const renderComponent = () => {
+const renderComponent = (initialEntries: string[] = ['/']) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <PortfolioList />
-      </SidebarProvider>
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="/" element={<SidebarProvider><PortfolioList /></SidebarProvider>} />
+          <Route path="/portfolios/:id" element={<SidebarProvider><PortfolioList /></SidebarProvider>} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>
   );
 };
@@ -45,14 +43,8 @@ const mockPortfolios: Portfolio[] = [
 ];
 
 describe('PortfolioList', () => {
-  const mockSetActivePortfolioId = vi.fn();
-
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(usePortfolioContext).mockReturnValue({
-      activePortfolioId: null,
-      setActivePortfolioId: mockSetActivePortfolioId,
-    });
   });
 
   it('shows skeleton rows while loading', () => {
@@ -80,7 +72,7 @@ describe('PortfolioList', () => {
     expect(screen.getByText(/Error loading portfolios/)).toBeInTheDocument();
   });
 
-  it('shows "New Portfolio" sub-button when portfolios list is empty', () => {
+  it('shows empty state message when portfolios list is empty', () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: [],
       isLoading: false,
@@ -89,7 +81,7 @@ describe('PortfolioList', () => {
 
     renderComponent();
 
-    expect(screen.getByText('New Portfolio')).toBeInTheDocument();
+    expect(screen.getByText('Get started by creating your first portfolio.')).toBeInTheDocument();
   });
 
   it('renders portfolio names in the list', () => {
@@ -105,7 +97,7 @@ describe('PortfolioList', () => {
     expect(screen.getByText('Dividend Portfolio')).toBeInTheDocument();
   });
 
-  it('clicking add button opens CreatePortfolioModal', async () => {
+  it('portfolio items are links to /portfolios/:id', () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -114,57 +106,24 @@ describe('PortfolioList', () => {
 
     renderComponent();
 
-    await userEvent.click(screen.getByRole('button', { name: /New/i }));
+    const growthLink = screen.getByText('Growth Fund').closest('a');
+    expect(growthLink).toHaveAttribute('href', '/portfolios/1');
 
-    await waitFor(() => {
-      expect(screen.getByText('Create New Portfolio')).toBeInTheDocument();
-    });
+    const dividendLink = screen.getByText('Dividend Portfolio').closest('a');
+    expect(dividendLink).toHaveAttribute('href', '/portfolios/2');
   });
 
-  it('clicking a portfolio sub-item calls setActivePortfolioId', async () => {
+  it('highlights the active portfolio based on URL', () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof usePortfolios>);
 
-    renderComponent();
-
-    await userEvent.click(screen.getByText('Growth Fund'));
-
-    expect(mockSetActivePortfolioId).toHaveBeenCalledWith(1);
-  });
-
-  it('highlights the active portfolio', () => {
-    vi.mocked(usePortfolioContext).mockReturnValue({
-      activePortfolioId: 2,
-      setActivePortfolioId: mockSetActivePortfolioId,
-    });
-    vi.mocked(usePortfolios).mockReturnValue({
-      data: mockPortfolios,
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolios>);
-
-    renderComponent();
+    renderComponent(['/portfolios/2']);
 
     const activeItem = screen.getByText('Dividend Portfolio').closest('[data-active]');
     expect(activeItem).toHaveAttribute('data-active', 'true');
   });
 
-  it('clicking "New Portfolio" in empty state opens CreatePortfolioModal', async () => {
-    vi.mocked(usePortfolios).mockReturnValue({
-      data: [],
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolios>);
-
-    renderComponent();
-
-    await userEvent.click(screen.getByText('New Portfolio'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Create New Portfolio')).toBeInTheDocument();
-    });
-  });
 });

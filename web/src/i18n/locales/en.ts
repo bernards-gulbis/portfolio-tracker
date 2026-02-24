@@ -288,6 +288,7 @@ const en = {
   settings: {
     menuItem: 'Settings',
     title: 'Settings',
+    description: 'Manage your account settings and preferences.',
     profile: {
       tab: 'Profile',
       nameLabel: 'Name',
@@ -305,15 +306,28 @@ const en = {
       cancel: 'Cancel',
       oauthNote: 'You signed in with Google. Setting a password will also enable email login.',
     },
+    account: {
+      tab: 'Account',
+      dangerZone: 'Danger Zone',
+      closeTitle: 'Close Account',
+      closeDescription: 'Permanently delete your account and all associated data (portfolios, transactions). This action cannot be undone.',
+      passwordLabel: 'Current password',
+      confirmationLabel: 'Type DELETE to confirm',
+      confirmationPlaceholder: 'DELETE',
+      submit: 'Close Account',
+    },
     validation: {
       nameRequired: 'Name is required',
       nameTooLong: 'Name must be at most 255 characters',
       passwordMinLength: 'Password must be at least 8 characters',
       passwordsDoNotMatch: 'Passwords do not match',
+      passwordRequired: 'Password is required',
+      confirmationRequired: 'Type DELETE to confirm',
     },
     toasts: {
       profileUpdated: 'Profile updated',
       passwordChanged: 'Password changed',
+      accountClosed: 'Account closed',
     },
   },
 };

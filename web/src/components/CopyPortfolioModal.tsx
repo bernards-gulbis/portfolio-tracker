@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useCopyPortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import {
@@ -46,6 +47,7 @@ const CopyPortfolioModal = ({
   portfolioName,
 }: CopyPortfolioModalProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const copyPortfolio = useCopyPortfolio();
   const defaultName = t('portfolio.copy.defaultName', { name: portfolioName });
   const form = useForm<FormValues>({
@@ -61,8 +63,9 @@ const CopyPortfolioModal = ({
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await copyPortfolio.mutateAsync({ portfolioId, newName: values.name.trim() });
+      const copied = await copyPortfolio.mutateAsync({ portfolioId, newName: values.name.trim() });
       onClose();
+      navigate(`/portfolios/${copied.id}`);
     } catch (err) {
       form.setError('root', { message: getErrorMessage(err) });
     }

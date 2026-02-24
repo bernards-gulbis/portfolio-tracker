@@ -1,15 +1,13 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui';
 import { usePortfolios } from '../hooks/usePortfolios';
-import { usePortfolioContext } from '../context/PortfolioContext';
+import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { getErrorMessage } from '../api';
-import CreatePortfolioModal from './CreatePortfolioModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupAction,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -17,22 +15,16 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
-import { Plus, ChevronRight, BriefcaseBusiness } from 'lucide-react';
+import { ChevronRight, BriefcaseBusiness } from 'lucide-react';
 
 const PortfolioList = () => {
   const { t } = useTranslation();
   const { data: portfolios, isLoading, error } = usePortfolios();
-  const { activePortfolioId, setActivePortfolioId } = usePortfolioContext();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const activePortfolioId = useActivePortfolioId();
 
   return (
-    <>
       <SidebarGroup>
         <SidebarGroupLabel>{t('portfolio.list.title')}</SidebarGroupLabel>
-        <SidebarGroupAction title={t('portfolio.list.newButton')} onClick={() => setIsModalOpen(true)}>
-          <Plus />
-          <span className="sr-only">{t('portfolio.list.newButton')}</span>
-        </SidebarGroupAction>
         <SidebarMenu>
           <CollapsiblePrimitive.Root defaultOpen className="group/collapsible">
             <SidebarMenuItem>
@@ -61,19 +53,20 @@ const PortfolioList = () => {
                     </SidebarMenuSubItem>
                   ) : portfolios && portfolios.length === 0 ? (
                     <SidebarMenuSubItem>
-                      <SidebarMenuSubButton onClick={() => setIsModalOpen(true)}>
-                        <Plus className="h-3 w-3" />
-                        <span>{t('portfolio.list.empty.newButton')}</span>
-                      </SidebarMenuSubButton>
+                      <span className="px-2 py-1.5 text-muted-foreground text-xs">
+                        {t('portfolio.list.empty.description')}
+                      </span>
                     </SidebarMenuSubItem>
                   ) : (
                     portfolios?.map((portfolio) => (
                       <SidebarMenuSubItem key={portfolio.id}>
                         <SidebarMenuSubButton
+                          asChild
                           isActive={activePortfolioId === portfolio.id}
-                          onClick={() => setActivePortfolioId(portfolio.id)}
                         >
-                          <span className="truncate">{portfolio.name}</span>
+                          <Link to={`/portfolios/${portfolio.id}`}>
+                            <span className="truncate">{portfolio.name}</span>
+                          </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     ))
@@ -84,12 +77,6 @@ const PortfolioList = () => {
           </CollapsiblePrimitive.Root>
         </SidebarMenu>
       </SidebarGroup>
-
-      <CreatePortfolioModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
-    </>
   );
 };
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import CopyPortfolioModal from '../components/CopyPortfolioModal';
 
 vi.mock('../hooks/usePortfolios', () => ({
@@ -29,7 +30,9 @@ const renderModal = (props = defaultProps) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <CopyPortfolioModal {...props} />
+      <MemoryRouter>
+        <CopyPortfolioModal {...props} />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 };

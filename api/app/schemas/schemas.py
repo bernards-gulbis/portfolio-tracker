@@ -23,6 +23,11 @@ class UserUpdate(fu_schemas.BaseUserUpdate):
     picture: Optional[str] = None
 
 
+class CloseAccountRequest(BaseModel):
+    password: Optional[str] = None
+    confirmation: Optional[str] = None
+
+
 # ================== Portfolio Schemas ==================
 
 class PortfolioBase(BaseModel):

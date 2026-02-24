@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { PortfolioProvider, usePortfolioContext } from './context/PortfolioContext';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './components/LoginPage';
@@ -8,6 +8,7 @@ import { useLogout } from './hooks/useAuth';
 import PortfolioList from './components/PortfolioList';
 import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
+import { AppBreadcrumbs } from './components/AppBreadcrumbs';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -21,20 +22,26 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Sun, Moon, LogOut, Settings, Plus } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
-import SettingsModal from './components/SettingsModal';
+import CreatePortfolioModal from './components/CreatePortfolioModal';
+import { SettingsLayout, ProfileSection, PasswordSection, AccountSection } from './components/SettingsPage';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 export const queryClient = new QueryClient({
@@ -46,13 +53,8 @@ export const queryClient = new QueryClient({
   },
 });
 
-function AppContent() {
-  const { activePortfolioId } = usePortfolioContext();
-  const { theme, toggleTheme } = useTheme();
-  const { status, user } = useAuth();
-  const logoutMutation = useLogout();
-  const { t } = useTranslation();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+function AuthGuard() {
+  const { status } = useAuth();
 
   if (status === 'loading') {
     return (
@@ -66,6 +68,17 @@ function AppContent() {
     return <LoginPage />;
   }
 
+  return <Outlet />;
+}
+
+function AppLayout() {
+  const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
+  const logoutMutation = useLogout();
+  const { pathname } = useLocation();
+  const { t } = useTranslation();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
   return (
     <SidebarProvider>
       <Sidebar collapsible="offcanvas">
@@ -75,12 +88,33 @@ function AppContent() {
         <SidebarContent>
           <PortfolioList />
         </SidebarContent>
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
+                <Link to="/settings">
+                  <Settings />
+                  <span>{t('settings.menuItem')}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
       </Sidebar>
 
       <SidebarInset>
         <header className="border-b px-4 py-3 flex justify-between items-center">
-          <SidebarTrigger />
           <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <Separator orientation="vertical" className="mr-2 !h-4" />
+            <AppBreadcrumbs />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
+              <Plus className="h-4 w-4" />
+              {t('portfolio.list.newButton')}
+            </Button>
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -115,11 +149,6 @@ function AppContent() {
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t('settings.menuItem')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
@@ -133,12 +162,24 @@ function AppContent() {
         </header>
 
         <main className="flex-1 p-6">
-          <PortfolioStatusView portfolioId={activePortfolioId} />
-          <TransactionView />
+          <Outlet />
         </main>
       </SidebarInset>
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <CreatePortfolioModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </SidebarProvider>
+  );
+}
+
+function PortfolioPage() {
+  return (
+    <>
+      <PortfolioStatusView />
+      <TransactionView />
+    </>
   );
 }
 
@@ -146,11 +187,25 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AuthProvider>
-          <PortfolioProvider>
-            <AppContent />
-          </PortfolioProvider>
-        </AuthProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route element={<AuthGuard />}>
+                <Route element={<AppLayout />}>
+                  <Route index element={<PortfolioPage />} />
+                  <Route path="portfolios/:id" element={<PortfolioPage />} />
+                  <Route path="settings" element={<SettingsLayout />}>
+                    <Route index element={<Navigate to="profile" replace />} />
+                    <Route path="profile" element={<ProfileSection />} />
+                    <Route path="password" element={<PasswordSection />} />
+                    <Route path="account" element={<AccountSection />} />
+                  </Route>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Route>
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
         <Toaster position="bottom-right" />
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />

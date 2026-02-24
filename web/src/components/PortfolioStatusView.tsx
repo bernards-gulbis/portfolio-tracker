@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
-import { usePortfolioContext } from '../context/PortfolioContext';
+import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
+import { useNavigate } from 'react-router-dom';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage } from '../api';
@@ -51,10 +52,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
-interface PortfolioStatusProps {
-  portfolioId: number | null;
-}
-
 const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
   if (value == null) return '-';
   const sign = value > 0 ? '+' : '';
@@ -90,14 +87,15 @@ const formatCurrencyWithPercent = (
   );
 };
 
-export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
+export const PortfolioStatusView = () => {
+  const portfolioId = useActivePortfolioId();
   const { t } = useTranslation();
   const locale = useLocale();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-  const { setActivePortfolioId } = usePortfolioContext();
+  const navigate = useNavigate();
   const deletePortfolio = useDeletePortfolio();
 
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
@@ -114,7 +112,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
     if (portfolioId == null) return;
     try {
       await deletePortfolio.mutateAsync(portfolioId);
-      setActivePortfolioId(null);
+      navigate('/', { replace: true });
     } catch (err) {
       toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(err) }));
     } finally {

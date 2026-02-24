@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { PortfolioStatusView } from '../components/PortfolioStatusView';
 import type { PortfolioStatus } from '../api';
 
@@ -18,14 +19,9 @@ vi.mock('../hooks/usePortfolios', () => ({
   useCopyPortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('../context/PortfolioContext', () => ({
-  usePortfolioContext: vi.fn(),
-}));
-
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
-import { usePortfolioContext } from '../context/PortfolioContext';
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -35,11 +31,16 @@ const createTestQueryClient = () =>
     },
   });
 
-const renderComponent = (portfolioId: number | null) => {
+const renderComponent = (initialEntry: string = '/') => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <PortfolioStatusView portfolioId={portfolioId} />
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/" element={<PortfolioStatusView />} />
+          <Route path="/portfolios/:id" element={<PortfolioStatusView />} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>
   );
 };
@@ -91,24 +92,20 @@ describe('PortfolioStatusView', () => {
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof usePortfolioPerformance>);
-    vi.mocked(usePortfolioContext).mockReturnValue({
-      activePortfolioId: null,
-      setActivePortfolioId: vi.fn(),
-    });
     vi.mocked(useDeletePortfolio).mockReturnValue({
       mutateAsync: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof useDeletePortfolio>);
   });
 
-  it('shows "Select a portfolio" message when portfolioId is null', () => {
+  it('shows "Select a portfolio" message when no portfolio in URL', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: undefined,
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent(null);
+    renderComponent('/');
 
     expect(screen.getByText('Select a portfolio to view its status')).toBeInTheDocument();
   });
@@ -120,7 +117,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent(1);
+    renderComponent('/portfolios/1');
 
     const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
     expect(skeletons.length).toBeGreaterThan(0);
@@ -133,7 +130,7 @@ describe('PortfolioStatusView', () => {
       error: new Error('Failed to load status'),
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent(1);
+    renderComponent('/portfolios/1');
 
     expect(screen.getByText(/Error loading portfolio status/)).toBeInTheDocument();
   });
@@ -145,7 +142,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent(1);
+    renderComponent('/portfolios/1');
 
     expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
@@ -161,7 +158,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent(1);
+    renderComponent('/portfolios/1');
 
     expect(screen.getAllByText('CASH').length).toBeGreaterThan(0);
   });
@@ -173,7 +170,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent(1);
+    renderComponent('/portfolios/1');
 
     expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0);
   });

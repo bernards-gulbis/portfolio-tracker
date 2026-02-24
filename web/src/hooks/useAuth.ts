@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import { login, register, getCurrentUser, updateUser, LoginCredentials, RegisterCredentials } from '../api';
+import { login, register, getCurrentUser, updateUser, closeAccount, LoginCredentials, RegisterCredentials, CloseAccountRequest } from '../api';
 import { useAuth } from '../context/AuthContext';
 
 export const useLogin = () => {
@@ -59,6 +59,17 @@ export const useChangePassword = () => {
     mutationFn: (data: { password: string }) => updateUser({ password: data.password }),
     onSuccess: () => {
       toast.success(t('settings.toasts.passwordChanged'));
+    },
+  });
+};
+
+export const useCloseAccount = () => {
+  const { t } = useTranslation();
+  return useMutation({
+    mutationFn: (data: CloseAccountRequest) => closeAccount(data),
+    onSuccess: () => {
+      toast.success(t('settings.toasts.accountClosed'));
+      window.dispatchEvent(new CustomEvent('auth:logout'));
     },
   });
 };

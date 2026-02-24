@@ -290,6 +290,7 @@ const lv: Translation = {
   settings: {
     menuItem: 'Iestatījumi',
     title: 'Iestatījumi',
+    description: 'Pārvaldiet sava konta iestatījumus un preferences.',
     profile: {
       tab: 'Profils',
       nameLabel: 'Vārds',
@@ -307,15 +308,28 @@ const lv: Translation = {
       cancel: 'Atcelt',
       oauthNote: 'Jūs ierakstījāties ar Google. Iestatot paroli, tiks iespējota arī e-pasta ierakstīšanās.',
     },
+    account: {
+      tab: 'Konts',
+      dangerZone: 'Bīstamā zona',
+      closeTitle: 'Slēgt kontu',
+      closeDescription: 'Neatgriezeniski dzēst jūsu kontu un visus saistītos datus (portfeļi, darījumi). Šo darbību nevar atsaukt.',
+      passwordLabel: 'Pašreizējā parole',
+      confirmationLabel: 'Ierakstiet DELETE, lai apstiprinātu',
+      confirmationPlaceholder: 'DELETE',
+      submit: 'Slēgt kontu',
+    },
     validation: {
       nameRequired: 'Vārds ir obligāts',
       nameTooLong: 'Vārdam jābūt ne garākam par 255 rakstzīmēm',
       passwordMinLength: 'Parolei jābūt vismaz 8 rakstzīmēm',
       passwordsDoNotMatch: 'Paroles nesakrīt',
+      passwordRequired: 'Parole ir obligāta',
+      confirmationRequired: 'Ierakstiet DELETE, lai apstiprinātu',
     },
     toasts: {
       profileUpdated: 'Profils atjaunināts',
       passwordChanged: 'Parole nomainīta',
+      accountClosed: 'Konts slēgts',
     },
   },
 };
