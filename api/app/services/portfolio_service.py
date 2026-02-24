@@ -2,13 +2,12 @@
 Portfolio service for business logic
 """
 import logging
-import os
 import uuid
 from bisect import bisect_right
 from dataclasses import dataclass, field as dc_field
 from decimal import Decimal
 from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlmodel import Session
 from app.models import Portfolio, Transaction, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
@@ -23,8 +22,7 @@ from app.services.price_service import PriceService
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
 HOLDINGS_EPSILON = Decimal('1e-6')
 
-# Tax rate applied to capital gains — overridable via TAX_RATE env var
-TAX_RATE = Decimal(os.getenv('TAX_RATE', '0.255'))
+_DEFAULT_TAX_RATE = Decimal('0.255')
 
 # Shorthand for Decimal constants
 _ZERO = Decimal('0')
@@ -248,7 +246,7 @@ class PortfolioService:
 
         return copied_portfolio
 
-    def calculate_portfolio_status(self, portfolio_id: int, user_id: uuid.UUID, tax_rate: Decimal = TAX_RATE) -> PortfolioStatusResponse:
+    def calculate_portfolio_status(self, portfolio_id: int, user_id: uuid.UUID, tax_rate: Decimal = _DEFAULT_TAX_RATE) -> PortfolioStatusResponse:
         """
         Calculate comprehensive portfolio status including holdings, cash, and performance metrics.
 
@@ -552,7 +550,7 @@ class PortfolioService:
         if start_date is None:
             start_date = min(t.date for t in transactions)
         if end_date is None:
-            end_date = datetime.now()
+            end_date = datetime.now(timezone.utc).replace(tzinfo=None)
 
         if start_date >= end_date:
             raise ValueError(f"start_date ({start_date}) must be before end_date ({end_date})")

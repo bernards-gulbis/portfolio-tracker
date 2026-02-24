@@ -21,4 +21,4 @@ class User(SQLModel, table=True):
     is_verified: bool = Field(default=False)
     name: Optional[str] = Field(default=None, max_length=255)
     picture: Optional[str] = Field(default=None, max_length=2048)
-    tax_rate: Decimal = Field(default=Decimal('0.255'), ge=0, le=1)
+    tax_rate: Decimal = Field(default=Decimal('0.255'), ge=0, le=1, max_digits=5, decimal_places=4)

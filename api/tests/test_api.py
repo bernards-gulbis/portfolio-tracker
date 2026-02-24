@@ -3243,3 +3243,99 @@ def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: Us
     # Tax at 15%: capital_gains_eur = 10000, tax = 10000 * 0.15 = 1500
     assert data["capital_gains_tax_rate"] == 0.15
     assert data["tax_eur"] == 1500.0
+
+
+# ==================== TransactionUpdate Validation ====================
+
+def test_transaction_update_validates_invalid_ticker(client: TestClient):
+    """TransactionUpdate should reject tickers with invalid characters"""
+    from pydantic import ValidationError
+    from app.schemas.schemas import TransactionUpdate
+
+    with pytest.raises(ValidationError, match="Ticker must contain only alphanumeric"):
+        TransactionUpdate(ticker="AAPL$$$")
+
+
+def test_transaction_update_validates_negative_fee(client: TestClient):
+    """TransactionUpdate should reject negative fees"""
+    from pydantic import ValidationError
+    from app.schemas.schemas import TransactionUpdate
+
+    with pytest.raises(ValidationError, match="Fee must be positive"):
+        TransactionUpdate(fee=-5.0)
+
+
+def test_transaction_update_validates_zero_split_ratio(client: TestClient):
+    """TransactionUpdate should reject zero split_ratio"""
+    from pydantic import ValidationError
+    from app.schemas.schemas import TransactionUpdate
+
+    with pytest.raises(ValidationError, match="Split ratio must be greater than 0"):
+        TransactionUpdate(split_ratio=0.0)
+
+
+def test_transaction_update_validates_negative_split_ratio(client: TestClient):
+    """TransactionUpdate should reject negative split_ratio"""
+    from pydantic import ValidationError
+    from app.schemas.schemas import TransactionUpdate
+
+    with pytest.raises(ValidationError, match="Split ratio must be greater than 0"):
+        TransactionUpdate(split_ratio=-2.0)
+
+
+def test_transaction_update_normalizes_ticker(client: TestClient):
+    """TransactionUpdate should normalize ticker to uppercase"""
+    from app.schemas.schemas import TransactionUpdate
+
+    update = TransactionUpdate(ticker="aapl")
+    assert update.ticker == "AAPL"
+
+
+def test_transaction_update_valid_fields_pass(client: TestClient):
+    """TransactionUpdate should accept valid field values"""
+    from app.schemas.schemas import TransactionUpdate
+
+    update = TransactionUpdate(ticker="AAPL", fee=1.5, split_ratio=2.0)
+    assert update.ticker == "AAPL"
+    assert update.fee == 1.5
+    assert update.split_ratio == 2.0
+
+
+def test_transaction_update_api_rejects_invalid_ticker(client: TestClient):
+    """PUT /transactions/:id should reject invalid ticker via TransactionUpdate validation"""
+    portfolio_response = client.post("/portfolios/", json={"name": "Validation Test"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    tx_response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+            "fee": 0.0,
+        },
+    )
+    tx_id = tx_response.json()["id"]
+
+    response = client.put(f"/transactions/{tx_id}", json={"ticker": "BAD$TICK"})
+    assert response.status_code == 422
+
+
+def test_transaction_update_api_rejects_negative_fee(client: TestClient):
+    """PUT /transactions/:id should reject negative fee via TransactionUpdate validation"""
+    portfolio_response = client.post("/portfolios/", json={"name": "Validation Test 2"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    tx_response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+            "fee": 0.0,
+        },
+    )
+    tx_id = tx_response.json()["id"]
+
+    response = client.put(f"/transactions/{tx_id}", json={"fee": -10.0})
+    assert response.status_code == 422

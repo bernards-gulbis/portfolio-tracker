@@ -19,7 +19,7 @@ export const usePortfolioPerformance = (
       return getPortfolioPerformance(portfolioId, startDate, endDate, numPoints);
     },
     enabled: portfolioId !== null,
-    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    staleTime: 30_000, // Consider data stale after 30 seconds (matches usePortfolioStatus)
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 };

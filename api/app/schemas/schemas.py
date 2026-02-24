@@ -162,6 +162,31 @@ class TransactionUpdate(BaseModel):
     currency: Optional[str] = None
     fx_rate: Optional[float] = None
 
+    @field_validator('ticker')
+    @classmethod
+    def validate_ticker(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip().upper()
+            if not v:
+                return None
+            if not all(c.isalnum() or c in '.-' for c in v):
+                raise ValueError('Ticker must contain only alphanumeric characters, dots, or hyphens')
+        return v
+
+    @field_validator('split_ratio')
+    @classmethod
+    def validate_split_ratio(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError('Split ratio must be greater than 0')
+        return v
+
+    @field_validator('fee')
+    @classmethod
+    def validate_fee(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v < 0:
+            raise ValueError('Fee must be positive')
+        return v
+
 
 class TransactionResponse(TransactionBase):
     """Schema for transaction response"""

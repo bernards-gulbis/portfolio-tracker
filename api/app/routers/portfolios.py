@@ -1,5 +1,4 @@
 """Portfolio API routes"""
-from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from typing import List, Optional
@@ -66,7 +65,7 @@ def get_portfolio_status(
     PriceService.clear_session_cache()
     service = PortfolioService(session)
     try:
-        return service.calculate_portfolio_status(portfolio_id, user.id, tax_rate=Decimal(str(user.tax_rate)))
+        return service.calculate_portfolio_status(portfolio_id, user.id, tax_rate=user.tax_rate)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

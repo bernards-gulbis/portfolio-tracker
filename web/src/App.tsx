@@ -38,10 +38,11 @@ import {
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import CreatePortfolioModal from './components/CreatePortfolioModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
@@ -54,6 +55,13 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+const CreatePortfolioContext = createContext<(() => void) | null>(null);
+function useCreatePortfolio() {
+  const fn = useContext(CreatePortfolioContext);
+  if (!fn) throw new Error('useCreatePortfolio must be used within AppLayout');
+  return fn;
+}
 
 function AuthGuard() {
   const { status } = useAuth();
@@ -102,6 +110,7 @@ function AppLayout() {
   const isDashboardActive = pathname === '/' || pathname.startsWith('/portfolios');
 
   return (
+    <CreatePortfolioContext.Provider value={() => setIsCreateModalOpen(true)}>
     <SidebarProvider>
       <Sidebar collapsible="offcanvas">
         <SidebarHeader>
@@ -197,13 +206,14 @@ function AppLayout() {
         onClose={() => setIsCreateModalOpen(false)}
       />
     </SidebarProvider>
+    </CreatePortfolioContext.Provider>
   );
 }
 
 function PortfolioRedirect() {
   const { data: portfolios, isLoading } = usePortfolios();
   const { t } = useTranslation();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const openCreateModal = useCreatePortfolio();
 
   if (isLoading) {
     return (
@@ -218,26 +228,20 @@ function PortfolioRedirect() {
   }
 
   return (
-    <>
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia>
-            <Briefcase />
-          </EmptyMedia>
-          <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
-          <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            {t('portfolio.list.empty.newButton')}
-          </Button>
-        </EmptyContent>
-      </Empty>
-      <CreatePortfolioModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
-    </>
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia>
+          <Briefcase />
+        </EmptyMedia>
+        <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
+        <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={openCreateModal}>
+          {t('portfolio.list.empty.newButton')}
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }
 
@@ -256,6 +260,7 @@ function App() {
       <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
+            <ErrorBoundary>
             <Routes>
               <Route element={<AuthGuard />}>
                 <Route element={<AppLayout />}>
@@ -272,6 +277,7 @@ function App() {
                 </Route>
               </Route>
             </Routes>
+            </ErrorBoundary>
           </AuthProvider>
         </BrowserRouter>
         <Toaster position="bottom-right" />
