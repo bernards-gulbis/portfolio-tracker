@@ -1,13 +1,11 @@
-import { useLocation, useParams, Link } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePortfolios } from '../hooks/usePortfolios';
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 
 export const AppBreadcrumbs = () => {
@@ -34,12 +32,6 @@ export const AppBreadcrumbs = () => {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/">{t('portfolio.list.title')}</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
             <BreadcrumbPage>{portfolioName ?? `#${id}`}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -51,7 +43,7 @@ export const AppBreadcrumbs = () => {
     <Breadcrumb>
       <BreadcrumbList>
         <BreadcrumbItem>
-          <BreadcrumbPage>{t('portfolio.list.title')}</BreadcrumbPage>
+          <BreadcrumbPage>{t('app.sidebar.dashboard')}</BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>

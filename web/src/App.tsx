@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation, useMatch } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { useLogout } from './hooks/useAuth';
-import PortfolioList from './components/PortfolioList';
+import PortfolioSwitcher from './components/PortfolioSwitcher';
+import { usePortfolios } from './hooks/usePortfolios';
 import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
 import { AppBreadcrumbs } from './components/AppBreadcrumbs';
@@ -36,8 +37,8 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Sun, Moon, LogOut, Settings, LayoutDashboard } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import CreatePortfolioModal from './components/CreatePortfolioModal';
@@ -78,15 +79,44 @@ function AppLayout() {
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { data: portfolios } = usePortfolios();
+  const portfolioMatch = useMatch('/portfolios/:id');
+  const matchedId = portfolioMatch?.params.id ? Number(portfolioMatch.params.id) : null;
+  const activePortfolioId = matchedId && Number.isFinite(matchedId) ? matchedId : null;
+  const lastPortfolioId = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (activePortfolioId !== null) {
+      lastPortfolioId.current = activePortfolioId;
+    }
+  }, [activePortfolioId]);
+
+  // Clear stale ref if the remembered portfolio was deleted
+  if (lastPortfolioId.current !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioId.current)) {
+    lastPortfolioId.current = null;
+  }
+
+  const rememberedId = activePortfolioId ?? lastPortfolioId.current;
+  const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
+  const isDashboardActive = pathname === '/' || pathname.startsWith('/portfolios');
 
   return (
     <SidebarProvider>
       <Sidebar collapsible="offcanvas">
-        <SidebarHeader className="border-b px-4 py-3">
-          <span className="text-lg font-semibold">{t('app.title')}</span>
+        <SidebarHeader>
+          <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
         </SidebarHeader>
         <SidebarContent>
-          <PortfolioList />
+          <SidebarMenu className="px-2">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isDashboardActive}>
+                <Link to={dashboardPath}>
+                  <LayoutDashboard />
+                  <span>{t('app.sidebar.dashboard')}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
@@ -110,11 +140,6 @@ function AppLayout() {
             <AppBreadcrumbs />
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              {t('portfolio.list.newButton')}
-            </Button>
-
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -174,6 +199,24 @@ function AppLayout() {
   );
 }
 
+function PortfolioRedirect() {
+  const { data: portfolios, isLoading } = usePortfolios();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Skeleton className="h-12 w-48" />
+      </div>
+    );
+  }
+
+  if (portfolios && portfolios.length > 0) {
+    return <Navigate to={`/portfolios/${portfolios[0].id}`} replace />;
+  }
+
+  return <PortfolioPage />;
+}
+
 function PortfolioPage() {
   return (
     <>
@@ -192,7 +235,7 @@ function App() {
             <Routes>
               <Route element={<AuthGuard />}>
                 <Route element={<AppLayout />}>
-                  <Route index element={<PortfolioPage />} />
+                  <Route index element={<PortfolioRedirect />} />
                   <Route path="portfolios/:id" element={<PortfolioPage />} />
                   <Route path="settings" element={<SettingsLayout />}>
                     <Route index element={<Navigate to="profile" replace />} />

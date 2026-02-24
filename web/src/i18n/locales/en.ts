@@ -4,6 +4,9 @@ const en = {
   },
   app: {
     title: 'Portfolio Tracker',
+    sidebar: {
+      dashboard: 'Dashboard',
+    },
     header: {
       toggleTheme: 'Toggle theme',
       switchToDark: 'Switch to dark mode',
@@ -72,6 +75,7 @@ const en = {
     list: {
       title: 'Portfolios',
       newButton: 'New',
+      createButton: 'New Portfolio',
       empty: {
         title: 'No Portfolios Yet',
         description: 'Get started by creating your first portfolio.',

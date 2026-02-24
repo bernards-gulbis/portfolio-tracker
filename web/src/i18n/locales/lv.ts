@@ -6,6 +6,9 @@ const lv: Translation = {
   },
   app: {
     title: 'Portfeļa izsekotājs',
+    sidebar: {
+      dashboard: 'Panelis',
+    },
     header: {
       toggleTheme: 'Pārslēgt motīvu',
       switchToDark: 'Pārslēgties uz tumšo motīvu',
@@ -74,6 +77,7 @@ const lv: Translation = {
     list: {
       title: 'Portfeļi',
       newButton: 'Jauns',
+      createButton: 'Jauns portfelis',
       empty: {
         title: 'Vēl nav portfeļu',
         description: 'Sāciet, izveidojot savu pirmo portfeli.',

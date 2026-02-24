@@ -49,12 +49,11 @@ describe('AppBreadcrumbs', () => {
     } as unknown as ReturnType<typeof usePortfolios>);
   });
 
-  it('renders "Portfolios" as current page at root path', () => {
+  it('renders "Dashboard" as current page at root path', () => {
     renderBreadcrumbs('/');
 
-    expect(screen.getByText('Portfolios')).toBeInTheDocument();
-    // Should not be a link at root
-    expect(screen.getByText('Portfolios').closest('a')).toBeNull();
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard').closest('a')).toBeNull();
   });
 
   it('renders "Settings" as current page at /settings', () => {
@@ -70,15 +69,11 @@ describe('AppBreadcrumbs', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
-  it('renders two breadcrumb segments for portfolio detail', () => {
+  it('renders portfolio name as current page for portfolio detail', () => {
     renderBreadcrumbs('/portfolios/1');
 
-    // "Portfolios" as a link
-    const portfoliosLink = screen.getByText('Portfolios').closest('a');
-    expect(portfoliosLink).toHaveAttribute('href', '/');
-
-    // Portfolio name as current page
     expect(screen.getByText('Growth Fund')).toBeInTheDocument();
+    expect(screen.getByText('Growth Fund').closest('a')).toBeNull();
   });
 
   it('shows portfolio name from data', () => {
