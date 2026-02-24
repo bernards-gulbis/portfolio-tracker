@@ -73,11 +73,18 @@ export function LoginPage() {
     defaultValues: { name: '', email: '', password: '' },
   });
 
+  const translateApiError = (err: unknown): string => {
+    const raw = getErrorMessage(err);
+    const key = `auth.apiErrors.${raw}`;
+    const translated = t(key);
+    return translated !== key ? translated : raw;
+  };
+
   const handleLogin = async (values: LoginValues) => {
     try {
       await loginMutation.mutateAsync({ username: values.email, password: values.password });
     } catch (err) {
-      loginForm.setError('root', { message: getErrorMessage(err) });
+      loginForm.setError('root', { message: translateApiError(err) });
     }
   };
 
@@ -88,7 +95,7 @@ export function LoginPage() {
       loginForm.reset({ email: values.email, password: '' });
       setMode('login');
     } catch (err) {
-      registerForm.setError('root', { message: getErrorMessage(err) });
+      registerForm.setError('root', { message: translateApiError(err) });
     }
   };
 

@@ -55,6 +55,12 @@ const en = {
       googleLoginFailed: 'Google login failed: {{error}}',
     },
     separator: 'or',
+    apiErrors: {
+      LOGIN_BAD_CREDENTIALS: 'Invalid email or password',
+      LOGIN_USER_NOT_VERIFIED: 'Please verify your email before signing in',
+      REGISTER_USER_ALREADY_EXISTS: 'An account with this email already exists',
+      REGISTER_INVALID_PASSWORD: 'Password does not meet requirements',
+    },
   },
   language: {
     en: 'English',

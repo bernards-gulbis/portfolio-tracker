@@ -57,6 +57,12 @@ const lv: Translation = {
       googleLoginFailed: 'Google ierakstīšanās neizdevās: {{error}}',
     },
     separator: 'vai',
+    apiErrors: {
+      LOGIN_BAD_CREDENTIALS: 'Nepareizs e-pasts vai parole',
+      LOGIN_USER_NOT_VERIFIED: 'Lūdzu, apstipriniet savu e-pastu pirms ierakstīšanās',
+      REGISTER_USER_ALREADY_EXISTS: 'Konts ar šo e-pastu jau pastāv',
+      REGISTER_INVALID_PASSWORD: 'Parole neatbilst prasībām',
+    },
   },
   language: {
     en: 'English',
