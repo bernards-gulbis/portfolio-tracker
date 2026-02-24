@@ -1,148 +1,82 @@
 # Portfolio Tracker v4
 
-A self-hosted investment portfolio tracker for European retail investors who trade in multiple currencies but report in EUR. Manage multiple portfolios, record all transaction types (buy, sell, deposit, withdrawal, dividend, fee, stock split), and get real-time valuations, gain/loss calculations, performance charts, and tax estimates — all with automatic EUR conversion via FX rates.
+A self-hosted investment portfolio tracker for European retail investors who trade in multiple currencies but report in EUR. Record all transaction types, get real-time valuations, gain/loss calculations, performance charts, and tax estimates — all with automatic EUR conversion.
 
-Built with FastAPI and React. Live market prices from Yahoo Finance with multi-level caching. UI built with shadcn/ui components on Tailwind CSS v4.
+Built with **FastAPI** (Python) and **React** (TypeScript). Live market prices from Yahoo Finance. UI built with shadcn/ui on Tailwind CSS v4.
+
+See [api/README.md](api/README.md) and [web/README.md](web/README.md) for architecture and developer conventions.
 
 ## Features
 
-- **User Accounts & Authentication**: Email/password registration and Google OAuth login; sessions stored in httpOnly JWT cookies (7-day lifetime); per-user portfolio isolation
-- **Multi-Portfolio Management**: Create, copy, and manage separate investment portfolios
-- **Full Transaction Support**: Deposits, withdrawals, buy/sell, dividends, fees, and stock splits
-- **Real-Time Valuation**: Live market prices via Yahoo Finance with current holdings, cash balance, and unrealized gains
-- **EUR-Centric Multi-Currency**: Track transactions in any currency with automatic EUR amount and FX rate recording for tax reporting
-- **Gain/Loss & Tax Calculations**: Realized and unrealized gains with 25.5% capital gains tax estimates
-- **Performance Charts**: Time-series portfolio performance visualization (lazy-loaded)
-- **CSV Import/Export**: Bulk import transaction history from brokers or other tools
-- **UI Localization**: English and Latvian language support via i18next; language switcher in the app header; preference persisted to `localStorage`
-- **Locale-Aware Formatting**: Currency and date values formatted using `Intl.NumberFormat` / `toLocaleDateString` with the active locale (e.g. comma vs period decimal separator)
-- **Responsive UI**: Mobile-friendly interface with light/dark theme (available on login page and app), color-coded signed values, and paginated transaction history
-- **Toast Notifications**: Sonner-powered toast feedback on all mutations (create, update, delete, import)
-- **shadcn/ui Design System**: Accessible component library built on Radix UI primitives with a neutral theme
+- **Authentication**: Email/password and Google OAuth; httpOnly cookie sessions; per-user isolation
+- **Multi-Portfolio Management**: Create, copy, and manage separate portfolios
+- **Full Transaction Support**: Deposits, withdrawals, buy/sell, dividends, fees, stock splits
+- **Real-Time Valuation**: Live prices via Yahoo Finance with multi-level caching
+- **Multi-Currency**: Transactions in any currency with automatic EUR conversion and FX rates
+- **Gain/Loss & Tax**: Realized and unrealized gains with 25.5% capital gains tax estimates
+- **Performance Charts**: Time-series portfolio performance visualization
+- **CSV Import/Export**: Bulk import/export transaction history
+- **Localization**: English and Latvian with locale-aware currency/date formatting
+- **Responsive UI**: Light/dark theme, paginated transactions, toast notifications
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.10 or higher
-- Node.js 18 or higher
-- npm or yarn
+- Python 3.10+
+- Node.js 18+
 
-### Backend Setup
+### Backend
 
-1. Navigate to the API directory:
 ```bash
 cd api
-```
-
-2. Create and activate a virtual environment:
-```bash
 python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
-```
-
-3. Install dependencies:
-```bash
+# Windows: venv\Scripts\activate | macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
-```
-
-4. Configure environment variables:
-```bash
 cp .env.example .env
-# Edit .env with your settings
 ```
 
-**Required for authentication:**
+Generate the required secrets and add them to `.env`:
 ```bash
-# Generate random secrets (run once):
 python -c "import secrets; print(secrets.token_hex(32))"
 
 SECRET_KEY=<generated-secret>
 OAUTH_STATE_SECRET=<generated-secret>
 ```
 
-**Optional — Google OAuth login** (skip to use email/password only):
-1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
-2. Create an OAuth 2.0 Client ID (Web application)
-3. Add `http://localhost:8000/auth/google/callback` as an Authorized Redirect URI
-4. Copy the credentials to `.env`:
+**Google OAuth** (optional — skip to use email/password only):
+1. Create an OAuth 2.0 Client ID at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Add `http://localhost:8000/auth/google/callback` as an Authorized Redirect URI
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `FRONTEND_URL` in `.env`
+
+Start the server:
 ```bash
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
-FRONTEND_URL=http://localhost:3000
+uvicorn main:app --reload    # http://localhost:8000 (docs at /docs)
 ```
 
-Other notable variables:
-- `DATABASE_ECHO`: Set to `true` to enable SQL query logging (default: `false`) — do not enable in production
-- `COOKIE_SECURE`: Set to `true` in production when serving over HTTPS (default: `false`)
+All environment variables are documented in `api/.env.example`.
 
-5. Run the development server:
-```bash
-uvicorn main:app --reload
-```
+### Frontend
 
-The API will be available at `http://localhost:8000`
-
-API documentation is available at `http://localhost:8000/docs`
-
-**Note:** Backend routes have no path prefix. The Vite dev server proxies `/api/*` → `localhost:8000/*` (stripping the `/api` prefix).
-
-### Frontend Setup
-
-1. Navigate to the web directory:
 ```bash
 cd web
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Run the development server:
-```bash
-npm run dev
-```
-
-The web application will be available at `http://localhost:3000`
-
-**Frontend stack:** React 18, TypeScript, Vite, TanStack Query, Axios, Recharts, shadcn/ui (Radix UI + Tailwind CSS v4), sonner (toasts), i18next + react-i18next (localization)
-
-To add a new shadcn/ui component:
-```bash
-cd web
-npx shadcn@latest add <component-name>
+npm run dev                  # http://localhost:3000 (proxies /api to :8000)
 ```
 
 ## Running Tests
 
-### Backend Tests
-
 ```bash
-# From project root
+# Backend
 pytest api/tests/test_api.py -v
-
-# With coverage
 pytest api/tests/test_api.py --cov=api
-```
 
-### Frontend Tests
-
-```bash
-# From web directory
+# Frontend (from web/)
 cd web
 npm test
-
-# Watch mode
-npm test -- --watch
 ```
 
-## CSV Upload Format
-
-The CSV file must include the following headers:
+## CSV Import Format
 
 ```csv
 date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
@@ -155,62 +89,38 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,curre
 02/01/2024 09:30:00,Split,AAPL,,,,,0.00,,2.0,,
 ```
 
-**Field Descriptions:**
-- `date`: Transaction date and time (MM/DD/YYYY HH:MM:SS format)
-- `type`: Transaction type - `Deposit`, `Buy`, `Sell`, `Withdraw`, `Dividend`, `Fee`, or `Split`
-- `ticker`: Stock symbol (required for Buy, Sell, Dividend, Split)
-- `quantity`: Number of shares (required for Buy, Sell)
-- `price_per_share`: Price per share (required for Buy, Sell)
-- `fee`: Transaction fee (optional, defaults to 0)
-- `total_amount`: Total transaction amount with sign:
-  - **Negative** for: Buy, Withdraw, Fee (money leaving account)
-  - **Positive** for: Deposit, Sell, Dividend (money entering account)
-  - Zero for: Split (no cash impact)
-- `eur`: EUR equivalent amount (optional, follows same sign convention as total_amount)
-- `split_ratio`: Stock split ratio (required for Split transactions, e.g., 2.0 for 2-for-1 split)
-- `currency`: Currency code (optional, 3-letter code, e.g., USD, EUR, GBP)
-- `fx_rate`: Foreign exchange rate (optional, up to 4 decimal places)
+| Field | Description |
+|-------|-------------|
+| `date` | MM/DD/YYYY HH:MM:SS format |
+| `type` | `Deposit`, `Buy`, `Sell`, `Withdraw`, `Dividend`, `Fee`, or `Split` |
+| `ticker` | Stock symbol (required for Buy, Sell, Dividend, Split) |
+| `quantity` | Number of shares (required for Buy, Sell) |
+| `price_per_share` | Price per share (required for Buy, Sell) |
+| `fee` | Transaction fee (optional) |
+| `total_amount` | Signed amount: negative for Buy/Withdraw/Fee, positive for Deposit/Sell/Dividend, zero for Split |
+| `eur` | EUR equivalent (optional, same sign convention) |
+| `split_ratio` | Split ratio, e.g. 2.0 for 2-for-1 (required for Split) |
+| `currency` | 3-letter currency code (optional) |
+| `fx_rate` | Foreign exchange rate (optional) |
 
-**Notes:**
-- Leave fields blank (empty) if not applicable for that transaction type
-- Fees are always stored as positive values
-- Total amounts use signed values to indicate cash flow direction
-- Date format must match: MM/DD/YYYY HH:MM:SS
+Leave fields blank if not applicable. Fees are stored as positive values.
 
 ## Database Schema
 
 ### User
-- `id`: Primary key (UUID)
-- `email`: User email (unique)
-- `hashed_password`: Bcrypt-hashed password
-- `is_active`, `is_superuser`, `is_verified`: FastAPI Users flags
+- `id` (UUID PK), `email` (unique), `hashed_password`
+- `is_active`, `is_superuser`, `is_verified`
 
 ### OAuthAccount
-- `id`: Primary key (UUID)
-- `user_id`: Foreign key to User (CASCADE delete)
-- `oauth_name`: Provider name (e.g. `google`)
-- `account_id`, `account_email`: Provider account details
-- `access_token`, `refresh_token`, `expires_at`: OAuth tokens
+- `id` (UUID PK), `user_id` (FK -> User, CASCADE)
+- `oauth_name`, `account_id`, `account_email`
+- `access_token`, `refresh_token`, `expires_at`
 
 ### Portfolio
-- `id`: Primary key (auto-increment)
-- `user_id`: Foreign key to User (CASCADE delete) — portfolios are per-user
-- `name`: Portfolio name (required)
-- `created_at`: Timestamp
+- `id` (auto PK), `user_id` (FK -> User, CASCADE), `name`, `created_at`
 
 ### Transaction
-- `id`: Primary key (auto-increment)
-- `portfolio_id`: Foreign key to Portfolio (CASCADE delete)
-- `date`: Transaction date and time (required)
-- `type`: Transaction type - Deposit, Buy, Sell, Withdraw, Dividend, Fee, or Split (required)
-- `ticker`: Stock symbol (optional, required for Buy/Sell/Dividend/Split)
-- `quantity`: Number of shares (optional, required for Buy/Sell)
-- `price_per_share`: Price per share (optional, required for Buy/Sell)
-- `fee`: Transaction fee (optional, defaults to None)
-- `total_amount`: Total transaction amount with sign (required, defaults to 0)
-  - Negative for costs (Buy, Withdraw, Fee)
-  - Positive for income (Deposit, Sell, Dividend)
-- `eur_amount`: EUR equivalent amount (optional, follows same sign convention)
-- `split_ratio`: Stock split ratio (optional, required for Split transactions)
-- `currency`: Currency code (optional, 3-letter code)
-- `fx_rate`: Foreign exchange rate (optional, up to 4 decimal places)
+- `id` (auto PK), `portfolio_id` (FK -> Portfolio, CASCADE)
+- `date`, `type`, `ticker`, `quantity`, `price_per_share`, `fee`
+- `total_amount` (signed), `eur_amount` (signed), `split_ratio`
+- `currency`, `fx_rate`
