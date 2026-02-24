@@ -5,6 +5,7 @@ const en = {
   app: {
     title: 'Portfolio Tracker',
     sidebar: {
+      general: 'General',
       dashboard: 'Dashboard',
     },
     header: {

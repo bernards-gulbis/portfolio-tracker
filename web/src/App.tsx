@@ -28,6 +28,9 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -118,16 +121,21 @@ function AppLayout() {
           <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
         </SidebarHeader>
         <SidebarContent>
-          <SidebarMenu className="px-2">
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isDashboardActive}>
-                <Link to={dashboardPath}>
-                  <LayoutDashboard />
-                  <span>{t('app.sidebar.dashboard')}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+          <SidebarGroup>
+            <SidebarGroupLabel>{t('app.sidebar.general')}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isDashboardActive}>
+                    <Link to={dashboardPath}>
+                      <LayoutDashboard />
+                      <span>{t('app.sidebar.dashboard')}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>

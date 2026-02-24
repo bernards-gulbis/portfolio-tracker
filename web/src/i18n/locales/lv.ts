@@ -7,6 +7,7 @@ const lv: Translation = {
   app: {
     title: 'Portfeļa izsekotājs',
     sidebar: {
+      general: 'Vispārīgi',
       dashboard: 'Panelis',
     },
     header: {
