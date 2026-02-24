@@ -28,7 +28,7 @@ const triggerClassName = [
   'disabled:pointer-events-none disabled:opacity-50',
   'aria-disabled:pointer-events-none aria-disabled:opacity-50',
   'data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground',
-  'h-12 group-data-[collapsible=icon]:p-2!',
+  'h-12 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!',
   '[&>svg]:size-4 [&>svg]:shrink-0',
 ].join(' ');
 

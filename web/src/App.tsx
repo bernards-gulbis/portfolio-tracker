@@ -34,6 +34,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
@@ -112,7 +113,7 @@ function AppLayout() {
   return (
     <CreatePortfolioContext.Provider value={() => setIsCreateModalOpen(true)}>
     <SidebarProvider>
-      <Sidebar collapsible="offcanvas">
+      <Sidebar collapsible="icon">
         <SidebarHeader>
           <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
         </SidebarHeader>
@@ -140,6 +141,7 @@ function AppLayout() {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
+        <SidebarRail />
       </Sidebar>
 
       <SidebarInset>
