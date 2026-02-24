@@ -12,7 +12,7 @@ const mockHoldings: Holding[] = [
     current_price: 200,
     current_value: 2000,
     unrealized_gain_loss: 500,
-    unrealized_gain_loss_percent: 33.33,
+    unrealized_gain_loss_pct: 33.33,
   },
   {
     ticker: 'MSFT',
@@ -22,7 +22,7 @@ const mockHoldings: Holding[] = [
     current_price: 400,
     current_value: 2000,
     unrealized_gain_loss: 500,
-    unrealized_gain_loss_percent: 33.33,
+    unrealized_gain_loss_pct: 33.33,
   },
 ];
 

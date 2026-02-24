@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
@@ -10,7 +10,6 @@ import { getErrorMessage } from '../api';
 import EditPortfolioModal from './EditPortfolioModal';
 import CopyPortfolioModal from './CopyPortfolioModal';
 import { toast } from 'sonner';
-import type { TimePeriod } from './PerformanceChart';
 
 const PerformanceChart = lazy(() =>
   import('./PerformanceChart').then((m) => ({ default: m.PerformanceChart }))
@@ -94,7 +93,6 @@ const formatCurrencyWithPercent = (
 export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('1month');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -104,28 +102,12 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
 
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
-  const params = useMemo(() => {
-    if (timePeriod === '1month') {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 1);
-      return {
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
-        numPoints: 30,
-      };
-    }
-    return {
-      startDate: undefined,
-      endDate: undefined,
-      numPoints: 60,
-    };
-  }, [timePeriod]);
+  // Fetch full history once status is loaded — period filtering happens client-side in PerformanceChart
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
-    portfolioId,
-    params.startDate,
-    params.endDate,
-    params.numPoints
+    status ? portfolioId : null,
+    undefined,
+    undefined,
+    365
   );
 
   const handleDeleteConfirm = async () => {
@@ -269,7 +251,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
               <p className={`text-sm mt-1 ${getValueClass(status.unrealized_gains_eur)}`}>
                 {formatCurrencyWithPercent(
                   status.unrealized_gains_eur,
-                  status.unrealized_gains_percent,
+                  status.unrealized_gains_pct,
                   'EUR',
                   locale
                 )}
@@ -346,8 +328,6 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
                 <PerformanceChart
                   data={performance?.data_points || []}
                   loading={performanceLoading}
-                  selectedPeriod={timePeriod}
-                  onPeriodChange={setTimePeriod}
                 />
                 <HoldingsAllocationChart
                   holdings={status.holdings}
@@ -404,14 +384,14 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
                           {holding.current_value != null ? formatCurrency(holding.current_value, 'USD', locale) : '-'}
                         </TableCell>
                         <TableCell>
-                          {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_percent != null
+                          {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
                             ? (
                               <div className="flex flex-col">
                                 <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
                                   {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
                                 </span>
                                 <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
-                                  {holding.unrealized_gain_loss_percent >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_percent).toFixed(2)}%
+                                  {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
                                 </span>
                               </div>
                             )

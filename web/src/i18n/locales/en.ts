@@ -276,6 +276,8 @@ const en = {
       noData: 'No performance data available',
       principal: 'Principal (EUR)',
       currentValue: 'Current Value (EUR)',
+      returnPct: 'Return (%)',
+      sp500: 'S&P 500 (%)',
     },
     allocation: {
       title: 'Allocation',

@@ -18,6 +18,7 @@ from app.schemas import (
     PerformanceDataPoint,
 )
 from app.services import PortfolioService
+from app.services.price_service import PriceService
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -61,6 +62,7 @@ def get_portfolio_status(
     user: User = Depends(current_active_user),
 ):
     """Get portfolio status with holdings, cash balance, and performance metrics"""
+    PriceService.clear_session_cache()
     service = PortfolioService(session)
     try:
         return service.calculate_portfolio_status(portfolio_id, user.id)
@@ -139,6 +141,7 @@ def get_portfolio_performance(
         raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
 
     try:
+        PriceService.clear_session_cache()
         # get_portfolio_performance verifies ownership and returns (name, data_points)
         portfolio_name, performance_data = service.get_portfolio_performance(
             portfolio_id,
@@ -152,7 +155,9 @@ def get_portfolio_performance(
             PerformanceDataPoint(
                 date=dp['date'],
                 principal_eur=dp['principal_eur'],
-                current_value_eur=dp['current_value_eur']
+                current_value_eur=dp['current_value_eur'],
+                return_pct=dp.get('return_pct'),
+                sp500_return_pct=dp.get('sp500_return_pct'),
             )
             for dp in performance_data
         ]
