@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { getCurrentUser, logoutApi, UserRead } from '../api';
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const [user, setUserState] = useState<UserRead | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
@@ -62,11 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserState(null);
       setStatus('unauthenticated');
       queryClient.clear();
+      navigate('/', { replace: true });
     };
 
     window.addEventListener('auth:logout', handleAuthLogout);
     return () => window.removeEventListener('auth:logout', handleAuthLogout);
-  }, [queryClient]);
+  }, [queryClient, navigate]);
 
   return (
     <AuthContext.Provider value={{ user, status, setUser, logout }}>

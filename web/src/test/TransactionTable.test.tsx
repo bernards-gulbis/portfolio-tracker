@@ -141,7 +141,7 @@ describe('TransactionTable', () => {
     expect(screen.getByText('$50.00')).toBeInTheDocument();
   });
 
-  it('shows empty state when no transactions', () => {
+  it('shows empty state without filter bar when no transactions', () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -158,6 +158,27 @@ describe('TransactionTable', () => {
 
     expect(screen.getByText('No Transactions Yet')).toBeInTheDocument();
     expect(screen.getByText('Upload a CSV file or add transactions manually using the button above.')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search ticker...')).not.toBeInTheDocument();
+  });
+
+  it('shows filter bar when no results but filters are active', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={[]}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          total={0}
+          tickerSearch="AAPL"
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('No Matching Transactions')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search ticker...')).toBeInTheDocument();
   });
 
   it('renders edit and delete buttons for each transaction', () => {

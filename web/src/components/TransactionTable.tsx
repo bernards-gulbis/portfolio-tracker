@@ -239,7 +239,7 @@ const TransactionTable = ({
   if (transactions.length === 0) {
     return (
       <>
-        {filterBar}
+        {hasActiveFilters && filterBar}
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
