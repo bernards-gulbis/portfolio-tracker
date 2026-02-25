@@ -354,21 +354,10 @@ class TransactionService:
         if total_amount is None:
             raise ValueError(f"Invalid total_amount: {total_amount_str}")
 
-        if transaction_type in [TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE]:
-            if total_amount > 0:
-                raise ValueError(f"{transaction_type.value} transactions must have negative total_amount in CSV, got {total_amount}")
-        elif transaction_type in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]:
-            if total_amount < 0:
-                raise ValueError(f"{transaction_type.value} transactions must have positive total_amount in CSV, got {total_amount}")
-        elif transaction_type == TransactionType.SPLIT:
-            if total_amount != 0:
-                raise ValueError(f"SPLIT transactions must have total_amount of 0 in CSV, got {total_amount}")
+        self._validate_csv_total_amount_sign(transaction_type, total_amount)
 
         eur_amount = self._clean_csv_number(row.get("eur", ""), "eur")
-        if eur_amount is not None:
-            if transaction_type != TransactionType.SPLIT:
-                if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
-                    raise ValueError(f"EUR amount sign must match total_amount sign: total_amount={total_amount}, eur_amount={eur_amount}")
+        self._validate_csv_eur_sign(transaction_type, total_amount, eur_amount)
 
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
 
@@ -395,6 +384,37 @@ class TransactionService:
             currency=currency,
             fx_rate=fx_rate,
         )
+
+    @staticmethod
+    def _validate_csv_total_amount_sign(
+        transaction_type: TransactionType, total_amount: float
+    ) -> None:
+        """Raise if total_amount has the wrong sign for the transaction type."""
+        negative_types = {TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE}
+        positive_types = {TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND}
+
+        if transaction_type in negative_types and total_amount > 0:
+            raise ValueError(
+                f"{transaction_type.value} transactions must have a negative total_amount"
+            )
+        if transaction_type in positive_types and total_amount < 0:
+            raise ValueError(
+                f"{transaction_type.value} transactions must have a positive total_amount"
+            )
+        if transaction_type == TransactionType.SPLIT and total_amount != 0:
+            raise ValueError("SPLIT transactions must have total_amount of 0")
+
+    @staticmethod
+    def _validate_csv_eur_sign(
+        transaction_type: TransactionType, total_amount: float, eur_amount: Optional[float]
+    ) -> None:
+        """Raise if eur_amount sign doesn't match total_amount sign."""
+        if eur_amount is None:
+            return
+        if transaction_type == TransactionType.SPLIT:
+            return
+        if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
+            raise ValueError("eur_amount sign must match total_amount sign")
 
     @staticmethod
     def _clean_csv_number(value: str, field_name: str = "field") -> Optional[float]:
