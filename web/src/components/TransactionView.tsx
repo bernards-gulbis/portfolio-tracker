@@ -90,8 +90,7 @@ const TransactionView = () => {
       link.download = `portfolio_${activePortfolioId}_transactions.csv`;
       document.body.appendChild(link);
       link.click();
-
-      document.body.removeChild(link);
+      link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setExportError(t('transaction.view.exportError', { message: getErrorMessage(err) }));
