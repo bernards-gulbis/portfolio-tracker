@@ -16,6 +16,7 @@ from main import app
 from decimal import Decimal
 from app.models import Portfolio, Transaction, TransactionType
 from app.models.user import User
+from app.models.historical_price import HistoricalPrice, FxRate  # noqa: F401 — ensures tables exist in test DB
 from app.services.portfolio_service import _apply_transaction, _TxState
 
 
@@ -2758,6 +2759,9 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
     with patch(
         'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
         side_effect=mock_historical_prices,
+    ), patch(
+        'app.services.price_service.PriceService.get_last_known_price',
+        return_value=None,
     ):
         response = client.get(
             f"/portfolios/{portfolio_id}/performance",
