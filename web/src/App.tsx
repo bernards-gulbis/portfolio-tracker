@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase } from 'lucide-react';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import CreatePortfolioModal from './components/CreatePortfolioModal';
@@ -113,8 +113,10 @@ function AppLayout() {
   const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
   const isDashboardActive = pathname === '/' || pathname.startsWith('/portfolios');
 
+  const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
+
   return (
-    <CreatePortfolioContext.Provider value={() => setIsCreateModalOpen(true)}>
+    <CreatePortfolioContext.Provider value={openCreateModal}>
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
