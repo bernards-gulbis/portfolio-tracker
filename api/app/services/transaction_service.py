@@ -251,28 +251,7 @@ class TransactionService:
             raise InvalidTransactionDataException("Fee must be positive")
 
         if transaction_type in (TransactionType.BUY, TransactionType.SELL):
-            if not ticker:
-                raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require a ticker symbol"
-                )
-            if quantity is None:
-                raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require quantity"
-                )
-            if price_per_share is None:
-                raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require a price"
-                )
-
-            if transaction_type == TransactionType.BUY:
-                expected_value = -(quantity * price_per_share + (fee or 0))
-            else:
-                expected_value = quantity * price_per_share - (fee or 0)
-
-            if abs(total_amount - expected_value) > abs(expected_value) * 0.01:
-                raise InvalidTransactionDataException(
-                    f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share {'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {total_amount}"
-                )
+            self._validate_buy_sell(transaction_type, ticker, quantity, price_per_share, total_amount, fee)
 
         elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):
             if ticker or quantity is not None or price_per_share is not None:
@@ -280,17 +259,45 @@ class TransactionService:
                     f"{transaction_type.value} transactions should not have ticker, quantity, or price"
                 )
 
-        elif transaction_type == TransactionType.SPLIT:
+        elif transaction_type in (TransactionType.SPLIT, TransactionType.DIVIDEND):
             if not ticker:
                 raise InvalidTransactionDataException(
-                    "Split transactions require a ticker symbol"
+                    f"{transaction_type.value} transactions require a ticker symbol"
                 )
 
-        elif transaction_type == TransactionType.DIVIDEND:
-            if not ticker:
-                raise InvalidTransactionDataException(
-                    "Dividend transactions require a ticker symbol"
-                )
+    @staticmethod
+    def _validate_buy_sell(
+        transaction_type: TransactionType,
+        ticker: Optional[str],
+        quantity: Optional[float],
+        price_per_share: Optional[float],
+        total_amount: float,
+        fee: Optional[float],
+    ) -> None:
+        """Validate fields specific to BUY/SELL transactions."""
+        if not ticker:
+            raise InvalidTransactionDataException(
+                f"{transaction_type.value} transactions require a ticker symbol"
+            )
+        if quantity is None:
+            raise InvalidTransactionDataException(
+                f"{transaction_type.value} transactions require quantity"
+            )
+        if price_per_share is None:
+            raise InvalidTransactionDataException(
+                f"{transaction_type.value} transactions require a price"
+            )
+
+        if transaction_type == TransactionType.BUY:
+            expected_value = -(quantity * price_per_share + (fee or 0))
+        else:
+            expected_value = quantity * price_per_share - (fee or 0)
+
+        if abs(total_amount - expected_value) > abs(expected_value) * 0.01:
+            raise InvalidTransactionDataException(
+                f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share "
+                f"{'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {total_amount}"
+            )
 
     def _parse_csv(self, csv_content: str, portfolio_id: int) -> List[Transaction]:
         """Parse CSV content and create Transaction objects"""
