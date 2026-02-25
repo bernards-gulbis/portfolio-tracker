@@ -35,7 +35,7 @@ export const useTransactions = (
   types?: string[],
   sortOrder: 'asc' | 'desc' = 'desc'
 ) => {
-  const normalizedTypes = types ? [...types].sort() : [];
+  const normalizedTypes = types ? [...types].sort((a, b) => a.localeCompare(b)) : [];
   return useQuery({
     queryKey: ['transactions', portfolioId, page, pageSize, ticker ?? '', normalizedTypes, sortOrder],
     queryFn: () => getTransactions(portfolioId!, page, pageSize, ticker, normalizedTypes, sortOrder),
