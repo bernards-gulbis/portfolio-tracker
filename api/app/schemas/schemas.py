@@ -232,27 +232,27 @@ class PortfolioStatusResponse(BaseModel):
     portfolio_id: int
     portfolio_name: str
     current_value: float  # Cash + Holdings current value
-    current_value_eur: Optional[float]  # Portfolio value in EUR
+    current_value_eur: Optional[float] = None  # Portfolio value in EUR
     principal: float  # Deposits - Withdrawals
     principal_eur: float  # Sum of all eur_amount fields
     dividends: float
-    dividends_eur: Optional[float]  # Dividends in EUR
+    dividends_eur: Optional[float] = None  # Dividends in EUR
     cash: float
     holdings: List[HoldingResponse]
     holdings_cost: float  # Sum of all holdings cost basis
     holdings_value: float  # Sum of current market value of all holdings
     unrealized_gains: float  # Total unrealized gains/losses
-    unrealized_gains_pct: Optional[float]  # Total unrealized gains/losses percentage
-    unrealized_gains_eur: Optional[float]  # Unrealized gains in EUR
+    unrealized_gains_pct: Optional[float] = None  # Total unrealized gains/losses percentage
+    unrealized_gains_eur: Optional[float] = None  # Unrealized gains in EUR
     realized_gains: float  # Gains/losses from sells
-    currency_gains_eur: Optional[float]  # FX gains/losses on principal (principal@current_rate - principal_eur)
-    currency_gains_pct: Optional[float]  # FX gains/losses percentage (currency_gains_eur / principal_eur * 100)
-    capital_gains_eur: Optional[float]  # Capital gains before tax (current_value_eur - principal_eur - dividends_eur)
+    currency_gains_eur: Optional[float] = None  # FX gains/losses on principal (principal@current_rate - principal_eur)
+    currency_gains_pct: Optional[float] = None  # FX gains/losses percentage (currency_gains_eur / principal_eur * 100)
+    capital_gains_eur: Optional[float] = None  # Capital gains before tax (current_value_eur - principal_eur - dividends_eur)
     capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
-    tax_eur: Optional[float]  # Tax amount in EUR: capital_gains_tax_rate * capital_gains_eur
-    total_return_after_tax_eur: Optional[float]  # Total return after tax in EUR
-    total_return_after_tax_pct: Optional[float]  # Total return after tax percentage
-    current_value_after_tax_eur: Optional[float]  # Portfolio value after taxes: current_value_eur - tax_eur
+    tax_eur: Optional[float] = None  # Tax amount in EUR: capital_gains_tax_rate * capital_gains_eur
+    total_return_after_tax_eur: Optional[float] = None  # Total return after tax in EUR
+    total_return_after_tax_pct: Optional[float] = None  # Total return after tax percentage
+    current_value_after_tax_eur: Optional[float] = None  # Portfolio value after taxes: current_value_eur - tax_eur
     missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
 
     model_config = ConfigDict(from_attributes=True)
@@ -262,7 +262,7 @@ class PerformanceDataPoint(BaseModel):
     """Schema for a single performance data point"""
     date: str  # YYYY-MM-DD format
     principal_eur: float
-    current_value_eur: Optional[float]
+    current_value_eur: Optional[float] = None
     return_pct: Optional[float] = None  # ((current_value_eur - principal_eur) / deposits_eur) * 100
     sp500_return_pct: Optional[float] = None  # S&P 500 return % from first data point
 
