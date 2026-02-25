@@ -54,7 +54,7 @@ const schema = z
     time: z.string().superRefine((val, ctx) => {
       if (val.length < 1) ctx.addIssue({ code: "custom", message: i18n.t('transaction.validation.timeRequired') });
     }),
-    type: z.nativeEnum(TransactionType),
+    type: z.enum(TransactionType),
     ticker: z.string().optional(),
     quantity: z.string().optional(),
     pricePerShare: z.string().optional(),
