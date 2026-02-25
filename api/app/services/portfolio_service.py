@@ -274,7 +274,7 @@ class PortfolioService:
             current_prices = PriceService.get_current_prices(tickers) if tickers else {}
         except Exception as e:
             logger.error("Error fetching prices for portfolio %s: %s", portfolio_id, e, exc_info=True)
-            current_prices = {ticker: None for ticker in tickers}
+            current_prices = dict.fromkeys(tickers)
 
         holdings_value = _ZERO
         unrealized_gains = _ZERO
