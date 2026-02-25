@@ -273,6 +273,123 @@ class PriceService:
         return None
 
     @classmethod
+    def _determine_fetch_ranges(
+        cls,
+        cached_prices: Dict[str, float],
+        start_date: datetime,
+        end_date: datetime,
+        yesterday,
+    ) -> List[Tuple[datetime, datetime]]:
+        """Compute date ranges that need to be fetched from the API given cached data."""
+        if not cached_prices:
+            return [(start_date, end_date)]
+
+        earliest_cached_date = datetime.strptime(min(cached_prices.keys()), '%Y-%m-%d').date()
+        latest_cached_date = datetime.strptime(max(cached_prices.keys()), '%Y-%m-%d').date()
+
+        ranges: List[Tuple[datetime, datetime]] = []
+
+        # Gap BEFORE the cached range
+        if start_date.date() < earliest_cached_date:
+            fetch_end = datetime.combine(earliest_cached_date, datetime.min.time()) - timedelta(days=1)
+            ranges.append((start_date, fetch_end))
+
+        # No gap AFTER — cache covers the request
+        if end_date.date() <= latest_cached_date:
+            return ranges
+
+        # Gap AFTER the cached range
+        fetch_start = datetime.combine(latest_cached_date, datetime.min.time()) + timedelta(days=1)
+        if end_date.date() <= yesterday:
+            ranges.append((fetch_start, end_date))
+        elif latest_cached_date >= yesterday:
+            pass  # already have yesterday; don't fetch today (market may not be closed)
+        else:
+            ranges.append((fetch_start, datetime.combine(yesterday, datetime.max.time())))
+
+        return ranges
+
+    @classmethod
+    def _fetch_yahoo_range(
+        cls, ticker: str, fetch_start: datetime, fetch_end: datetime
+    ) -> Dict[str, float]:
+        """Fetch daily closing prices from Yahoo Finance for a single date range."""
+        period1 = int(datetime.combine(
+            fetch_start.date(), datetime.min.time()
+        ).replace(tzinfo=timezone.utc).timestamp())
+        period2 = int(datetime.combine(
+            fetch_end.date() + timedelta(days=1), datetime.min.time()
+        ).replace(tzinfo=timezone.utc).timestamp())
+
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        params = {'period1': period1, 'period2': period2, 'interval': '1d'}
+
+        with cls._yahoo_semaphore:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+        result = data.get('chart', {}).get('result', [])
+        if not result:
+            return {}
+
+        timestamps = result[0].get('timestamp', [])
+        quotes = result[0].get('indicators', {}).get('quote', [{}])[0]
+        closes = quotes.get('close', [])
+
+        prices: Dict[str, float] = {}
+        for timestamp, close in zip(timestamps, closes):
+            if close is not None:
+                date_str = datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime('%Y-%m-%d')
+                prices[date_str] = float(close)
+        return prices
+
+    @classmethod
+    def _fetch_single_range(
+        cls, ticker: str, fetch_start: datetime, fetch_end: datetime, today
+    ) -> Dict[str, float]:
+        """Fetch one date range, persist historical prices, and handle errors. Returns new prices."""
+        if fetch_start.date() > fetch_end.date():
+            return {}
+        try:
+            new_prices = cls._fetch_yahoo_range(ticker, fetch_start, fetch_end)
+        except requests.exceptions.HTTPError as e:
+            cls._log_http_error(ticker, fetch_start, fetch_end, e)
+            return {}
+        except Exception as e:
+            logger.error(
+                "Error fetching historical prices for %s (%s to %s): %s",
+                ticker, fetch_start.date(), fetch_end.date(), e, exc_info=True,
+            )
+            return {}
+
+        if new_prices:
+            historical = {k: v for k, v in new_prices.items()
+                          if datetime.strptime(k, '%Y-%m-%d').date() < today}
+            if historical:
+                cls._save_historical_prices(ticker, historical)
+                logger.debug("Cached %d historical prices for %s", len(historical), ticker)
+        return new_prices
+
+    @staticmethod
+    def _log_http_error(ticker: str, fetch_start: datetime, fetch_end: datetime, e) -> None:
+        """Log an HTTP error from Yahoo Finance, with concise output for expected 400/404."""
+        status = e.response.status_code if e.response is not None else None
+        if status in (400, 404):
+            logger.warning(
+                "No Yahoo data for %s (%s to %s): HTTP %s",
+                ticker, fetch_start.date(), fetch_end.date(), status,
+            )
+        else:
+            logger.error(
+                "Error fetching historical prices for %s (%s to %s): %s",
+                ticker, fetch_start.date(), fetch_end.date(), e, exc_info=True,
+            )
+
+    @classmethod
     def get_historical_prices(
         cls,
         ticker: str,
@@ -282,166 +399,43 @@ class PriceService:
         """
         Fetch historical daily closing prices for a ticker from Yahoo Finance
         with permanent caching (historical data doesn't change)
-        
+
         Args:
             ticker: Ticker symbol
             start_date: Start date (inclusive)
             end_date: End date (inclusive)
-            
+
         Returns:
             Dictionary mapping date strings (YYYY-MM-DD) to closing prices (only trading days)
-            
+
         Raises:
             ValueError: If start_date >= end_date
         """
-        # Input validation
         if start_date >= end_date:
             raise ValueError(f"start_date ({start_date}) must be before end_date ({end_date})")
-        
-        # Check in-memory cache first (for current request session)
+
         cache_key = f"{ticker}:{start_date.date()}:{end_date.date()}"
         with cls._historical_cache_lock:
             if cache_key in cls._historical_cache:
                 logger.debug("In-memory cache hit for %s", ticker)
                 return cls._historical_cache[cache_key].copy()
 
-        # Historical data (> cutoff days old) is immutable and can be fully cached
-        # Recent data should always be fetched to get latest closing prices
         today = datetime.now(timezone.utc).date()
         yesterday = today - timedelta(days=1)
-        cutoff_date = today - timedelta(days=cls._HISTORICAL_DATA_CUTOFF_DAYS)
 
         cached_prices = cls._get_cached_historical_prices(ticker, start_date, end_date)
-        
-        # Determine if cache fully covers the requested range
-        ranges_to_fetch = []  # List of (start, end) tuples to fetch
-        
-        if cached_prices:
-            earliest_cached_str = min(cached_prices.keys())
-            latest_cached_str = max(cached_prices.keys())
-            earliest_cached_date = datetime.strptime(earliest_cached_str, '%Y-%m-%d').date()
-            latest_cached_date = datetime.strptime(latest_cached_str, '%Y-%m-%d').date()
-            
-            # Check if we need data BEFORE the cached range
-            if start_date.date() < earliest_cached_date:
-                # Need to fetch from start_date to day before earliest cached
-                fetch_end_before = datetime.combine(earliest_cached_date, datetime.min.time()) - timedelta(days=1)
-                ranges_to_fetch.append((start_date, fetch_end_before))
-                logger.debug("Need data before cache for %s: %s to %s", ticker, start_date.date(), fetch_end_before.date())
-            
-            # Check if we need data AFTER the cached range
-            if end_date.date() > latest_cached_date:
-                # For fully historical ranges, cached data should be complete
-                if end_date.date() <= cutoff_date:
-                    # Historical request but cache doesn't extend to end_date
-                    # Fetch missing portion
-                    fetch_start_after = datetime.combine(latest_cached_date, datetime.min.time()) + timedelta(days=1)
-                    ranges_to_fetch.append((fetch_start_after, end_date))
-                    logger.debug("Need historical data after cache for %s: %s to %s", ticker, fetch_start_after.date(), end_date.date())
-                elif end_date.date() <= yesterday:
-                    # Requesting up to yesterday - fetch if not cached
-                    fetch_start_after = datetime.combine(latest_cached_date, datetime.min.time()) + timedelta(days=1)
-                    ranges_to_fetch.append((fetch_start_after, end_date))
-                    logger.debug("Need data up to yesterday for %s: %s to %s", ticker, fetch_start_after.date(), end_date.date())
-                elif latest_cached_date >= yesterday:
-                    # Cache has yesterday's data, don't fetch today (market may not be closed)
-                    logger.debug("Cache has recent data for %s up to %s, skipping today", ticker, latest_cached_date)
-                else:
-                    # Cache is older than yesterday, fetch up to yesterday (not today)
-                    fetch_start_after = datetime.combine(latest_cached_date, datetime.min.time()) + timedelta(days=1)
-                    fetch_end_recent = datetime.combine(yesterday, datetime.max.time())
-                    ranges_to_fetch.append((fetch_start_after, fetch_end_recent))
-                    logger.debug("Need recent data for %s: %s to %s", ticker, fetch_start_after.date(), fetch_end_recent.date())
-            elif end_date.date() <= cutoff_date:
-                # Cache fully covers the historical range
-                logger.debug("Cache fully covers historical range for %s (%d days)", ticker, len(cached_prices))
-        else:
-            # No cache - fetch entire range
-            ranges_to_fetch.append((start_date, end_date))
-            logger.debug("No cache for %s, fetching full range", ticker)
-        
-        # If no ranges to fetch, return cached data
+
+        ranges_to_fetch = cls._determine_fetch_ranges(
+            cached_prices, start_date, end_date, yesterday,
+        )
+
         if not ranges_to_fetch:
             cls._store_in_historical_cache(cache_key, cached_prices)
             return cached_prices
 
-        # Fetch missing data from API for each range
         for fetch_start, fetch_end in ranges_to_fetch:
-            # Skip ranges where start date is past end date (can happen when
-            # per-ticker start dates have time-of-day components that shift
-            # the start past a midnight-based end boundary).
-            if fetch_start.date() > fetch_end.date():
-                continue
-            try:
-                # Normalize to midnight UTC boundaries — Yahoo API uses
-                # calendar-day resolution and requires period1 < period2.
-                # period2 is set to the day *after* fetch_end so the last
-                # requested day is included (period2 is exclusive).
-                period1 = int(datetime.combine(
-                    fetch_start.date(), datetime.min.time()
-                ).replace(tzinfo=timezone.utc).timestamp())
-                period2 = int(datetime.combine(
-                    fetch_end.date() + timedelta(days=1), datetime.min.time()
-                ).replace(tzinfo=timezone.utc).timestamp())
-
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-
-                params = {
-                    'period1': period1,
-                    'period2': period2,
-                    'interval': '1d'
-                }
-
-                with cls._yahoo_semaphore:
-                    response = requests.get(url, headers=headers, params=params, timeout=10)
-                response.raise_for_status()
-
-                data = response.json()
-
-                result = data.get('chart', {}).get('result', [])
-                if not result:
-                    continue
-
-                timestamps = result[0].get('timestamp', [])
-                quotes = result[0].get('indicators', {}).get('quote', [{}])[0]
-                closes = quotes.get('close', [])
-
-                new_prices = {}
-                for timestamp, close in zip(timestamps, closes):
-                    if close is not None:
-                        date_str = datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime('%Y-%m-%d')
-                        new_prices[date_str] = float(close)
-
-                # Save only historical data to persistent cache (today's data is still being traded)
-                if new_prices:
-                    historical_prices = {k: v for k, v in new_prices.items()
-                                        if datetime.strptime(k, '%Y-%m-%d').date() < today}
-                    if historical_prices:
-                        cls._save_historical_prices(ticker, historical_prices)
-                        logger.debug("Cached %d historical prices for %s", len(historical_prices), ticker)
-
-                cached_prices.update(new_prices)
-
-            except requests.exceptions.HTTPError as e:
-                # 400/404 are expected for delisted or pre-IPO tickers — log
-                # concisely without a traceback so production logs stay clean.
-                status = e.response.status_code if e.response is not None else None
-                if status in (400, 404):
-                    logger.warning(
-                        "No Yahoo data for %s (%s to %s): HTTP %s",
-                        ticker, fetch_start.date(), fetch_end.date(), status,
-                    )
-                else:
-                    logger.error(
-                        "Error fetching historical prices for %s (%s to %s): %s",
-                        ticker, fetch_start.date(), fetch_end.date(), e, exc_info=True,
-                    )
-            except Exception as e:
-                logger.error("Error fetching historical prices for %s (%s to %s): %s", ticker, fetch_start.date(), fetch_end.date(), e, exc_info=True)
+            new_prices = cls._fetch_single_range(ticker, fetch_start, fetch_end, today)
+            cached_prices.update(new_prices)
 
         cls._store_in_historical_cache(cache_key, cached_prices)
         return cached_prices

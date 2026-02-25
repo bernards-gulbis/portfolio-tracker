@@ -132,10 +132,10 @@ export const PerformanceChart = ({
     // visible point. Backend returns return % from portfolio inception; we convert:
     // rebased = ((1 + pct/100) / (1 + basePct/100) - 1) * 100
     const firstReturn = filtered.find((p) => p.return_pct != null)?.return_pct;
-    const baseReturnFactor = firstReturn != null ? 1 + firstReturn / 100 : null;
+    const baseReturnFactor = firstReturn == null ? null : 1 + firstReturn / 100;
 
     const firstSp500 = filtered.find((p) => p.sp500_return_pct != null)?.sp500_return_pct;
-    const baseSp500Factor = firstSp500 != null ? 1 + firstSp500 / 100 : null;
+    const baseSp500Factor = firstSp500 == null ? null : 1 + firstSp500 / 100;
 
     return filtered.map((point) => {
       let returnRebased: number | null = null;
@@ -262,12 +262,14 @@ export const PerformanceChart = ({
                     })
                   }
                   formatter={(value, name, item) => {
-                    const formatted =
-                      value == null
-                        ? t('common.notAvailable')
-                        : name === 'returnPct' || name === 'sp500ReturnPct'
-                          ? `${(value as number).toFixed(2)}%`
-                          : formatCurrency(value as number, 'EUR', locale);
+                    let formatted: string;
+                    if (value == null) {
+                      formatted = t('common.notAvailable');
+                    } else if (name === 'returnPct' || name === 'sp500ReturnPct') {
+                      formatted = `${(value as number).toFixed(2)}%`;
+                    } else {
+                      formatted = formatCurrency(value as number, 'EUR', locale);
+                    }
                     return (
                       <>
                         <div

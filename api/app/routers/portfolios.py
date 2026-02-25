@@ -111,9 +111,9 @@ def get_portfolio_performance(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
-    start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
-    end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
-    num_points: int = Query(60, ge=2, le=365, description="Number of data points to return"),
+    start_date: Annotated[Optional[str], Query(description="Start date in YYYY-MM-DD format")] = None,
+    end_date: Annotated[Optional[str], Query(description="End date in YYYY-MM-DD format")] = None,
+    num_points: Annotated[int, Query(ge=2, le=365, description="Number of data points to return")] = 60,
 ):
     """
     Get portfolio performance over time.

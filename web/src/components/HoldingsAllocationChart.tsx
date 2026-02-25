@@ -7,6 +7,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
+import type { ViewBox } from 'recharts/types/util/types';
 import { Holding } from '../api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +23,42 @@ interface HoldingsAllocationChartProps {
   cash: number;
   loading?: boolean;
 }
+
+interface PieCenterLabelProps {
+  viewBox?: ViewBox;
+  total: number;
+  locale: string;
+  label: string;
+}
+
+const PieCenterLabel = ({ viewBox, total, locale, label }: PieCenterLabelProps) => {
+  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+    return (
+      <text
+        x={viewBox.cx}
+        y={viewBox.cy}
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        <tspan
+          x={viewBox.cx}
+          y={(viewBox.cy || 0) - 10}
+          className="fill-foreground text-base font-bold"
+        >
+          {formatCurrency(total, 'USD', locale)}
+        </tspan>
+        <tspan
+          x={viewBox.cx}
+          y={(viewBox.cy || 0) + 14}
+          className="fill-muted-foreground text-xs"
+        >
+          {label}
+        </tspan>
+      </text>
+    );
+  }
+  return null;
+};
 
 const COLORS = [
   '#4f6ef7',
@@ -131,33 +168,14 @@ export const HoldingsAllocationChart = ({
               stroke="var(--card)"
             >
               <Label
-                content={({ viewBox }) => {
-                  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                    return (
-                      <text
-                        x={viewBox.cx}
-                        y={viewBox.cy}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                      >
-                        <tspan
-                          x={viewBox.cx}
-                          y={(viewBox.cy || 0) - 10}
-                          className="fill-foreground text-base font-bold"
-                        >
-                          {formatCurrency(total, 'USD', locale)}
-                        </tspan>
-                        <tspan
-                          x={viewBox.cx}
-                          y={(viewBox.cy || 0) + 14}
-                          className="fill-muted-foreground text-xs"
-                        >
-                          {t('chart.allocation.marketValue')}
-                        </tspan>
-                      </text>
-                    );
-                  }
-                }}
+                content={(props) => (
+                  <PieCenterLabel
+                    viewBox={props.viewBox}
+                    total={total}
+                    locale={locale}
+                    label={t('chart.allocation.marketValue')}
+                  />
+                )}
               />
             </Pie>
           </PieChart>

@@ -174,4 +174,38 @@ describe('PortfolioStatusView', () => {
 
     expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0);
   });
+
+  it('renders dashes for null monetary values', () => {
+    const nullStatus: PortfolioStatus = {
+      ...mockStatus,
+      current_value_eur: null,
+      dividends_eur: null,
+      tax_eur: null,
+      current_value_after_tax_eur: null,
+      holdings: [
+        {
+          ticker: 'AAPL',
+          quantity: 10,
+          average_cost: 150,
+          total_cost: 1500,
+          current_price: null,
+          current_value: null,
+          unrealized_gain_loss: null,
+          unrealized_gain_loss_pct: null,
+        },
+      ],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: nullStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    // All null monetary values should render as '-'
+    const dashes = screen.getAllByText('-');
+    expect(dashes.length).toBeGreaterThan(0);
+  });
 });

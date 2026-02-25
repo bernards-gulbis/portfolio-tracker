@@ -19,6 +19,16 @@ from app.core.exceptions import (
 )
 
 
+def _csv_field(value):
+    """Convert None to empty string for CSV export."""
+    return value if value is not None else ''
+
+
+def _coalesce(new, existing):
+    """Return *new* if provided (not None), otherwise keep *existing*."""
+    return new if new is not None else existing
+
+
 class TransactionService:
     """Service for transaction business logic"""
 
@@ -134,14 +144,14 @@ class TransactionService:
                 transaction.date.strftime('%m/%d/%Y %H:%M:%S'),
                 transaction.type.value,
                 transaction.ticker or '',
-                transaction.quantity if transaction.quantity is not None else '',
-                transaction.price_per_share if transaction.price_per_share is not None else '',
-                transaction.fee if transaction.fee is not None else '',
+                _csv_field(transaction.quantity),
+                _csv_field(transaction.price_per_share),
+                _csv_field(transaction.fee),
                 transaction.total_amount,
-                transaction.eur_amount if transaction.eur_amount is not None else '',
-                transaction.split_ratio if transaction.split_ratio is not None else '',
-                transaction.currency if transaction.currency is not None else '',
-                transaction.fx_rate if transaction.fx_rate is not None else '',
+                _csv_field(transaction.eur_amount),
+                _csv_field(transaction.split_ratio),
+                _csv_field(transaction.currency),
+                _csv_field(transaction.fx_rate),
             ])
 
         return output.getvalue()
@@ -167,13 +177,13 @@ class TransactionService:
         if not transaction:
             raise TransactionNotFoundException(transaction_id)
 
-        val_type = transaction_type if transaction_type is not None else transaction.type
-        val_ticker = ticker if ticker is not None else transaction.ticker
-        val_quantity = quantity if quantity is not None else transaction.quantity
-        val_price_per_share = price_per_share if price_per_share is not None else transaction.price_per_share
-        val_total_amount = total_amount if total_amount is not None else transaction.total_amount
-        val_fee = fee if fee is not None else transaction.fee
-        val_eur_amount = eur_amount if eur_amount is not None else transaction.eur_amount
+        val_type = _coalesce(transaction_type, transaction.type)
+        val_ticker = _coalesce(ticker, transaction.ticker)
+        val_quantity = _coalesce(quantity, transaction.quantity)
+        val_price_per_share = _coalesce(price_per_share, transaction.price_per_share)
+        val_total_amount = _coalesce(total_amount, transaction.total_amount)
+        val_fee = _coalesce(fee, transaction.fee)
+        val_eur_amount = _coalesce(eur_amount, transaction.eur_amount)
 
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
@@ -194,28 +204,15 @@ class TransactionService:
             val_fee
         )
 
-        if date is not None:
-            transaction.date = date
-        if transaction_type is not None:
-            transaction.type = transaction_type
-        if ticker is not None:
-            transaction.ticker = ticker
-        if quantity is not None:
-            transaction.quantity = quantity
-        if price_per_share is not None:
-            transaction.price_per_share = price_per_share
-        if fee is not None:
-            transaction.fee = fee
-        if total_amount is not None:
-            transaction.total_amount = total_amount
-        if eur_amount is not None:
-            transaction.eur_amount = eur_amount
-        if split_ratio is not None:
-            transaction.split_ratio = split_ratio
-        if currency is not None:
-            transaction.currency = currency
-        if fx_rate is not None:
-            transaction.fx_rate = fx_rate
+        provided = {
+            'date': date, 'type': transaction_type, 'ticker': ticker,
+            'quantity': quantity, 'price_per_share': price_per_share,
+            'fee': fee, 'total_amount': total_amount, 'eur_amount': eur_amount,
+            'split_ratio': split_ratio, 'currency': currency, 'fx_rate': fx_rate,
+        }
+        for field, value in provided.items():
+            if value is not None:
+                setattr(transaction, field, value)
 
         return self.transaction_repo.update(transaction)
 
@@ -254,28 +251,7 @@ class TransactionService:
             raise InvalidTransactionDataException("Fee must be positive")
 
         if transaction_type in (TransactionType.BUY, TransactionType.SELL):
-            if not ticker:
-                raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require a ticker symbol"
-                )
-            if quantity is None:
-                raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require quantity"
-                )
-            if price_per_share is None:
-                raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require a price"
-                )
-
-            if transaction_type == TransactionType.BUY:
-                expected_value = -(quantity * price_per_share + (fee or 0))
-            else:
-                expected_value = quantity * price_per_share - (fee or 0)
-
-            if abs(total_amount - expected_value) > abs(expected_value) * 0.01:
-                raise InvalidTransactionDataException(
-                    f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share {'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {total_amount}"
-                )
+            self._validate_buy_sell(transaction_type, ticker, quantity, price_per_share, total_amount, fee)
 
         elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):
             if ticker or quantity is not None or price_per_share is not None:
@@ -283,17 +259,45 @@ class TransactionService:
                     f"{transaction_type.value} transactions should not have ticker, quantity, or price"
                 )
 
-        elif transaction_type == TransactionType.SPLIT:
+        elif transaction_type in (TransactionType.SPLIT, TransactionType.DIVIDEND):
             if not ticker:
                 raise InvalidTransactionDataException(
-                    "Split transactions require a ticker symbol"
+                    f"{transaction_type.value} transactions require a ticker symbol"
                 )
 
-        elif transaction_type == TransactionType.DIVIDEND:
-            if not ticker:
-                raise InvalidTransactionDataException(
-                    "Dividend transactions require a ticker symbol"
-                )
+    @staticmethod
+    def _validate_buy_sell(
+        transaction_type: TransactionType,
+        ticker: Optional[str],
+        quantity: Optional[float],
+        price_per_share: Optional[float],
+        total_amount: float,
+        fee: Optional[float],
+    ) -> None:
+        """Validate fields specific to BUY/SELL transactions."""
+        if not ticker:
+            raise InvalidTransactionDataException(
+                f"{transaction_type.value} transactions require a ticker symbol"
+            )
+        if quantity is None:
+            raise InvalidTransactionDataException(
+                f"{transaction_type.value} transactions require quantity"
+            )
+        if price_per_share is None:
+            raise InvalidTransactionDataException(
+                f"{transaction_type.value} transactions require a price"
+            )
+
+        if transaction_type == TransactionType.BUY:
+            expected_value = -(quantity * price_per_share + (fee or 0))
+        else:
+            expected_value = quantity * price_per_share - (fee or 0)
+
+        if abs(total_amount - expected_value) > abs(expected_value) * 0.01:
+            raise InvalidTransactionDataException(
+                f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share "
+                f"{'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {total_amount}"
+            )
 
     def _parse_csv(self, csv_content: str, portfolio_id: int) -> List[Transaction]:
         """Parse CSV content and create Transaction objects"""
@@ -350,21 +354,10 @@ class TransactionService:
         if total_amount is None:
             raise ValueError(f"Invalid total_amount: {total_amount_str}")
 
-        if transaction_type in [TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE]:
-            if total_amount > 0:
-                raise ValueError(f"{transaction_type.value} transactions must have negative total_amount in CSV, got {total_amount}")
-        elif transaction_type in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]:
-            if total_amount < 0:
-                raise ValueError(f"{transaction_type.value} transactions must have positive total_amount in CSV, got {total_amount}")
-        elif transaction_type == TransactionType.SPLIT:
-            if total_amount != 0:
-                raise ValueError(f"SPLIT transactions must have total_amount of 0 in CSV, got {total_amount}")
+        self._validate_csv_total_amount_sign(transaction_type, total_amount)
 
         eur_amount = self._clean_csv_number(row.get("eur", ""), "eur")
-        if eur_amount is not None:
-            if transaction_type != TransactionType.SPLIT:
-                if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
-                    raise ValueError(f"EUR amount sign must match total_amount sign: total_amount={total_amount}, eur_amount={eur_amount}")
+        self._validate_csv_eur_sign(transaction_type, total_amount, eur_amount)
 
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
 
@@ -391,6 +384,37 @@ class TransactionService:
             currency=currency,
             fx_rate=fx_rate,
         )
+
+    @staticmethod
+    def _validate_csv_total_amount_sign(
+        transaction_type: TransactionType, total_amount: float
+    ) -> None:
+        """Raise if total_amount has the wrong sign for the transaction type."""
+        negative_types = {TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE}
+        positive_types = {TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND}
+
+        if transaction_type in negative_types and total_amount > 0:
+            raise ValueError(
+                f"{transaction_type.value} transactions must have a negative total_amount"
+            )
+        if transaction_type in positive_types and total_amount < 0:
+            raise ValueError(
+                f"{transaction_type.value} transactions must have a positive total_amount"
+            )
+        if transaction_type == TransactionType.SPLIT and total_amount != 0:
+            raise ValueError("SPLIT transactions must have total_amount of 0")
+
+    @staticmethod
+    def _validate_csv_eur_sign(
+        transaction_type: TransactionType, total_amount: float, eur_amount: Optional[float]
+    ) -> None:
+        """Raise if eur_amount sign doesn't match total_amount sign."""
+        if eur_amount is None:
+            return
+        if transaction_type == TransactionType.SPLIT:
+            return
+        if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
+            raise ValueError("eur_amount sign must match total_amount sign")
 
     @staticmethod
     def _clean_csv_number(value: str, field_name: str = "field") -> Optional[float]:

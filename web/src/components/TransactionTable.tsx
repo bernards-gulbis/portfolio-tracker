@@ -172,10 +172,32 @@ const TransactionTable = ({
     return pages;
   };
 
+  const getTransactionDetails = (transaction: Transaction): string => {
+    if (transaction.type === TransactionType.SPLIT && transaction.split_ratio != null) {
+      return t('transaction.table.columns.splitFormat', { ratio: transaction.split_ratio });
+    }
+    if (transaction.quantity != null && transaction.price_per_share != null) {
+      return t('transaction.table.columns.detailsFormat', {
+        qty: Number.parseFloat(transaction.quantity.toFixed(8)),
+        price: formatCurrency(transaction.price_per_share, 'USD', locale),
+      });
+    }
+    return '-';
+  };
+
   const hasActiveFilters = tickerSearch !== '' || typeFilter.length > 0;
 
   const startIndex = (responsePage - 1) * responsePageSize;
   const endIndex = Math.min(startIndex + (transactions.length || 0), total);
+
+  let typeFilterLabel: string;
+  if (typeFilter.length === 0) {
+    typeFilterLabel = t('transaction.table.filters.typeAll');
+  } else if (typeFilter.length === 1) {
+    typeFilterLabel = transactionTypeLabels[typeFilter[0] as TransactionType];
+  } else {
+    typeFilterLabel = t('transaction.table.filters.typeCount', { count: typeFilter.length });
+  }
 
   const filterBar = (
     <div className="flex items-center gap-3 mb-3">
@@ -194,11 +216,7 @@ const TransactionTable = ({
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="min-w-[160px] justify-start gap-2">
             <FilterIcon className="h-4 w-4 text-muted-foreground" />
-            {typeFilter.length === 0
-              ? t('transaction.table.filters.typeAll')
-              : typeFilter.length === 1
-                ? transactionTypeLabels[typeFilter[0] as TransactionType]
-                : t('transaction.table.filters.typeCount', { count: typeFilter.length })}
+            {typeFilterLabel}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
@@ -298,14 +316,7 @@ const TransactionTable = ({
                 </TableCell>
                 <TableCell>{transaction.ticker || '-'}</TableCell>
                 <TableCell>
-                  {transaction.type === TransactionType.SPLIT && transaction.split_ratio != null
-                    ? t('transaction.table.columns.splitFormat', { ratio: transaction.split_ratio })
-                    : transaction.quantity != null && transaction.price_per_share != null
-                      ? t('transaction.table.columns.detailsFormat', {
-                          qty: parseFloat(transaction.quantity.toFixed(8)),
-                          price: formatCurrency(transaction.price_per_share, 'USD', locale),
-                        })
-                      : '-'}
+                  {getTransactionDetails(transaction)}
                 </TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(transaction.total_amount, 'USD', locale)}

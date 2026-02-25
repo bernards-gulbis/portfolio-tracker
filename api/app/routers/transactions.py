@@ -1,5 +1,5 @@
 """Transaction API routes"""
-from fastapi import APIRouter, Depends, UploadFile, File, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 from typing import Annotated, List, Optional
@@ -53,11 +53,11 @@ def list_transactions(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
-    page: int = Query(default=1, ge=1, description="Page number"),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
-    ticker: Optional[str] = Query(default=None, description="Filter by ticker (partial, case-insensitive)"),
-    type: Optional[List[str]] = Query(default=None, description="Filter by transaction type(s)"),
-    sort_order: str = Query(default="desc", pattern="^(asc|desc)$", description="Sort by date: asc or desc"),
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
+    ticker: Annotated[Optional[str], Query(description="Filter by ticker (partial, case-insensitive)")] = None,
+    type: Annotated[Optional[List[str]], Query(description="Filter by transaction type(s)")] = None,
+    sort_order: Annotated[str, Query(pattern="^(asc|desc)$", description="Sort by date: asc or desc")] = "desc",
 ):
     """Get paginated transactions for a specific portfolio"""
     service = TransactionService(session)
@@ -102,7 +102,7 @@ async def import_transactions_csv(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
 ):
     """
     Import a CSV file to bulk import transactions.

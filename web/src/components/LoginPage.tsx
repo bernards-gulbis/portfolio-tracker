@@ -18,7 +18,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 
-const emailValidator = z.string().email();
+const emailValidator = z.email();
 
 const loginSchema = z.object({
   email: z.string().superRefine((val, ctx) => {
@@ -77,7 +77,7 @@ export function LoginPage() {
     const raw = getErrorMessage(err);
     const key = `auth.apiErrors.${raw}` as const;
     const translated = t(key as never);
-    return String(translated) !== key ? String(translated) : raw;
+    return String(translated) === key ? raw : String(translated);
   };
 
   const handleLogin = async (values: LoginValues) => {
