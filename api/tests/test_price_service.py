@@ -32,7 +32,7 @@ class TestPriceService:
         with patch('app.services.price_service.requests.get', return_value=mock_response):
             price = PriceService.get_current_price('AAPL')
             
-        assert price == 150.25
+        assert price == pytest.approx(150.25)
     
     def test_get_current_price_missing_data(self):
         """Test price fetch when API returns incomplete data"""
@@ -138,7 +138,7 @@ class TestPriceService:
         with patch.object(PriceService, 'get_current_price', side_effect=mock_get_current_price):
             prices = PriceService.get_current_prices(['AAPL', 'INVALID', 'NOTFOUND'])
         
-        assert prices['AAPL'] == 150.25
+        assert prices['AAPL'] == pytest.approx(150.25)
         assert prices['INVALID'] is None
         assert prices['NOTFOUND'] is None
     
@@ -167,8 +167,8 @@ class TestPriceService:
             prices = PriceService.get_current_prices(['AAPL', 'GOOGL'], max_workers=2)
         
         assert len(prices) == 2
-        assert prices['AAPL'] == 100.0
-        assert prices['GOOGL'] == 100.0
+        assert prices['AAPL'] == pytest.approx(100.0)
+        assert prices['GOOGL'] == pytest.approx(100.0)
     
     def test_get_current_price_api_request_format(self):
         """Test that API request is formatted correctly"""

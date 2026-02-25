@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import CopyPortfolioModal from '../components/CopyPortfolioModal';
 
 vi.mock('../hooks/usePortfolios', () => ({
@@ -29,7 +30,9 @@ const renderModal = (props = defaultProps) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <CopyPortfolioModal {...props} />
+      <MemoryRouter>
+        <CopyPortfolioModal {...props} />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 };
@@ -84,6 +87,21 @@ describe('CopyPortfolioModal', () => {
 
     const input = screen.getByLabelText('New Portfolio Name');
     await userEvent.clear(input);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy Portfolio' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Portfolio name is required')).toBeInTheDocument();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows validation error for whitespace-only name', async () => {
+    renderModal();
+
+    const input = screen.getByLabelText('New Portfolio Name');
+    await userEvent.clear(input);
+    await userEvent.type(input, '   ');
 
     await userEvent.click(screen.getByRole('button', { name: 'Copy Portfolio' }));
 

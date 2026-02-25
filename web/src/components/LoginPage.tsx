@@ -23,12 +23,12 @@ const emailValidator = z.string().email();
 const loginSchema = z.object({
   email: z.string().superRefine((val, ctx) => {
     if (!emailValidator.safeParse(val).success) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.invalidEmail') });
     }
   }),
   password: z.string().superRefine((val, ctx) => {
     if (val.length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.passwordRequired') });
     }
   }),
 });
@@ -36,17 +36,17 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().superRefine((val, ctx) => {
     if (val.trim().length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.nameRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.nameRequired') });
     }
   }),
   email: z.string().superRefine((val, ctx) => {
     if (!emailValidator.safeParse(val).success) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.invalidEmail') });
     }
   }),
   password: z.string().superRefine((val, ctx) => {
     if (val.length < 8) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordMinLength') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.passwordMinLength') });
     }
   }),
 });
@@ -73,11 +73,18 @@ export function LoginPage() {
     defaultValues: { name: '', email: '', password: '' },
   });
 
+  const translateApiError = (err: unknown): string => {
+    const raw = getErrorMessage(err);
+    const key = `auth.apiErrors.${raw}` as const;
+    const translated = t(key as never);
+    return String(translated) !== key ? String(translated) : raw;
+  };
+
   const handleLogin = async (values: LoginValues) => {
     try {
       await loginMutation.mutateAsync({ username: values.email, password: values.password });
     } catch (err) {
-      loginForm.setError('root', { message: getErrorMessage(err) });
+      loginForm.setError('root', { message: translateApiError(err) });
     }
   };
 
@@ -88,7 +95,7 @@ export function LoginPage() {
       loginForm.reset({ email: values.email, password: '' });
       setMode('login');
     } catch (err) {
-      registerForm.setError('root', { message: getErrorMessage(err) });
+      registerForm.setError('root', { message: translateApiError(err) });
     }
   };
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import CreatePortfolioModal from '../components/CreatePortfolioModal';
 
 // Mock the hook
@@ -23,7 +24,9 @@ const renderModal = (props: { isOpen: boolean; onClose: () => void }) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <CreatePortfolioModal {...props} />
+      <MemoryRouter>
+        <CreatePortfolioModal {...props} />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 };
@@ -68,6 +71,20 @@ describe('CreatePortfolioModal', () => {
 
   it('shows validation error for empty name', async () => {
     renderModal({ isOpen: true, onClose: mockOnClose });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create Portfolio' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Portfolio name is required')).toBeInTheDocument();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows validation error for whitespace-only name', async () => {
+    renderModal({ isOpen: true, onClose: mockOnClose });
+
+    const input = screen.getByLabelText('Portfolio Name');
+    await userEvent.type(input, '   ');
 
     await userEvent.click(screen.getByRole('button', { name: 'Create Portfolio' }));
 

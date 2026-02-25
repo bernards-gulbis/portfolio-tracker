@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
-import { usePortfolioContext } from '../context/PortfolioContext';
+import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
+import { useNavigate } from 'react-router-dom';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage } from '../api';
@@ -51,10 +52,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
-interface PortfolioStatusProps {
-  portfolioId: number | null;
-}
-
 const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
   if (value == null) return '-';
   const sign = value > 0 ? '+' : '';
@@ -90,21 +87,22 @@ const formatCurrencyWithPercent = (
   );
 };
 
-export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
+export const PortfolioStatusView = () => {
+  const portfolioId = useActivePortfolioId();
   const { t } = useTranslation();
   const locale = useLocale();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-  const { setActivePortfolioId } = usePortfolioContext();
+  const navigate = useNavigate();
   const deletePortfolio = useDeletePortfolio();
 
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
-  // Fetch full history once status is loaded — period filtering happens client-side in PerformanceChart
+  // Fetch full history — period filtering happens client-side in PerformanceChart
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
-    status ? portfolioId : null,
+    portfolioId,
     undefined,
     undefined,
     365
@@ -114,7 +112,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
     if (portfolioId == null) return;
     try {
       await deletePortfolio.mutateAsync(portfolioId);
-      setActivePortfolioId(null);
+      navigate('/', { replace: true });
     } catch (err) {
       toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(err) }));
     } finally {
@@ -291,7 +289,7 @@ export const PortfolioStatusView = ({ portfolioId }: PortfolioStatusProps) => {
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(status.capital_gains_tax_rate * 100) })}</p>
                 <p className="text-lg font-semibold">
                   {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR', locale) : '-'}
                 </p>

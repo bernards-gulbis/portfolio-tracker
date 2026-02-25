@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import PortfolioList from '../components/PortfolioList';
+import { MemoryRouter } from 'react-router-dom';
+import PortfolioSwitcher from '../components/PortfolioSwitcher';
 import type { Portfolio } from '../api';
 import { SidebarProvider } from '../components/ui/sidebar';
 
@@ -13,12 +14,7 @@ vi.mock('../hooks/usePortfolios', () => ({
   useCopyPortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('../context/PortfolioContext', () => ({
-  usePortfolioContext: vi.fn(),
-}));
-
 import { usePortfolios } from '../hooks/usePortfolios';
-import { usePortfolioContext } from '../context/PortfolioContext';
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -28,13 +24,17 @@ const createTestQueryClient = () =>
     },
   });
 
-const renderComponent = () => {
+const mockOnCreateClick = vi.fn();
+
+const renderComponent = (activePortfolioId: number | null = null) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <PortfolioList />
-      </SidebarProvider>
+      <MemoryRouter>
+        <SidebarProvider>
+          <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
+        </SidebarProvider>
+      </MemoryRouter>
     </QueryClientProvider>
   );
 };
@@ -44,18 +44,12 @@ const mockPortfolios: Portfolio[] = [
   { id: 2, name: 'Dividend Portfolio', created_at: '2024-02-01T00:00:00' },
 ];
 
-describe('PortfolioList', () => {
-  const mockSetActivePortfolioId = vi.fn();
-
+describe('PortfolioSwitcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(usePortfolioContext).mockReturnValue({
-      activePortfolioId: null,
-      setActivePortfolioId: mockSetActivePortfolioId,
-    });
   });
 
-  it('shows skeleton rows while loading', () => {
+  it('shows skeleton while loading', () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -68,7 +62,47 @@ describe('PortfolioList', () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it('shows error message on failure', () => {
+  it('shows "Portfolios" when no portfolio is active', () => {
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: mockPortfolios,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderComponent();
+
+    expect(screen.getByText('Portfolios')).toBeInTheDocument();
+  });
+
+  it('shows active portfolio name when activePortfolioId is set', () => {
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: mockPortfolios,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderComponent(2);
+
+    expect(screen.getByText('Dividend Portfolio')).toBeInTheDocument();
+  });
+
+  it('shows portfolio list in dropdown when clicked', async () => {
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: mockPortfolios,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderComponent();
+
+    const trigger = screen.getByRole('button');
+    await userEvent.click(trigger);
+
+    expect(screen.getByText('Growth Fund')).toBeInTheDocument();
+    expect(screen.getByText('Dividend Portfolio')).toBeInTheDocument();
+  });
+
+  it('shows error message when portfolios fail to load', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -77,10 +111,13 @@ describe('PortfolioList', () => {
 
     renderComponent();
 
+    const trigger = screen.getByRole('button');
+    await userEvent.click(trigger);
+
     expect(screen.getByText(/Error loading portfolios/)).toBeInTheDocument();
   });
 
-  it('shows "New Portfolio" sub-button when portfolios list is empty', () => {
+  it('shows empty state when no portfolios exist', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: [],
       isLoading: false,
@@ -88,11 +125,29 @@ describe('PortfolioList', () => {
     } as unknown as ReturnType<typeof usePortfolios>);
 
     renderComponent();
+
+    const trigger = screen.getByRole('button');
+    await userEvent.click(trigger);
+
+    expect(screen.getByText('Get started by creating your first portfolio.')).toBeInTheDocument();
+  });
+
+  it('shows "New Portfolio" button in dropdown', async () => {
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: mockPortfolios,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderComponent();
+
+    const trigger = screen.getByRole('button');
+    await userEvent.click(trigger);
 
     expect(screen.getByText('New Portfolio')).toBeInTheDocument();
   });
 
-  it('renders portfolio names in the list', () => {
+  it('calls onCreateClick when "New Portfolio" is clicked', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -101,11 +156,16 @@ describe('PortfolioList', () => {
 
     renderComponent();
 
-    expect(screen.getByText('Growth Fund')).toBeInTheDocument();
-    expect(screen.getByText('Dividend Portfolio')).toBeInTheDocument();
+    const trigger = screen.getByRole('button');
+    await userEvent.click(trigger);
+
+    const newButton = screen.getByText('New Portfolio');
+    await userEvent.click(newButton);
+
+    expect(mockOnCreateClick).toHaveBeenCalledOnce();
   });
 
-  it('clicking add button opens CreatePortfolioModal', async () => {
+  it('portfolio items are links to /portfolios/:id', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -114,57 +174,13 @@ describe('PortfolioList', () => {
 
     renderComponent();
 
-    await userEvent.click(screen.getByRole('button', { name: /New/i }));
+    const trigger = screen.getByRole('button');
+    await userEvent.click(trigger);
 
-    await waitFor(() => {
-      expect(screen.getByText('Create New Portfolio')).toBeInTheDocument();
-    });
-  });
+    const growthLink = screen.getByText('Growth Fund').closest('a');
+    expect(growthLink).toHaveAttribute('href', '/portfolios/1');
 
-  it('clicking a portfolio sub-item calls setActivePortfolioId', async () => {
-    vi.mocked(usePortfolios).mockReturnValue({
-      data: mockPortfolios,
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolios>);
-
-    renderComponent();
-
-    await userEvent.click(screen.getByText('Growth Fund'));
-
-    expect(mockSetActivePortfolioId).toHaveBeenCalledWith(1);
-  });
-
-  it('highlights the active portfolio', () => {
-    vi.mocked(usePortfolioContext).mockReturnValue({
-      activePortfolioId: 2,
-      setActivePortfolioId: mockSetActivePortfolioId,
-    });
-    vi.mocked(usePortfolios).mockReturnValue({
-      data: mockPortfolios,
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolios>);
-
-    renderComponent();
-
-    const activeItem = screen.getByText('Dividend Portfolio').closest('[data-active]');
-    expect(activeItem).toHaveAttribute('data-active', 'true');
-  });
-
-  it('clicking "New Portfolio" in empty state opens CreatePortfolioModal', async () => {
-    vi.mocked(usePortfolios).mockReturnValue({
-      data: [],
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolios>);
-
-    renderComponent();
-
-    await userEvent.click(screen.getByText('New Portfolio'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Create New Portfolio')).toBeInTheDocument();
-    });
+    const dividendLink = screen.getByText('Dividend Portfolio').closest('a');
+    expect(dividendLink).toHaveAttribute('href', '/portfolios/2');
   });
 });

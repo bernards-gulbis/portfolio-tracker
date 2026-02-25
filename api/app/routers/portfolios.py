@@ -1,7 +1,7 @@
 """Portfolio API routes"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from datetime import datetime
 
 from app.core import get_session
@@ -26,8 +26,8 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 @router.post("/", response_model=PortfolioResponse, status_code=201)
 def create_portfolio(
     portfolio: PortfolioCreate,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Create a new portfolio"""
     service = PortfolioService(session)
@@ -36,8 +36,8 @@ def create_portfolio(
 
 @router.get("/", response_model=List[PortfolioResponse])
 def list_portfolios(
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Get all portfolios"""
     service = PortfolioService(session)
@@ -47,25 +47,25 @@ def list_portfolios(
 @router.get("/{portfolio_id}", response_model=PortfolioWithTransactions)
 def get_portfolio(
     portfolio_id: int,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Get a specific portfolio with its transactions"""
     service = PortfolioService(session)
     return service.get_portfolio(portfolio_id, user.id)
 
 
-@router.get("/{portfolio_id}/status", response_model=PortfolioStatusResponse)
+@router.get("/{portfolio_id}/status", response_model=PortfolioStatusResponse, responses={400: {"description": "Invalid portfolio data"}})
 def get_portfolio_status(
     portfolio_id: int,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Get portfolio status with holdings, cash balance, and performance metrics"""
     PriceService.clear_session_cache()
     service = PortfolioService(session)
     try:
-        return service.calculate_portfolio_status(portfolio_id, user.id)
+        return service.calculate_portfolio_status(portfolio_id, user.id, tax_rate=user.tax_rate)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -74,8 +74,8 @@ def get_portfolio_status(
 def update_portfolio(
     portfolio_id: int,
     portfolio: PortfolioUpdate,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Update a portfolio"""
     service = PortfolioService(session)
@@ -86,8 +86,8 @@ def update_portfolio(
 def copy_portfolio(
     portfolio_id: int,
     copy_request: PortfolioCopy,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Copy a portfolio with all its transactions"""
     service = PortfolioService(session)
@@ -97,8 +97,8 @@ def copy_portfolio(
 @router.delete("/{portfolio_id}", status_code=204)
 def delete_portfolio(
     portfolio_id: int,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Delete a portfolio and all its transactions"""
     service = PortfolioService(session)
@@ -106,14 +106,14 @@ def delete_portfolio(
     return None
 
 
-@router.get("/{portfolio_id}/performance", response_model=PortfolioPerformanceResponse)
+@router.get("/{portfolio_id}/performance", response_model=PortfolioPerformanceResponse, responses={400: {"description": "Invalid date format or date range"}})
 def get_portfolio_performance(
     portfolio_id: int,
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
     start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
     end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
     num_points: int = Query(60, ge=2, le=365, description="Number of data points to return"),
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
 ):
     """
     Get portfolio performance over time.

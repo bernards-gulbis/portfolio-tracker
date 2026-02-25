@@ -2,7 +2,7 @@
 import os
 import uuid
 import logging
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import Depends
 from fastapi.responses import RedirectResponse
@@ -190,7 +190,7 @@ class SyncSQLAlchemyUserDatabase(BaseUserDatabase[User, uuid.UUID]):
 
 # ================== User Database Dependency ==================
 
-def get_user_db(session: Session = Depends(get_session)):
+def get_user_db(session: Annotated[Session, Depends(get_session)]):
     yield SyncSQLAlchemyUserDatabase(session)
 
 
@@ -276,7 +276,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         return user
 
 
-async def get_user_manager(user_db=Depends(get_user_db)):
+async def get_user_manager(user_db: Annotated[SyncSQLAlchemyUserDatabase, Depends(get_user_db)]):
     yield UserManager(user_db)
 
 

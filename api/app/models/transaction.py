@@ -1,4 +1,5 @@
 """Transaction database model"""
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
@@ -11,9 +12,13 @@ if TYPE_CHECKING:
 
 class Transaction(SQLModel, table=True):
     """Transaction model"""
+    __table_args__ = (
+        Index('ix_transaction_portfolio_date', 'portfolio_id', 'date'),
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolio.id", index=True, ondelete="CASCADE")
-    date: datetime = Field(index=True)  # Indexed for efficient sorting and filtering
+    date: datetime
     type: TransactionType
     ticker: Optional[str] = Field(default=None)
     quantity: Optional[float] = Field(default=None, decimal_places=8)

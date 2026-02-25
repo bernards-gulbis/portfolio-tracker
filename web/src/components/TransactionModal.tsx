@@ -49,10 +49,10 @@ import {
 const schema = z
   .object({
     date: z.string().superRefine((val, ctx) => {
-      if (val.length < 1) ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.validation.dateRequired') });
+      if (val.length < 1) ctx.addIssue({ code: "custom", message: i18n.t('transaction.validation.dateRequired') });
     }),
     time: z.string().superRefine((val, ctx) => {
-      if (val.length < 1) ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.validation.timeRequired') });
+      if (val.length < 1) ctx.addIssue({ code: "custom", message: i18n.t('transaction.validation.timeRequired') });
     }),
     type: z.nativeEnum(TransactionType),
     ticker: z.string().optional(),
@@ -77,7 +77,7 @@ const schema = z
     ) {
       if (!data.ticker?.trim()) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ['ticker'],
           message: i18n.t('transaction.validation.tickerRequired'),
         });
@@ -87,14 +87,14 @@ const schema = z
     if ([TransactionType.BUY, TransactionType.SELL].includes(type)) {
       if (!(parseFloat(data.quantity || '0') > 0)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ['quantity'],
           message: i18n.t('transaction.validation.quantityPositive'),
         });
       }
       if (!(parseFloat(data.pricePerShare || '0') > 0)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ['pricePerShare'],
           message: i18n.t('transaction.validation.pricePositive'),
         });
@@ -104,7 +104,7 @@ const schema = z
     if (type === TransactionType.SPLIT) {
       if (!(parseFloat(data.splitRatio || '0') > 0)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ['splitRatio'],
           message: i18n.t('transaction.validation.splitRatioPositive'),
         });
@@ -114,7 +114,7 @@ const schema = z
     if (type !== TransactionType.SPLIT) {
       if (!(parseFloat(data.totalAmount || '0') > 0)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ['totalAmount'],
           message: i18n.t('transaction.validation.totalAmountPositive'),
         });

@@ -137,6 +137,24 @@ describe('LoginPage', () => {
     );
   });
 
+  it('translates LOGIN_BAD_CREDENTIALS error code from backend', async () => {
+    const axiosError = {
+      isAxiosError: true,
+      response: { data: { detail: 'LOGIN_BAD_CREDENTIALS' } },
+    };
+    Object.setPrototypeOf(axiosError, Error.prototype);
+    mockLoginMutateAsync.mockRejectedValueOnce(axiosError);
+    renderPage();
+
+    await userEvent.type(screen.getByLabelText('Email'), 'user@example.com');
+    await userEvent.type(screen.getByLabelText('Password'), 'wrongpass');
+    await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Invalid email or password')).toBeInTheDocument()
+    );
+  });
+
   // ── Register form ───────────────────────────────────────────────
 
   it('calls register mutation with name, email and password', async () => {
@@ -220,6 +238,26 @@ describe('LoginPage', () => {
 
     await waitFor(() =>
       expect(screen.getByText('Email already registered')).toBeInTheDocument()
+    );
+  });
+
+  it('translates REGISTER_USER_ALREADY_EXISTS error code from backend', async () => {
+    const axiosError = {
+      isAxiosError: true,
+      response: { data: { detail: 'REGISTER_USER_ALREADY_EXISTS' } },
+    };
+    Object.setPrototypeOf(axiosError, Error.prototype);
+    mockRegisterMutateAsync.mockRejectedValueOnce(axiosError);
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Taken User');
+    await userEvent.type(screen.getByLabelText('Email'), 'taken@example.com');
+    await userEvent.type(screen.getByLabelText('Password'), 'password123');
+    await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('An account with this email already exists')).toBeInTheDocument()
     );
   });
 

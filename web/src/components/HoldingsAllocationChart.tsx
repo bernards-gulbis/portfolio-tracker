@@ -44,26 +44,6 @@ export const HoldingsAllocationChart = ({
   const { t } = useTranslation();
   const locale = useLocale();
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-4 w-20" />
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-center mb-3">
-            <Skeleton className="h-[240px] w-[240px] rounded-full" />
-          </div>
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-4 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const { chartData, total, chartConfig } = useMemo(() => {
     const data: Array<{ name: string; value: number; fill: string }> = [];
 
@@ -90,6 +70,26 @@ export const HoldingsAllocationChart = ({
 
     return { chartData: data, total, chartConfig: config };
   }, [holdings, cash]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-4 w-20" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center mb-3">
+            <Skeleton className="h-[240px] w-[240px] rounded-full" />
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-4 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (chartData.length === 0) {
     return (

@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from contextlib import asynccontextmanager
 
 from app.core import (
@@ -26,12 +26,13 @@ from app.core import (
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
 from app.core.database import engine, get_session
-from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL, current_active_user
-from app.schemas import UserRead, UserCreate, UserUpdate
+from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL, current_active_user, get_user_manager, UserManager
+from app.schemas import UserRead, UserCreate, UserUpdate, CloseAccountRequest
 from app.models.user import User
 from app.models.oauth_account import OAuthAccount
 from sqlmodel import Session, select
 from sqlalchemy import text
+from typing import Annotated
 from fastapi import Depends
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
 
@@ -152,24 +153,25 @@ app.include_router(transactions_router)
 app.include_router(transaction_router)
 
 # Auth routers
+AUTH_PREFIX = "/auth"
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
-    prefix="/auth/cookie",
+    prefix=f"{AUTH_PREFIX}/cookie",
     tags=["auth"],
 )
 app.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
-    prefix="/auth",
+    prefix=AUTH_PREFIX,
     tags=["auth"],
 )
 app.include_router(
     fastapi_users.get_reset_password_router(),
-    prefix="/auth",
+    prefix=AUTH_PREFIX,
     tags=["auth"],
 )
 app.include_router(
     fastapi_users.get_verify_router(UserRead),
-    prefix="/auth",
+    prefix=AUTH_PREFIX,
     tags=["auth"],
 )
 # Build the FastAPI Users users router, then replace its GET /me with our own
@@ -177,13 +179,16 @@ app.include_router(
 _users_router = fastapi_users.get_users_router(UserRead, UserUpdate)
 _users_router.routes = [
     r for r in _users_router.routes
-    if not (getattr(r, "path", None) == "/me" and "GET" in getattr(r, "methods", set()))
+    if not (
+        getattr(r, "path", None) == "/me"
+        and ({"GET", "DELETE"} & getattr(r, "methods", set()))
+    )
 ]
 
 @_users_router.get("/me", tags=["users"])
 def get_current_user_me(
-    user: User = Depends(current_active_user),
-    session: Session = Depends(get_session),
+    user: Annotated[User, Depends(current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
 ):
     providers = list(session.exec(
         select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
@@ -192,10 +197,46 @@ def get_current_user_me(
     user_data["oauth_providers"] = providers
     return user_data
 
-# The decorator appends GET /me to the end of the routes list. Move it to position 0
-# so it is checked before GET /{id}, which would otherwise match the literal string
-# "me" as a path parameter and return 403 (/{id} requires superuser).
-_users_router.routes.insert(0, _users_router.routes.pop())
+@_users_router.delete("/me", tags=["users"], status_code=204, responses={400: {"description": "Incorrect password or missing DELETE confirmation"}})
+async def delete_current_user(
+    body: CloseAccountRequest,
+    user: Annotated[User, Depends(current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    user_manager: Annotated[UserManager, Depends(get_user_manager)],
+):
+    """Permanently delete the current user and all associated data."""
+    # Determine which providers the user has
+    providers = list(session.exec(
+        select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
+    ).all())
+    has_oauth = len(providers) > 0
+
+    # Verify identity: password OR "DELETE" confirmation for OAuth-only users
+    if body.password:
+        verified, _ = user_manager.password_helper.verify_and_update(
+            body.password, user.hashed_password
+        )
+        if not verified:
+            raise HTTPException(status_code=400, detail="Incorrect password")
+    elif has_oauth and body.confirmation == "DELETE":
+        pass  # OAuth-only user confirmed with typed "DELETE"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Password or DELETE confirmation required",
+        )
+
+    await user_manager.delete(user)
+
+    response = Response(status_code=204)
+    response.delete_cookie("pt_auth")
+    return response
+
+# Move /me routes to the front so they are checked before GET /{id}, which would
+# otherwise match the literal string "me" as a path parameter and return 403.
+_me_routes = [r for r in _users_router.routes if getattr(r, "path", None) == "/me"]
+_other_routes = [r for r in _users_router.routes if getattr(r, "path", None) != "/me"]
+_users_router.routes = _me_routes + _other_routes
 
 app.include_router(_users_router, prefix="/users", tags=["users"])
 app.include_router(

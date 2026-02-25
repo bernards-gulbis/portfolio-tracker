@@ -35,6 +35,7 @@ const mockUser: UserRead = {
   name: null,
   picture: null,
   oauth_providers: [],
+  tax_rate: 0.255,
 };
 
 const createWrapper = () => {

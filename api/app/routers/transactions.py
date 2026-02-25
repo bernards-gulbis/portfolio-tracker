@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from io import BytesIO
 import math
 
@@ -26,8 +26,8 @@ router = APIRouter(prefix="/portfolios/{portfolio_id}", tags=["transactions"])
 def create_transaction(
     portfolio_id: int,
     transaction: TransactionCreate,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Create a new transaction for a portfolio"""
     service = TransactionService(session)
@@ -51,13 +51,13 @@ def create_transaction(
 @router.get("/transactions", response_model=PaginatedTransactionResponse)
 def list_transactions(
     portfolio_id: int,
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     ticker: Optional[str] = Query(default=None, description="Filter by ticker (partial, case-insensitive)"),
     type: Optional[List[str]] = Query(default=None, description="Filter by transaction type(s)"),
     sort_order: str = Query(default="desc", pattern="^(asc|desc)$", description="Sort by date: asc or desc"),
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
 ):
     """Get paginated transactions for a specific portfolio"""
     service = TransactionService(session)
@@ -79,8 +79,8 @@ def list_transactions(
 @router.get("/transactions/export")
 def export_transactions(
     portfolio_id: int,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Export all transactions for a portfolio as CSV"""
     service = TransactionService(session)
@@ -100,9 +100,9 @@ def export_transactions(
 @router.post("/transactions/import", response_model=BulkImportResponse, status_code=201)
 async def import_transactions_csv(
     portfolio_id: int,
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
     file: UploadFile = File(...),
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
 ):
     """
     Import a CSV file to bulk import transactions.
@@ -143,8 +143,8 @@ transaction_router = APIRouter(prefix="/transactions", tags=["transactions"])
 def update_transaction(
     transaction_id: int,
     transaction: TransactionUpdate,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Update a transaction"""
     service = TransactionService(session)
@@ -168,8 +168,8 @@ def update_transaction(
 @transaction_router.delete("/{transaction_id}", status_code=204)
 def delete_transaction(
     transaction_id: int,
-    session: Session = Depends(get_session),
-    user: User = Depends(current_active_user),
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
 ):
     """Delete a transaction"""
     service = TransactionService(session)

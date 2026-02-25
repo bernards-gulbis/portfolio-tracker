@@ -330,7 +330,7 @@ class TransactionService:
         """Parse a single CSV row into a Transaction object"""
         try:
             date = datetime.strptime(row["date"].strip(), "%m/%d/%Y %H:%M:%S")
-        except ValueError as e:
+        except ValueError:
             raise ValueError(f"Invalid date format: {row['date']}. Expected MM/DD/YYYY HH:MM:SS")
 
         try:

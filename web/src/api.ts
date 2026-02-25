@@ -21,11 +21,18 @@ export interface UserRead {
   name: string | null;
   picture: string | null;
   oauth_providers: string[];
+  tax_rate: number;
 }
 
 export interface UserUpdate {
   name?: string;
   password?: string;
+  tax_rate?: number;
+}
+
+export interface CloseAccountRequest {
+  password?: string;
+  confirmation?: string;
 }
 
 export interface LoginCredentials {
@@ -236,6 +243,10 @@ export const getGoogleAuthorizeUrl = async (): Promise<string> => {
 export const updateUser = async (data: UserUpdate): Promise<UserRead> => {
   const response = await api.patch<UserRead>('/users/me', data);
   return response.data;
+};
+
+export const closeAccount = async (data: CloseAccountRequest): Promise<void> => {
+  await api.delete('/users/me', { data });
 };
 
 // ================== Portfolio API Functions ==================

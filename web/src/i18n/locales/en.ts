@@ -4,6 +4,10 @@ const en = {
   },
   app: {
     title: 'Portfolio Tracker',
+    sidebar: {
+      general: 'General',
+      dashboard: 'Dashboard',
+    },
     header: {
       toggleTheme: 'Toggle theme',
       switchToDark: 'Switch to dark mode',
@@ -52,6 +56,12 @@ const en = {
       googleLoginFailed: 'Google login failed: {{error}}',
     },
     separator: 'or',
+    apiErrors: {
+      LOGIN_BAD_CREDENTIALS: 'Invalid email or password',
+      LOGIN_USER_NOT_VERIFIED: 'Please verify your email before signing in',
+      REGISTER_USER_ALREADY_EXISTS: 'An account with this email already exists',
+      REGISTER_INVALID_PASSWORD: 'Password does not meet requirements',
+    },
   },
   language: {
     en: 'English',
@@ -72,6 +82,7 @@ const en = {
     list: {
       title: 'Portfolios',
       newButton: 'New',
+      createButton: 'New Portfolio',
       empty: {
         title: 'No Portfolios Yet',
         description: 'Get started by creating your first portfolio.',
@@ -256,7 +267,7 @@ const en = {
     netInvestedTooltip: 'Deposits minus withdrawals. EUR conversion rate changes affect gains.',
     fx: 'FX',
     dividends: 'Dividends',
-    estTax: 'Est. Tax (25.5%)',
+    estTax: 'Est. Tax ({{rate}}%)',
     on: 'on',
     afterTaxValue: 'After-tax Value',
     positions: 'Positions',
@@ -288,6 +299,7 @@ const en = {
   settings: {
     menuItem: 'Settings',
     title: 'Settings',
+    description: 'Manage your account settings and preferences.',
     profile: {
       tab: 'Profile',
       nameLabel: 'Name',
@@ -305,15 +317,37 @@ const en = {
       cancel: 'Cancel',
       oauthNote: 'You signed in with Google. Setting a password will also enable email login.',
     },
+    account: {
+      tab: 'Account',
+      dangerZone: 'Danger Zone',
+      closeTitle: 'Close Account',
+      closeDescription: 'Permanently delete your account and all associated data (portfolios, transactions). This action cannot be undone.',
+      passwordLabel: 'Current password',
+      confirmationLabel: 'Type DELETE to confirm',
+      confirmationPlaceholder: 'DELETE',
+      submit: 'Close Account',
+    },
     validation: {
       nameRequired: 'Name is required',
       nameTooLong: 'Name must be at most 255 characters',
       passwordMinLength: 'Password must be at least 8 characters',
       passwordsDoNotMatch: 'Passwords do not match',
+      passwordRequired: 'Password is required',
+      confirmationRequired: 'Type DELETE to confirm',
+      taxRateMin: 'Tax rate must be at least 0%',
+      taxRateMax: 'Tax rate cannot exceed 100%',
+    },
+    tax: {
+      tab: 'Tax',
+      description: 'Configure the tax rate applied to capital gains calculations.',
+      rateLabel: 'Tax rate (%)',
+      submit: 'Save tax rate',
     },
     toasts: {
       profileUpdated: 'Profile updated',
       passwordChanged: 'Password changed',
+      accountClosed: 'Account closed',
+      taxRateUpdated: 'Tax rate updated',
     },
   },
 };

@@ -6,6 +6,10 @@ const lv: Translation = {
   },
   app: {
     title: 'Portfeļa izsekotājs',
+    sidebar: {
+      general: 'Vispārīgi',
+      dashboard: 'Panelis',
+    },
     header: {
       toggleTheme: 'Pārslēgt motīvu',
       switchToDark: 'Pārslēgties uz tumšo motīvu',
@@ -54,6 +58,12 @@ const lv: Translation = {
       googleLoginFailed: 'Google ierakstīšanās neizdevās: {{error}}',
     },
     separator: 'vai',
+    apiErrors: {
+      LOGIN_BAD_CREDENTIALS: 'Nepareizs e-pasts vai parole',
+      LOGIN_USER_NOT_VERIFIED: 'Lūdzu, apstipriniet savu e-pastu pirms ierakstīšanās',
+      REGISTER_USER_ALREADY_EXISTS: 'Konts ar šo e-pastu jau pastāv',
+      REGISTER_INVALID_PASSWORD: 'Parole neatbilst prasībām',
+    },
   },
   language: {
     en: 'English',
@@ -74,6 +84,7 @@ const lv: Translation = {
     list: {
       title: 'Portfeļi',
       newButton: 'Jauns',
+      createButton: 'Jauns portfelis',
       empty: {
         title: 'Vēl nav portfeļu',
         description: 'Sāciet, izveidojot savu pirmo portfeli.',
@@ -258,7 +269,7 @@ const lv: Translation = {
     netInvestedTooltip: 'Iemaksas mīnus izmaksas. EUR konvertācijas kursa izmaiņas ietekmē peļņu.',
     fx: 'Valūta',
     dividends: 'Dividendes',
-    estTax: 'Aplēstais nodoklis (25,5%)',
+    estTax: 'Aplēstais nodoklis ({{rate}}%)',
     on: 'no',
     afterTaxValue: 'Vērtība pēc nodokļa',
     positions: 'Pozīcijas',
@@ -290,6 +301,7 @@ const lv: Translation = {
   settings: {
     menuItem: 'Iestatījumi',
     title: 'Iestatījumi',
+    description: 'Pārvaldiet sava konta iestatījumus un preferences.',
     profile: {
       tab: 'Profils',
       nameLabel: 'Vārds',
@@ -307,15 +319,37 @@ const lv: Translation = {
       cancel: 'Atcelt',
       oauthNote: 'Jūs ierakstījāties ar Google. Iestatot paroli, tiks iespējota arī e-pasta ierakstīšanās.',
     },
+    account: {
+      tab: 'Konts',
+      dangerZone: 'Bīstamā zona',
+      closeTitle: 'Slēgt kontu',
+      closeDescription: 'Neatgriezeniski dzēst jūsu kontu un visus saistītos datus (portfeļi, darījumi). Šo darbību nevar atsaukt.',
+      passwordLabel: 'Pašreizējā parole',
+      confirmationLabel: 'Ierakstiet DELETE, lai apstiprinātu',
+      confirmationPlaceholder: 'DELETE',
+      submit: 'Slēgt kontu',
+    },
     validation: {
       nameRequired: 'Vārds ir obligāts',
       nameTooLong: 'Vārdam jābūt ne garākam par 255 rakstzīmēm',
       passwordMinLength: 'Parolei jābūt vismaz 8 rakstzīmēm',
       passwordsDoNotMatch: 'Paroles nesakrīt',
+      passwordRequired: 'Parole ir obligāta',
+      confirmationRequired: 'Ierakstiet DELETE, lai apstiprinātu',
+      taxRateMin: 'Nodokļu likmei jābūt vismaz 0%',
+      taxRateMax: 'Nodokļu likme nedrīkst pārsniegt 100%',
+    },
+    tax: {
+      tab: 'Nodoklis',
+      description: 'Konfigurējiet nodokļu likmi, kas tiek piemērota kapitāla pieauguma aprēķiniem.',
+      rateLabel: 'Nodokļu likme (%)',
+      submit: 'Saglabāt nodokļu likmi',
     },
     toasts: {
       profileUpdated: 'Profils atjaunināts',
       passwordChanged: 'Parole nomainīta',
+      accountClosed: 'Konts slēgts',
+      taxRateUpdated: 'Nodokļu likme atjaunināta',
     },
   },
 };

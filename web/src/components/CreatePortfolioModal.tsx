@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useCreatePortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import {
@@ -22,10 +23,10 @@ import { Spinner } from '@/components/ui/spinner';
 
 const schema = z.object({
   name: z.string().superRefine((val, ctx) => {
-    if (val.length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('portfolio.validation.nameRequired') });
-    } else if (val.length > 255) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('portfolio.validation.nameTooLong') });
+    if (val.trim().length < 1) {
+      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameRequired') });
+    } else if (val.trim().length > 255) {
+      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameTooLong') });
     }
   }),
 });
@@ -39,6 +40,7 @@ interface CreatePortfolioModalProps {
 
 const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const createPortfolio = useCreatePortfolio();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -53,8 +55,9 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await createPortfolio.mutateAsync({ name: values.name.trim() });
+      const portfolio = await createPortfolio.mutateAsync({ name: values.name.trim() });
       onClose();
+      navigate(`/portfolios/${portfolio.id}`);
     } catch (err) {
       form.setError('root', { message: getErrorMessage(err) });
     }

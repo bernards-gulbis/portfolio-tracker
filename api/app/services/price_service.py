@@ -72,7 +72,7 @@ class PriceService:
             return {price.date: price.price for price in results}
 
     @classmethod
-    def _bulk_upsert(cls, model, values: List[dict], index_elements: List[str], update_fields: dict, label: str) -> None:
+    def _bulk_upsert(cls, model, values: List[dict], index_elements: List[str], update_fields: List[str], label: str) -> None:
         """Bulk upsert rows into a table using ON CONFLICT, silently swallowing errors."""
         if not values:
             return
@@ -101,7 +101,7 @@ class PriceService:
         cls._bulk_upsert(
             HistoricalPrice, values,
             index_elements=['ticker', 'date'],
-            update_fields={'price', 'created_at'},
+            update_fields=['price', 'created_at'],
             label=f"historical prices for {ticker}",
         )
 
@@ -134,7 +134,7 @@ class PriceService:
         cls._bulk_upsert(
             FxRate, values,
             index_elements=['date'],
-            update_fields={'usd_to_eur_rate', 'created_at'},
+            update_fields=['usd_to_eur_rate', 'created_at'],
             label="FX rates",
         )
     

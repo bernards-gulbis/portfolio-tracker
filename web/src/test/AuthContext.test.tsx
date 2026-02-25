@@ -2,15 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import * as api from '../api';
 import type { UserRead } from '../api';
 
+const mockNavigate = vi.fn();
 const mockQueryClient = { clear: vi.fn() };
 
 vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual('@tanstack/react-query');
   return { ...actual, useQueryClient: () => mockQueryClient };
+});
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return { ...actual, useNavigate: () => mockNavigate };
 });
 
 vi.mock('../api', async () => {
@@ -27,6 +34,7 @@ const mockUser: UserRead = {
   name: null,
   picture: null,
   oauth_providers: [],
+  tax_rate: 0.255,
 };
 
 // Renders AuthProvider with a simple consumer component
@@ -42,16 +50,19 @@ const StatusDisplay = () => {
 
 const renderAuth = (children?: React.ReactNode) =>
   render(
-    <AuthProvider>
-      <StatusDisplay />
-      {children}
-    </AuthProvider>
+    <MemoryRouter initialEntries={['/portfolios/2']}>
+      <AuthProvider>
+        <StatusDisplay />
+        {children}
+      </AuthProvider>
+    </MemoryRouter>
   );
 
 describe('AuthContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQueryClient.clear.mockReset();
+    mockNavigate.mockReset();
   });
 
   it('starts in loading state before getCurrentUser resolves', () => {
@@ -97,6 +108,23 @@ describe('AuthContext', () => {
     );
     expect(screen.getByTestId('email')).toHaveTextContent('none');
     expect(mockQueryClient.clear).toHaveBeenCalled();
+  });
+
+  it('navigates to / on auth:logout to reset stale portfolio URL', async () => {
+    vi.mocked(api.getCurrentUser).mockResolvedValueOnce(mockUser);
+    renderAuth();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    );
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+    });
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+    });
   });
 
   describe('logout()', () => {
