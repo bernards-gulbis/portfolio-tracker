@@ -75,6 +75,7 @@ Thumbs.db
 .coverage
 htmlcov/
 .tox/
+coverage/
 
 # MyPy
 .mypy_cache/
