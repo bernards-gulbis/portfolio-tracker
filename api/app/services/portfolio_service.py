@@ -215,6 +215,97 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
     handler(state, tx, strict)
 
 
+# ================== Date / price resolution helpers ==================
+
+
+def _resolve_nearest_date_value(
+    date_prices: Dict[str, float], target_date_str: str
+) -> Optional[float]:
+    """Return the value for *target_date_str* or the nearest earlier date, else None."""
+    if not date_prices:
+        return None
+    if target_date_str in date_prices:
+        return date_prices[target_date_str]
+    available = sorted(
+        (d for d in date_prices if d <= target_date_str), reverse=True
+    )
+    if available:
+        return date_prices[available[0]]
+    return None
+
+
+def _fetch_historical_prices(
+    tickers: List[str], target_date: datetime
+) -> Dict[str, float]:
+    """Fetch historical prices for *tickers* at (or near) *target_date*."""
+    if not tickers:
+        return {}
+    start_date = target_date - timedelta(days=5)
+    end_date = target_date + timedelta(days=1)
+    all_prices = PriceService.get_historical_prices_for_multiple_tickers(
+        tickers, start_date, end_date
+    )
+    target_date_str = target_date.strftime('%Y-%m-%d')
+    result: Dict[str, float] = {}
+    for ticker, date_prices in all_prices.items():
+        if not date_prices:
+            continue
+        price = _resolve_nearest_date_value(date_prices, target_date_str)
+        if price is not None:
+            result[ticker] = price
+        else:
+            # All dates are after target; use earliest as best guess
+            result[ticker] = date_prices[min(date_prices.keys())]
+    return result
+
+
+def _value_holdings_at_date(
+    state: _TxState,
+    historical_prices: Optional[Dict[str, float]],
+    forward_split_factors: Dict[str, Decimal],
+    target_date_str: str,
+) -> Decimal:
+    """Compute total holdings value at a historical date using price → DB cache → cost basis fallback."""
+    holdings_value = _ZERO
+    for ticker, holding_data in state.holdings.items():
+        price = historical_prices.get(ticker) if historical_prices else None
+        if price is not None and price > 0:
+            split_factor = forward_split_factors.get(ticker, _ONE)
+            holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
+            continue
+        # Try last known price from DB cache before falling back to cost basis
+        db_price = PriceService.get_last_known_price(ticker)
+        if db_price is not None and db_price > 0:
+            split_factor = forward_split_factors.get(ticker, _ONE)
+            holdings_value += holding_data['quantity'] * _to_decimal(db_price) * split_factor
+            logger.debug(
+                "Status at %s: using last known price %.4f for %s",
+                target_date_str, db_price, ticker,
+            )
+        else:
+            holdings_value += holding_data['total_cost']
+            logger.warning(
+                "Status at %s: no price data for %s (using cost basis)",
+                target_date_str, ticker,
+            )
+    return holdings_value
+
+
+def _resolve_usd_to_eur_rate(target_date: datetime) -> Optional[float]:
+    """Resolve USD→EUR rate at *target_date*, falling back to nearest earlier date or current rate."""
+    start_date = target_date - timedelta(days=5)
+    end_date = target_date + timedelta(days=1)
+    fx_rates = PriceService.get_historical_usd_to_eur_rates(start_date, end_date)
+    target_date_str = target_date.strftime('%Y-%m-%d')
+    rate = _resolve_nearest_date_value(fx_rates, target_date_str)
+    if rate is not None:
+        return rate
+    try:
+        return PriceService.get_usd_to_eur_rate()
+    except Exception:
+        return None
+
+
 # ================== Portfolio status helpers ==================
 
 
@@ -529,76 +620,21 @@ class PortfolioService:
             _apply_transaction(state, tx, strict=False)
 
         if historical_prices is None:
-            tickers = list(state.holdings.keys())
-            if tickers:
-                start_date = target_date - timedelta(days=5)
-                end_date = target_date + timedelta(days=1)
-                all_historical_prices = PriceService.get_historical_prices_for_multiple_tickers(
-                    tickers, start_date, end_date
-                )
-                historical_prices = {}
-                target_date_str = target_date.strftime('%Y-%m-%d')
-                for ticker, date_prices in all_historical_prices.items():
-                    if not date_prices:
-                        continue
-                    if target_date_str in date_prices:
-                        historical_prices[ticker] = date_prices[target_date_str]
-                    else:
-                        available_dates = sorted(
-                            [d for d in date_prices.keys() if d <= target_date_str], reverse=True
-                        )
-                        if available_dates:
-                            historical_prices[ticker] = date_prices[available_dates[0]]
-                        else:
-                            historical_prices[ticker] = date_prices[min(date_prices.keys())]
-            else:
-                historical_prices = {}
+            historical_prices = _fetch_historical_prices(
+                list(state.holdings.keys()), target_date
+            )
 
         forward_split_factors = _compute_forward_split_factors(all_transactions, cutoff_date=target_date)
 
-        holdings_value = _ZERO
-        for ticker, holding_data in state.holdings.items():
-            price = historical_prices.get(ticker) if historical_prices else None
-            if price is not None and price > 0:
-                split_factor = forward_split_factors.get(ticker, _ONE)
-                holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
-            else:
-                # Try last known price from DB cache before falling back to cost basis
-                db_price = PriceService.get_last_known_price(ticker)
-                if db_price is not None and db_price > 0:
-                    split_factor = forward_split_factors.get(ticker, _ONE)
-                    holdings_value += holding_data['quantity'] * _to_decimal(db_price) * split_factor
-                    logger.debug(
-                        "Status at %s: using last known price %.4f for %s",
-                        target_date.strftime('%Y-%m-%d'), db_price, ticker,
-                    )
-                else:
-                    holdings_value += holding_data['total_cost']
-                    logger.warning(
-                        "Status at %s: no price data for %s (using cost basis)",
-                        target_date.strftime('%Y-%m-%d'), ticker,
-                    )
+        holdings_value = _value_holdings_at_date(
+            state, historical_prices, forward_split_factors,
+            target_date.strftime('%Y-%m-%d'),
+        )
 
         current_value_usd = state.cash + holdings_value
 
         if usd_to_eur_rate is None:
-            start_date = target_date - timedelta(days=5)
-            end_date = target_date + timedelta(days=1)
-            fx_rates = PriceService.get_historical_usd_to_eur_rates(start_date, end_date)
-            target_date_str = target_date.strftime('%Y-%m-%d')
-            if target_date_str in fx_rates:
-                usd_to_eur_rate = fx_rates[target_date_str]
-            else:
-                available_dates = sorted(
-                    [d for d in fx_rates.keys() if d <= target_date_str], reverse=True
-                )
-                if available_dates:
-                    usd_to_eur_rate = fx_rates[available_dates[0]]
-                else:
-                    try:
-                        usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
-                    except Exception:
-                        usd_to_eur_rate = None
+            usd_to_eur_rate = _resolve_usd_to_eur_rate(target_date)
 
         current_value_eur = None
         if usd_to_eur_rate is not None:
