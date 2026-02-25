@@ -187,8 +187,8 @@ def test_create_transaction(client: TestClient):
     assert response.status_code == 201
     data = response.json()
     assert data["type"] == "Deposit"
-    assert data["total_amount"] == 3000.00
-    assert data["eur_amount"] == 2760.27
+    assert data["total_amount"] == pytest.approx(3000.00)
+    assert data["eur_amount"] == pytest.approx(2760.27)
     assert data["portfolio_id"] == portfolio_id
     assert "id" in data
 
@@ -221,9 +221,9 @@ def test_create_transaction_with_all_fields(client: TestClient):
     data = response.json()
     assert data["type"] == "Buy"
     assert data["ticker"] == "MSFT"
-    assert data["quantity"] == 15.00000001
-    assert data["price_per_share"] == 183.69
-    assert data["total_amount"] == -2755.35
+    assert data["quantity"] == pytest.approx(15.00000001)
+    assert data["price_per_share"] == pytest.approx(183.69)
+    assert data["total_amount"] == pytest.approx(-2755.35)
 
 
 def test_list_transactions(client: TestClient):
@@ -396,8 +396,8 @@ def test_update_transaction(client: TestClient):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["total_amount"] == 3500.00
-    assert data["fee"] == 10.0
+    assert data["total_amount"] == pytest.approx(3500.00)
+    assert data["fee"] == pytest.approx(10.0)
 
 
 def test_delete_transaction(client: TestClient):
@@ -564,7 +564,7 @@ def test_export_and_reimport_csv(client: TestClient):
     assert transactions[0]["ticker"] == "AAPL"
     assert transactions[0]["quantity"] == 10
     assert transactions[1]["type"] == "Deposit"
-    assert transactions[1]["total_amount"] == 5000.00
+    assert transactions[1]["total_amount"] == pytest.approx(5000.00)
 
 
 def test_export_transactions_csv_empty(client: TestClient):
@@ -669,18 +669,18 @@ def test_csv_upload(client: TestClient):
     # Verify first transaction (Deposit)
     transaction1 = data["transactions"][0]
     assert transaction1["type"] == "Deposit"
-    assert transaction1["total_amount"] == 3000.00
-    assert transaction1["eur_amount"] == 2760.27
+    assert transaction1["total_amount"] == pytest.approx(3000.00)
+    assert transaction1["eur_amount"] == pytest.approx(2760.27)
     assert transaction1["currency"] == "USD"
-    assert transaction1["fx_rate"] == 1.0871
+    assert transaction1["fx_rate"] == pytest.approx(1.0871)
     
     # Verify second transaction (Buy)
     transaction2 = data["transactions"][1]
     assert transaction2["type"] == "Buy"
     assert transaction2["ticker"] == "MSFT"
-    assert transaction2["quantity"] == 15.00000001
-    assert transaction2["price_per_share"] == 183.69
-    assert transaction2["total_amount"] == -2755.35
+    assert transaction2["quantity"] == pytest.approx(15.00000001)
+    assert transaction2["price_per_share"] == pytest.approx(183.69)
+    assert transaction2["total_amount"] == pytest.approx(-2755.35)
     assert transaction2["currency"] is None
     assert transaction2["fx_rate"] is None
 
@@ -756,7 +756,7 @@ def test_csv_with_complex_transactions(client: TestClient):
     assert transactions[1]["type"] == "Buy"
     assert transactions[2]["type"] == "Dividend"
     assert transactions[3]["type"] == "Split"
-    assert transactions[3]["split_ratio"] == 2.0
+    assert transactions[3]["split_ratio"] == pytest.approx(2.0)
     assert transactions[4]["type"] == "Sell"
     assert transactions[5]["type"] == "Fee"
     assert transactions[6]["type"] == "Withdraw"
@@ -905,13 +905,13 @@ def test_portfolio_status_empty_portfolio(client: TestClient):
     
     assert data["portfolio_id"] == portfolio_id
     assert data["portfolio_name"] == "Empty Portfolio"
-    assert data["principal"] == 0.0
-    assert data["principal_eur"] == 0.0
-    assert data["dividends"] == 0.0
-    assert data["cash"] == 0.0
+    assert data["principal"] == pytest.approx(0.0)
+    assert data["principal_eur"] == pytest.approx(0.0)
+    assert data["dividends"] == pytest.approx(0.0)
+    assert data["cash"] == pytest.approx(0.0)
     assert data["holdings"] == []
-    assert data["realized_gains"] == 0.0
-    assert data["holdings_cost"] == 0.0
+    assert data["realized_gains"] == pytest.approx(0.0)
+    assert data["holdings_cost"] == pytest.approx(0.0)
 
 
 def test_portfolio_status_with_deposit(client: TestClient):
@@ -939,8 +939,8 @@ def test_portfolio_status_with_deposit(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash"] == 1000.0
-    assert data["principal"] == 1000.0
+    assert data["cash"] == pytest.approx(1000.0)
+    assert data["principal"] == pytest.approx(1000.0)
     assert data["holdings"] == []
 
 
@@ -996,23 +996,23 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash"] == 2000.0  # 5000 - 1500 - 1500 (fees included in values)
-    assert data["principal"] == 5000.0
+    assert data["cash"] == pytest.approx(2000.0)  # 5000 - 1500 - 1500 (fees included in values)
+    assert data["principal"] == pytest.approx(5000.0)
     assert len(data["holdings"]) == 2
     
     # Check AAPL holding
     aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
-    assert aapl_holding["quantity"] == 10.0
-    assert aapl_holding["average_cost"] == 150.0
-    assert aapl_holding["total_cost"] == 1500.0
+    assert aapl_holding["quantity"] == pytest.approx(10.0)
+    assert aapl_holding["average_cost"] == pytest.approx(150.0)
+    assert aapl_holding["total_cost"] == pytest.approx(1500.0)
     
     # Check MSFT holding
     msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
-    assert msft_holding["quantity"] == 5.0
-    assert msft_holding["average_cost"] == 300.0
-    assert msft_holding["total_cost"] == 1500.0
+    assert msft_holding["quantity"] == pytest.approx(5.0)
+    assert msft_holding["average_cost"] == pytest.approx(300.0)
+    assert msft_holding["total_cost"] == pytest.approx(1500.0)
     
-    assert data["holdings_cost"] == 3000.0
+    assert data["holdings_cost"] == pytest.approx(3000.0)
 
 
 def test_portfolio_status_with_sell_transactions(client: TestClient):
@@ -1067,19 +1067,19 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash"] == 9500.0  # 10000 - 2000 + 1500 (fees included in values)
-    assert data["principal"] == 10000.0
+    assert data["cash"] == pytest.approx(9500.0)  # 10000 - 2000 + 1500 (fees included in values)
+    assert data["principal"] == pytest.approx(10000.0)
     
     # Should have 10 AAPL left
     assert len(data["holdings"]) == 1
     aapl_holding = data["holdings"][0]
     assert aapl_holding["ticker"] == "AAPL"
-    assert aapl_holding["quantity"] == 10.0
-    assert aapl_holding["average_cost"] == 100.0
-    assert aapl_holding["total_cost"] == 1000.0
+    assert aapl_holding["quantity"] == pytest.approx(10.0)
+    assert aapl_holding["average_cost"] == pytest.approx(100.0)
+    assert aapl_holding["total_cost"] == pytest.approx(1000.0)
     
     # Realized gains: sold 10 shares at 1500 (includes -1 fee) - cost basis 10*100 (1000) = 500
-    assert data["realized_gains"] == 500.0
+    assert data["realized_gains"] == pytest.approx(500.0)
 
 
 def test_portfolio_status_with_dividends(client: TestClient):
@@ -1143,8 +1143,8 @@ def test_portfolio_status_with_dividends(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash"] == 3600.0  # 5000 - 1500 + 50 + 50 (fees included in values)
-    assert data["dividends"] == 100.0
+    assert data["cash"] == pytest.approx(3600.0)  # 5000 - 1500 + 50 + 50 (fees included in values)
+    assert data["dividends"] == pytest.approx(100.0)
     assert len(data["holdings"]) == 1
 
 
@@ -1203,10 +1203,10 @@ def test_portfolio_status_with_stock_split(client: TestClient):
     assert len(data["holdings"]) == 1
     aapl_holding = data["holdings"][0]
     assert aapl_holding["ticker"] == "AAPL"
-    assert aapl_holding["quantity"] == 20.0
+    assert aapl_holding["quantity"] == pytest.approx(20.0)
     # Average cost per share after split: original cost basis $4000 / 20 shares = $200/share
-    assert aapl_holding["average_cost"] == 200.0
-    assert aapl_holding["total_cost"] == 4000.0
+    assert aapl_holding["average_cost"] == pytest.approx(200.0)
+    assert aapl_holding["total_cost"] == pytest.approx(4000.0)
 
 
 def test_portfolio_status_with_withdrawal(client: TestClient):
@@ -1244,8 +1244,8 @@ def test_portfolio_status_with_withdrawal(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     
-    assert data["cash"] == 3000.0  # 5000 - 2000
-    assert data["principal"] == 3000.0  # 5000 - 2000
+    assert data["cash"] == pytest.approx(3000.0)  # 5000 - 2000
+    assert data["principal"] == pytest.approx(3000.0)  # 5000 - 2000
 
 
 def test_portfolio_status_nonexistent_portfolio(client: TestClient):
@@ -1528,33 +1528,33 @@ def test_portfolio_status_with_current_prices(client: TestClient):
     data = response.json()
     
     # Check cash balance
-    assert data["cash"] == 7000.0  # 10000 - 1500 - 1500
+    assert data["cash"] == pytest.approx(7000.0)  # 10000 - 1500 - 1500
     
     # Check AAPL holding with price data
     aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
-    assert aapl_holding["quantity"] == 10.0
-    assert aapl_holding["average_cost"] == 150.0
-    assert aapl_holding["total_cost"] == 1500.0
-    assert aapl_holding["current_price"] == 180.0
-    assert aapl_holding["current_value"] == 1800.0  # 10 * 180
-    assert aapl_holding["unrealized_gain_loss"] == 300.0  # 1800 - 1500
+    assert aapl_holding["quantity"] == pytest.approx(10.0)
+    assert aapl_holding["average_cost"] == pytest.approx(150.0)
+    assert aapl_holding["total_cost"] == pytest.approx(1500.0)
+    assert aapl_holding["current_price"] == pytest.approx(180.0)
+    assert aapl_holding["current_value"] == pytest.approx(1800.0)  # 10 * 180
+    assert aapl_holding["unrealized_gain_loss"] == pytest.approx(300.0)  # 1800 - 1500
     assert abs(aapl_holding["unrealized_gain_loss_pct"] - 20.0) < 0.01
     
     # Check MSFT holding with price data
     msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
-    assert msft_holding["quantity"] == 5.0
-    assert msft_holding["average_cost"] == 300.0
-    assert msft_holding["total_cost"] == 1500.0
-    assert msft_holding["current_price"] == 270.0
-    assert msft_holding["current_value"] == 1350.0  # 5 * 270
-    assert msft_holding["unrealized_gain_loss"] == -150.0  # 1350 - 1500
+    assert msft_holding["quantity"] == pytest.approx(5.0)
+    assert msft_holding["average_cost"] == pytest.approx(300.0)
+    assert msft_holding["total_cost"] == pytest.approx(1500.0)
+    assert msft_holding["current_price"] == pytest.approx(270.0)
+    assert msft_holding["current_value"] == pytest.approx(1350.0)  # 5 * 270
+    assert msft_holding["unrealized_gain_loss"] == pytest.approx(-150.0)  # 1350 - 1500
     assert abs(msft_holding["unrealized_gain_loss_pct"] - (-10.0)) < 0.01
     
     # Check portfolio totals
-    assert data["holdings_cost"] == 3000.0
-    assert data["holdings_value"] == 3150.0  # 1800 + 1350
-    assert data["unrealized_gains"] == 150.0  # 300 - 150
-    assert data["current_value"] == 10150.0  # 7000 cash + 3150 holdings
+    assert data["holdings_cost"] == pytest.approx(3000.0)
+    assert data["holdings_value"] == pytest.approx(3150.0)  # 1800 + 1350
+    assert data["unrealized_gains"] == pytest.approx(150.0)  # 300 - 150
+    assert data["current_value"] == pytest.approx(10150.0)  # 7000 cash + 3150 holdings
 
 
 def test_portfolio_status_with_missing_prices(client: TestClient):
@@ -1616,9 +1616,9 @@ def test_portfolio_status_with_missing_prices(client: TestClient):
     
     # AAPL should have price data
     aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
-    assert aapl_holding["current_price"] == 180.0
-    assert aapl_holding["current_value"] == 1800.0
-    assert aapl_holding["unrealized_gain_loss"] == 300.0
+    assert aapl_holding["current_price"] == pytest.approx(180.0)
+    assert aapl_holding["current_value"] == pytest.approx(1800.0)
+    assert aapl_holding["unrealized_gain_loss"] == pytest.approx(300.0)
     
     # UNKNOWN should have None for price fields
     unknown_holding = next(h for h in data["holdings"] if h["ticker"] == "UNKNOWN")
@@ -1628,8 +1628,8 @@ def test_portfolio_status_with_missing_prices(client: TestClient):
     assert unknown_holding["unrealized_gain_loss_pct"] is None
     
     # Totals should only include holdings with prices
-    assert data["holdings_value"] == 1800.0  # Only AAPL
-    assert data["unrealized_gains"] == 300.0  # Only AAPL gain
+    assert data["holdings_value"] == pytest.approx(1800.0)  # Only AAPL
+    assert data["unrealized_gains"] == pytest.approx(300.0)  # Only AAPL gain
 
 
 def test_portfolio_status_with_zero_price(client: TestClient):
@@ -1672,7 +1672,7 @@ def test_portfolio_status_with_zero_price(client: TestClient):
     
     # Zero price should not calculate gains
     penny_holding = next(h for h in data["holdings"] if h["ticker"] == "PENNY")
-    assert penny_holding["current_price"] == 0.0
+    assert penny_holding["current_price"] == pytest.approx(0.0)
     assert penny_holding["current_value"] is None
     assert penny_holding["unrealized_gain_loss"] is None
 
@@ -1801,24 +1801,24 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
     
     # Check individual holdings
     winner = next(h for h in data["holdings"] if h["ticker"] == "WINNER")
-    assert winner["unrealized_gain_loss"] == 2500.0  # +2500
+    assert winner["unrealized_gain_loss"] == pytest.approx(2500.0)  # +2500
     assert abs(winner["unrealized_gain_loss_pct"] - 50.0) < 0.01
     
     loser = next(h for h in data["holdings"] if h["ticker"] == "LOSER")
-    assert loser["unrealized_gain_loss"] == -1500.0  # -1500
+    assert loser["unrealized_gain_loss"] == pytest.approx(-1500.0)  # -1500
     assert abs(loser["unrealized_gain_loss_pct"] - (-30.0)) < 0.01
     
     flat = next(h for h in data["holdings"] if h["ticker"] == "FLAT")
-    assert flat["unrealized_gain_loss"] == 0.0  # 0
+    assert flat["unrealized_gain_loss"] == pytest.approx(0.0)  # 0
     assert abs(flat["unrealized_gain_loss_pct"]) < 0.01
     
     # Total unrealized gains: 2500 - 1500 + 0 = 1000
-    assert data["unrealized_gains"] == 1000.0
+    assert data["unrealized_gains"] == pytest.approx(1000.0)
     
     # Total portfolio value: 5000 cash + (7500 + 3500 + 5000) holdings = 21000
-    assert data["cash"] == 5000.0
-    assert data["holdings_value"] == 16000.0
-    assert data["current_value"] == 21000.0
+    assert data["cash"] == pytest.approx(5000.0)
+    assert data["holdings_value"] == pytest.approx(16000.0)
+    assert data["current_value"] == pytest.approx(21000.0)
 
 
 # ================== EUR Conversion and Tax Tests ==================
@@ -1870,15 +1870,15 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     data = response.json()
     
     # USD values
-    assert data["cash"] == 9000.0
-    assert data["principal"] == 10000.0
-    assert data["current_value"] == 10500.0  # 9000 cash + 1500 holdings
-    assert data["unrealized_gains"] == 500.0  # 1500 - 1000
+    assert data["cash"] == pytest.approx(9000.0)
+    assert data["principal"] == pytest.approx(10000.0)
+    assert data["current_value"] == pytest.approx(10500.0)  # 9000 cash + 1500 holdings
+    assert data["unrealized_gains"] == pytest.approx(500.0)  # 1500 - 1000
     
     # EUR values
     assert abs(data["principal_eur"] - 9000.0) < 0.1  # 10000 / 1.1111 ≈ 9000
-    assert data["current_value_eur"] == 8925.0  # 10500 * 0.85
-    assert data["unrealized_gains_eur"] == 425.0  # 500 * 0.85
+    assert data["current_value_eur"] == pytest.approx(8925.0)  # 10500 * 0.85
+    assert data["unrealized_gains_eur"] == pytest.approx(425.0)  # 500 * 0.85
     
     # Currency gains: (principal @ current rate) - principal_eur
     # principal @ current rate = 10000 * 0.85 = 8500 EUR
@@ -1896,7 +1896,7 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     capital_gains_eur = 8925.0 - 9000.0  # -75 EUR
     expected_tax = 0.0  # No tax on negative gains
     assert abs(data["capital_gains_eur"] - capital_gains_eur) < 0.1
-    assert data["capital_gains_tax_rate"] == 0.255
+    assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
     assert data["tax_eur"] == expected_tax
     
     # After-tax return: (current_value_eur - principal_eur) - tax_eur
@@ -1951,37 +1951,37 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     data = response.json()
     
     # USD values
-    assert data["current_value"] == 20000.0  # 0 cash + 20000 holdings
-    assert data["principal"] == 10000.0
-    assert data["unrealized_gains"] == 10000.0
+    assert data["current_value"] == pytest.approx(20000.0)  # 0 cash + 20000 holdings
+    assert data["principal"] == pytest.approx(10000.0)
+    assert data["unrealized_gains"] == pytest.approx(10000.0)
     
     # EUR values
-    assert data["current_value_eur"] == 20000.0
-    assert data["principal_eur"] == 10000.0
+    assert data["current_value_eur"] == pytest.approx(20000.0)
+    assert data["principal_eur"] == pytest.approx(10000.0)
     
     # Currency gains: FX rate unchanged (1.0 deposit, 1.0 current) = 0 currency gains
-    assert data["currency_gains_eur"] == 0.0
-    assert data["currency_gains_pct"] == 0.0
+    assert data["currency_gains_eur"] == pytest.approx(0.0)
+    assert data["currency_gains_pct"] == pytest.approx(0.0)
     
     # Tax calculation: (20000 - 10000 - 0) * 0.255 = 2550 EUR
     capital_gains_eur = 20000.0 - 10000.0 - 0.0
     expected_tax = capital_gains_eur * 0.255
     assert data["capital_gains_eur"] == capital_gains_eur
-    assert data["capital_gains_eur"] == 10000.0
-    assert data["capital_gains_tax_rate"] == 0.255
+    assert data["capital_gains_eur"] == pytest.approx(10000.0)
+    assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
     assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == 2550.0
+    assert data["tax_eur"] == pytest.approx(2550.0)
     
     # After-tax return: (20000 - 10000) - 2550 = 7450 EUR
     expected_return = 20000.0 - 10000.0 - 2550.0
     assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == 7450.0
-    assert data["total_return_after_tax_pct"] == 74.5  # 7450 / 10000 * 100
+    assert data["total_return_after_tax_eur"] == pytest.approx(7450.0)
+    assert data["total_return_after_tax_pct"] == pytest.approx(74.5)  # 7450 / 10000 * 100
 
     # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7450 = 17450 EUR
     expected_value_after_tax = 10000.0 + 7450.0
     assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == 17450.0
+    assert data["current_value_after_tax_eur"] == pytest.approx(17450.0)
 
 
 def test_portfolio_status_tax_excludes_dividends(client: TestClient):
@@ -2042,11 +2042,11 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     data = response.json()
     
     # Current value: $2,000 cash + $15,000 holdings = $17,000
-    assert data["cash"] == 2000.0
-    assert data["current_value"] == 17000.0
-    assert data["principal"] == 10000.0
-    assert data["dividends"] == 2000.0
-    assert data["dividends_eur"] == 2000.0
+    assert data["cash"] == pytest.approx(2000.0)
+    assert data["current_value"] == pytest.approx(17000.0)
+    assert data["principal"] == pytest.approx(10000.0)
+    assert data["dividends"] == pytest.approx(2000.0)
+    assert data["dividends_eur"] == pytest.approx(2000.0)
     
     # Total gain: 17000 - 10000 = 7000 (includes dividends)
     # Capital gains (for tax): 17000 - 10000 - 2000 = 5000 (excludes dividends)
@@ -2054,20 +2054,20 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     capital_gains_eur = 17000.0 - 10000.0 - 2000.0
     expected_tax = capital_gains_eur * 0.255
     assert data["capital_gains_eur"] == capital_gains_eur
-    assert data["capital_gains_eur"] == 5000.0
-    assert data["capital_gains_tax_rate"] == 0.255
+    assert data["capital_gains_eur"] == pytest.approx(5000.0)
+    assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
     assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == 1275.0
+    assert data["tax_eur"] == pytest.approx(1275.0)
     
     # After-tax return: (17000 - 10000) - 1275 = 5725 EUR
     expected_return = 17000.0 - 10000.0 - 1275.0
     assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == 5725.0
+    assert data["total_return_after_tax_eur"] == pytest.approx(5725.0)
 
     # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 5725 = 15725 EUR
     expected_value_after_tax = 10000.0 + 5725.0
     assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == 15725.0
+    assert data["current_value_after_tax_eur"] == pytest.approx(15725.0)
 
 
 def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
@@ -2127,7 +2127,7 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
     data = response.json()
     
     # Dividends exist in USD
-    assert data["dividends"] == 1000.0
+    assert data["dividends"] == pytest.approx(1000.0)
     
     # Dividends EUR should be None (no fx_rate provided)
     assert data["dividends_eur"] is None
@@ -2186,8 +2186,8 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
     data = response.json()
     
     # USD values should be available
-    assert data["current_value"] == 15000.0
-    assert data["principal"] == 10000.0
+    assert data["current_value"] == pytest.approx(15000.0)
+    assert data["principal"] == pytest.approx(10000.0)
     
     # EUR values should be None
     assert data["current_value_eur"] is None
@@ -2198,7 +2198,7 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
     assert data["current_value_after_tax_eur"] is None
     
     # Historical EUR values should still be available
-    assert data["principal_eur"] == 10000.0  # Converted at historical rate
+    assert data["principal_eur"] == pytest.approx(10000.0)  # Converted at historical rate
 
 
 def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient):
@@ -2244,7 +2244,7 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
     data = response.json()
     
     # Principal in USD
-    assert data["principal"] == 15000.0
+    assert data["principal"] == pytest.approx(15000.0)
     
     # Principal in EUR (using historical fx_rates)
     # 10000 / 1.10 + 5000 / 1.05 = 9090.91 + 4761.90 = 13852.81
@@ -3176,7 +3176,7 @@ def test_user_default_tax_rate(session: Session):
     session.add(user)
     session.commit()
     session.refresh(user)
-    assert float(user.tax_rate) == 0.255
+    assert float(user.tax_rate) == pytest.approx(0.255)
 
 
 def test_user_custom_tax_rate(session: Session):
@@ -3193,7 +3193,7 @@ def test_user_custom_tax_rate(session: Session):
     session.add(user)
     session.commit()
     session.refresh(user)
-    assert float(user.tax_rate) == 0.15
+    assert float(user.tax_rate) == pytest.approx(0.15)
 
 
 def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: User, session: Session):
@@ -3245,8 +3245,8 @@ def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: Us
     data = response.json()
 
     # Tax at 15%: capital_gains_eur = 10000, tax = 10000 * 0.15 = 1500
-    assert data["capital_gains_tax_rate"] == 0.15
-    assert data["tax_eur"] == 1500.0
+    assert data["capital_gains_tax_rate"] == pytest.approx(0.15)
+    assert data["tax_eur"] == pytest.approx(1500.0)
 
 
 # ==================== TransactionUpdate Validation ====================
@@ -3301,8 +3301,8 @@ def test_transaction_update_valid_fields_pass(client: TestClient):
 
     update = TransactionUpdate(ticker="AAPL", fee=1.5, split_ratio=2.0)
     assert update.ticker == "AAPL"
-    assert update.fee == 1.5
-    assert update.split_ratio == 2.0
+    assert update.fee == pytest.approx(1.5)
+    assert update.split_ratio == pytest.approx(2.0)
 
 
 def test_transaction_update_api_rejects_invalid_ticker(client: TestClient):
