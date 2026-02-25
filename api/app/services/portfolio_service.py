@@ -101,6 +101,91 @@ def _eur_from_tx(tx: Transaction, total_amount: Decimal) -> Decimal:
     return _ZERO
 
 
+def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
+    total = _to_decimal(tx.total_amount)
+    state.cash += total
+    state.principal += total
+    eur = _eur_from_tx(tx, total)
+    state.principal_eur += eur
+    state.deposits_eur += eur
+
+
+def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
+    total = _to_decimal(tx.total_amount)  # total is negative
+    state.cash += total
+    state.principal += total
+    state.principal_eur += _eur_from_tx(tx, total)
+
+
+def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
+    total = _to_decimal(tx.total_amount)  # total is negative
+    state.cash += total
+    if tx.ticker:
+        quantity = _to_decimal(tx.quantity or 0)
+        h = state.holdings.setdefault(tx.ticker, {'quantity': _ZERO, 'total_cost': _ZERO})
+        h['quantity'] += quantity
+        h['total_cost'] += -total
+
+
+def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
+    total = _to_decimal(tx.total_amount)
+    ticker = tx.ticker
+    quantity = _to_decimal(tx.quantity or 0)
+    if not ticker:
+        state.cash += total
+        return
+    if ticker not in state.holdings:
+        if strict:
+            raise ValueError(f"Cannot sell {ticker}: not in holdings")
+        return
+    h = state.holdings[ticker]
+    if quantity > h['quantity'] + HOLDINGS_EPSILON:
+        if strict:
+            raise ValueError(
+                f"Cannot sell {quantity} quantity of {ticker}: "
+                f"only {h['quantity']} available"
+            )
+        return
+    state.cash += total
+    # Proportional cost removal: avoids intermediate avg_cost rounding
+    cost_basis = h['total_cost'] * (quantity / h['quantity']) if h['quantity'] > 0 else _ZERO
+    state.realized_gains += total - cost_basis
+    h['quantity'] -= quantity
+    h['total_cost'] -= cost_basis
+    if h['quantity'] < HOLDINGS_EPSILON:
+        del state.holdings[ticker]
+
+
+def _apply_dividend(state: _TxState, tx: Transaction, strict: bool) -> None:
+    total = _to_decimal(tx.total_amount)
+    state.cash += total
+    state.dividends += total
+    state.dividends_eur += _eur_from_tx(tx, total)
+
+
+def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
+    state.cash += _to_decimal(tx.total_amount)  # total is negative
+
+
+def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
+    split_ratio = _to_decimal(tx.split_ratio or 1)
+    if strict and split_ratio <= 0:
+        raise ValueError(f"Invalid split ratio {split_ratio}: must be positive")
+    if tx.ticker and tx.ticker in state.holdings:
+        state.holdings[tx.ticker]['quantity'] *= split_ratio
+
+
+_TX_HANDLERS = {
+    TransactionType.DEPOSIT: _apply_deposit,
+    TransactionType.WITHDRAW: _apply_withdraw,
+    TransactionType.BUY: _apply_buy,
+    TransactionType.SELL: _apply_sell,
+    TransactionType.DIVIDEND: _apply_dividend,
+    TransactionType.FEE: _apply_fee,
+    TransactionType.SPLIT: _apply_split,
+}
+
+
 def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -> None:
     """
     Apply a single transaction to *state* in-place.
@@ -112,77 +197,12 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
                 ratio, unknown type). If False, skip the update silently — used for
                 historical/performance calculations where missing data is tolerated.
     """
-    tx_type = tx.type
-    total = _to_decimal(tx.total_amount)
-
-    if tx_type == TransactionType.DEPOSIT:
-        state.cash += total
-        state.principal += total
-        eur = _eur_from_tx(tx, total)
-        state.principal_eur += eur
-        state.deposits_eur += eur
-
-    elif tx_type == TransactionType.WITHDRAW:
-        state.cash += total           # total is negative
-        state.principal += total
-        state.principal_eur += _eur_from_tx(tx, total)
-
-    elif tx_type == TransactionType.BUY:
-        state.cash += total           # total is negative
-        ticker = tx.ticker
-        quantity = _to_decimal(tx.quantity or 0)
-        cost = -total
-        if ticker:
-            h = state.holdings.setdefault(ticker, {'quantity': _ZERO, 'total_cost': _ZERO})
-            h['quantity'] += quantity
-            h['total_cost'] += cost
-
-    elif tx_type == TransactionType.SELL:
-        ticker = tx.ticker
-        quantity = _to_decimal(tx.quantity or 0)
-        if ticker:
-            if ticker not in state.holdings:
-                if strict:
-                    raise ValueError(f"Cannot sell {ticker}: not in holdings")
-                return
-            h = state.holdings[ticker]
-            if quantity > h['quantity'] + HOLDINGS_EPSILON:
-                if strict:
-                    raise ValueError(
-                        f"Cannot sell {quantity} quantity of {ticker}: "
-                        f"only {h['quantity']} available"
-                    )
-                return
-            state.cash += total
-            # Proportional cost removal: avoids intermediate avg_cost rounding
-            cost_basis = h['total_cost'] * (quantity / h['quantity']) if h['quantity'] > 0 else _ZERO
-            state.realized_gains += total - cost_basis
-            h['quantity'] -= quantity
-            h['total_cost'] -= cost_basis
-            if h['quantity'] < HOLDINGS_EPSILON:
-                del state.holdings[ticker]
-        else:
-            state.cash += total
-
-    elif tx_type == TransactionType.DIVIDEND:
-        state.cash += total
-        state.dividends += total
-        state.dividends_eur += _eur_from_tx(tx, total)
-
-    elif tx_type == TransactionType.FEE:
-        state.cash += total           # total is negative
-
-    elif tx_type == TransactionType.SPLIT:
-        ticker = tx.ticker
-        split_ratio = _to_decimal(tx.split_ratio or 1)
-        if strict and split_ratio <= 0:
-            raise ValueError(f"Invalid split ratio {split_ratio}: must be positive")
-        if ticker and ticker in state.holdings:
-            state.holdings[ticker]['quantity'] *= split_ratio
-
-    else:
+    handler = _TX_HANDLERS.get(tx.type)
+    if handler is None:
         if strict:
-            raise ValueError(f"Unknown transaction type: {tx_type}")
+            raise ValueError(f"Unknown transaction type: {tx.type}")
+        return
+    handler(state, tx, strict)
 
 
 # ================== Service ==================
