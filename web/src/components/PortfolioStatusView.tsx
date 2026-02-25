@@ -77,7 +77,7 @@ const formatCurrencyWithPercent = (
 ): JSX.Element | string => {
   if (currencyValue == null) return '-';
   const formattedCurrency = formatSignedCurrency(currencyValue, currency, locale);
-  const formattedPercent = percentValue != null ? formatSignedPercent(percentValue) : '';
+  const formattedPercent = percentValue == null ? '' : formatSignedPercent(percentValue);
   const percentClass = currencyValue >= 0 ? 'text-green-600' : 'text-red-600';
   return (
     <>
@@ -244,7 +244,7 @@ export const PortfolioStatusView = () => {
             <div className="mb-6">
               <p className="text-sm text-muted-foreground mb-1">{t('status.marketValue')}</p>
               <p className="text-3xl font-bold">
-                {status.current_value_eur !== null ? formatCurrency(status.current_value_eur, 'EUR', locale) : '-'}
+                {status.current_value_eur === null ? '-' : formatCurrency(status.current_value_eur, 'EUR', locale)}
               </p>
               <p className={`text-sm mt-1 ${getValueClass(status.unrealized_gains_eur)}`}>
                 {formatCurrencyWithPercent(
@@ -284,14 +284,14 @@ export const PortfolioStatusView = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.dividends')}</p>
                 <p className="text-lg font-semibold">
-                  {status.dividends_eur !== null ? formatCurrency(status.dividends_eur, 'EUR', locale) : '-'}
+                  {status.dividends_eur === null ? '-' : formatCurrency(status.dividends_eur, 'EUR', locale)}
                 </p>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(status.capital_gains_tax_rate * 100) })}</p>
                 <p className="text-lg font-semibold">
-                  {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR', locale) : '-'}
+                  {status.tax_eur === null ? '-' : formatCurrency(status.tax_eur, 'EUR', locale)}
                 </p>
                 {status.capital_gains_eur !== null && status.tax_eur !== null && (
                   <p className="text-xs mt-0.5 text-muted-foreground">
@@ -303,9 +303,9 @@ export const PortfolioStatusView = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
                 <p className="text-lg font-semibold">
-                  {status.current_value_after_tax_eur !== null
-                    ? formatCurrency(status.current_value_after_tax_eur, 'EUR', locale)
-                    : '-'}
+                  {status.current_value_after_tax_eur === null
+                    ? '-'
+                    : formatCurrency(status.current_value_after_tax_eur, 'EUR', locale)}
                 </p>
                 <p className={`text-xs mt-0.5 ${getValueClass(status.total_return_after_tax_eur)}`}>
                   {formatSignedCurrency(status.total_return_after_tax_eur, 'EUR', locale)}
@@ -376,10 +376,10 @@ export const PortfolioStatusView = () => {
                         <TableCell>{formatCurrency(holding.average_cost, 'USD', locale)}</TableCell>
                         <TableCell>{formatCurrency(holding.total_cost, 'USD', locale)}</TableCell>
                         <TableCell>
-                          {holding.current_price != null ? formatCurrency(holding.current_price, 'USD', locale) : '-'}
+                          {holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale)}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {holding.current_value != null ? formatCurrency(holding.current_value, 'USD', locale) : '-'}
+                          {holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale)}
                         </TableCell>
                         <TableCell>
                           {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
