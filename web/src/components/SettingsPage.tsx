@@ -276,13 +276,9 @@ export const PasswordSection = () => {
 // ================== Tax section ==================
 
 const taxSchema = z.object({
-  taxRate: z.coerce.number().superRefine((val, ctx) => {
-    if (Number.isNaN(val) || val < 0) {
-      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.taxRateMin') });
-    } else if (val > 100) {
-      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.taxRateMax') });
-    }
-  }),
+  taxRate: z.number()
+    .min(0, { message: i18n.t('settings.validation.taxRateMin') })
+    .max(100, { message: i18n.t('settings.validation.taxRateMax') }),
 });
 
 type TaxFormValues = z.infer<typeof taxSchema>;

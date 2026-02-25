@@ -52,7 +52,7 @@ const defaultUser = {
 describe('SettingsLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as unknown as ReturnType<typeof useAuth>);
   });
 
   const renderLayout = (initialEntry = '/settings/profile') => {
@@ -116,7 +116,7 @@ describe('ProfileSection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as unknown as ReturnType<typeof useAuth>);
     vi.mocked(useUpdateProfile).mockReturnValue({
       mutateAsync: mockMutateAsync,
       isPending: false,
@@ -215,7 +215,7 @@ describe('PasswordSection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as unknown as ReturnType<typeof useAuth>);
     vi.mocked(useChangePassword).mockReturnValue({
       mutateAsync: mockMutateAsync,
       isPending: false,
@@ -238,7 +238,7 @@ describe('PasswordSection', () => {
   it('shows OAuth info alert and "Set password" button for OAuth users', () => {
     vi.mocked(useAuth).mockReturnValue({
       user: { ...defaultUser, oauth_providers: ['google'] },
-    } as ReturnType<typeof useAuth>);
+    } as unknown as ReturnType<typeof useAuth>);
 
     renderWithProviders(<PasswordSection />);
 
@@ -327,7 +327,7 @@ describe('TaxSection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as unknown as ReturnType<typeof useAuth>);
     vi.mocked(useUpdateTaxRate).mockReturnValue({
       mutateAsync: mockMutateAsync,
       isPending: false,
@@ -410,7 +410,7 @@ describe('AccountSection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as unknown as ReturnType<typeof useAuth>);
     vi.mocked(useCloseAccount).mockReturnValue({
       mutateAsync: mockMutateAsync,
       isPending: false,
@@ -434,7 +434,7 @@ describe('AccountSection', () => {
   it('shows confirmation form for OAuth users', () => {
     vi.mocked(useAuth).mockReturnValue({
       user: { ...defaultUser, oauth_providers: ['google'] },
-    } as ReturnType<typeof useAuth>);
+    } as unknown as ReturnType<typeof useAuth>);
 
     renderWithProviders(<AccountSection />);
 
@@ -469,7 +469,7 @@ describe('AccountSection', () => {
   it('shows validation error when confirmation is not DELETE (OAuth)', async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: { ...defaultUser, oauth_providers: ['google'] },
-    } as ReturnType<typeof useAuth>);
+    } as unknown as ReturnType<typeof useAuth>);
 
     renderWithProviders(<AccountSection />);
 
@@ -488,7 +488,7 @@ describe('AccountSection', () => {
     mockMutateAsync.mockResolvedValueOnce(undefined);
     vi.mocked(useAuth).mockReturnValue({
       user: { ...defaultUser, oauth_providers: ['google'] },
-    } as ReturnType<typeof useAuth>);
+    } as unknown as ReturnType<typeof useAuth>);
 
     renderWithProviders(<AccountSection />);
 
