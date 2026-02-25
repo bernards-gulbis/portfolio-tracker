@@ -172,6 +172,19 @@ const TransactionTable = ({
     return pages;
   };
 
+  const getTransactionDetails = (transaction: Transaction): string => {
+    if (transaction.type === TransactionType.SPLIT && transaction.split_ratio != null) {
+      return t('transaction.table.columns.splitFormat', { ratio: transaction.split_ratio });
+    }
+    if (transaction.quantity != null && transaction.price_per_share != null) {
+      return t('transaction.table.columns.detailsFormat', {
+        qty: Number.parseFloat(transaction.quantity.toFixed(8)),
+        price: formatCurrency(transaction.price_per_share, 'USD', locale),
+      });
+    }
+    return '-';
+  };
+
   const hasActiveFilters = tickerSearch !== '' || typeFilter.length > 0;
 
   const startIndex = (responsePage - 1) * responsePageSize;
@@ -303,14 +316,7 @@ const TransactionTable = ({
                 </TableCell>
                 <TableCell>{transaction.ticker || '-'}</TableCell>
                 <TableCell>
-                  {transaction.type === TransactionType.SPLIT && transaction.split_ratio != null
-                    ? t('transaction.table.columns.splitFormat', { ratio: transaction.split_ratio })
-                    : transaction.quantity != null && transaction.price_per_share != null
-                      ? t('transaction.table.columns.detailsFormat', {
-                          qty: parseFloat(transaction.quantity.toFixed(8)),
-                          price: formatCurrency(transaction.price_per_share, 'USD', locale),
-                        })
-                      : '-'}
+                  {getTransactionDetails(transaction)}
                 </TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(transaction.total_amount, 'USD', locale)}
