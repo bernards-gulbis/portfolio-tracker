@@ -77,7 +77,7 @@ export function LoginPage() {
     const raw = getErrorMessage(err);
     const key = `auth.apiErrors.${raw}` as const;
     const translated = t(key as never);
-    return String(translated) !== key ? String(translated) : raw;
+    return String(translated) === key ? raw : String(translated);
   };
 
   const handleLogin = async (values: LoginValues) => {
