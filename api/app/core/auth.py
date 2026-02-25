@@ -203,6 +203,40 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def on_after_register(self, user: User, request=None):
         logger.info("User %s registered", user.id)
 
+    async def _create_oauth_user(
+        self, oauth_account_dict: dict, profile: dict, is_verified_by_default: bool, request
+    ) -> User:
+        """Create a brand-new user from OAuth profile data."""
+        password = self.password_helper.generate()
+        user_dict: dict = {
+            "email": oauth_account_dict["account_email"],
+            "hashed_password": self.password_helper.hash(password),
+            "is_verified": is_verified_by_default,
+        }
+        profile_name = profile.get("name")
+        if profile_name:
+            user_dict["name"] = profile_name
+        profile_picture = profile.get("picture")
+        if profile_picture:
+            user_dict["picture"] = profile_picture
+        user = await self.user_db.create(user_dict)
+        user = await self.user_db.add_oauth_account(user, oauth_account_dict)
+        await self.on_after_register(user, request)
+        return user
+
+    async def _backfill_profile(self, user: User, profile: dict) -> User:
+        """Backfill/refresh profile fields from the OAuth provider on re-login."""
+        update_fields: dict = {}
+        profile_name = profile.get("name")
+        if profile_name and not user.name:
+            update_fields["name"] = profile_name
+        profile_picture = profile.get("picture")
+        if profile_picture and profile_picture != user.picture:
+            update_fields["picture"] = profile_picture
+        if update_fields:
+            user = await self.user_db.update(user, update_fields)
+        return user
+
     async def oauth_callback(
         self,
         oauth_name: str,
@@ -234,8 +268,6 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
         # Fetch profile data using this request's own access token
         profile = await fetch_google_profile(access_token) if oauth_name == "google" else {}
-        profile_name = profile.get("name")
-        profile_picture = profile.get("picture")
 
         try:
             user = await self.get_by_oauth_account(oauth_name, account_id)
@@ -247,31 +279,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     raise exceptions.UserAlreadyExists()
                 user = await self.user_db.add_oauth_account(user, oauth_account_dict)
             except exceptions.UserNotExists:
-                # Create new user, pulling profile info from the OAuth provider
-                password = self.password_helper.generate()
-                user_dict = {
-                    "email": account_email,
-                    "hashed_password": self.password_helper.hash(password),
-                    "is_verified": is_verified_by_default,
-                    **({"name": profile_name} if profile_name else {}),
-                    **({"picture": profile_picture} if profile_picture else {}),
-                }
-                user = await self.user_db.create(user_dict)
-                user = await self.user_db.add_oauth_account(user, oauth_account_dict)
-                await self.on_after_register(user, request)
+                user = await self._create_oauth_user(
+                    oauth_account_dict, profile, is_verified_by_default, request
+                )
         else:
             # Re-login: update stored tokens without touching user.oauth_accounts
             user = await self.user_db.update_oauth_account_by_ids(
                 user, oauth_name, account_id, oauth_account_dict
             )
-            # Backfill/refresh profile fields from OAuth provider
-            update_fields: dict = {}
-            if profile_name and not user.name:
-                update_fields["name"] = profile_name
-            if profile_picture and profile_picture != user.picture:
-                update_fields["picture"] = profile_picture
-            if update_fields:
-                user = await self.user_db.update(user, update_fields)
+            user = await self._backfill_profile(user, profile)
 
         return user
 
