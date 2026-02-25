@@ -196,7 +196,7 @@ def get_current_user_me(
     user_data["oauth_providers"] = providers
     return user_data
 
-@_users_router.delete("/me", tags=["users"], status_code=204)
+@_users_router.delete("/me", tags=["users"], status_code=204, responses={400: {"description": "Incorrect password or missing DELETE confirmation"}})
 async def delete_current_user(
     body: CloseAccountRequest,
     user: Annotated[User, Depends(current_active_user)],

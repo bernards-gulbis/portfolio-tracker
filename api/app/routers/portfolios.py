@@ -55,7 +55,7 @@ def get_portfolio(
     return service.get_portfolio(portfolio_id, user.id)
 
 
-@router.get("/{portfolio_id}/status", response_model=PortfolioStatusResponse)
+@router.get("/{portfolio_id}/status", response_model=PortfolioStatusResponse, responses={400: {"description": "Invalid portfolio data"}})
 def get_portfolio_status(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
@@ -106,7 +106,7 @@ def delete_portfolio(
     return None
 
 
-@router.get("/{portfolio_id}/performance", response_model=PortfolioPerformanceResponse)
+@router.get("/{portfolio_id}/performance", response_model=PortfolioPerformanceResponse, responses={400: {"description": "Invalid date format or date range"}})
 def get_portfolio_performance(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
