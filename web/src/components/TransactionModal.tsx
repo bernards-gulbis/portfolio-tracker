@@ -85,14 +85,14 @@ const schema = z
     }
 
     if ([TransactionType.BUY, TransactionType.SELL].includes(type)) {
-      if (parseFloat(data.quantity || '0') <= 0) {
+      if (Number.parseFloat(data.quantity || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['quantity'],
           message: i18n.t('transaction.validation.quantityPositive'),
         });
       }
-      if (parseFloat(data.pricePerShare || '0') <= 0) {
+      if (Number.parseFloat(data.pricePerShare || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['pricePerShare'],
@@ -102,7 +102,7 @@ const schema = z
     }
 
     if (type === TransactionType.SPLIT) {
-      if (parseFloat(data.splitRatio || '0') <= 0) {
+      if (Number.parseFloat(data.splitRatio || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['splitRatio'],
@@ -112,7 +112,7 @@ const schema = z
     }
 
     if (type !== TransactionType.SPLIT) {
-      if (parseFloat(data.totalAmount || '0') <= 0) {
+      if (Number.parseFloat(data.totalAmount || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['totalAmount'],
@@ -293,39 +293,39 @@ const buildTransactionData = (values: FormValues): TransactionCreate => {
 
   switch (values.type) {
     case TransactionType.DEPOSIT:
-      base.total_amount = Math.abs(parseFloat(values.totalAmount || '0'));
-      if (values.valueEur?.trim()) base.eur_amount = Math.abs(parseFloat(values.valueEur));
+      base.total_amount = Math.abs(Number.parseFloat(values.totalAmount || '0'));
+      if (values.valueEur?.trim()) base.eur_amount = Math.abs(Number.parseFloat(values.valueEur));
       break;
     case TransactionType.WITHDRAW:
-      base.total_amount = -Math.abs(parseFloat(values.totalAmount || '0'));
-      if (values.valueEur?.trim()) base.eur_amount = -Math.abs(parseFloat(values.valueEur));
+      base.total_amount = -Math.abs(Number.parseFloat(values.totalAmount || '0'));
+      if (values.valueEur?.trim()) base.eur_amount = -Math.abs(Number.parseFloat(values.valueEur));
       break;
     case TransactionType.FEE:
-      base.total_amount = -Math.abs(parseFloat(values.totalAmount || '0'));
+      base.total_amount = -Math.abs(Number.parseFloat(values.totalAmount || '0'));
       break;
     case TransactionType.BUY:
       base.ticker = values.ticker;
-      base.quantity = parseFloat(values.quantity || '0');
-      base.price_per_share = parseFloat(values.pricePerShare || '0');
-      base.fee = Math.abs(parseFloat(values.fee || '0'));
-      base.total_amount = -Math.abs(parseFloat(values.totalAmount || '0'));
+      base.quantity = Number.parseFloat(values.quantity || '0');
+      base.price_per_share = Number.parseFloat(values.pricePerShare || '0');
+      base.fee = Math.abs(Number.parseFloat(values.fee || '0'));
+      base.total_amount = -Math.abs(Number.parseFloat(values.totalAmount || '0'));
       break;
     case TransactionType.SELL:
       base.ticker = values.ticker;
-      base.quantity = parseFloat(values.quantity || '0');
-      base.price_per_share = parseFloat(values.pricePerShare || '0');
-      base.fee = Math.abs(parseFloat(values.fee || '0'));
-      base.total_amount = Math.abs(parseFloat(values.totalAmount || '0'));
+      base.quantity = Number.parseFloat(values.quantity || '0');
+      base.price_per_share = Number.parseFloat(values.pricePerShare || '0');
+      base.fee = Math.abs(Number.parseFloat(values.fee || '0'));
+      base.total_amount = Math.abs(Number.parseFloat(values.totalAmount || '0'));
       break;
     case TransactionType.DIVIDEND:
       base.ticker = values.ticker;
-      base.total_amount = Math.abs(parseFloat(values.totalAmount || '0'));
-      if (values.fee?.trim()) base.fee = Math.abs(parseFloat(values.fee));
-      if (values.fxRate?.trim()) base.fx_rate = parseFloat(values.fxRate);
+      base.total_amount = Math.abs(Number.parseFloat(values.totalAmount || '0'));
+      if (values.fee?.trim()) base.fee = Math.abs(Number.parseFloat(values.fee));
+      if (values.fxRate?.trim()) base.fx_rate = Number.parseFloat(values.fxRate);
       break;
     case TransactionType.SPLIT:
       base.ticker = values.ticker;
-      base.split_ratio = parseFloat(values.splitRatio || '1');
+      base.split_ratio = Number.parseFloat(values.splitRatio || '1');
       base.total_amount = 0;
       break;
     default:
