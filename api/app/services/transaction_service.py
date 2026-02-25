@@ -24,6 +24,11 @@ def _csv_field(value):
     return value if value is not None else ''
 
 
+def _coalesce(new, existing):
+    """Return *new* if provided (not None), otherwise keep *existing*."""
+    return new if new is not None else existing
+
+
 class TransactionService:
     """Service for transaction business logic"""
 
@@ -172,13 +177,13 @@ class TransactionService:
         if not transaction:
             raise TransactionNotFoundException(transaction_id)
 
-        val_type = transaction_type if transaction_type is not None else transaction.type
-        val_ticker = ticker if ticker is not None else transaction.ticker
-        val_quantity = quantity if quantity is not None else transaction.quantity
-        val_price_per_share = price_per_share if price_per_share is not None else transaction.price_per_share
-        val_total_amount = total_amount if total_amount is not None else transaction.total_amount
-        val_fee = fee if fee is not None else transaction.fee
-        val_eur_amount = eur_amount if eur_amount is not None else transaction.eur_amount
+        val_type = _coalesce(transaction_type, transaction.type)
+        val_ticker = _coalesce(ticker, transaction.ticker)
+        val_quantity = _coalesce(quantity, transaction.quantity)
+        val_price_per_share = _coalesce(price_per_share, transaction.price_per_share)
+        val_total_amount = _coalesce(total_amount, transaction.total_amount)
+        val_fee = _coalesce(fee, transaction.fee)
+        val_eur_amount = _coalesce(eur_amount, transaction.eur_amount)
 
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
@@ -199,28 +204,15 @@ class TransactionService:
             val_fee
         )
 
-        if date is not None:
-            transaction.date = date
-        if transaction_type is not None:
-            transaction.type = transaction_type
-        if ticker is not None:
-            transaction.ticker = ticker
-        if quantity is not None:
-            transaction.quantity = quantity
-        if price_per_share is not None:
-            transaction.price_per_share = price_per_share
-        if fee is not None:
-            transaction.fee = fee
-        if total_amount is not None:
-            transaction.total_amount = total_amount
-        if eur_amount is not None:
-            transaction.eur_amount = eur_amount
-        if split_ratio is not None:
-            transaction.split_ratio = split_ratio
-        if currency is not None:
-            transaction.currency = currency
-        if fx_rate is not None:
-            transaction.fx_rate = fx_rate
+        provided = {
+            'date': date, 'type': transaction_type, 'ticker': ticker,
+            'quantity': quantity, 'price_per_share': price_per_share,
+            'fee': fee, 'total_amount': total_amount, 'eur_amount': eur_amount,
+            'split_ratio': split_ratio, 'currency': currency, 'fx_rate': fx_rate,
+        }
+        for field, value in provided.items():
+            if value is not None:
+                setattr(transaction, field, value)
 
         return self.transaction_repo.update(transaction)
 
