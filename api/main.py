@@ -32,6 +32,7 @@ from app.models.user import User
 from app.models.oauth_account import OAuthAccount
 from sqlmodel import Session, select
 from sqlalchemy import text
+from typing import Annotated
 from fastapi import Depends
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
 
@@ -185,8 +186,8 @@ _users_router.routes = [
 
 @_users_router.get("/me", tags=["users"])
 def get_current_user_me(
-    user: User = Depends(current_active_user),
-    session: Session = Depends(get_session),
+    user: Annotated[User, Depends(current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
 ):
     providers = list(session.exec(
         select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
@@ -198,9 +199,9 @@ def get_current_user_me(
 @_users_router.delete("/me", tags=["users"], status_code=204)
 async def delete_current_user(
     body: CloseAccountRequest,
-    user: User = Depends(current_active_user),
-    session: Session = Depends(get_session),
-    user_manager: UserManager = Depends(get_user_manager),
+    user: Annotated[User, Depends(current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    user_manager: Annotated[UserManager, Depends(get_user_manager)],
 ):
     """Permanently delete the current user and all associated data."""
     # Determine which providers the user has
