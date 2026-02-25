@@ -4,5 +4,5 @@ export const useActivePortfolioId = (): number | null => {
   const { id } = useParams<{ id: string }>();
   if (!id) return null;
   const parsed = Number(id);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };

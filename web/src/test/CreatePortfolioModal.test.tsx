@@ -80,6 +80,20 @@ describe('CreatePortfolioModal', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
+  it('shows validation error for whitespace-only name', async () => {
+    renderModal({ isOpen: true, onClose: mockOnClose });
+
+    const input = screen.getByLabelText('Portfolio Name');
+    await userEvent.type(input, '   ');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create Portfolio' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Portfolio name is required')).toBeInTheDocument();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
   it('shows validation error for name exceeding 255 characters', async () => {
     renderModal({ isOpen: true, onClose: mockOnClose });
 

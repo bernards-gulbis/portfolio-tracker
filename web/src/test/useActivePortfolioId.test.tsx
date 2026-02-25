@@ -36,8 +36,18 @@ describe('useActivePortfolioId', () => {
     expect(result.current).toBeNull();
   });
 
-  it('returns the numeric id for a decimal string', () => {
+  it('returns null for a decimal string', () => {
     const { result } = renderWithRoute('/portfolios/3.5', '/portfolios/:id');
-    expect(result.current).toBe(3.5);
+    expect(result.current).toBeNull();
+  });
+
+  it('returns null for zero', () => {
+    const { result } = renderWithRoute('/portfolios/0', '/portfolios/:id');
+    expect(result.current).toBeNull();
+  });
+
+  it('returns null for negative integer', () => {
+    const { result } = renderWithRoute('/portfolios/-1', '/portfolios/:id');
+    expect(result.current).toBeNull();
   });
 });

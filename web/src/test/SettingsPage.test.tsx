@@ -166,6 +166,21 @@ describe('ProfileSection', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
+  it('shows validation error when name is only whitespace', async () => {
+    renderWithProviders(<ProfileSection />);
+
+    const input = screen.getByLabelText('Name');
+    await userEvent.clear(input);
+    await userEvent.type(input, '   ');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Name is required')).toBeInTheDocument();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
   it('shows API error on mutation failure', async () => {
     mockMutateAsync.mockRejectedValueOnce(new Error('Server error'));
     renderWithProviders(<ProfileSection />);

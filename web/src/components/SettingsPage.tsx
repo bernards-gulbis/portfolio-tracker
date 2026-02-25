@@ -20,9 +20,9 @@ import { User, KeyRound, ShieldAlert, Receipt, Info } from 'lucide-react';
 
 const profileSchema = z.object({
   name: z.string().superRefine((val, ctx) => {
-    if (val.length < 1) {
+    if (val.trim().length < 1) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.nameRequired') });
-    } else if (val.length > 255) {
+    } else if (val.trim().length > 255) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.nameTooLong') });
     }
   }),

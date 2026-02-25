@@ -289,7 +289,7 @@ export const PortfolioStatusView = () => {
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: (status.capital_gains_tax_rate * 100).toFixed(1) })}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(status.capital_gains_tax_rate * 100) })}</p>
                 <p className="text-lg font-semibold">
                   {status.tax_eur !== null ? formatCurrency(status.tax_eur, 'EUR', locale) : '-'}
                 </p>
