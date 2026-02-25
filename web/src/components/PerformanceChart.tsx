@@ -262,12 +262,14 @@ export const PerformanceChart = ({
                     })
                   }
                   formatter={(value, name, item) => {
-                    const formatted =
-                      value == null
-                        ? t('common.notAvailable')
-                        : name === 'returnPct' || name === 'sp500ReturnPct'
-                          ? `${(value as number).toFixed(2)}%`
-                          : formatCurrency(value as number, 'EUR', locale);
+                    let formatted: string;
+                    if (value == null) {
+                      formatted = t('common.notAvailable');
+                    } else if (name === 'returnPct' || name === 'sp500ReturnPct') {
+                      formatted = `${(value as number).toFixed(2)}%`;
+                    } else {
+                      formatted = formatCurrency(value as number, 'EUR', locale);
+                    }
                     return (
                       <>
                         <div
