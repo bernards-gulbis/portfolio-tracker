@@ -23,12 +23,12 @@ const emailValidator = z.string().email();
 const loginSchema = z.object({
   email: z.string().superRefine((val, ctx) => {
     if (!emailValidator.safeParse(val).success) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.invalidEmail') });
     }
   }),
   password: z.string().superRefine((val, ctx) => {
     if (val.length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.passwordRequired') });
     }
   }),
 });
@@ -36,17 +36,17 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().superRefine((val, ctx) => {
     if (val.trim().length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.nameRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.nameRequired') });
     }
   }),
   email: z.string().superRefine((val, ctx) => {
     if (!emailValidator.safeParse(val).success) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.invalidEmail') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.invalidEmail') });
     }
   }),
   password: z.string().superRefine((val, ctx) => {
     if (val.length < 8) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('auth.validation.passwordMinLength') });
+      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.passwordMinLength') });
     }
   }),
 });

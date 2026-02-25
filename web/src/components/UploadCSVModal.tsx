@@ -23,11 +23,11 @@ import { Spinner } from '@/components/ui/spinner';
 const schema = z.object({
   file: z.any().superRefine((val, ctx) => {
     if (!(val instanceof File)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.csv.validation.fileRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('transaction.csv.validation.fileRequired') });
       return;
     }
     if (!val.name.toLowerCase().endsWith('.csv')) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('transaction.csv.validation.fileMustBeCsv') });
+      ctx.addIssue({ code: "custom", message: i18n.t('transaction.csv.validation.fileMustBeCsv') });
     }
   }),
 });

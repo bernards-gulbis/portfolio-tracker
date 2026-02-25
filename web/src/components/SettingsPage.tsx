@@ -21,9 +21,9 @@ import { User, KeyRound, ShieldAlert, Receipt, Info } from 'lucide-react';
 const profileSchema = z.object({
   name: z.string().superRefine((val, ctx) => {
     if (val.trim().length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.nameRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.nameRequired') });
     } else if (val.trim().length > 255) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.nameTooLong') });
+      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.nameTooLong') });
     }
   }),
 });
@@ -33,14 +33,14 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 const passwordSchema = z.object({
   newPassword: z.string().superRefine((val, ctx) => {
     if (val.length < 8) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.passwordMinLength') });
+      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.passwordMinLength') });
     }
   }),
   confirmPassword: z.string(),
 }).superRefine((data, ctx) => {
   if (data.newPassword.length >= 8 && data.newPassword !== data.confirmPassword) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       message: i18n.t('settings.validation.passwordsDoNotMatch'),
       path: ['confirmPassword'],
     });
@@ -52,7 +52,7 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 const closeAccountPasswordSchema = z.object({
   password: z.string().superRefine((val, ctx) => {
     if (val.length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.passwordRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.passwordRequired') });
     }
   }),
 });
@@ -60,7 +60,7 @@ const closeAccountPasswordSchema = z.object({
 const closeAccountConfirmSchema = z.object({
   confirmation: z.string().superRefine((val, ctx) => {
     if (val !== 'DELETE') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.confirmationRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.confirmationRequired') });
     }
   }),
 });
@@ -278,9 +278,9 @@ export const PasswordSection = () => {
 const taxSchema = z.object({
   taxRate: z.coerce.number().superRefine((val, ctx) => {
     if (Number.isNaN(val) || val < 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.taxRateMin') });
+      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.taxRateMin') });
     } else if (val > 100) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('settings.validation.taxRateMax') });
+      ctx.addIssue({ code: "custom", message: i18n.t('settings.validation.taxRateMax') });
     }
   }),
 });

@@ -23,9 +23,9 @@ import { Spinner } from '@/components/ui/spinner';
 const schema = z.object({
   name: z.string().superRefine((val, ctx) => {
     if (val.trim().length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('portfolio.validation.nameRequired') });
+      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameRequired') });
     } else if (val.trim().length > 255) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: i18n.t('portfolio.validation.nameTooLong') });
+      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameTooLong') });
     }
   }),
 });
