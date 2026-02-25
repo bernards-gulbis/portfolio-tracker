@@ -177,6 +177,15 @@ const TransactionTable = ({
   const startIndex = (responsePage - 1) * responsePageSize;
   const endIndex = Math.min(startIndex + (transactions.length || 0), total);
 
+  let typeFilterLabel: string;
+  if (typeFilter.length === 0) {
+    typeFilterLabel = t('transaction.table.filters.typeAll');
+  } else if (typeFilter.length === 1) {
+    typeFilterLabel = transactionTypeLabels[typeFilter[0] as TransactionType];
+  } else {
+    typeFilterLabel = t('transaction.table.filters.typeCount', { count: typeFilter.length });
+  }
+
   const filterBar = (
     <div className="flex items-center gap-3 mb-3">
       <div className="relative max-w-xs">
@@ -194,11 +203,7 @@ const TransactionTable = ({
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="min-w-[160px] justify-start gap-2">
             <FilterIcon className="h-4 w-4 text-muted-foreground" />
-            {typeFilter.length === 0
-              ? t('transaction.table.filters.typeAll')
-              : typeFilter.length === 1
-                ? transactionTypeLabels[typeFilter[0] as TransactionType]
-                : t('transaction.table.filters.typeCount', { count: typeFilter.length })}
+            {typeFilterLabel}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
