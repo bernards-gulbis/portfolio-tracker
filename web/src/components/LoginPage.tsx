@@ -18,7 +18,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 
-const emailValidator = z.string().email();
+const emailValidator = z.email();
 
 const loginSchema = z.object({
   email: z.string().superRefine((val, ctx) => {
