@@ -153,24 +153,25 @@ app.include_router(transactions_router)
 app.include_router(transaction_router)
 
 # Auth routers
+AUTH_PREFIX = "/auth"
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
-    prefix="/auth/cookie",
+    prefix=f"{AUTH_PREFIX}/cookie",
     tags=["auth"],
 )
 app.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
-    prefix="/auth",
+    prefix=AUTH_PREFIX,
     tags=["auth"],
 )
 app.include_router(
     fastapi_users.get_reset_password_router(),
-    prefix="/auth",
+    prefix=AUTH_PREFIX,
     tags=["auth"],
 )
 app.include_router(
     fastapi_users.get_verify_router(UserRead),
-    prefix="/auth",
+    prefix=AUTH_PREFIX,
     tags=["auth"],
 )
 # Build the FastAPI Users users router, then replace its GET /me with our own
