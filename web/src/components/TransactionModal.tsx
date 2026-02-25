@@ -85,14 +85,14 @@ const schema = z
     }
 
     if ([TransactionType.BUY, TransactionType.SELL].includes(type)) {
-      if (!(parseFloat(data.quantity || '0') > 0)) {
+      if (parseFloat(data.quantity || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['quantity'],
           message: i18n.t('transaction.validation.quantityPositive'),
         });
       }
-      if (!(parseFloat(data.pricePerShare || '0') > 0)) {
+      if (parseFloat(data.pricePerShare || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['pricePerShare'],
@@ -102,7 +102,7 @@ const schema = z
     }
 
     if (type === TransactionType.SPLIT) {
-      if (!(parseFloat(data.splitRatio || '0') > 0)) {
+      if (parseFloat(data.splitRatio || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['splitRatio'],
@@ -112,7 +112,7 @@ const schema = z
     }
 
     if (type !== TransactionType.SPLIT) {
-      if (!(parseFloat(data.totalAmount || '0') > 0)) {
+      if (parseFloat(data.totalAmount || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
           path: ['totalAmount'],
