@@ -45,6 +45,36 @@ const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitch
 
   const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
 
+  const renderPortfolioItems = () => {
+    if (error) {
+      return (
+        <div className="px-2 py-1.5 text-xs text-destructive">
+          {t('portfolio.list.error', { message: getErrorMessage(error) })}
+        </div>
+      );
+    }
+    if (portfolios && portfolios.length > 0) {
+      return portfolios.map((portfolio) => (
+        <DropdownMenuItem key={portfolio.id} asChild className="gap-2 p-2">
+          <Link
+            to={`/portfolios/${portfolio.id}`}
+            onClick={() => setOpen(false)}
+          >
+            <div className="flex size-6 items-center justify-center rounded-sm border">
+              <BriefcaseBusiness className="size-4 shrink-0" />
+            </div>
+            <span className="truncate">{portfolio.name}</span>
+          </Link>
+        </DropdownMenuItem>
+      ));
+    }
+    return (
+      <div className="px-2 py-1.5 text-xs text-muted-foreground">
+        {t('portfolio.list.empty.description')}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <SidebarMenu>
@@ -84,29 +114,7 @@ const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitch
             <DropdownMenuLabel className="text-muted-foreground text-xs">
               {t('portfolio.list.title')}
             </DropdownMenuLabel>
-            {error ? (
-              <div className="px-2 py-1.5 text-xs text-destructive">
-                {t('portfolio.list.error', { message: getErrorMessage(error) })}
-              </div>
-            ) : portfolios && portfolios.length > 0 ? (
-              portfolios.map((portfolio) => (
-                <DropdownMenuItem key={portfolio.id} asChild className="gap-2 p-2">
-                  <Link
-                    to={`/portfolios/${portfolio.id}`}
-                    onClick={() => setOpen(false)}
-                  >
-                    <div className="flex size-6 items-center justify-center rounded-sm border">
-                      <BriefcaseBusiness className="size-4 shrink-0" />
-                    </div>
-                    <span className="truncate">{portfolio.name}</span>
-                  </Link>
-                </DropdownMenuItem>
-              ))
-            ) : (
-              <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                {t('portfolio.list.empty.description')}
-              </div>
-            )}
+            {renderPortfolioItems()}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 p-2"
