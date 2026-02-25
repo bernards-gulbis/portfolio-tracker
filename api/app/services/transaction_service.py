@@ -19,6 +19,11 @@ from app.core.exceptions import (
 )
 
 
+def _csv_field(value):
+    """Convert None to empty string for CSV export."""
+    return value if value is not None else ''
+
+
 class TransactionService:
     """Service for transaction business logic"""
 
@@ -134,14 +139,14 @@ class TransactionService:
                 transaction.date.strftime('%m/%d/%Y %H:%M:%S'),
                 transaction.type.value,
                 transaction.ticker or '',
-                transaction.quantity if transaction.quantity is not None else '',
-                transaction.price_per_share if transaction.price_per_share is not None else '',
-                transaction.fee if transaction.fee is not None else '',
+                _csv_field(transaction.quantity),
+                _csv_field(transaction.price_per_share),
+                _csv_field(transaction.fee),
                 transaction.total_amount,
-                transaction.eur_amount if transaction.eur_amount is not None else '',
-                transaction.split_ratio if transaction.split_ratio is not None else '',
-                transaction.currency if transaction.currency is not None else '',
-                transaction.fx_rate if transaction.fx_rate is not None else '',
+                _csv_field(transaction.eur_amount),
+                _csv_field(transaction.split_ratio),
+                _csv_field(transaction.currency),
+                _csv_field(transaction.fx_rate),
             ])
 
         return output.getvalue()
