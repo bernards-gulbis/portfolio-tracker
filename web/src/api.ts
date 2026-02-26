@@ -201,7 +201,7 @@ api.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401 && sessionActive) {
       sessionActive = false;
-      window.dispatchEvent(new CustomEvent('auth:logout'));
+      globalThis.dispatchEvent(new CustomEvent('auth:logout'));
     }
     return Promise.reject(error);
   }

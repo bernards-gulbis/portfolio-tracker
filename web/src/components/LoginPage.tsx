@@ -103,7 +103,7 @@ export function LoginPage() {
     setGoogleLoading(true);
     try {
       const url = await getGoogleAuthorizeUrl();
-      window.location.href = url;
+      globalThis.location.href = url;
     } catch (err) {
       toast.error(getErrorMessage(err));
       setGoogleLoading(false);

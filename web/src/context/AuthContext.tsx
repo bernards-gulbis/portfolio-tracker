@@ -34,17 +34,17 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     } catch {
       // Ignore logout errors — clear state regardless
     }
-    window.dispatchEvent(new CustomEvent('auth:logout'));
+    globalThis.dispatchEvent(new CustomEvent('auth:logout'));
   }, []);
 
   useEffect(() => {
     // Show error toast if backend redirected back with ?oauth_error=
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(globalThis.location.search);
     const oauthError = params.get('oauth_error');
     if (oauthError) {
       toast.error(t('auth.toasts.googleLoginFailed', { error: oauthError }));
       // Remove the query param without reloading the page
-      window.history.replaceState({}, '', window.location.pathname);
+      globalThis.history.replaceState({}, '', globalThis.location.pathname);
     }
 
     const init = async () => {
@@ -66,8 +66,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
       navigate('/', { replace: true });
     };
 
-    window.addEventListener('auth:logout', handleAuthLogout);
-    return () => window.removeEventListener('auth:logout', handleAuthLogout);
+    globalThis.addEventListener('auth:logout', handleAuthLogout);
+    return () => globalThis.removeEventListener('auth:logout', handleAuthLogout);
   }, [queryClient, navigate, updateUser]);
 
   const value = useMemo(() => ({ user, status, setUser: updateUser, logout }), [user, status, updateUser, logout]);

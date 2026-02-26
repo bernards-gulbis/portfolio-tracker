@@ -100,7 +100,7 @@ describe('AuthContext', () => {
     );
 
     act(() => {
-      window.dispatchEvent(new CustomEvent('auth:logout'));
+      globalThis.dispatchEvent(new CustomEvent('auth:logout'));
     });
 
     await waitFor(() =>
@@ -119,7 +119,7 @@ describe('AuthContext', () => {
     );
 
     act(() => {
-      window.dispatchEvent(new CustomEvent('auth:logout'));
+      globalThis.dispatchEvent(new CustomEvent('auth:logout'));
     });
 
     await waitFor(() => {
