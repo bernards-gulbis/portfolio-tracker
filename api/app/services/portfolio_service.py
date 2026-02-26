@@ -416,10 +416,8 @@ def _compute_tax_metrics(
     capital_gains_eur: Optional[Decimal] = None
     tax_eur: Optional[Decimal] = None
 
-    # Dividends exist but EUR conversion unavailable — cannot compute accurate tax
-    if state.dividends > 0 and dividends_eur is None:
-        pass
-    else:
+    # Skip tax computation when dividends exist but EUR conversion is unavailable
+    if state.dividends == 0 or dividends_eur is not None:
         dividends_for_tax = dividends_eur if dividends_eur is not None else _ZERO
         capital_gains_eur = current_value_eur - state.principal_eur - dividends_for_tax
         tax_eur = capital_gains_eur * tax_rate if capital_gains_eur > 0 else _ZERO
