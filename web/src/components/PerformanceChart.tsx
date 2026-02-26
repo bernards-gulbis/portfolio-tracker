@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ComposedChart,
   Area,
@@ -90,6 +90,54 @@ const getCutoffDate = (period: TimePeriod): string | null => {
   }
   return cutoff.toISOString().split('T')[0];
 };
+
+const PerformanceTooltipContent = ({
+  chartConfig,
+  locale,
+  notAvailableLabel,
+  ...rest
+}: React.ComponentProps<typeof ChartTooltipContent> & {
+  chartConfig: ChartConfig;
+  locale: string;
+  notAvailableLabel: string;
+}) => (
+  <ChartTooltipContent
+    {...rest}
+    labelFormatter={(value) =>
+      parseYMD(value as string).toLocaleDateString(locale, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    }
+    formatter={(value, name, item) => {
+      let formatted: string;
+      if (value == null) {
+        formatted = notAvailableLabel;
+      } else if (name === 'returnPct' || name === 'sp500ReturnPct') {
+        formatted = `${(value as number).toFixed(2)}%`;
+      } else {
+        formatted = formatCurrency(value as number, 'EUR', locale);
+      }
+      return (
+        <>
+          <div
+            className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+            style={{ backgroundColor: item.color }}
+          />
+          <div className="flex flex-1 justify-between items-center leading-none">
+            <span className="text-muted-foreground">
+              {chartConfig[name as keyof typeof chartConfig]?.label || name}
+            </span>
+            <span className="font-mono font-medium tabular-nums ml-2">
+              {formatted}
+            </span>
+          </div>
+        </>
+      );
+    }}
+  />
+);
 
 export const PerformanceChart = ({
   data,
@@ -253,40 +301,10 @@ export const PerformanceChart = ({
             )}
             <ChartTooltip
               content={
-                <ChartTooltipContent
-                  labelFormatter={(value) =>
-                    parseYMD(value as string).toLocaleDateString(locale, {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })
-                  }
-                  formatter={(value, name, item) => {
-                    let formatted: string;
-                    if (value == null) {
-                      formatted = t('common.notAvailable');
-                    } else if (name === 'returnPct' || name === 'sp500ReturnPct') {
-                      formatted = `${(value as number).toFixed(2)}%`;
-                    } else {
-                      formatted = formatCurrency(value as number, 'EUR', locale);
-                    }
-                    return (
-                      <>
-                        <div
-                          className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <div className="flex flex-1 justify-between items-center leading-none">
-                          <span className="text-muted-foreground">
-                            {chartConfig[name as keyof typeof chartConfig]?.label || name}
-                          </span>
-                          <span className="font-mono font-medium tabular-nums ml-2">
-                            {formatted}
-                          </span>
-                        </div>
-                      </>
-                    );
-                  }}
+                <PerformanceTooltipContent
+                  chartConfig={chartConfig}
+                  locale={locale}
+                  notAvailableLabel={t('common.notAvailable')}
                 />
               }
             />

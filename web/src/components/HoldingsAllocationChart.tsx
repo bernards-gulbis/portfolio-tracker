@@ -168,14 +168,13 @@ export const HoldingsAllocationChart = ({
               stroke="var(--card)"
             >
               <Label
-                content={(props) => (
+                content={
                   <PieCenterLabel
-                    viewBox={props.viewBox}
                     total={total}
                     locale={locale}
                     label={t('chart.allocation.marketValue')}
                   />
-                )}
+                }
               />
             </Pie>
           </PieChart>
