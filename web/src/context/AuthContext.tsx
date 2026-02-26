@@ -20,11 +20,11 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [user, setUserState] = useState<UserRead | null>(null);
+  const [user, setUser] = useState<UserRead | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
 
-  const setUser = useCallback((u: UserRead | null) => {
-    setUserState(u);
+  const updateUser = useCallback((u: UserRead | null) => {
+    setUser(u);
     setStatus(u ? 'authenticated' : 'unauthenticated');
   }, []);
 
@@ -50,28 +50,27 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     const init = async () => {
       try {
         const currentUser = await getCurrentUser();
-        setUser(currentUser);
+        updateUser(currentUser);
       } catch {
         setStatus('unauthenticated');
       }
     };
 
     init();
-  }, [setUser, t]);
+  }, [updateUser, t]);
 
   useEffect(() => {
     const handleAuthLogout = () => {
-      setUserState(null);
-      setStatus('unauthenticated');
+      updateUser(null);
       queryClient.clear();
       navigate('/', { replace: true });
     };
 
     window.addEventListener('auth:logout', handleAuthLogout);
     return () => window.removeEventListener('auth:logout', handleAuthLogout);
-  }, [queryClient, navigate]);
+  }, [queryClient, navigate, updateUser]);
 
-  const value = useMemo(() => ({ user, status, setUser, logout }), [user, status, setUser, logout]);
+  const value = useMemo(() => ({ user, status, setUser: updateUser, logout }), [user, status, updateUser, logout]);
 
   return (
     <AuthContext.Provider value={value}>
