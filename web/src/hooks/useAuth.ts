@@ -86,7 +86,7 @@ export const useCloseAccount = () => {
     mutationFn: (data: CloseAccountRequest) => closeAccount(data),
     onSuccess: () => {
       toast.success(t('settings.toasts.accountClosed'));
-      window.dispatchEvent(new CustomEvent('auth:logout'));
+      globalThis.dispatchEvent(new CustomEvent('auth:logout'));
     },
   });
 };

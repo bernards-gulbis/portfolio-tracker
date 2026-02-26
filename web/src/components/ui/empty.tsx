@@ -46,9 +46,13 @@ EmptyMedia.displayName = 'EmptyMedia';
 const EmptyTitle = React.forwardRef<
   HTMLHeadingElement,
   React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
-  <h3 ref={ref} className={cn('text-base font-semibold', className)} {...props} />
-));
+>(({ className, children, ...props }, ref) =>
+  children ? (
+    <h3 ref={ref} className={cn('text-base font-semibold', className)} {...props}>
+      {children}
+    </h3>
+  ) : null
+);
 EmptyTitle.displayName = 'EmptyTitle';
 
 const EmptyDescription = React.forwardRef<

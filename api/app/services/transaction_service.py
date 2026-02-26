@@ -19,6 +19,9 @@ from app.core.exceptions import (
 )
 
 
+_ERR_EUR_AMOUNT_SIGN_MISMATCH = "eur_amount sign must match total_amount sign"
+
+
 def _csv_field(value):
     """Convert None to empty string for CSV export."""
     return value if value is not None else ''
@@ -65,7 +68,7 @@ class TransactionService:
         if eur_amount is not None and transaction_type != TransactionType.SPLIT:
             if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
                 raise InvalidTransactionDataException(
-                    "eur_amount sign must match total_amount sign"
+                    _ERR_EUR_AMOUNT_SIGN_MISMATCH
                 )
 
         self._validate_transaction_data(
@@ -192,7 +195,7 @@ class TransactionService:
         if val_eur_amount is not None and val_type != TransactionType.SPLIT:
             if (val_total_amount > 0 and val_eur_amount < 0) or (val_total_amount < 0 and val_eur_amount > 0):
                 raise InvalidTransactionDataException(
-                    "eur_amount sign must match total_amount sign"
+                    _ERR_EUR_AMOUNT_SIGN_MISMATCH
                 )
 
         self._validate_transaction_data(
@@ -414,7 +417,7 @@ class TransactionService:
         if transaction_type == TransactionType.SPLIT:
             return
         if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
-            raise ValueError("eur_amount sign must match total_amount sign")
+            raise ValueError(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
 
     @staticmethod
     def _clean_csv_number(value: str, field_name: str = "field") -> Optional[float]:
