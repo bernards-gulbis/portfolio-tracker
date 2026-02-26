@@ -45,7 +45,7 @@ function ChartContainer({
   >["children"]
 }) {
   const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const chartId = `chart-${id || uniqueId.replaceAll(":", "")}`
   const contextValue = React.useMemo(() => ({ config }), [config])
 
   return (
