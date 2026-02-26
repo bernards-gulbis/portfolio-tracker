@@ -91,6 +91,47 @@ const getCutoffDate = (period: TimePeriod): string | null => {
   return cutoff.toISOString().split('T')[0];
 };
 
+const PerformanceTooltipItem = ({
+  value,
+  name,
+  color,
+  chartConfig,
+  locale,
+  notAvailableLabel,
+}: {
+  value: number | string;
+  name: string;
+  color: string;
+  chartConfig: ChartConfig;
+  locale: string;
+  notAvailableLabel: string;
+}) => {
+  let formatted: string;
+  if (value == null) {
+    formatted = notAvailableLabel;
+  } else if (name === 'returnPct' || name === 'sp500ReturnPct') {
+    formatted = `${(value as number).toFixed(2)}%`;
+  } else {
+    formatted = formatCurrency(value as number, 'EUR', locale);
+  }
+  return (
+    <>
+      <div
+        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+        style={{ backgroundColor: color }}
+      />
+      <div className="flex flex-1 justify-between items-center leading-none">
+        <span className="text-muted-foreground">
+          {chartConfig[name as keyof typeof chartConfig]?.label || name}
+        </span>
+        <span className="font-mono font-medium tabular-nums ml-2">
+          {formatted}
+        </span>
+      </div>
+    </>
+  );
+};
+
 const PerformanceTooltipContent = ({
   chartConfig,
   locale,
@@ -110,32 +151,16 @@ const PerformanceTooltipContent = ({
         year: 'numeric',
       })
     }
-    formatter={(value, name, item) => {
-      let formatted: string;
-      if (value == null) {
-        formatted = notAvailableLabel;
-      } else if (name === 'returnPct' || name === 'sp500ReturnPct') {
-        formatted = `${(value as number).toFixed(2)}%`;
-      } else {
-        formatted = formatCurrency(value as number, 'EUR', locale);
-      }
-      return (
-        <>
-          <div
-            className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-            style={{ backgroundColor: item.color }}
-          />
-          <div className="flex flex-1 justify-between items-center leading-none">
-            <span className="text-muted-foreground">
-              {chartConfig[name as keyof typeof chartConfig]?.label || name}
-            </span>
-            <span className="font-mono font-medium tabular-nums ml-2">
-              {formatted}
-            </span>
-          </div>
-        </>
-      );
-    }}
+    formatter={(value, name, item) => (
+      <PerformanceTooltipItem
+        value={value as number | string}
+        name={name as string}
+        color={item.color}
+        chartConfig={chartConfig}
+        locale={locale}
+        notAvailableLabel={notAvailableLabel}
+      />
+    )}
   />
 );
 
