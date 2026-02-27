@@ -18,6 +18,14 @@ export const formatNumber = (value: number, decimals: number = 2): string => {
 };
 
 /**
+ * Format quantity — show up to 8 decimals but strip trailing zeros.
+ */
+export const formatQuantity = (value: number): string => {
+  const fixed = value.toFixed(8);
+  return fixed.replace(/\.?0+$/, '');
+};
+
+/**
  * Format date. Pass the locale returned by useLocale() for reactive formatting.
  */
 export const formatDate = (date: string, locale: string = 'en-US'): string => {

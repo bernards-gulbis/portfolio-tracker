@@ -287,6 +287,7 @@ const en = {
     performance: {
       title: 'Performance',
       noData: 'No performance data available',
+      insufficientData: 'Not enough data points to display performance chart.',
       principal: 'Principal (EUR)',
       currentValue: 'Current Value (EUR)',
       returnPct: 'Return (%)',
@@ -305,6 +306,7 @@ const en = {
     deselectAll: 'Deselect All',
     noSelection: 'Select at least one portfolio to view aggregated data.',
     summary: 'Combined Summary',
+    selectedCount: '{{selected}} of {{total}} selected',
   },
   settings: {
     menuItem: 'Settings',

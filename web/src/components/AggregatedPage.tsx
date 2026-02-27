@@ -63,13 +63,16 @@ export const AggregatedPage = () => {
             </div>
           ) : portfolios && portfolios.length > 0 ? (
             <>
-              <div className="flex gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4">
                 <Button variant="outline" size="sm" onClick={selectAll}>
                   {t('aggregate.selectAll')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={deselectAll}>
                   {t('aggregate.deselectAll')}
                 </Button>
+                <span className="text-sm text-muted-foreground ml-auto">
+                  {t('aggregate.selectedCount', { selected: selectedIds.length, total: portfolios.length })}
+                </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {portfolios.map((portfolio) => (

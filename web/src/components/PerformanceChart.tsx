@@ -258,6 +258,19 @@ export const PerformanceChart = ({
     );
   }
 
+  if (data.length < 2) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('chart.performance.title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{t('chart.performance.insufficientData')}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>

@@ -2070,14 +2070,14 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     assert data["current_value_after_tax_eur"] == pytest.approx(15725.0)
 
 
-def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
-    """Test that tax_eur is None when dividends exist but EUR conversion is unavailable"""
+def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClient):
+    """Test that dividends without fx_rate fall back to current USD→EUR rate"""
     portfolio_response = client.post(
         "/portfolios/",
-        json={"name": "Missing Dividend EUR Test"}
+        json={"name": "Dividend EUR Fallback Test"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2089,7 +2089,7 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2103,7 +2103,76 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
             "fee": 0.0
         }
     )
-    
+
+    # Receive dividend WITHOUT fx_rate — should fall back to current rate
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Dividend",
+            "ticker": "AAPL",
+            "total_amount": 1000.0,
+            "fee": 0.0
+        }
+    )
+
+    # Mock current price and USD→EUR rate
+    mock_prices = {'AAPL': 150.0}
+
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.92):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Dividends exist in USD
+    assert data["dividends"] == pytest.approx(1000.0)
+
+    # Dividends EUR should be computed via fallback rate (1000 * 0.92 = 920)
+    assert data["dividends_eur"] == pytest.approx(920.0)
+
+    # Tax should be computable now
+    assert data["tax_eur"] is not None
+
+    # After-tax metrics should also be available
+    assert data["current_value_after_tax_eur"] is not None
+
+
+def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
+    """Test that tax_eur is None when dividends exist and EUR fallback rate is also unavailable"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Missing Dividend EUR Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+
+    # Buy AAPL
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0
+        }
+    )
+
     # Receive dividend WITHOUT fx_rate (EUR conversion unavailable)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2115,26 +2184,26 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
             "fee": 0.0
         }
     )
-    
-    # Mock current price
+
+    # Mock current price, but USD→EUR rate returns None (unavailable)
     mock_prices = {'AAPL': 150.0}
-    
+
     with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=None):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Dividends exist in USD
     assert data["dividends"] == pytest.approx(1000.0)
-    
-    # Dividends EUR should be None (no fx_rate provided)
+
+    # Dividends EUR should be None (no fx_rate and fallback rate unavailable)
     assert data["dividends_eur"] is None
-    
+
     # Tax should be None (cannot compute without knowing dividend EUR value)
     assert data["tax_eur"] is None
-    
+
     # After-tax metrics should also be None
     assert data["total_return_after_tax_eur"] is None
     assert data["total_return_after_tax_pct"] is None

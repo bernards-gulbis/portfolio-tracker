@@ -108,6 +108,13 @@ def _eur_from_tx(tx: Transaction, total_amount: Decimal) -> Decimal:
         return _to_decimal(tx.eur_amount)
     if tx.fx_rate is not None and tx.fx_rate > 0:
         return total_amount / _to_decimal(tx.fx_rate)
+    # Fallback: use current USD→EUR rate
+    try:
+        usd_to_eur = PriceService.get_usd_to_eur_rate()
+        if usd_to_eur is not None:
+            return total_amount * _to_decimal(usd_to_eur)
+    except Exception:
+        pass
     return _ZERO
 
 

@@ -289,6 +289,7 @@ const lv: Translation = {
     performance: {
       title: 'Sniegums',
       noData: 'Nav pieejami snieguma dati',
+      insufficientData: 'Nepietiekami datu punkti, lai attēlotu snieguma grafiku.',
       principal: 'Pamatsumma (EUR)',
       currentValue: 'Pašreizējā vērtība (EUR)',
       returnPct: 'Ienesīgums (%)',
@@ -307,6 +308,7 @@ const lv: Translation = {
     deselectAll: 'Noņemt atlasi',
     noSelection: 'Atlasiet vismaz vienu portfeli, lai skatītu apkopotos datus.',
     summary: 'Kopējais kopsavilkums',
+    selectedCount: '{{selected}} no {{total}} atlasīti',
   },
   settings: {
     menuItem: 'Iestatījumi',

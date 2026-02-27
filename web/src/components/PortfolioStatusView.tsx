@@ -5,7 +5,7 @@ import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useNavigate } from 'react-router-dom';
-import { formatCurrency, formatNumber } from '../utils/formatters';
+import { formatCurrency, formatQuantity } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PortfolioStatus, PortfolioPerformance } from '../api';
 import EditPortfolioModal from './EditPortfolioModal';
@@ -237,7 +237,7 @@ export const PortfolioStatusContent = ({
               {status.holdings.map((holding) => (
                 <TableRow key={holding.ticker}>
                   <TableCell className="font-semibold">{holding.ticker}</TableCell>
-                  <TableCell>{formatNumber(holding.quantity, 8)}</TableCell>
+                  <TableCell>{formatQuantity(holding.quantity)}</TableCell>
                   <TableCell>{formatCurrency(holding.average_cost, 'USD', locale)}</TableCell>
                   <TableCell>{formatCurrency(holding.total_cost, 'USD', locale)}</TableCell>
                   <TableCell>
