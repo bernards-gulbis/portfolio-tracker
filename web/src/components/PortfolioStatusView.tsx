@@ -5,6 +5,7 @@ import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatQuantity } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PortfolioStatus, PortfolioPerformance } from '../api';
@@ -50,7 +51,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, XIcon } from 'lucide-react';
+import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, XIcon, RefreshCwIcon } from 'lucide-react';
 
 const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
   if (value == null) return '-';
@@ -66,7 +67,7 @@ const formatSignedPercent = (value: number | null | undefined): string => {
 
 const getValueClass = (value: number | null | undefined): string => {
   if (value == null) return '';
-  return value >= 0 ? 'text-green-600' : 'text-red-600';
+  return value >= 0 ? 'text-positive' : 'text-negative';
 };
 
 const formatCurrencyWithPercent = (
@@ -78,7 +79,7 @@ const formatCurrencyWithPercent = (
   if (currencyValue == null) return '-';
   const formattedCurrency = formatSignedCurrency(currencyValue, currency, locale);
   const formattedPercent = percentValue == null ? '' : formatSignedPercent(percentValue);
-  const percentClass = currencyValue >= 0 ? 'text-green-600' : 'text-red-600';
+  const percentClass = currencyValue >= 0 ? 'text-positive' : 'text-negative';
   return (
     <>
       <span>{formattedCurrency}</span>
@@ -211,7 +212,7 @@ export const PortfolioStatusContent = ({
             </AlertDescription>
           </Alert>
         )}
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -323,6 +324,8 @@ export const PortfolioStatusView = () => {
   const navigate = useNavigate();
   const deletePortfolio = useDeletePortfolio();
 
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
   // Fetch full history — period filtering happens client-side in PerformanceChart
@@ -332,6 +335,18 @@ export const PortfolioStatusView = () => {
     undefined,
     365
   );
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['portfolio-status', portfolioId] }),
+        queryClient.invalidateQueries({ queryKey: ['portfolio-performance', portfolioId] }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleDeleteConfirm = async () => {
     if (portfolioId == null) return;
@@ -405,10 +420,19 @@ export const PortfolioStatusView = () => {
           <CardHeader>
             <CardTitle>{status.portfolio_name}</CardTitle>
             {dataUpdatedAt > 0 && (
-              <CardDescription>
+              <CardDescription className="flex items-center gap-1.5">
                 {t('status.fetchedAt', {
                   time: new Date(dataUpdatedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
                 })}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCwIcon className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
               </CardDescription>
             )}
             <CardAction>

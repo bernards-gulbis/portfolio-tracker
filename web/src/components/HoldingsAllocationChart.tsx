@@ -147,7 +147,7 @@ export const HoldingsAllocationChart = ({
         <CardTitle>{t('chart.allocation.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px]">
+        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]">
           <PieChart>
             <ChartTooltip
               cursor={false}

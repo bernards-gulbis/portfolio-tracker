@@ -290,6 +290,7 @@ const lv: Translation = {
       title: 'Sniegums',
       noData: 'Nav pieejami snieguma dati',
       insufficientData: 'Nepietiekami datu punkti, lai attēlotu snieguma grafiku.',
+      insufficientDataForPeriod: 'Nepietiekami datu punkti šim laika periodam. Izmēģiniet garāku periodu vai "Visi".',
       principal: 'Pamatsumma (EUR)',
       currentValue: 'Pašreizējā vērtība (EUR)',
       returnPct: 'Ienesīgums (%)',
@@ -356,6 +357,12 @@ const lv: Translation = {
       description: 'Konfigurējiet nodokļu likmi, kas tiek piemērota kapitāla pieauguma aprēķiniem.',
       rateLabel: 'Nodokļu likme (%)',
       submit: 'Saglabāt nodokļu likmi',
+    },
+    unsavedChanges: {
+      title: 'Nesaglabātas izmaiņas',
+      description: 'Jums ir nesaglabātas izmaiņas. Vai tiešām vēlaties aiziet?',
+      stay: 'Palikt',
+      leave: 'Aiziet',
     },
     toasts: {
       profileUpdated: 'Profils atjaunināts',

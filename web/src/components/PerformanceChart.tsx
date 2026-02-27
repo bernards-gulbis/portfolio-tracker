@@ -271,6 +271,33 @@ export const PerformanceChart = ({
     );
   }
 
+  const timePeriodSelector = (
+    <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
+      <TabsList>
+        <TabsTrigger value="1month">1M</TabsTrigger>
+        <TabsTrigger value="3month">3M</TabsTrigger>
+        <TabsTrigger value="6month">6M</TabsTrigger>
+        <TabsTrigger value="ytd">YTD</TabsTrigger>
+        <TabsTrigger value="1year">1Y</TabsTrigger>
+        <TabsTrigger value="all">All</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+
+  if (chartData.length < 2) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('chart.performance.title')}</CardTitle>
+          <CardAction>{timePeriodSelector}</CardAction>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{t('chart.performance.insufficientDataForPeriod')}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -283,16 +310,7 @@ export const PerformanceChart = ({
                 <TabsTrigger value="pct">%</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
-              <TabsList>
-                <TabsTrigger value="1month">1M</TabsTrigger>
-                <TabsTrigger value="3month">3M</TabsTrigger>
-                <TabsTrigger value="6month">6M</TabsTrigger>
-                <TabsTrigger value="ytd">YTD</TabsTrigger>
-                <TabsTrigger value="1year">1Y</TabsTrigger>
-                <TabsTrigger value="all">All</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {timePeriodSelector}
           </div>
         </CardAction>
       </CardHeader>
@@ -346,7 +364,7 @@ export const PerformanceChart = ({
                 />
               }
             />
-            <ChartLegend content={<ChartLegendContent />} />
+            <ChartLegend content={<ChartLegendContent className="text-[10px] sm:text-xs" />} />
             {viewMode === 'eur' ? (
               <>
                 <Area

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePortfolios } from '../hooks/usePortfolios';
 import { useAggregatedStatus } from '../hooks/useAggregatedStatus';
 import { useAggregatedPerformance } from '../hooks/useAggregatedPerformance';
@@ -9,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RefreshCwIcon } from 'lucide-react';
 import { useLocale } from '../hooks/useLocale';
 
 export const AggregatedPage = () => {
@@ -24,6 +26,8 @@ export const AggregatedPage = () => {
     }
   }, [portfolios]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: status, isLoading: statusLoading, error, dataUpdatedAt } = useAggregatedStatus(selectedIds);
   const { data: performance, isLoading: performanceLoading } = useAggregatedPerformance(
     selectedIds,
@@ -44,6 +48,18 @@ export const AggregatedPage = () => {
 
   const deselectAll = () => {
     setSelectedIds([]);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['aggregated-status'] }),
+        queryClient.invalidateQueries({ queryKey: ['aggregated-performance'] }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (
@@ -115,10 +131,19 @@ export const AggregatedPage = () => {
           <CardHeader>
             <CardTitle>{t('aggregate.summary')}</CardTitle>
             {dataUpdatedAt > 0 && (
-              <CardDescription>
+              <CardDescription className="flex items-center gap-1.5">
                 {t('status.fetchedAt', {
                   time: new Date(dataUpdatedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
                 })}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCwIcon className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
               </CardDescription>
             )}
           </CardHeader>

@@ -288,6 +288,7 @@ const en = {
       title: 'Performance',
       noData: 'No performance data available',
       insufficientData: 'Not enough data points to display performance chart.',
+      insufficientDataForPeriod: 'Not enough data points for this time period. Try a longer period or "All".',
       principal: 'Principal (EUR)',
       currentValue: 'Current Value (EUR)',
       returnPct: 'Return (%)',
@@ -354,6 +355,12 @@ const en = {
       description: 'Configure the tax rate applied to capital gains calculations.',
       rateLabel: 'Tax rate (%)',
       submit: 'Save tax rate',
+    },
+    unsavedChanges: {
+      title: 'Unsaved changes',
+      description: 'You have unsaved changes. Are you sure you want to leave?',
+      stay: 'Stay',
+      leave: 'Leave',
     },
     toasts: {
       profileUpdated: 'Profile updated',

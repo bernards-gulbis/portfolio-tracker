@@ -37,3 +37,15 @@ export const formatDate = (date: string, locale: string = 'en-US'): string => {
     minute: '2-digit',
   });
 };
+
+/**
+ * Compact date format for tables — drops year to save space.
+ */
+export const formatDateCompact = (date: string, locale: string = 'en-US'): string => {
+  return new Date(date).toLocaleDateString(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};

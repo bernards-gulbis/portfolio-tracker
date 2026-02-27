@@ -41,7 +41,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase, Layers } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase, Layers, UserIcon } from 'lucide-react';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
@@ -111,6 +111,7 @@ function AppLayout() {
   }
 
   const rememberedId = activePortfolioId ?? lastPortfolioId.current;
+  const activePortfolio = portfolios?.find((p) => p.id === rememberedId);
   const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
   const isDashboardActive = pathname === '/' || pathname.startsWith('/portfolios');
 
@@ -133,6 +134,11 @@ function AppLayout() {
                     <Link to={dashboardPath}>
                       <LayoutDashboard />
                       <span>{t('app.sidebar.dashboard')}</span>
+                      {activePortfolio && (
+                        <span className="text-xs text-muted-foreground truncate ml-auto">
+                          {activePortfolio.name}
+                        </span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -194,7 +200,9 @@ function AppLayout() {
                     <AvatarFallback>
                       {user?.name
                         ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-                        : user?.email?.slice(0, 2).toUpperCase() ?? '??'}
+                        : user?.email
+                          ? user.email.slice(0, 2).toUpperCase()
+                          : <UserIcon className="h-4 w-4" />}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
