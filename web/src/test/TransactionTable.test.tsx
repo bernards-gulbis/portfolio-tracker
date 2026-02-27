@@ -79,6 +79,7 @@ describe('TransactionTable', () => {
     total: mockTransactions.length,
     responsePage: 1,
     responsePageSize: 20,
+    gainByTxId: new Map<number, { gain: number; gainPct: number | null }>(),
     onPageChange: mockOnPageChange,
     isLoading: false,
     tickerSearch: '',
@@ -233,6 +234,76 @@ describe('TransactionTable', () => {
     );
 
     expect(screen.getByText('15.00000001 shares at $183.69')).toBeInTheDocument();
+  });
+
+  it('shows locked-in gain for SELL transactions', () => {
+    const sellTransaction: Transaction = {
+      id: 10,
+      portfolio_id: 1,
+      date: '2022-06-01T10:00:00',
+      type: TransactionType.SELL,
+      ticker: 'MSFT',
+      quantity: 5,
+      price_per_share: 270,
+      fee: 0,
+      total_amount: 1350,
+      eur_amount: null,
+      split_ratio: null,
+    };
+
+    const gainByTxId = new Map([[10, { gain: 432.75, gainPct: 47.25 }]]);
+
+    const queryClient = createTestQueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={[sellTransaction]}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          gainByTxId={gainByTxId}
+          total={1}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/\+\$432\.75/)).toBeInTheDocument();
+    expect(screen.getByText(/▲47\.25%/)).toBeInTheDocument();
+  });
+
+  it('shows negative gain for losing SELL transactions', () => {
+    const sellTransaction: Transaction = {
+      id: 11,
+      portfolio_id: 1,
+      date: '2022-06-01T10:00:00',
+      type: TransactionType.SELL,
+      ticker: 'AAPL',
+      quantity: 3,
+      price_per_share: 140,
+      fee: 0,
+      total_amount: 420,
+      eur_amount: null,
+      split_ratio: null,
+    };
+
+    const gainByTxId = new Map([[11, { gain: -80, gainPct: -16.0 }]]);
+
+    const queryClient = createTestQueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={[sellTransaction]}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          gainByTxId={gainByTxId}
+          total={1}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/-\$80\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/▼16\.00%/)).toBeInTheDocument();
   });
 
   it('shows error toast when transaction delete fails', async () => {

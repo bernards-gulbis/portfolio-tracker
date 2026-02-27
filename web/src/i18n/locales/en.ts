@@ -187,6 +187,7 @@ const en = {
         detailsFormat: '{{qty}} shares at {{price}}',
         splitFormat: 'Split 1:{{ratio}}',
         totalAmount: 'Total Amount',
+        gain: 'Gain/Loss',
         actions: 'Actions',
       },
       actions: {
@@ -323,9 +324,8 @@ const en = {
     noSells: 'No sell transactions found.',
     error: 'Error loading realized sales: {{message}}',
     columns: {
-      date: 'Date',
       ticker: 'Ticker',
-      quantity: 'Quantity',
+      sells: '# Sells',
       proceeds: 'Proceeds',
       costBasis: 'Cost Basis',
       gainLoss: 'Gain / Loss',

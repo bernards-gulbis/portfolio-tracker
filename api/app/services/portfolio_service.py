@@ -184,8 +184,10 @@ def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
 
 def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
     split_ratio = _to_decimal(tx.split_ratio or 1)
-    if strict and split_ratio <= 0:
-        raise ValueError(f"Invalid split ratio {split_ratio}: must be positive")
+    if split_ratio <= 0:
+        if strict:
+            raise ValueError(f"Invalid split ratio {split_ratio}: must be positive")
+        return  # skip silently in non-strict historical replay
     if tx.ticker and tx.ticker in state.holdings:
         state.holdings[tx.ticker]['quantity'] *= split_ratio
 
@@ -663,8 +665,10 @@ class PortfolioService:
             unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
 
         # Normalize dividends_eur (historical per-transaction rates):
-        # - dividends exist but no EUR conversion available → None
-        # - no dividends at all → None
+        # - dividends exist but no EUR conversion available → None (dividends_eur == 0)
+        # - no dividends at all → None (dividends == 0)
+        # Note: both cases produce None on the frontend, which is intentional — the
+        # distinction (no dividends vs. dividends with missing EUR rate) is not surfaced in UI.
         has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
         dividends_eur: Optional[Decimal] = state.dividends_eur if has_valid_eur else None
 
@@ -916,28 +920,29 @@ class PortfolioService:
                 quantity = _to_decimal(tx.quantity or 0)
                 total = _to_decimal(tx.total_amount)
 
-                cost_basis = _ZERO
-                if ticker in state.holdings:
-                    h = state.holdings[ticker]
-                    if h['quantity'] > 0:
-                        cost_basis = h['total_cost'] * (quantity / h['quantity'])
+                # Only record the sale when _apply_sell will actually process it.
+                # If the ticker is missing or quantity exceeds available holdings,
+                # _apply_sell returns early (strict=False) leaving state unchanged,
+                # which would cause subsequent sells to read stale cost_basis.
+                h = state.holdings.get(ticker)
+                if h and h['quantity'] > 0 and quantity <= h['quantity'] + HOLDINGS_EPSILON:
+                    cost_basis = h['total_cost'] * (quantity / h['quantity'])
+                    gain = total - cost_basis
+                    gain_pct = float((gain / cost_basis) * 100) if cost_basis > 0 else None
+                    total_realized += gain
 
-                gain = total - cost_basis
-                gain_pct = float((gain / cost_basis) * 100) if cost_basis > 0 else None
-                total_realized += gain
-
-                sales.append(RealizedSaleResponse(
-                    portfolio_id=portfolio_id,
-                    portfolio_name=portfolio.name,
-                    transaction_id=tx.id,
-                    date=tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
-                    ticker=ticker,
-                    quantity=float(quantity),
-                    sale_proceeds=float(total),
-                    cost_basis=float(cost_basis),
-                    realized_gain_loss=float(gain),
-                    realized_gain_loss_pct=gain_pct,
-                ))
+                    sales.append(RealizedSaleResponse(
+                        portfolio_id=portfolio_id,
+                        portfolio_name=portfolio.name,
+                        transaction_id=tx.id,
+                        date=tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                        ticker=ticker,
+                        quantity=float(quantity),
+                        sale_proceeds=float(total),
+                        cost_basis=float(cost_basis),
+                        realized_gain_loss=float(gain),
+                        realized_gain_loss_pct=gain_pct,
+                    ))
 
             _apply_transaction(state, tx, strict=False)
 

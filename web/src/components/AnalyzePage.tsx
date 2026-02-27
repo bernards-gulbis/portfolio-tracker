@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useRealizedSales } from '../hooks/useRealizedSales';
@@ -13,13 +14,51 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useLocale } from '../hooks/useLocale';
-import { formatCurrency, formatDate, formatQuantity } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency } from '../utils/formatters';
+
+interface TickerGroup {
+  ticker: string;
+  sellCount: number;
+  totalProceeds: number;
+  totalCostBasis: number;
+  totalGain: number;
+  gainPct: number | null;
+}
 
 export const AnalyzePage = () => {
   const { t } = useTranslation();
   const locale = useLocale();
   const portfolioId = useActivePortfolioId();
   const { data, isLoading, error } = useRealizedSales(portfolioId);
+
+  const grouped = useMemo<TickerGroup[]>(() => {
+    if (!data) return [];
+    const map = new Map<string, TickerGroup>();
+    for (const sale of data.sales) {
+      const existing = map.get(sale.ticker);
+      if (existing) {
+        existing.sellCount += 1;
+        existing.totalProceeds += sale.sale_proceeds;
+        existing.totalCostBasis += sale.cost_basis;
+        existing.totalGain += sale.realized_gain_loss;
+      } else {
+        map.set(sale.ticker, {
+          ticker: sale.ticker,
+          sellCount: 1,
+          totalProceeds: sale.sale_proceeds,
+          totalCostBasis: sale.cost_basis,
+          totalGain: sale.realized_gain_loss,
+          gainPct: null,
+        });
+      }
+    }
+    const rows = Array.from(map.values()).map((g) => ({
+      ...g,
+      gainPct: g.totalCostBasis !== 0 ? (g.totalGain / g.totalCostBasis) * 100 : null,
+    }));
+    rows.sort((a, b) => b.totalGain - a.totalGain);
+    return rows;
+  }, [data]);
 
   if (!portfolioId) {
     return (
@@ -67,46 +106,49 @@ export const AnalyzePage = () => {
         <CardDescription>
           {t('analyze.totalGainLoss')}:{' '}
           <span className={data.total_realized_gain_loss >= 0 ? 'text-positive' : 'text-negative'}>
-            {formatCurrency(data.total_realized_gain_loss, 'USD', locale)}
+            {formatSignedCurrency(data.total_realized_gain_loss, 'USD', locale)}
           </span>
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {data.sales.length === 0 ? (
+        {grouped.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">{t('analyze.noSells')}</p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('analyze.columns.date')}</TableHead>
                   <TableHead>{t('analyze.columns.ticker')}</TableHead>
-                  <TableHead className="text-right">{t('analyze.columns.quantity')}</TableHead>
+                  <TableHead className="text-right">{t('analyze.columns.sells')}</TableHead>
                   <TableHead className="text-right">{t('analyze.columns.proceeds')}</TableHead>
                   <TableHead className="text-right">{t('analyze.columns.costBasis')}</TableHead>
                   <TableHead className="text-right">{t('analyze.columns.gainLoss')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.sales.map((sale) => (
-                  <TableRow key={sale.transaction_id}>
-                    <TableCell className="whitespace-nowrap">{formatDate(sale.date, locale)}</TableCell>
-                    <TableCell className="font-medium">{sale.ticker}</TableCell>
-                    <TableCell className="text-right">{formatQuantity(sale.quantity)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(sale.sale_proceeds, 'USD', locale)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(sale.cost_basis, 'USD', locale)}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={sale.realized_gain_loss >= 0 ? 'text-positive' : 'text-negative'}>
-                        {formatCurrency(sale.realized_gain_loss, 'USD', locale)}
-                        {sale.realized_gain_loss_pct !== null && (
-                          <span className="text-xs ml-1">
-                            ({sale.realized_gain_loss_pct >= 0 ? '+' : ''}{sale.realized_gain_loss_pct.toFixed(1)}%)
+                {grouped.map((row) => {
+                  const colorClass = row.totalGain >= 0 ? 'text-positive' : 'text-negative';
+                  return (
+                    <TableRow key={row.ticker}>
+                      <TableCell className="font-medium">{row.ticker}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{row.sellCount}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(row.totalProceeds, 'USD', locale)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(row.totalCostBasis, 'USD', locale)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span className={`font-semibold ${colorClass}`}>
+                            {formatSignedCurrency(row.totalGain, 'USD', locale)}
                           </span>
-                        )}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {row.gainPct !== null && (
+                            <span className={`text-xs ${colorClass}`}>
+                              {row.gainPct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(row.gainPct).toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

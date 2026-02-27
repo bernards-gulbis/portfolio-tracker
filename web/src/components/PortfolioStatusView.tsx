@@ -6,7 +6,7 @@ import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatCurrency, formatQuantity } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatQuantity } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PortfolioStatus, PortfolioPerformance } from '../api';
 import { useCurrencyPreference } from '../hooks/useCurrencyPreference';
@@ -54,11 +54,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, XIcon, RefreshCwIcon } from 'lucide-react';
 
-const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
-  if (value == null) return '-';
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${formatCurrency(value, currency, locale)}`;
-};
 
 const formatSignedPercent = (value: number | null | undefined): string => {
   if (value == null) return '';

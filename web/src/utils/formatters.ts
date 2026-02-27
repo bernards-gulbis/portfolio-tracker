@@ -11,6 +11,16 @@ export const formatCurrency = (value: number, currency: string = 'USD', locale: 
 };
 
 /**
+ * Format currency with a sign prefix: '+' for positive values, nothing for zero/negative
+ * (negative sign is already included by formatCurrency). Returns '-' for null/undefined.
+ */
+export const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
+  if (value == null) return '-';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${formatCurrency(value, currency, locale)}`;
+};
+
+/**
  * Format number with specified decimal places
  */
 export const formatNumber = (value: number, decimals: number = 2): string => {

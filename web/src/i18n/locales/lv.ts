@@ -189,6 +189,7 @@ const lv: Translation = {
         detailsFormat: '{{qty}} akcijas par {{price}}',
         splitFormat: 'Sadalīts 1:{{ratio}}',
         totalAmount: 'Kopējā summa',
+        gain: 'Peļņa/Zaudējumi',
         actions: 'Darbības',
       },
       actions: {
@@ -325,9 +326,8 @@ const lv: Translation = {
     noSells: 'Nav atrasti pārdošanas darījumi.',
     error: 'Kļūda ielādējot realizētos darījumus: {{message}}',
     columns: {
-      date: 'Datums',
       ticker: 'Tīkotājs',
-      quantity: 'Daudzums',
+      sells: '# Pārdošanas',
       proceeds: 'Ieņēmumi',
       costBasis: 'Izmaksu bāze',
       gainLoss: 'Ienākums / Zaudējums',

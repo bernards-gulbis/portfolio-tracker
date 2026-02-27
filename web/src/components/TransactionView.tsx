@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
+import { useRealizedSales } from '../hooks/useRealizedSales';
 import { useDebounce } from '../hooks/useDebounce';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
@@ -35,6 +36,14 @@ const TransactionView = () => {
     debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
     sortOrder
   );
+  const { data: realizedSalesData } = useRealizedSales(activePortfolioId);
+  const gainByTxId = useMemo(() => {
+    const map = new Map<number, { gain: number; gainPct: number | null }>();
+    for (const sale of realizedSalesData?.sales ?? []) {
+      map.set(sale.transaction_id, { gain: sale.realized_gain_loss, gainPct: sale.realized_gain_loss_pct });
+    }
+    return map;
+  }, [realizedSalesData]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
@@ -189,6 +198,7 @@ const TransactionView = () => {
         <TransactionTable
           transactions={transactions}
           portfolioId={activePortfolioId}
+          gainByTxId={gainByTxId}
           onEdit={handleEdit}
           currentPage={currentPage}
           totalPages={totalPages}
