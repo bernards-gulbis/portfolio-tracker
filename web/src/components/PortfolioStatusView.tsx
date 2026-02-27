@@ -50,7 +50,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon } from 'lucide-react';
+import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, XIcon } from 'lucide-react';
 
 const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
   if (value == null) return '-';
@@ -94,6 +94,7 @@ export const PortfolioStatusView = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [emptyAlertDismissed, setEmptyAlertDismissed] = useState(false);
 
   const navigate = useNavigate();
   const deletePortfolio = useDeletePortfolio();
@@ -189,8 +190,27 @@ export const PortfolioStatusView = () => {
     );
   }
 
+  const isEmptyPortfolio = status.holdings.length === 0 && status.principal_eur === 0;
+
   return (
     <>
+      {isEmptyPortfolio && !emptyAlertDismissed && (
+        <Alert className="mb-6">
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>{t('status.emptyPortfolio')}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={() => setEmptyAlertDismissed(true)}
+              aria-label={t('portfolio.delete.cancel')}
+            >
+              <XIcon className="h-4 w-4" />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="mb-6 space-y-6">
         <Card>
           <CardHeader>

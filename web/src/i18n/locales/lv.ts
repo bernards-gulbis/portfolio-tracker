@@ -260,6 +260,7 @@ const lv: Translation = {
   status: {
     noPortfolio: 'Izvēlieties portfeli, lai skatītu tā statusu',
     noData: 'Nav pieejami statusa dati',
+    emptyPortfolio: 'Šim portfelim vēl nav darījumu. Pievienojiet pirmo darījumu vai importējiet CSV failu, lai sāktu.',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
     fetchedAt: 'Atjaunināts {{time}}',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',

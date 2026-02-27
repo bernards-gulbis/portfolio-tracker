@@ -258,6 +258,7 @@ const en = {
   status: {
     noPortfolio: 'Select a portfolio to view its status',
     noData: 'No status data available',
+    emptyPortfolio: 'This portfolio has no transactions yet. Add your first transaction or import a CSV file to get started.',
     error: 'Error loading portfolio status: {{message}}',
     fetchedAt: 'Updated {{time}}',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',

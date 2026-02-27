@@ -175,6 +175,40 @@ describe('PortfolioStatusView', () => {
     expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0);
   });
 
+  it('shows empty portfolio alert when no transactions exist', () => {
+    const emptyStatus: PortfolioStatus = {
+      ...mockStatus,
+      holdings: [],
+      principal_eur: 0,
+      principal: 0,
+      cash: 0,
+      current_value: 0,
+      current_value_eur: null,
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: emptyStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.getByText(/no transactions yet/i)).toBeInTheDocument();
+  });
+
+  it('does not show empty portfolio alert when transactions exist', () => {
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.queryByText(/no transactions yet/i)).not.toBeInTheDocument();
+  });
+
   it('renders dashes for null monetary values', () => {
     const nullStatus: PortfolioStatus = {
       ...mockStatus,
