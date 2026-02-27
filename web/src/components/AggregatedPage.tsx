@@ -54,8 +54,8 @@ export const AggregatedPage = () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['aggregated-status'] }),
-        queryClient.invalidateQueries({ queryKey: ['aggregated-performance'] }),
+        queryClient.invalidateQueries({ queryKey: ['aggregatedStatus'] }),
+        queryClient.invalidateQueries({ queryKey: ['aggregatedPerformance'] }),
       ]);
     } finally {
       setIsRefreshing(false);

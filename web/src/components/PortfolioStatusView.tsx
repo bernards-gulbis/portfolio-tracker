@@ -340,8 +340,8 @@ export const PortfolioStatusView = () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['portfolio-status', portfolioId] }),
-        queryClient.invalidateQueries({ queryKey: ['portfolio-performance', portfolioId] }),
+        queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] }),
+        queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', portfolioId] }),
       ]);
     } finally {
       setIsRefreshing(false);

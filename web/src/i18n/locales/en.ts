@@ -356,12 +356,6 @@ const en = {
       rateLabel: 'Tax rate (%)',
       submit: 'Save tax rate',
     },
-    unsavedChanges: {
-      title: 'Unsaved changes',
-      description: 'You have unsaved changes. Are you sure you want to leave?',
-      stay: 'Stay',
-      leave: 'Leave',
-    },
     toasts: {
       profileUpdated: 'Profile updated',
       passwordChanged: 'Password changed',

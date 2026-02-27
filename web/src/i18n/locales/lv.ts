@@ -358,12 +358,6 @@ const lv: Translation = {
       rateLabel: 'Nodokļu likme (%)',
       submit: 'Saglabāt nodokļu likmi',
     },
-    unsavedChanges: {
-      title: 'Nesaglabātas izmaiņas',
-      description: 'Jums ir nesaglabātas izmaiņas. Vai tiešām vēlaties aiziet?',
-      stay: 'Palikt',
-      leave: 'Aiziet',
-    },
     toasts: {
       profileUpdated: 'Profils atjaunināts',
       passwordChanged: 'Parole nomainīta',
