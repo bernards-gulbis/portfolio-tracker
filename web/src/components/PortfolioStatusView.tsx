@@ -9,6 +9,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatQuantity } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PortfolioStatus, PortfolioPerformance } from '../api';
+import { useCurrencyPreference } from '../hooks/useCurrencyPreference';
+import { computeEurMetrics, applyRateToHolding } from '../utils/eurMetrics';
 import EditPortfolioModal from './EditPortfolioModal';
 import CopyPortfolioModal from './CopyPortfolioModal';
 import { toast } from 'sonner';
@@ -103,20 +105,64 @@ export const PortfolioStatusContent = ({
 }: PortfolioStatusContentProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
+  const { currency, toggle } = useCurrencyPreference();
+  const eurMetrics = computeEurMetrics(status);
+
+  const showEur = currency === 'EUR';
+  const eurAvailable = eurMetrics !== null;
+  const taxRate = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
+    status.capital_gains_tax_rate * 100
+  );
+
+  // Resolve display values based on currency toggle
+  const displayCurrency = showEur ? 'EUR' : 'USD';
+  const marketValue = showEur ? (eurAvailable ? eurMetrics!.currentValueEur : null) : status.current_value;
+  const unrealizedGains = showEur ? (eurAvailable ? eurMetrics!.unrealizedGainsEur : null) : status.unrealized_gains;
+  const netInvested = showEur ? status.principal_eur : status.principal;
+  const currencyGainsEur = showEur && eurAvailable ? eurMetrics!.currencyGainsEur : null;
+  const dividends = showEur ? status.dividends_eur : status.dividends;
+  const taxEur = showEur && eurAvailable ? eurMetrics!.taxEur : null;
+  const capitalGainsEur = showEur && eurAvailable ? eurMetrics!.capitalGainsEur : null;
+  const afterTaxValue = showEur && eurAvailable ? eurMetrics!.currentValueAfterTaxEur : null;
+  const totalReturnAfterTax = showEur && eurAvailable ? eurMetrics!.totalReturnAfterTaxEur : null;
+  const cashDisplay = showEur && eurAvailable ? eurMetrics!.cashEur : status.cash;
+  const eurRate = showEur && eurAvailable ? eurMetrics!.rate : null;
 
   return (
     <CardContent>
+      {/* Currency Toggle */}
+      <div className="flex items-center justify-end mb-4 gap-2">
+        {showEur && !eurAvailable && (
+          <span className="text-xs text-muted-foreground">{t('status.currency.eurUnavailable')}</span>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggle}
+          aria-label={t('status.currency.toggle')}
+          className="h-7 px-2 text-xs font-medium"
+        >
+          <span className={currency === 'USD' ? 'font-bold' : 'text-muted-foreground'}>
+            {t('status.currency.usdLabel')}
+          </span>
+          <span className="mx-1 text-muted-foreground">/</span>
+          <span className={currency === 'EUR' ? 'font-bold' : 'text-muted-foreground'}>
+            {t('status.currency.eurLabel')}
+          </span>
+        </Button>
+      </div>
+
       {/* Portfolio Value */}
       <div className="mb-6">
         <p className="text-sm text-muted-foreground mb-1">{t('status.marketValue')}</p>
         <p className="text-3xl font-bold">
-          {status.current_value_eur === null ? '-' : formatCurrency(status.current_value_eur, 'EUR', locale)}
+          {marketValue === null ? '-' : formatCurrency(marketValue, displayCurrency, locale)}
         </p>
-        <p className={`text-sm mt-1 ${getValueClass(status.unrealized_gains_eur)}`}>
+        <p className={`text-sm mt-1 ${getValueClass(unrealizedGains)}`}>
           {formatCurrencyWithPercent(
-            status.unrealized_gains_eur,
+            unrealizedGains,
             status.unrealized_gains_pct,
-            'EUR',
+            displayCurrency,
             locale
           )}
           <span className="text-muted-foreground ml-2 font-normal">{t('status.unrealized')}</span>
@@ -139,10 +185,10 @@ export const PortfolioStatusContent = ({
               </Tooltip>
             </TooltipProvider>
           </p>
-          <p className="text-lg font-semibold">{formatCurrency(status.principal_eur, 'EUR', locale)}</p>
-          {status.currency_gains_eur !== null && (
-            <p className={`text-xs mt-0.5 ${getValueClass(status.currency_gains_eur)}`}>
-              {t('status.fx')}: {formatSignedCurrency(status.currency_gains_eur, 'EUR', locale)}
+          <p className="text-lg font-semibold">{formatCurrency(netInvested, displayCurrency, locale)}</p>
+          {currencyGainsEur !== null && (
+            <p className={`text-xs mt-0.5 ${getValueClass(currencyGainsEur)}`}>
+              {t('status.fx')}: {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
             </p>
           )}
         </div>
@@ -150,18 +196,18 @@ export const PortfolioStatusContent = ({
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.dividends')}</p>
           <p className="text-lg font-semibold">
-            {status.dividends_eur === null ? '-' : formatCurrency(status.dividends_eur, 'EUR', locale)}
+            {dividends === null ? '-' : formatCurrency(dividends, displayCurrency, locale)}
           </p>
         </div>
 
         <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(status.capital_gains_tax_rate * 100) })}</p>
+          <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: taxRate })}</p>
           <p className="text-lg font-semibold">
-            {status.tax_eur === null ? '-' : formatCurrency(status.tax_eur, 'EUR', locale)}
+            {taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
           </p>
-          {status.capital_gains_eur !== null && status.tax_eur !== null && (
+          {capitalGainsEur !== null && taxEur !== null && (
             <p className="text-xs mt-0.5 text-muted-foreground">
-              {t('status.on')} {formatCurrency(status.capital_gains_eur, 'EUR', locale)}
+              {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
             </p>
           )}
         </div>
@@ -169,12 +215,10 @@ export const PortfolioStatusContent = ({
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
           <p className="text-lg font-semibold">
-            {status.current_value_after_tax_eur === null
-              ? '-'
-              : formatCurrency(status.current_value_after_tax_eur, 'EUR', locale)}
+            {afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
           </p>
-          <p className={`text-xs mt-0.5 ${getValueClass(status.total_return_after_tax_eur)}`}>
-            {formatSignedCurrency(status.total_return_after_tax_eur, 'EUR', locale)}
+          <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
+            {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
           </p>
         </div>
       </div>
@@ -196,7 +240,7 @@ export const PortfolioStatusContent = ({
           <HoldingsAllocationChart
             holdings={status.holdings}
             cash={status.cash}
-            cash_eur={status.cash_eur}
+            eurRate={eurRate}
             loading={false}
           />
         </div>
@@ -234,63 +278,64 @@ export const PortfolioStatusContent = ({
                 <TableCell>-</TableCell>
                 <TableCell>-</TableCell>
                 <TableCell>
-                  {status.cash_eur != null
-                    ? formatCurrency(status.cash_eur, 'EUR', locale)
-                    : formatCurrency(status.cash, 'USD', locale)}
+                  {formatCurrency(cashDisplay, displayCurrency, locale)}
                 </TableCell>
                 <TableCell>-</TableCell>
               </TableRow>
-              {status.holdings.map((holding) => (
-                <TableRow key={holding.ticker}>
-                  <TableCell className="font-semibold">{holding.ticker}</TableCell>
-                  <TableCell>{formatQuantity(holding.quantity)}</TableCell>
-                  <TableCell>
-                    {holding.average_cost_eur != null
-                      ? formatCurrency(holding.average_cost_eur, 'EUR', locale)
-                      : formatCurrency(holding.average_cost, 'USD', locale)}
-                  </TableCell>
-                  <TableCell>
-                    {holding.total_cost_eur != null
-                      ? formatCurrency(holding.total_cost_eur, 'EUR', locale)
-                      : formatCurrency(holding.total_cost, 'USD', locale)}
-                  </TableCell>
-                  <TableCell>
-                    {holding.current_price_eur != null
-                      ? formatCurrency(holding.current_price_eur, 'EUR', locale)
-                      : holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale)}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {holding.current_value_eur != null
-                      ? formatCurrency(holding.current_value_eur, 'EUR', locale)
-                      : holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale)}
-                  </TableCell>
-                  <TableCell>
-                    {holding.unrealized_gain_loss_eur != null && holding.unrealized_gain_loss_pct != null
-                      ? (
-                        <div className="flex flex-col">
-                          <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss_eur)}`}>
-                            {formatSignedCurrency(holding.unrealized_gain_loss_eur, 'EUR', locale)}
-                          </span>
-                          <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss_eur)}`}>
-                            {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
-                          </span>
-                        </div>
-                      )
-                      : holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
+              {status.holdings.map((holding) => {
+                const eurVals = showEur && eurAvailable ? applyRateToHolding(holding, eurMetrics!.rate) : null;
+                return (
+                  <TableRow key={holding.ticker}>
+                    <TableCell className="font-semibold">{holding.ticker}</TableCell>
+                    <TableCell>{formatQuantity(holding.quantity)}</TableCell>
+                    <TableCell>
+                      {eurVals != null
+                        ? formatCurrency(eurVals.average_cost_eur, 'EUR', locale)
+                        : formatCurrency(holding.average_cost, 'USD', locale)}
+                    </TableCell>
+                    <TableCell>
+                      {eurVals != null
+                        ? formatCurrency(eurVals.total_cost_eur, 'EUR', locale)
+                        : formatCurrency(holding.total_cost, 'USD', locale)}
+                    </TableCell>
+                    <TableCell>
+                      {eurVals != null
+                        ? (eurVals.current_price_eur != null ? formatCurrency(eurVals.current_price_eur, 'EUR', locale) : '-')
+                        : (holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale))}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {eurVals != null
+                        ? (eurVals.current_value_eur != null ? formatCurrency(eurVals.current_value_eur, 'EUR', locale) : '-')
+                        : (holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale))}
+                    </TableCell>
+                    <TableCell>
+                      {eurVals != null && eurVals.unrealized_gain_loss_eur != null && holding.unrealized_gain_loss_pct != null
                         ? (
                           <div className="flex flex-col">
-                            <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
-                              {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
+                            <span className={`font-semibold ${getValueClass(eurVals.unrealized_gain_loss_eur)}`}>
+                              {formatSignedCurrency(eurVals.unrealized_gain_loss_eur, 'EUR', locale)}
                             </span>
-                            <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
+                            <span className={`text-xs ${getValueClass(eurVals.unrealized_gain_loss_eur)}`}>
                               {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
                             </span>
                           </div>
                         )
-                        : '-'}
-                  </TableCell>
-                </TableRow>
-              ))}
+                        : holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
+                          ? (
+                            <div className="flex flex-col">
+                              <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
+                                {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
+                              </span>
+                              <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
+                                {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
+                              </span>
+                            </div>
+                          )
+                          : '-'}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

@@ -283,6 +283,12 @@ const en = {
       marketValue: 'Market value',
       unrealizedGL: 'Unrealized G/L',
     },
+    currency: {
+      toggle: 'Currency',
+      usdLabel: 'USD',
+      eurLabel: 'EUR',
+      eurUnavailable: 'EUR unavailable — rate could not be fetched',
+    },
   },
   chart: {
     performance: {

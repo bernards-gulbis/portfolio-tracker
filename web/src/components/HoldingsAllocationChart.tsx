@@ -21,7 +21,7 @@ import {
 interface HoldingsAllocationChartProps {
   holdings: Holding[];
   cash: number;
-  cash_eur?: number | null;
+  eurRate?: number | null;
   loading?: boolean;
 }
 
@@ -78,24 +78,25 @@ const COLORS = [
 export const HoldingsAllocationChart = ({
   holdings,
   cash,
-  cash_eur,
+  eurRate,
   loading,
 }: HoldingsAllocationChartProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
 
   const { chartData, total, chartConfig, currency } = useMemo(() => {
-    const useEur = cash_eur != null || holdings.some((h) => h.current_value_eur != null);
+    const useEur = eurRate != null && eurRate > 0;
     const currency = useEur ? 'EUR' : 'USD';
     const data: Array<{ name: string; value: number; fill: string }> = [];
 
-    const cashValue = useEur && cash_eur != null ? cash_eur : cash;
+    const cashValue = useEur ? cash * eurRate! : cash;
     if (cashValue > 0) {
       data.push({ name: 'CASH', value: cashValue, fill: COLORS[0] });
     }
 
     holdings.forEach((holding) => {
-      const value = useEur ? (holding.current_value_eur ?? holding.current_value) : holding.current_value;
+      const rawValue = holding.current_value;
+      const value = useEur && rawValue != null ? rawValue * eurRate! : rawValue;
       if (value && value > 0) {
         const index = data.length;
         data.push({ name: holding.ticker, value, fill: COLORS[index % COLORS.length] });
@@ -113,7 +114,7 @@ export const HoldingsAllocationChart = ({
     }, {} as ChartConfig);
 
     return { chartData: data, total, chartConfig: config, currency };
-  }, [holdings, cash, cash_eur]);
+  }, [holdings, cash, eurRate]);
 
   if (loading) {
     return (

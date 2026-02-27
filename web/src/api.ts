@@ -134,40 +134,27 @@ export interface Holding {
   current_value?: number | null;
   unrealized_gain_loss?: number | null;
   unrealized_gain_loss_pct?: number | null;
-  average_cost_eur?: number | null;
-  total_cost_eur?: number | null;
-  current_price_eur?: number | null;
-  current_value_eur?: number | null;
-  unrealized_gain_loss_eur?: number | null;
 }
 
 export interface PortfolioStatus {
   portfolio_id: number;
   portfolio_name: string;
   current_value: number;
-  current_value_eur: number | null;
   principal: number;
   principal_eur: number;
   dividends: number;
   dividends_eur: number | null;
   cash: number;
-  cash_eur: number | null;
   holdings: Holding[];
   holdings_cost: number;
   holdings_value: number;
   unrealized_gains: number;
   unrealized_gains_pct: number | null;
-  unrealized_gains_eur: number | null;
   realized_gains: number;
-  currency_gains_eur: number | null;
-  currency_gains_pct: number | null;
-  capital_gains_eur: number | null;
   capital_gains_tax_rate: number;
-  tax_eur: number | null;
-  total_return_after_tax_eur: number | null;
-  total_return_after_tax_pct: number | null;
-  current_value_after_tax_eur: number | null;
   missing_prices: string[];
+  usd_to_eur_rate: number | null;
+  deposits_eur: number;
 }
 
 export interface PerformanceDataPoint {

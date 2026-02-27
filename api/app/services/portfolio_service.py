@@ -319,7 +319,6 @@ def _resolve_usd_to_eur_rate(target_date: datetime) -> Optional[float]:
 def _build_holdings_list(
     state: _TxState,
     current_prices: Dict[str, Optional[float]],
-    usd_to_eur_rate: Optional[float] = None,
 ) -> Tuple[List[HoldingResponse], Decimal, Decimal, Decimal, List[str]]:
     """Build the sorted holdings list and aggregate value/cost totals.
 
@@ -331,7 +330,6 @@ def _build_holdings_list(
     holdings_value = _ZERO
     unrealized_gains = _ZERO
     missing_prices: List[str] = []
-    eur_d: Optional[Decimal] = _to_decimal(usd_to_eur_rate) if usd_to_eur_rate else None
 
     for ticker, holding_data in state.holdings.items():
         quantity = holding_data['quantity']
@@ -363,92 +361,11 @@ def _build_holdings_list(
             current_value=_opt_float(current_value_h),
             unrealized_gain_loss=_opt_float(unrealized_gain_loss),
             unrealized_gain_loss_pct=_opt_float(unrealized_gain_loss_pct),
-            average_cost_eur=_opt_float(avg_cost * eur_d) if eur_d is not None else None,
-            total_cost_eur=_opt_float(total_cost * eur_d) if eur_d is not None else None,
-            current_price_eur=float(current_price) * usd_to_eur_rate if current_price and usd_to_eur_rate else None,
-            current_value_eur=_opt_float(current_value_h * eur_d) if eur_d is not None and current_value_h is not None else None,
-            unrealized_gain_loss_eur=_opt_float(unrealized_gain_loss * eur_d) if eur_d is not None and unrealized_gain_loss is not None else None,
         ))
         holdings_cost += total_cost
 
     holdings_list.sort(key=lambda h: h.ticker)
     return holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices
-
-
-def _compute_eur_metrics(
-    state: _TxState,
-    current_value: Decimal,
-    unrealized_gains: Decimal,
-    portfolio_id: int,
-) -> Tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
-    """Fetch USD→EUR rate and derive EUR-denominated portfolio metrics.
-
-    Returns:
-        (current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct)
-    """
-    try:
-        usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
-    except Exception as e:
-        logger.error(
-            "Error fetching USD to EUR exchange rate for portfolio %s: %s",
-            portfolio_id, e, exc_info=True,
-        )
-        return None, None, None, None
-
-    if usd_to_eur_rate is None:
-        return None, None, None, None
-
-    usd_to_eur_d = _to_decimal(usd_to_eur_rate)
-    current_value_eur = current_value * usd_to_eur_d
-    unrealized_gains_eur = unrealized_gains * usd_to_eur_d
-
-    principal_at_current_rate = state.principal * usd_to_eur_d
-    currency_gains_eur = principal_at_current_rate - state.principal_eur
-    currency_gains_pct: Optional[Decimal] = None
-    if state.deposits_eur > 0:
-        currency_gains_pct = (currency_gains_eur / state.deposits_eur) * 100
-
-    return current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct
-
-
-def _compute_tax_metrics(
-    state: _TxState,
-    current_value_eur: Optional[Decimal],
-    dividends_eur: Optional[Decimal],
-    tax_rate: Decimal,
-) -> Tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
-    """Compute capital-gains tax and after-tax return metrics.
-
-    Returns:
-        (capital_gains_eur, tax_eur,
-         total_return_after_tax_eur, total_return_after_tax_pct,
-         current_value_after_tax_eur)
-    """
-    if current_value_eur is None:
-        return None, None, None, None, None
-
-    capital_gains_eur: Optional[Decimal] = None
-    tax_eur: Optional[Decimal] = None
-
-    # Skip tax computation when dividends exist but EUR conversion is unavailable
-    if state.dividends == 0 or dividends_eur is not None:
-        dividends_for_tax = dividends_eur if dividends_eur is not None else _ZERO
-        capital_gains_eur = current_value_eur - state.principal_eur - dividends_for_tax
-        tax_eur = capital_gains_eur * tax_rate if capital_gains_eur > 0 else _ZERO
-
-    total_return_after_tax_eur: Optional[Decimal] = None
-    total_return_after_tax_pct: Optional[Decimal] = None
-    current_value_after_tax_eur: Optional[Decimal] = None
-
-    if tax_eur is not None:
-        current_value_after_tax_eur = current_value_eur - tax_eur
-        total_return_after_tax_eur = (current_value_eur - state.principal_eur) - tax_eur
-        if state.deposits_eur > 0:
-            total_return_after_tax_pct = (total_return_after_tax_eur / state.deposits_eur) * 100
-
-    return (capital_gains_eur, tax_eur,
-            total_return_after_tax_eur, total_return_after_tax_pct,
-            current_value_after_tax_eur)
 
 
 # ================== Performance helpers ==================
@@ -751,7 +668,7 @@ class PortfolioService:
             logger.error("Error fetching prices for portfolio %s: %s", portfolio_id, e, exc_info=True)
             current_prices = dict.fromkeys(tickers)
 
-        # Fetch EUR rate once for both holdings EUR values and portfolio EUR metrics
+        # Fetch live USD→EUR rate; passed to frontend for client-side EUR conversion
         try:
             usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
         except Exception:
@@ -759,7 +676,7 @@ class PortfolioService:
 
         # Build holdings list and aggregate metrics
         holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
-            _build_holdings_list(state, current_prices, usd_to_eur_rate)
+            _build_holdings_list(state, current_prices)
 
         current_value = state.cash + holdings_value
 
@@ -767,50 +684,31 @@ class PortfolioService:
         if holdings_cost > 0:
             unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
 
-        cash_eur: Optional[float] = float(state.cash) * usd_to_eur_rate if usd_to_eur_rate else None
-
-        # EUR conversion
-        current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct = \
-            _compute_eur_metrics(state, current_value, unrealized_gains, portfolio_id)
-
-        # Normalize dividends_eur:
-        # - dividends exist but no EUR conversion available → None (can't compute accurate tax)
+        # Normalize dividends_eur (historical per-transaction rates):
+        # - dividends exist but no EUR conversion available → None
         # - no dividends at all → None
         has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
         dividends_eur: Optional[Decimal] = state.dividends_eur if has_valid_eur else None
-
-        # Tax on capital gains
-        capital_gains_eur, tax_eur, total_return_after_tax_eur, \
-            total_return_after_tax_pct, current_value_after_tax_eur = \
-            _compute_tax_metrics(state, current_value_eur, dividends_eur, tax_rate)
 
         return PortfolioStatusResponse(
             portfolio_id=portfolio.id,
             portfolio_name=portfolio.name,
             current_value=_normalize_zero(current_value),
-            current_value_eur=_opt_normalize(current_value_eur),
             principal=_normalize_zero(state.principal),
             principal_eur=_normalize_zero(state.principal_eur),
             dividends=_normalize_zero(state.dividends),
             dividends_eur=_opt_normalize(dividends_eur),
             cash=_normalize_zero(state.cash),
-            cash_eur=cash_eur,
             holdings=holdings_list,
             holdings_cost=_normalize_zero(holdings_cost),
             holdings_value=_normalize_zero(holdings_value),
             unrealized_gains=_normalize_zero(unrealized_gains),
             unrealized_gains_pct=_opt_normalize(unrealized_gains_pct),
-            unrealized_gains_eur=_opt_normalize(unrealized_gains_eur),
             realized_gains=_normalize_zero(state.realized_gains),
-            currency_gains_eur=_opt_normalize(currency_gains_eur),
-            currency_gains_pct=_opt_normalize(currency_gains_pct),
-            capital_gains_eur=_opt_normalize(capital_gains_eur),
             capital_gains_tax_rate=float(tax_rate),
-            tax_eur=_opt_normalize(tax_eur),
-            total_return_after_tax_eur=_opt_normalize(total_return_after_tax_eur),
-            total_return_after_tax_pct=_opt_normalize(total_return_after_tax_pct),
-            current_value_after_tax_eur=_opt_normalize(current_value_after_tax_eur),
             missing_prices=missing_prices,
+            usd_to_eur_rate=usd_to_eur_rate,
+            deposits_eur=float(state.deposits_eur),
         )
 
     def calculate_portfolio_status_at_date(
@@ -975,7 +873,7 @@ class PortfolioService:
             usd_to_eur_rate = None
 
         holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
-            _build_holdings_list(state, current_prices, usd_to_eur_rate)
+            _build_holdings_list(state, current_prices)
 
         current_value = state.cash + holdings_value
 
@@ -983,45 +881,28 @@ class PortfolioService:
         if holdings_cost > 0:
             unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
 
-        cash_eur: Optional[float] = float(state.cash) * usd_to_eur_rate if usd_to_eur_rate else None
-
-        current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct = \
-            _compute_eur_metrics(state, current_value, unrealized_gains, 0)
-
         has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
         dividends_eur: Optional[Decimal] = state.dividends_eur if has_valid_eur else None
-
-        capital_gains_eur, tax_eur, total_return_after_tax_eur, \
-            total_return_after_tax_pct, current_value_after_tax_eur = \
-            _compute_tax_metrics(state, current_value_eur, dividends_eur, tax_rate)
 
         return PortfolioStatusResponse(
             portfolio_id=0,
             portfolio_name="Aggregated",
             current_value=_normalize_zero(current_value),
-            current_value_eur=_opt_normalize(current_value_eur),
             principal=_normalize_zero(state.principal),
             principal_eur=_normalize_zero(state.principal_eur),
             dividends=_normalize_zero(state.dividends),
             dividends_eur=_opt_normalize(dividends_eur),
             cash=_normalize_zero(state.cash),
-            cash_eur=cash_eur,
             holdings=holdings_list,
             holdings_cost=_normalize_zero(holdings_cost),
             holdings_value=_normalize_zero(holdings_value),
             unrealized_gains=_normalize_zero(unrealized_gains),
             unrealized_gains_pct=_opt_normalize(unrealized_gains_pct),
-            unrealized_gains_eur=_opt_normalize(unrealized_gains_eur),
             realized_gains=_normalize_zero(state.realized_gains),
-            currency_gains_eur=_opt_normalize(currency_gains_eur),
-            currency_gains_pct=_opt_normalize(currency_gains_pct),
-            capital_gains_eur=_opt_normalize(capital_gains_eur),
             capital_gains_tax_rate=float(tax_rate),
-            tax_eur=_opt_normalize(tax_eur),
-            total_return_after_tax_eur=_opt_normalize(total_return_after_tax_eur),
-            total_return_after_tax_pct=_opt_normalize(total_return_after_tax_pct),
-            current_value_after_tax_eur=_opt_normalize(current_value_after_tax_eur),
             missing_prices=missing_prices,
+            usd_to_eur_rate=usd_to_eur_rate,
+            deposits_eur=float(state.deposits_eur),
         )
 
     def get_aggregated_performance(

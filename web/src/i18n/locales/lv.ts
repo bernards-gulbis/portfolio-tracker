@@ -285,6 +285,12 @@ const lv: Translation = {
       marketValue: 'Tirgus vērtība',
       unrealizedGL: 'Nerealizētā P/Z',
     },
+    currency: {
+      toggle: 'Valūta',
+      usdLabel: 'USD',
+      eurLabel: 'EUR',
+      eurUnavailable: 'EUR nav pieejams — kursu neizdevās iegūt',
+    },
   },
   chart: {
     performance: {

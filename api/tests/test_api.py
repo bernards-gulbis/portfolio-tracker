@@ -1824,13 +1824,13 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
 # ================== EUR Conversion and Tax Tests ==================
 
 def test_portfolio_status_with_eur_conversion(client: TestClient):
-    """Test portfolio status with EUR conversion and tax calculation"""
+    """Test portfolio status passes live FX rate and deposits_eur to frontend"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "EUR Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000 with fx_rate = 1.1111 (meaning 1 EUR = 1.1111 USD)
     # This converts to: 10000 / 1.1111 = 9000 EUR
     client.post(
@@ -1843,7 +1843,7 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL at $100 (10 shares = $1000)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1857,62 +1857,42 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Mock current price: AAPL at $150 (50% gain)
     # Mock USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
     mock_prices = {'AAPL': 150.0}
-    
+
     with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
          patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # USD values
     assert data["cash"] == pytest.approx(9000.0)
     assert data["principal"] == pytest.approx(10000.0)
     assert data["current_value"] == pytest.approx(10500.0)  # 9000 cash + 1500 holdings
     assert data["unrealized_gains"] == pytest.approx(500.0)  # 1500 - 1000
-    
-    # EUR values
+
+    # Historical EUR values (unchanged)
     assert abs(data["principal_eur"] - 9000.0) < 0.1  # 10000 / 1.1111 ≈ 9000
-    assert data["current_value_eur"] == pytest.approx(8925.0)  # 10500 * 0.85
-    assert data["unrealized_gains_eur"] == pytest.approx(425.0)  # 500 * 0.85
-    
-    # Currency gains: (principal @ current rate) - principal_eur
-    # principal @ current rate = 10000 * 0.85 = 8500 EUR
-    # currency_gains_eur = 8500 - 9000 = -500 EUR (EUR strengthened, loss for USD holder)
-    principal_at_current_rate = 10000.0 * 0.85
-    expected_currency_gains = principal_at_current_rate - 9000.0
-    assert abs(data["currency_gains_eur"] - expected_currency_gains) < 0.1
-    assert abs(data["currency_gains_eur"] - (-500.0)) < 0.1
-    # currency_gains_pct = -500 / 9000 * 100 ≈ -5.56%
-    expected_currency_gains_pct = (expected_currency_gains / 9000.0) * 100
-    assert abs(data["currency_gains_pct"] - expected_currency_gains_pct) < 0.01
-    
-    # Tax calculation: (current_value_eur - principal_eur - dividends_eur) * 0.255
-    # dividends_eur is None (no dividends), treated as 0
-    capital_gains_eur = 8925.0 - 9000.0  # -75 EUR
-    expected_tax = 0.0  # No tax on negative gains
-    assert abs(data["capital_gains_eur"] - capital_gains_eur) < 0.1
+
+    # Live rate and deposits_eur passed to frontend for client-side conversion
+    assert data["usd_to_eur_rate"] == pytest.approx(0.85)
+    assert abs(data["deposits_eur"] - 9000.0) < 0.1  # same as principal_eur (single deposit)
+
     assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
-    assert data["tax_eur"] == expected_tax
-    
-    # After-tax return: (current_value_eur - principal_eur) - tax_eur
-    expected_return = 8925.0 - 9000.0 - expected_tax
-    assert abs(data["total_return_after_tax_eur"] - expected_return) < 0.1
-    assert abs(data["total_return_after_tax_pct"] - (expected_return / 9000.0 * 100)) < 0.01
 
 
 def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
-    """Test tax calculation with positive capital gains"""
+    """Test that live rate and deposits_eur are returned for frontend tax computation"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Tax Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000 with EUR conversion at 1.0 (for simplicity)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1924,7 +1904,7 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL at $100 (100 shares = $10,000)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1938,60 +1918,39 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
             "fee": 0.0
         }
     )
-    
-    # Mock current price: AAPL at $200 (100% gain = $10,000 gain)
-    # Mock USD to EUR rate: 1.0 (for simplicity)
+
+    # Mock current price: AAPL at $200, FX rate 1.0
     mock_prices = {'AAPL': 200.0}
-    
+
     with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
          patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # USD values
-    assert data["current_value"] == pytest.approx(20000.0)  # 0 cash + 20000 holdings
+    assert data["current_value"] == pytest.approx(20000.0)
     assert data["principal"] == pytest.approx(10000.0)
     assert data["unrealized_gains"] == pytest.approx(10000.0)
-    
-    # EUR values
-    assert data["current_value_eur"] == pytest.approx(20000.0)
-    assert data["principal_eur"] == pytest.approx(10000.0)
-    
-    # Currency gains: FX rate unchanged (1.0 deposit, 1.0 current) = 0 currency gains
-    assert data["currency_gains_eur"] == pytest.approx(0.0)
-    assert data["currency_gains_pct"] == pytest.approx(0.0)
-    
-    # Tax calculation: (20000 - 10000 - 0) * 0.255 = 2550 EUR
-    capital_gains_eur = 20000.0 - 10000.0 - 0.0
-    expected_tax = capital_gains_eur * 0.255
-    assert data["capital_gains_eur"] == capital_gains_eur
-    assert data["capital_gains_eur"] == pytest.approx(10000.0)
-    assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
-    assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == pytest.approx(2550.0)
-    
-    # After-tax return: (20000 - 10000) - 2550 = 7450 EUR
-    expected_return = 20000.0 - 10000.0 - 2550.0
-    assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == pytest.approx(7450.0)
-    assert data["total_return_after_tax_pct"] == pytest.approx(74.5)  # 7450 / 10000 * 100
 
-    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7450 = 17450 EUR
-    expected_value_after_tax = 10000.0 + 7450.0
-    assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == pytest.approx(17450.0)
+    # Historical EUR
+    assert data["principal_eur"] == pytest.approx(10000.0)
+
+    # Live rate and deposits_eur for frontend computation
+    assert data["usd_to_eur_rate"] == pytest.approx(1.0)
+    assert data["deposits_eur"] == pytest.approx(10000.0)
+    assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
 
 
 def test_portfolio_status_tax_excludes_dividends(client: TestClient):
-    """Test that tax calculation excludes dividends from capital gains base"""
+    """Test that dividends_eur is returned for frontend dividend-aware tax computation"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Dividend Tax Test"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2003,7 +1962,7 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2017,7 +1976,7 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Receive $2,000 dividend
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2040,34 +1999,19 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     
     assert response.status_code == 200
     data = response.json()
-    
+
     # Current value: $2,000 cash + $15,000 holdings = $17,000
     assert data["cash"] == pytest.approx(2000.0)
     assert data["current_value"] == pytest.approx(17000.0)
     assert data["principal"] == pytest.approx(10000.0)
     assert data["dividends"] == pytest.approx(2000.0)
+    # dividends_eur comes from historical per-transaction rate (fx_rate=1.0 → 2000 EUR)
     assert data["dividends_eur"] == pytest.approx(2000.0)
-    
-    # Total gain: 17000 - 10000 = 7000 (includes dividends)
-    # Capital gains (for tax): 17000 - 10000 - 2000 = 5000 (excludes dividends)
-    # Tax: 5000 * 0.255 = 1275 EUR
-    capital_gains_eur = 17000.0 - 10000.0 - 2000.0
-    expected_tax = capital_gains_eur * 0.255
-    assert data["capital_gains_eur"] == capital_gains_eur
-    assert data["capital_gains_eur"] == pytest.approx(5000.0)
     assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
-    assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == pytest.approx(1275.0)
-    
-    # After-tax return: (17000 - 10000) - 1275 = 5725 EUR
-    expected_return = 17000.0 - 10000.0 - 1275.0
-    assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == pytest.approx(5725.0)
 
-    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 5725 = 15725 EUR
-    expected_value_after_tax = 10000.0 + 5725.0
-    assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == pytest.approx(15725.0)
+    # Live rate and deposits_eur for frontend computation
+    assert data["usd_to_eur_rate"] == pytest.approx(1.0)
+    assert data["deposits_eur"] == pytest.approx(10000.0)
 
 
 def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClient):
@@ -2129,14 +2073,11 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
     # Dividends exist in USD
     assert data["dividends"] == pytest.approx(1000.0)
 
-    # Dividends EUR should be computed via fallback rate (1000 * 0.92 = 920)
+    # dividends_eur computed via fallback rate (1000 * 0.92 = 920)
     assert data["dividends_eur"] == pytest.approx(920.0)
 
-    # Tax should be computable now
-    assert data["tax_eur"] is not None
-
-    # After-tax metrics should also be available
-    assert data["current_value_after_tax_eur"] is not None
+    # Live rate available for frontend tax computation
+    assert data["usd_to_eur_rate"] == pytest.approx(0.92)
 
 
 def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
@@ -2198,20 +2139,15 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
     # Dividends exist in USD
     assert data["dividends"] == pytest.approx(1000.0)
 
-    # Dividends EUR should be None (no fx_rate and fallback rate unavailable)
+    # dividends_eur is None (no fx_rate and fallback rate unavailable)
     assert data["dividends_eur"] is None
 
-    # Tax should be None (cannot compute without knowing dividend EUR value)
-    assert data["tax_eur"] is None
-
-    # After-tax metrics should also be None
-    assert data["total_return_after_tax_eur"] is None
-    assert data["total_return_after_tax_pct"] is None
-    assert data["current_value_after_tax_eur"] is None
+    # usd_to_eur_rate is None — frontend knows EUR conversion is unavailable
+    assert data["usd_to_eur_rate"] is None
 
 
 def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestClient):
-    """Test that EUR metrics are None when current exchange rate is unavailable"""
+    """Test that usd_to_eur_rate is None when exchange rate is unavailable"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "No Exchange Rate Test"}
@@ -2257,15 +2193,10 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
     # USD values should be available
     assert data["current_value"] == pytest.approx(15000.0)
     assert data["principal"] == pytest.approx(10000.0)
-    
-    # EUR values should be None
-    assert data["current_value_eur"] is None
-    assert data["unrealized_gains_eur"] is None
-    assert data["tax_eur"] is None
-    assert data["total_return_after_tax_eur"] is None
-    assert data["total_return_after_tax_pct"] is None
-    assert data["current_value_after_tax_eur"] is None
-    
+
+    # usd_to_eur_rate is None — frontend shows '-' for all EUR-derived values
+    assert data["usd_to_eur_rate"] is None
+
     # Historical EUR values should still be available
     assert data["principal_eur"] == pytest.approx(10000.0)  # Converted at historical rate
 
@@ -2311,19 +2242,20 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
     
     assert response.status_code == 200
     data = response.json()
-    
+
     # Principal in USD
     assert data["principal"] == pytest.approx(15000.0)
-    
+
     # Principal in EUR (using historical fx_rates)
     # 10000 / 1.10 + 5000 / 1.05 = 9090.91 + 4761.90 = 13852.81
     expected_principal_eur = 10000.0 / 1.10 + 5000.0 / 1.05
     assert abs(data["principal_eur"] - expected_principal_eur) < 0.01
-    
-    # Current value in EUR (using current rate)
-    # 15000 * 0.85 = 12750.0
-    expected_current_value_eur = 15000.0 * 0.85
-    assert data["current_value_eur"] == expected_current_value_eur
+
+    # Live rate passed to frontend for client-side EUR conversion
+    assert data["usd_to_eur_rate"] == pytest.approx(0.85)
+
+    # deposits_eur = sum of all deposit EUR amounts (two deposits at historical rates)
+    assert abs(data["deposits_eur"] - expected_principal_eur) < 0.01
 
 
 # ================== Health Check Test ==================
@@ -3313,9 +3245,10 @@ def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: Us
     assert response.status_code == 200
     data = response.json()
 
-    # Tax at 15%: capital_gains_eur = 10000, tax = 10000 * 0.15 = 1500
+    # Custom tax rate is returned for frontend computation
     assert data["capital_gains_tax_rate"] == pytest.approx(0.15)
-    assert data["tax_eur"] == pytest.approx(1500.0)
+    # Live rate for frontend to compute tax = 10000 * 0.15 = 1500 EUR
+    assert data["usd_to_eur_rate"] == pytest.approx(1.0)
 
 
 # ==================== TransactionUpdate Validation ====================

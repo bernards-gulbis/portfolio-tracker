@@ -36,11 +36,6 @@ const mockHoldingsEur: Holding[] = [
     current_value: 2000,
     unrealized_gain_loss: 500,
     unrealized_gain_loss_pct: 33.33,
-    average_cost_eur: 138,
-    total_cost_eur: 1380,
-    current_price_eur: 184,
-    current_value_eur: 1840,
-    unrealized_gain_loss_eur: 460,
   },
 ];
 
@@ -89,29 +84,30 @@ describe('HoldingsAllocationChart', () => {
     expect(screen.getByText('CASH')).toBeInTheDocument();
   });
 
-  it('uses EUR values when cash_eur is provided', () => {
+  it('uses EUR values when eurRate is provided', () => {
+    // eurRate=0.92: cash=500 → €460.00, AAPL current_value=2000 → €1,840.00
     render(
       <HoldingsAllocationChart
         holdings={mockHoldingsEur}
         cash={500}
-        cash_eur={460}
+        eurRate={0.92}
         loading={false}
       />
     );
 
     expect(screen.getByText('AAPL')).toBeInTheDocument();
     expect(screen.getByText('CASH')).toBeInTheDocument();
-    // EUR amounts should appear in the legend (€460.00 for cash, €1,840.00 for AAPL)
+    // EUR amounts should appear in the legend
     expect(screen.getByText('€460.00')).toBeInTheDocument();
     expect(screen.getByText('€1,840.00')).toBeInTheDocument();
   });
 
-  it('falls back to USD when cash_eur is null and no EUR holding values', () => {
+  it('falls back to USD when eurRate is null', () => {
     render(
       <HoldingsAllocationChart
         holdings={mockHoldings}
         cash={500}
-        cash_eur={null}
+        eurRate={null}
         loading={false}
       />
     );
