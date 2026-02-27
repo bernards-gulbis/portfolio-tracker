@@ -246,7 +246,6 @@ class PortfolioStatusResponse(BaseModel):
     capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
     missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
     usd_to_eur_rate: Optional[float] = None  # Live USD→EUR rate; None when unavailable
-    deposits_eur: float = 0.0  # Cumulative gross deposits in EUR at historical rates (return % denominator)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -254,10 +253,12 @@ class PortfolioStatusResponse(BaseModel):
 class PerformanceDataPoint(BaseModel):
     """Schema for a single performance data point"""
     date: str  # YYYY-MM-DD format
-    principal_eur: float
-    current_value_eur: Optional[float] = None
-    return_pct: Optional[float] = None  # ((current_value_eur - principal_eur) / deposits_eur) * 100
-    sp500_return_pct: Optional[float] = None  # S&P 500 return % from first data point
+    principal: float = 0.0
+    principal_eur: Optional[float] = None   # Cumulative net deposits in EUR at historical rates
+    current_value: Optional[float] = None
+    fx_rate: Optional[float] = None         # Historical USD→EUR rate at this date
+    return_pct: Optional[float] = None      # ((current_value - principal) / principal) * 100
+    sp500_return_pct: Optional[float] = None  # S&P 500 USD return % from first data point
 
     model_config = ConfigDict(from_attributes=True)
 

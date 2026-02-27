@@ -1878,9 +1878,7 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
     # Historical EUR values (unchanged)
     assert abs(data["principal_eur"] - 9000.0) < 0.1  # 10000 / 1.1111 ≈ 9000
 
-    # Live rate and deposits_eur passed to frontend for client-side conversion
     assert data["usd_to_eur_rate"] == pytest.approx(0.85)
-    assert abs(data["deposits_eur"] - 9000.0) < 0.1  # same as principal_eur (single deposit)
 
     assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
 
@@ -1937,9 +1935,7 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
     # Historical EUR
     assert data["principal_eur"] == pytest.approx(10000.0)
 
-    # Live rate and deposits_eur for frontend computation
     assert data["usd_to_eur_rate"] == pytest.approx(1.0)
-    assert data["deposits_eur"] == pytest.approx(10000.0)
     assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
 
 
@@ -2009,9 +2005,7 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     assert data["dividends_eur"] == pytest.approx(2000.0)
     assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
 
-    # Live rate and deposits_eur for frontend computation
     assert data["usd_to_eur_rate"] == pytest.approx(1.0)
-    assert data["deposits_eur"] == pytest.approx(10000.0)
 
 
 def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClient):
@@ -2254,8 +2248,8 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
     # Live rate passed to frontend for client-side EUR conversion
     assert data["usd_to_eur_rate"] == pytest.approx(0.85)
 
-    # deposits_eur = sum of all deposit EUR amounts (two deposits at historical rates)
-    assert abs(data["deposits_eur"] - expected_principal_eur) < 0.01
+    # principal_eur = sum of all deposit EUR amounts at historical rates (no withdrawals)
+    assert abs(data["principal_eur"] - expected_principal_eur) < 0.01
 
 
 # ================== Health Check Test ==================
@@ -2505,7 +2499,7 @@ def test_performance_chart_split_adjusted_prices(client: TestClient):
     assert len(points) > 0
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # Portfolio is fully invested in one stock — value should always
@@ -2513,7 +2507,7 @@ def test_performance_chart_split_adjusted_prices(client: TestClient):
         # is before or after the split.  Any value far below deposit
         # would indicate the split-adjustment bug.
         assert val == pytest.approx(6000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈6000 "
+            f"date={pt['date']}: current_value={val}, expected ≈6000 "
             f"(return_pct={pt['return_pct']})"
         )
 
@@ -2608,14 +2602,14 @@ def test_performance_chart_multiple_splits(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # 10 × $200 × 6 = 12 000 before both splits
         # 30 × $200 × 2 = 12 000 between splits
         # 60 × $200 × 1 = 12 000 after both splits
         assert val == pytest.approx(12000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈12000"
+            f"date={pt['date']}: current_value={val}, expected ≈12000"
         )
 
 
@@ -2681,12 +2675,12 @@ def test_performance_chart_no_splits(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # 20 × $250 = $5 000 — no split factor needed
         assert val == pytest.approx(5000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈5000"
+            f"date={pt['date']}: current_value={val}, expected ≈5000"
         )
 
 
@@ -2773,7 +2767,7 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # GOOD: 50 × $100 = $5 000
@@ -2781,7 +2775,7 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
         # Total = $10 000 ≈ principal
         # Without the fallback, DELIST would be $0, giving $5 000 — a 50% loss
         assert val == pytest.approx(10000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈10000 "
+            f"date={pt['date']}: current_value={val}, expected ≈10000 "
             f"(cost basis fallback for DELIST)"
         )
         # return_pct should be ~0% (no gain/loss)
@@ -2947,7 +2941,7 @@ def test_performance_last_known_price_gap(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         date_str = pt["date"]
@@ -3051,7 +3045,7 @@ def test_performance_delisted_db_fallback(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # Skip points before all buys are applied (buys on Jan 2 and Jan 3)
@@ -3148,7 +3142,7 @@ def test_performance_delisted_no_cache(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # Skip points before all buys are applied (buys on Jan 2 and Jan 3)

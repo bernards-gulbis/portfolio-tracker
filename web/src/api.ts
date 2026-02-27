@@ -154,13 +154,14 @@ export interface PortfolioStatus {
   capital_gains_tax_rate: number;
   missing_prices: string[];
   usd_to_eur_rate: number | null;
-  deposits_eur: number;
 }
 
 export interface PerformanceDataPoint {
   date: string;
-  principal_eur: number;
-  current_value_eur: number | null;
+  principal: number;
+  principal_eur: number | null;
+  current_value: number | null;
+  fx_rate: number | null;
   return_pct: number | null;
   sp500_return_pct: number | null;
 }

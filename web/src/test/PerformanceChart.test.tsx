@@ -10,14 +10,14 @@ yesterday.setDate(today.getDate() - 1);
 const fmtDate = (d: Date) => d.toISOString().split('T')[0];
 
 const mockData = [
-  { date: fmtDate(yesterday), principal_eur: 10000, current_value_eur: 10500, return_pct: 5.0, sp500_return_pct: 0 },
-  { date: fmtDate(today), principal_eur: 10000, current_value_eur: 10800, return_pct: 8.0, sp500_return_pct: 1.2 },
+  { date: fmtDate(yesterday), principal: 11765, principal_eur: 10824, current_value: 12353, fx_rate: 0.92, return_pct: 5.0, sp500_return_pct: 0 },
+  { date: fmtDate(today), principal: 11765, principal_eur: 10824, current_value: 12706, fx_rate: 0.92, return_pct: 8.0, sp500_return_pct: 1.2 },
 ];
 
 // Old data that will be filtered out by the default "1M" period
 const oldMockData = [
-  { date: '2023-01-01', principal_eur: 10000, current_value_eur: 10500, return_pct: 5.0, sp500_return_pct: 0 },
-  { date: '2023-01-02', principal_eur: 10000, current_value_eur: 10800, return_pct: 8.0, sp500_return_pct: 1.2 },
+  { date: '2023-01-01', principal: 11765, principal_eur: 10589, current_value: 12353, fx_rate: 0.90, return_pct: 5.0, sp500_return_pct: 0 },
+  { date: '2023-01-02', principal: 11765, principal_eur: 10589, current_value: 12706, fx_rate: 0.90, return_pct: 8.0, sp500_return_pct: 1.2 },
 ];
 
 describe('PerformanceChart', () => {

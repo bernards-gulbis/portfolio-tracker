@@ -172,12 +172,7 @@ def get_portfolio_performance(
     end_date: Annotated[Optional[str], Query(description="End date in YYYY-MM-DD format")] = None,
     num_points: Annotated[int, Query(ge=2, le=365, description="Number of data points to return")] = 60,
 ):
-    """
-    Get portfolio performance over time.
-
-    Returns a time series of portfolio values showing how the portfolio has evolved.
-    Includes principal_eur (deposits/withdrawals) and current_value_eur (market value).
-    """
+    """Get portfolio performance over time as a time series of portfolio values."""
     service = PortfolioService(session)
 
     start_dt = None
@@ -211,8 +206,10 @@ def get_portfolio_performance(
         data_points = [
             PerformanceDataPoint(
                 date=dp['date'],
-                principal_eur=dp['principal_eur'],
-                current_value_eur=dp['current_value_eur'],
+                principal=dp.get('principal', 0.0),
+                principal_eur=dp.get('principal_eur'),
+                current_value=dp.get('current_value'),
+                fx_rate=dp.get('fx_rate'),
                 return_pct=dp.get('return_pct'),
                 sp500_return_pct=dp.get('sp500_return_pct'),
             )

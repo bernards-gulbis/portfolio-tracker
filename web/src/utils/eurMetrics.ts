@@ -36,7 +36,7 @@ export const computeEurMetrics = (status: PortfolioStatus): EurMetrics | null =>
   const unrealizedGainsEur = status.unrealized_gains * rate;
   const currencyGainsEur = status.principal * rate - status.principal_eur;
   const currencyGainsPct =
-    status.deposits_eur > 0 ? (currencyGainsEur / status.deposits_eur) * 100 : null;
+    status.principal_eur > 0 ? (currencyGainsEur / status.principal_eur) * 100 : null;
   const cashEur = status.cash * rate;
 
   // Skip tax when dividends exist but EUR conversion is unavailable
@@ -54,7 +54,7 @@ export const computeEurMetrics = (status: PortfolioStatus): EurMetrics | null =>
     currentValueAfterTaxEur = currentValueEur - taxEur;
     totalReturnAfterTaxEur = currentValueEur - status.principal_eur - taxEur;
     totalReturnAfterTaxPct =
-      status.deposits_eur > 0 ? (totalReturnAfterTaxEur / status.deposits_eur) * 100 : null;
+      status.principal_eur > 0 ? (totalReturnAfterTaxEur / status.principal_eur) * 100 : null;
   }
 
   return {

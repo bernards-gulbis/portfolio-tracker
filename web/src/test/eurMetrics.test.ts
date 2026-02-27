@@ -20,7 +20,6 @@ const baseStatus: PortfolioStatus = {
   capital_gains_tax_rate: 0.255,
   missing_prices: [],
   usd_to_eur_rate: 0.85,
-  deposits_eur: 9000,
 };
 
 describe('computeEurMetrics', () => {
@@ -66,7 +65,6 @@ describe('computeEurMetrics', () => {
       principal_eur: 10000,
       cash: 0,
       usd_to_eur_rate: 1.0,
-      deposits_eur: 10000,
     };
     const result = computeEurMetrics(status)!;
     // capitalGainsEur = 20000 - 10000 - 0 = 10000
@@ -91,7 +89,6 @@ describe('computeEurMetrics', () => {
       dividends_eur: 2000,
       cash: 2000,
       usd_to_eur_rate: 1.0,
-      deposits_eur: 10000,
     };
     const result = computeEurMetrics(status)!;
     // capitalGainsEur = 17000 - 10000 - 2000 = 5000
@@ -113,8 +110,8 @@ describe('computeEurMetrics', () => {
     expect(result.currentValueAfterTaxEur).toBeNull();
   });
 
-  it('returns currencyGainsPct as null when deposits_eur is 0', () => {
-    const status = { ...baseStatus, deposits_eur: 0 };
+  it('returns currencyGainsPct as null when principal_eur is 0', () => {
+    const status = { ...baseStatus, principal_eur: 0 };
     const result = computeEurMetrics(status)!;
     expect(result.currencyGainsPct).toBeNull();
   });

@@ -95,7 +95,6 @@ class _TxState:
     cash: Decimal = _ZERO
     principal: Decimal = _ZERO        # Net deposits - withdrawals in native currency
     principal_eur: Decimal = _ZERO    # Net deposits - withdrawals in EUR (historical rates)
-    deposits_eur: Decimal = _ZERO     # Cumulative deposits in EUR (inflows only, for return % denominator)
     dividends: Decimal = _ZERO
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
@@ -124,7 +123,6 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.principal += total
     eur = _eur_from_tx(tx, total)
     state.principal_eur += eur
-    state.deposits_eur += eur
 
 
 def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -522,9 +520,9 @@ def _compute_perf_data_point(
     sorted_fx_dates: List[str],
     sp500_prices: Dict[str, float],
     sorted_sp500_dates: List[str],
-    sp500_base_price_eur: Optional[float],
+    sp500_base_price: Optional[float],
 ) -> Tuple[Dict, Optional[float]]:
-    """Build a single performance data-point dict. Returns (data_point, updated sp500_base_price_eur)."""
+    """Build a single performance data-point dict. Returns (data_point, updated sp500_base_price)."""
     if last_known_tickers:
         logger.debug(
             "Performance %s: using last known price for %s",
@@ -536,47 +534,31 @@ def _compute_perf_data_point(
             date_str, cost_basis_tickers,
         )
 
-    current_value_usd = state.cash + holdings_value
+    current_value = state.cash + holdings_value
     fx_rate = _bisect_lookup(sorted_fx_dates, fx_rates, date_str)
-    current_value_eur = float(current_value_usd * _to_decimal(fx_rate)) if fx_rate is not None else None
 
     return_pct = None
-    if current_value_eur is not None and state.deposits_eur > 0:
-        cv_d = _to_decimal(current_value_eur)
-        return_pct = float((cv_d - state.principal_eur) / state.deposits_eur * Decimal('100'))
+    if state.principal > 0:
+        return_pct = float((current_value - state.principal) / state.principal * Decimal('100'))
 
-    # S&P 500 benchmark return % in EUR
+    # S&P 500 in USD — frontend applies FX rate for EUR mode
     sp500_return_pct = None
     sp500_price = _bisect_lookup(sorted_sp500_dates, sp500_prices, date_str)
-    if sp500_price is not None and sp500_price > 0 and fx_rate is not None:
-        sp500_price_eur = sp500_price * fx_rate
-        if sp500_base_price_eur is None:
-            sp500_base_price_eur = sp500_price_eur
-        sp500_return_pct = (sp500_price_eur / sp500_base_price_eur - 1.0) * 100.0
-
-    if return_pct is not None and return_pct < -50:
-        logger.warning(
-            "Performance %s: large negative return %.2f%% — "
-            "cash=%.2f holdings=%.2f fx=%.6f "
-            "value_usd=%.2f value_eur=%s "
-            "principal_eur=%.2f deposits_eur=%.2f "
-            "held=%s last_known=%s cost_basis=%s",
-            date_str, return_pct,
-            float(state.cash), float(holdings_value),
-            fx_rate if fx_rate is not None else 0,
-            float(current_value_usd), current_value_eur,
-            float(state.principal_eur), float(state.deposits_eur),
-            list(state.holdings.keys()), last_known_tickers, cost_basis_tickers,
-        )
+    if sp500_price is not None and sp500_price > 0:
+        if sp500_base_price is None:
+            sp500_base_price = sp500_price
+        sp500_return_pct = (sp500_price / sp500_base_price - 1.0) * 100.0
 
     data_point = {
         'date': date_str,
+        'principal': float(state.principal),
         'principal_eur': float(state.principal_eur),
-        'current_value_eur': current_value_eur,
+        'current_value': float(current_value),
+        'fx_rate': fx_rate,
         'return_pct': return_pct,
         'sp500_return_pct': sp500_return_pct,
     }
-    return data_point, sp500_base_price_eur
+    return data_point, sp500_base_price
 
 
 # ================== Service ==================
@@ -594,7 +576,7 @@ class PortfolioService:
         stripped = name.strip() if name else ""
         if not stripped:
             raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-        if len(name) > 255:
+        if len(stripped) > 255:
             raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
         return stripped
 
@@ -624,10 +606,6 @@ class PortfolioService:
         """Delete a portfolio (user-scoped)"""
         if not self.portfolio_repo.delete(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
-
-    def portfolio_exists(self, portfolio_id: int, user_id: uuid.UUID) -> bool:
-        """Check if a portfolio exists and belongs to user"""
-        return self.portfolio_repo.exists_for_user(portfolio_id, user_id)
 
     def copy_portfolio(self, portfolio_id: int, new_name: str, user_id: uuid.UUID) -> Portfolio:
         """Copy a portfolio with all its transactions (user-scoped)"""
@@ -708,69 +686,7 @@ class PortfolioService:
             capital_gains_tax_rate=float(tax_rate),
             missing_prices=missing_prices,
             usd_to_eur_rate=usd_to_eur_rate,
-            deposits_eur=float(state.deposits_eur),
         )
-
-    def calculate_portfolio_status_at_date(
-        self,
-        portfolio_id: int,
-        target_date: datetime,
-        historical_prices: Optional[Dict[str, float]] = None,
-        usd_to_eur_rate: Optional[float] = None,
-        user_id: Optional[uuid.UUID] = None,
-    ) -> Tuple[float, Optional[float]]:
-        """
-        Calculate portfolio value (principal_eur, current_value_eur) at a specific date.
-
-        Args:
-            portfolio_id:      The ID of the portfolio.
-            target_date:       The date to calculate status for.
-            historical_prices: Optional dict of ticker -> price for the target date.
-            usd_to_eur_rate:   Optional USD to EUR exchange rate for the target date.
-            user_id:           Required — used for ownership verification.
-
-        Returns:
-            Tuple of (principal_eur, current_value_eur)
-
-        Raises:
-            PortfolioNotFoundException: If portfolio_id does not exist or belongs to another user.
-            ValueError: If user_id is not provided.
-        """
-        if user_id is None:
-            raise ValueError("user_id is required")
-        portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
-        if not portfolio:
-            raise PortfolioNotFoundException(portfolio_id)
-
-        all_transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
-        transactions = [t for t in all_transactions if t.date.date() <= target_date.date()]
-
-        state = _TxState()
-        for tx in transactions:
-            _apply_transaction(state, tx, strict=False)
-
-        if historical_prices is None:
-            historical_prices = _fetch_historical_prices(
-                list(state.holdings.keys()), target_date
-            )
-
-        forward_split_factors = _compute_forward_split_factors(all_transactions, cutoff_date=target_date)
-
-        holdings_value = _value_holdings_at_date(
-            state, historical_prices, forward_split_factors,
-            target_date.strftime('%Y-%m-%d'),
-        )
-
-        current_value_usd = state.cash + holdings_value
-
-        if usd_to_eur_rate is None:
-            usd_to_eur_rate = _resolve_usd_to_eur_rate(target_date)
-
-        current_value_eur = None
-        if usd_to_eur_rate is not None:
-            current_value_eur = float(current_value_usd * _to_decimal(usd_to_eur_rate))
-
-        return (float(state.principal_eur), current_value_eur)
 
     def get_portfolio_performance(
         self,
@@ -784,7 +700,7 @@ class PortfolioService:
         Get portfolio performance over time as a time series.
 
         Returns (portfolio_name, data_points) where each data point is a dict with
-        keys: date, principal_eur, current_value_eur.
+        keys: date, principal, principal_eur, current_value, fx_rate, return_pct, sp500_return_pct.
 
         Performance: O(N + M) where N = transactions, M = date points.
 
@@ -821,7 +737,7 @@ class PortfolioService:
         performance_data = []
         state = _TxState()
         tx_index = 0
-        sp500_base_price_eur: Optional[float] = None
+        sp500_base_price: Optional[float] = None
 
         for date_point in date_points:
             date_str = date_point.strftime('%Y-%m-%d')
@@ -832,10 +748,10 @@ class PortfolioService:
                 state, sorted_dates_map, historical_data,
                 ticker_last_price, forward_split_factors, date_str,
             )
-            data_point_dict, sp500_base_price_eur = _compute_perf_data_point(
+            data_point_dict, sp500_base_price = _compute_perf_data_point(
                 state, date_str, holdings_value, last_known, cost_basis,
                 fx_rates, sorted_fx_dates, sp500_prices, sorted_sp500_dates,
-                sp500_base_price_eur,
+                sp500_base_price,
             )
             performance_data.append(data_point_dict)
 
@@ -902,7 +818,6 @@ class PortfolioService:
             capital_gains_tax_rate=float(tax_rate),
             missing_prices=missing_prices,
             usd_to_eur_rate=usd_to_eur_rate,
-            deposits_eur=float(state.deposits_eur),
         )
 
     def get_aggregated_performance(
@@ -940,10 +855,10 @@ class PortfolioService:
 
         forward_split_factors = _compute_forward_split_factors(transactions)
 
-        performance_data: List[PerformanceDataPoint] = []
+        performance_data: List[Dict] = []
         state = _TxState()
         tx_index = 0
-        sp500_base_price_eur: Optional[float] = None
+        sp500_base_price: Optional[float] = None
 
         for date_point in date_points:
             date_str = date_point.strftime('%Y-%m-%d')
@@ -954,21 +869,28 @@ class PortfolioService:
                 state, sorted_dates_map, historical_data,
                 ticker_last_price, forward_split_factors, date_str,
             )
-            data_point_dict, sp500_base_price_eur = _compute_perf_data_point(
+            data_point_dict, sp500_base_price = _compute_perf_data_point(
                 state, date_str, holdings_value, last_known, cost_basis,
                 fx_rates, sorted_fx_dates, sp500_prices, sorted_sp500_dates,
-                sp500_base_price_eur,
+                sp500_base_price,
             )
-            performance_data.append(PerformanceDataPoint(
-                date=data_point_dict['date'],
-                principal_eur=data_point_dict['principal_eur'],
-                current_value_eur=data_point_dict['current_value_eur'],
-                return_pct=data_point_dict.get('return_pct'),
-                sp500_return_pct=data_point_dict.get('sp500_return_pct'),
-            ))
+            performance_data.append(data_point_dict)
 
         return PortfolioPerformanceResponse(
-            portfolio_id=0, portfolio_name="Aggregated", data_points=performance_data
+            portfolio_id=0,
+            portfolio_name="Aggregated",
+            data_points=[
+                PerformanceDataPoint(
+                    date=dp['date'],
+                    principal=dp.get('principal', 0.0),
+                    principal_eur=dp.get('principal_eur'),
+                    current_value=dp.get('current_value'),
+                    fx_rate=dp.get('fx_rate'),
+                    return_pct=dp.get('return_pct'),
+                    sp500_return_pct=dp.get('sp500_return_pct'),
+                )
+                for dp in performance_data
+            ],
         )
 
     def get_realized_sales(

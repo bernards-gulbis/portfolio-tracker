@@ -74,7 +74,6 @@ const mockStatus: PortfolioStatus = {
   capital_gains_tax_rate: 0.255,
   missing_prices: [],
   usd_to_eur_rate: 0.92,
-  deposits_eur: 7360,
 };
 
 describe('PortfolioStatusView', () => {

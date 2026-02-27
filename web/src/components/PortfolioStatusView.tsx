@@ -52,7 +52,6 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, XIcon, RefreshCwIcon } from 'lucide-react';
 
 const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
@@ -120,6 +119,7 @@ export const PortfolioStatusContent = ({
   const unrealizedGains = showEur ? (eurAvailable ? eurMetrics!.unrealizedGainsEur : null) : status.unrealized_gains;
   const netInvested = showEur ? status.principal_eur : status.principal;
   const currencyGainsEur = showEur && eurAvailable ? eurMetrics!.currencyGainsEur : null;
+  const currencyGainsPct = showEur && eurAvailable ? eurMetrics!.currencyGainsPct : null;
   const dividends = showEur ? status.dividends_eur : status.dividends;
   const taxEur = showEur && eurAvailable ? eurMetrics!.taxEur : null;
   const capitalGainsEur = showEur && eurAvailable ? eurMetrics!.capitalGainsEur : null;
@@ -172,25 +172,8 @@ export const PortfolioStatusContent = ({
       {/* Financial Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1">
-            {t('status.netInvested')}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <InfoIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t('status.netInvestedTooltip')}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </p>
+          <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
           <p className="text-lg font-semibold">{formatCurrency(netInvested, displayCurrency, locale)}</p>
-          {currencyGainsEur !== null && (
-            <p className={`text-xs mt-0.5 ${getValueClass(currencyGainsEur)}`}>
-              {t('status.fx')}: {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
-            </p>
-          )}
         </div>
 
         <div>
@@ -236,6 +219,14 @@ export const PortfolioStatusContent = ({
           <PerformanceChart
             data={performance?.data_points || []}
             loading={performanceLoading}
+            currency={currency}
+            liveLastPoint={{
+              currentValue: status.current_value,
+              fxRate: status.usd_to_eur_rate,
+              returnPct: status.principal > 0
+                ? (status.current_value - status.principal) / status.principal * 100
+                : null,
+            }}
           />
           <HoldingsAllocationChart
             holdings={status.holdings}
@@ -280,7 +271,20 @@ export const PortfolioStatusContent = ({
                 <TableCell>
                   {formatCurrency(cashDisplay, displayCurrency, locale)}
                 </TableCell>
-                <TableCell>-</TableCell>
+                <TableCell>
+                  {currencyGainsEur !== null ? (
+                    <div className="flex flex-col">
+                      <span className={`font-semibold ${getValueClass(currencyGainsEur)}`}>
+                        {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
+                      </span>
+                      {currencyGainsPct !== null && (
+                        <span className={`text-xs ${getValueClass(currencyGainsEur)}`}>
+                          {currencyGainsPct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(currencyGainsPct).toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
+                  ) : '-'}
+                </TableCell>
               </TableRow>
               {status.holdings.map((holding) => {
                 const eurVals = showEur && eurAvailable ? applyRateToHolding(holding, eurMetrics!.rate) : null;
@@ -467,7 +471,7 @@ export const PortfolioStatusView = () => {
     );
   }
 
-  const isEmptyPortfolio = status.holdings.length === 0 && status.principal_eur === 0;
+  const isEmptyPortfolio = status.holdings.length === 0 && status.principal === 0;
 
   return (
     <>
