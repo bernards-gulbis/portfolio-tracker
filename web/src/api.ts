@@ -342,6 +342,40 @@ export const getPortfolioPerformance = async (
   return response.data;
 };
 
+// ================== Aggregated Portfolio API Functions ==================
+
+/**
+ * Get aggregated portfolio status across multiple portfolios
+ */
+export const getAggregatedStatus = async (portfolioIds: number[]): Promise<PortfolioStatus> => {
+  const response = await api.post<PortfolioStatus>('/portfolios/aggregate/status', {
+    portfolio_ids: portfolioIds,
+  });
+  return response.data;
+};
+
+/**
+ * Get aggregated portfolio performance across multiple portfolios
+ */
+export const getAggregatedPerformance = async (
+  portfolioIds: number[],
+  startDate?: string,
+  endDate?: string,
+  numPoints?: number
+): Promise<PortfolioPerformance> => {
+  const params: PerformanceParams = {};
+  if (startDate) params.start_date = startDate;
+  if (endDate) params.end_date = endDate;
+  if (numPoints) params.num_points = numPoints;
+
+  const response = await api.post<PortfolioPerformance>(
+    '/portfolios/aggregate/performance',
+    { portfolio_ids: portfolioIds },
+    { params }
+  );
+  return response.data;
+};
+
 // ================== Transaction API Functions ==================
 
 /**

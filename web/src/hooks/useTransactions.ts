@@ -59,6 +59,8 @@ export const useCreateTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedPerformance' });
       toast.success(t('transaction.toasts.added'));
     },
   });
@@ -85,6 +87,8 @@ export const useUpdateTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedPerformance' });
       toast.success(t('transaction.toasts.updated'));
     },
   });
@@ -108,6 +112,8 @@ export const useDeleteTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedPerformance' });
       toast.success(t('transaction.toasts.deleted'));
     },
   });
@@ -131,6 +137,8 @@ export const useImportTransactionsCSV = () => {
       queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedPerformance' });
       toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
     },
   });

@@ -3343,3 +3343,217 @@ def test_transaction_update_api_rejects_negative_fee(client: TestClient):
 
     response = client.put(f"/transactions/{tx_id}", json={"fee": -10.0})
     assert response.status_code == 422
+
+
+# ================== Aggregated Portfolio Tests ==================
+
+
+def test_aggregated_status_single_portfolio_matches_individual(client: TestClient):
+    """Aggregated status for a single portfolio should match the individual portfolio status"""
+    # Create portfolio with a deposit
+    portfolio_response = client.post("/portfolios/", json={"name": "Agg Test 1"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+        },
+    )
+
+    # Get individual status
+    individual = client.get(f"/portfolios/{portfolio_id}/status").json()
+
+    # Get aggregated status for just this one portfolio
+    agg = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [portfolio_id]},
+    )
+    assert agg.status_code == 200
+    agg_data = agg.json()
+
+    assert agg_data["cash"] == pytest.approx(individual["cash"])
+    assert agg_data["principal"] == pytest.approx(individual["principal"])
+    assert agg_data["principal_eur"] == pytest.approx(individual["principal_eur"])
+    assert agg_data["portfolio_id"] == 0
+    assert agg_data["portfolio_name"] == "Aggregated"
+
+
+def test_aggregated_status_multiple_portfolios(client: TestClient):
+    """Aggregated status should combine cash, principal, and holdings from multiple portfolios"""
+    # Portfolio 1: deposit 1000
+    p1 = client.post("/portfolios/", json={"name": "Multi Agg 1"}).json()["id"]
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 1000.0},
+    )
+
+    # Portfolio 2: deposit 2000
+    p2 = client.post("/portfolios/", json={"name": "Multi Agg 2"}).json()["id"]
+    client.post(
+        f"/portfolios/{p2}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 2000.0},
+    )
+
+    agg = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [p1, p2]},
+    )
+    assert agg.status_code == 200
+    data = agg.json()
+
+    assert data["cash"] == pytest.approx(3000.0)
+    assert data["principal"] == pytest.approx(3000.0)
+
+
+def test_aggregated_status_merged_holdings(client: TestClient):
+    """Aggregated status should merge holdings from different portfolios for the same ticker"""
+    # Portfolio 1: buy 10 AAPL
+    p1 = client.post("/portfolios/", json={"name": "Merge 1"}).json()["id"]
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 5000.0},
+    )
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+        },
+    )
+
+    # Portfolio 2: buy 5 AAPL
+    p2 = client.post("/portfolios/", json={"name": "Merge 2"}).json()["id"]
+    client.post(
+        f"/portfolios/{p2}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 5000.0},
+    )
+    client.post(
+        f"/portfolios/{p2}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 5,
+            "price_per_share": 160.0,
+            "total_amount": -800.0,
+        },
+    )
+
+    agg = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [p1, p2]},
+    )
+    assert agg.status_code == 200
+    data = agg.json()
+
+    # Should have merged AAPL holding: 15 shares total
+    assert len(data["holdings"]) == 1
+    assert data["holdings"][0]["ticker"] == "AAPL"
+    assert data["holdings"][0]["quantity"] == pytest.approx(15.0)
+    assert data["holdings"][0]["total_cost"] == pytest.approx(2300.0)  # 1500 + 800
+
+    # Cash: (5000 - 1500) + (5000 - 800) = 7700
+    assert data["cash"] == pytest.approx(7700.0)
+
+
+def test_aggregated_status_empty_portfolio_ids_returns_422(client: TestClient):
+    """Empty portfolio_ids list should return 422 validation error"""
+    response = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": []},
+    )
+    assert response.status_code == 422
+
+
+def test_aggregated_status_nonexistent_portfolio_returns_404(client: TestClient):
+    """Non-existent portfolio in the list should return 404"""
+    response = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [99999]},
+    )
+    assert response.status_code == 404
+
+
+def test_aggregated_status_other_users_portfolio_returns_404(session: Session):
+    """Including another user's portfolio in aggregation should return 404"""
+    user_a = User(
+        id=uuid.uuid4(), email="agg_a@example.com", hashed_password="x",
+        is_active=True, is_superuser=False, is_verified=True,
+    )
+    user_b = User(
+        id=uuid.uuid4(), email="agg_b@example.com", hashed_password="x",
+        is_active=True, is_superuser=False, is_verified=True,
+    )
+    session.add(user_a)
+    session.add(user_b)
+    session.commit()
+
+    # Create portfolios owned by different users
+    p_a = Portfolio(name="User A Agg", user_id=user_a.id)
+    p_b = Portfolio(name="User B Agg", user_id=user_b.id)
+    session.add(p_a)
+    session.add(p_b)
+    session.commit()
+    session.refresh(p_a)
+    session.refresh(p_b)
+
+    # Request as user_a with user_b's portfolio
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[current_active_user] = lambda: user_a
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/portfolios/aggregate/status",
+            json={"portfolio_ids": [p_a.id, p_b.id]},
+        )
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_aggregated_performance_returns_data_points(client: TestClient):
+    """Aggregated performance should return data points"""
+    p1 = client.post("/portfolios/", json={"name": "Perf Agg 1"}).json()["id"]
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+            "eur_amount": 900.0,
+        },
+    )
+
+    with patch("app.services.portfolio_service.PriceService") as mock_price:
+        mock_price.get_historical_prices_for_multiple_tickers.return_value = {
+            "EURUSD=X": {"2024-01-01": 1.1, "2024-06-01": 1.1},
+            "^GSPC": {"2024-01-01": 4700.0, "2024-06-01": 5100.0},
+        }
+        mock_price.get_last_known_price.return_value = None
+
+        response = client.post(
+            "/portfolios/aggregate/performance",
+            json={"portfolio_ids": [p1]},
+            params={"num_points": 5},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["portfolio_id"] == 0
+        assert data["portfolio_name"] == "Aggregated"
+        assert len(data["data_points"]) >= 2
+
+
+def test_aggregated_performance_empty_ids_returns_422(client: TestClient):
+    """Empty portfolio_ids list for performance should return 422"""
+    response = client.post(
+        "/portfolios/aggregate/performance",
+        json={"portfolio_ids": []},
+    )
+    assert response.status_code == 422

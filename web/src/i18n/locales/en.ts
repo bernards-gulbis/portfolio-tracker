@@ -7,6 +7,7 @@ const en = {
     sidebar: {
       general: 'General',
       dashboard: 'Dashboard',
+      aggregate: 'Aggregate',
     },
     header: {
       toggleTheme: 'Toggle theme',
@@ -296,6 +297,14 @@ const en = {
       noData: 'No allocation data available',
       marketValue: 'Market Value',
     },
+  },
+  aggregate: {
+    title: 'Aggregated Portfolio',
+    description: 'Select portfolios to view a combined summary of holdings and performance.',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+    noSelection: 'Select at least one portfolio to view aggregated data.',
+    summary: 'Combined Summary',
   },
   settings: {
     menuItem: 'Settings',

@@ -16,7 +16,7 @@ from app.core.exceptions import (
     PortfolioNotFoundException,
     InvalidPortfolioNameException,
 )
-from app.schemas import HoldingResponse, PortfolioStatusResponse
+from app.schemas import HoldingResponse, PortfolioStatusResponse, PortfolioPerformanceResponse, PerformanceDataPoint
 from app.services.price_service import PriceService
 
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
@@ -919,3 +919,142 @@ class PortfolioService:
             performance_data.append(data_point_dict)
 
         return portfolio.name, performance_data
+
+    def _verify_portfolio_ownership(self, portfolio_ids: List[int], user_id: uuid.UUID) -> None:
+        """Verify all portfolios exist and belong to the user. Raises PortfolioNotFoundException if not."""
+        for pid in portfolio_ids:
+            portfolio = self.portfolio_repo.get_by_id_and_user(pid, user_id)
+            if not portfolio:
+                raise PortfolioNotFoundException(pid)
+
+    def calculate_aggregated_status(
+        self, portfolio_ids: List[int], user_id: uuid.UUID, tax_rate: Decimal = _DEFAULT_TAX_RATE
+    ) -> PortfolioStatusResponse:
+        """Calculate combined status across multiple portfolios."""
+        self._verify_portfolio_ownership(portfolio_ids, user_id)
+
+        transactions = self.transaction_repo.get_by_portfolio_ids(portfolio_ids)
+
+        state = _TxState()
+        for tx in transactions:
+            _apply_transaction(state, tx, strict=True)
+
+        tickers = list(state.holdings.keys())
+        try:
+            current_prices = PriceService.get_current_prices(tickers) if tickers else {}
+        except Exception as e:
+            logger.error("Error fetching prices for aggregated portfolios: %s", e, exc_info=True)
+            current_prices = dict.fromkeys(tickers)
+
+        holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
+            _build_holdings_list(state, current_prices)
+
+        current_value = state.cash + holdings_value
+
+        unrealized_gains_pct: Optional[Decimal] = None
+        if holdings_cost > 0:
+            unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
+
+        current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct = \
+            _compute_eur_metrics(state, current_value, unrealized_gains, 0)
+
+        has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
+        dividends_eur: Optional[Decimal] = state.dividends_eur if has_valid_eur else None
+
+        capital_gains_eur, tax_eur, total_return_after_tax_eur, \
+            total_return_after_tax_pct, current_value_after_tax_eur = \
+            _compute_tax_metrics(state, current_value_eur, dividends_eur, tax_rate)
+
+        return PortfolioStatusResponse(
+            portfolio_id=0,
+            portfolio_name="Aggregated",
+            current_value=_normalize_zero(current_value),
+            current_value_eur=_opt_normalize(current_value_eur),
+            principal=_normalize_zero(state.principal),
+            principal_eur=_normalize_zero(state.principal_eur),
+            dividends=_normalize_zero(state.dividends),
+            dividends_eur=_opt_normalize(dividends_eur),
+            cash=_normalize_zero(state.cash),
+            holdings=holdings_list,
+            holdings_cost=_normalize_zero(holdings_cost),
+            holdings_value=_normalize_zero(holdings_value),
+            unrealized_gains=_normalize_zero(unrealized_gains),
+            unrealized_gains_pct=_opt_normalize(unrealized_gains_pct),
+            unrealized_gains_eur=_opt_normalize(unrealized_gains_eur),
+            realized_gains=_normalize_zero(state.realized_gains),
+            currency_gains_eur=_opt_normalize(currency_gains_eur),
+            currency_gains_pct=_opt_normalize(currency_gains_pct),
+            capital_gains_eur=_opt_normalize(capital_gains_eur),
+            capital_gains_tax_rate=float(tax_rate),
+            tax_eur=_opt_normalize(tax_eur),
+            total_return_after_tax_eur=_opt_normalize(total_return_after_tax_eur),
+            total_return_after_tax_pct=_opt_normalize(total_return_after_tax_pct),
+            current_value_after_tax_eur=_opt_normalize(current_value_after_tax_eur),
+            missing_prices=missing_prices,
+        )
+
+    def get_aggregated_performance(
+        self,
+        portfolio_ids: List[int],
+        user_id: uuid.UUID,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        num_points: int = 60,
+    ) -> PortfolioPerformanceResponse:
+        """Get combined performance across multiple portfolios."""
+        self._verify_portfolio_ownership(portfolio_ids, user_id)
+
+        transactions = self.transaction_repo.get_by_portfolio_ids(portfolio_ids)
+        if not transactions:
+            return PortfolioPerformanceResponse(
+                portfolio_id=0, portfolio_name="Aggregated", data_points=[]
+            )
+
+        if start_date is None:
+            start_date = min(t.date for t in transactions)
+        if end_date is None:
+            end_date = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        if start_date >= end_date:
+            raise ValueError(f"start_date ({start_date}) must be before end_date ({end_date})")
+        if num_points < 2:
+            raise ValueError(f"num_points must be at least 2, got {num_points}")
+
+        date_points = _generate_date_points(start_date, end_date, num_points)
+
+        (historical_data, sorted_dates_map, fx_rates, sorted_fx_dates,
+         sp500_prices, sorted_sp500_dates, ticker_last_price) = \
+            _prepare_perf_data(transactions, start_date, end_date)
+
+        forward_split_factors = _compute_forward_split_factors(transactions)
+
+        performance_data: List[PerformanceDataPoint] = []
+        state = _TxState()
+        tx_index = 0
+        sp500_base_price_eur: Optional[float] = None
+
+        for date_point in date_points:
+            date_str = date_point.strftime('%Y-%m-%d')
+            tx_index = _replay_transactions_up_to(
+                transactions, tx_index, state, date_point, forward_split_factors,
+            )
+            holdings_value, last_known, cost_basis = _compute_perf_holdings(
+                state, sorted_dates_map, historical_data,
+                ticker_last_price, forward_split_factors, date_str,
+            )
+            data_point_dict, sp500_base_price_eur = _compute_perf_data_point(
+                state, date_str, holdings_value, last_known, cost_basis,
+                fx_rates, sorted_fx_dates, sp500_prices, sorted_sp500_dates,
+                sp500_base_price_eur,
+            )
+            performance_data.append(PerformanceDataPoint(
+                date=data_point_dict['date'],
+                principal_eur=data_point_dict['principal_eur'],
+                current_value_eur=data_point_dict['current_value_eur'],
+                return_pct=data_point_dict.get('return_pct'),
+                sp500_return_pct=data_point_dict.get('sp500_return_pct'),
+            ))
+
+        return PortfolioPerformanceResponse(
+            portfolio_id=0, portfolio_name="Aggregated", data_points=performance_data
+        )

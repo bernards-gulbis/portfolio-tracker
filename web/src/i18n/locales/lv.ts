@@ -9,6 +9,7 @@ const lv: Translation = {
     sidebar: {
       general: 'Vispārīgi',
       dashboard: 'Panelis',
+      aggregate: 'Apkopojums',
     },
     header: {
       toggleTheme: 'Pārslēgt motīvu',
@@ -298,6 +299,14 @@ const lv: Translation = {
       noData: 'Nav pieejami sadalījuma dati',
       marketValue: 'Tirgus vērtība',
     },
+  },
+  aggregate: {
+    title: 'Apkopots portfelis',
+    description: 'Atlasiet portfeļus, lai skatītu kopējo turējumu un veiktspējas kopsavilkumu.',
+    selectAll: 'Atlasīt visus',
+    deselectAll: 'Noņemt atlasi',
+    noSelection: 'Atlasiet vismaz vienu portfeli, lai skatītu apkopotos datus.',
+    summary: 'Kopējais kopsavilkums',
   },
   settings: {
     menuItem: 'Iestatījumi',

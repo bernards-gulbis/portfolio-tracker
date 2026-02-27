@@ -274,5 +274,12 @@ class PortfolioPerformanceResponse(BaseModel):
     portfolio_id: int
     portfolio_name: str
     data_points: List[PerformanceDataPoint]
-    
+
     model_config = ConfigDict(from_attributes=True)
+
+
+# ================== Aggregated Portfolio Schemas ==================
+
+class AggregatedStatusRequest(BaseModel):
+    """Schema for requesting aggregated status across multiple portfolios"""
+    portfolio_ids: List[int] = Field(min_length=1)

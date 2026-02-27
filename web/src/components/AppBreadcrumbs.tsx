@@ -14,6 +14,18 @@ export const AppBreadcrumbs = () => {
   const { id } = useParams<{ id: string }>();
   const { data: portfolios } = usePortfolios();
 
+  if (pathname === '/aggregate') {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage>{t('aggregate.title')}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
+
   if (pathname.startsWith('/settings')) {
     return (
       <Breadcrumb>
