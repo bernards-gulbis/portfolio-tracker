@@ -155,7 +155,7 @@ const PerformanceTooltipContent = ({
       <PerformanceTooltipItem
         value={value as number | string}
         name={name as string}
-        color={item.color}
+        color={item.color ?? ''}
         chartConfig={chartConfig}
         locale={locale}
         notAvailableLabel={notAvailableLabel}
