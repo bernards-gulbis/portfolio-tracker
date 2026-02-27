@@ -10,6 +10,7 @@ const lv: Translation = {
       general: 'Vispārīgi',
       dashboard: 'Panelis',
       aggregate: 'Apkopojums',
+      analyze: 'Analīze',
     },
     header: {
       toggleTheme: 'Pārslēgt motīvu',
@@ -310,6 +311,21 @@ const lv: Translation = {
     noSelection: 'Atlasiet vismaz vienu portfeli, lai skatītu apkopotos datus.',
     summary: 'Kopējais kopsavilkums',
     selectedCount: '{{selected}} no {{total}} atlasīti',
+  },
+  analyze: {
+    title: 'Analīze',
+    realizedGains: 'Realizētie ienākumi / zaudējumi',
+    totalGainLoss: 'Kopējais realizētais I/Z',
+    noSells: 'Nav atrasti pārdošanas darījumi.',
+    error: 'Kļūda ielādējot realizētos darījumus: {{message}}',
+    columns: {
+      date: 'Datums',
+      ticker: 'Tīkotājs',
+      quantity: 'Daudzums',
+      proceeds: 'Ieņēmumi',
+      costBasis: 'Izmaksu bāze',
+      gainLoss: 'Ienākums / Zaudējums',
+    },
   },
   settings: {
     menuItem: 'Iestatījumi',

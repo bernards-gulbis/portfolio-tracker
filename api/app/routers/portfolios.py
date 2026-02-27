@@ -17,7 +17,9 @@ from app.schemas import (
     PortfolioPerformanceResponse,
     PerformanceDataPoint,
     AggregatedStatusRequest,
+    RealizedSalesResponse,
 )
+
 from app.services import PortfolioService
 from app.services.price_service import PriceService
 
@@ -224,3 +226,14 @@ def get_portfolio_performance(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{portfolio_id}/sells", response_model=RealizedSalesResponse)
+def get_portfolio_sells(
+    portfolio_id: int,
+    session: Annotated[Session, Depends(get_session)],
+    user: Annotated[User, Depends(current_active_user)],
+):
+    """Get realized sales (sells with gain/loss) for a portfolio"""
+    service = PortfolioService(session)
+    return service.get_realized_sales(portfolio_id, user.id)

@@ -41,7 +41,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase, Layers, UserIcon } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase, Layers, UserIcon, TrendingUpDown } from 'lucide-react';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
@@ -49,6 +49,7 @@ import CreatePortfolioModal from './components/CreatePortfolioModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
 import { AggregatedPage } from './components/AggregatedPage';
+import { AnalyzePage } from './components/AnalyzePage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
@@ -111,9 +112,10 @@ function AppLayout() {
   }
 
   const rememberedId = activePortfolioId ?? lastPortfolioId.current;
-  const activePortfolio = portfolios?.find((p) => p.id === rememberedId);
   const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
-  const isDashboardActive = pathname === '/' || pathname.startsWith('/portfolios');
+  const analyzePath = rememberedId ? `/portfolios/${rememberedId}/analyze` : '/';
+  const isAnalyzeActive = pathname.endsWith('/analyze');
+  const isDashboardActive = (pathname === '/' || pathname.startsWith('/portfolios')) && !isAnalyzeActive;
 
   const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
 
@@ -134,11 +136,6 @@ function AppLayout() {
                     <Link to={dashboardPath}>
                       <LayoutDashboard />
                       <span>{t('app.sidebar.dashboard')}</span>
-                      {activePortfolio && (
-                        <span className="text-xs text-muted-foreground truncate ml-auto">
-                          {activePortfolio.name}
-                        </span>
-                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -147,6 +144,14 @@ function AppLayout() {
                     <Link to="/aggregate">
                       <Layers />
                       <span>{t('app.sidebar.aggregate')}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isAnalyzeActive}>
+                    <Link to={analyzePath}>
+                      <TrendingUpDown />
+                      <span>{t('app.sidebar.analyze')}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -295,6 +300,7 @@ function App() {
                 <Route element={<AppLayout />}>
                   <Route index element={<PortfolioRedirect />} />
                   <Route path="portfolios/:id" element={<PortfolioPage />} />
+                  <Route path="portfolios/:id/analyze" element={<AnalyzePage />} />
                   <Route path="aggregate" element={<AggregatedPage />} />
                   <Route path="settings" element={<SettingsLayout />}>
                     <Route index element={<Navigate to="profile" replace />} />

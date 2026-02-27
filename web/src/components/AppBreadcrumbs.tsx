@@ -6,6 +6,7 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 
 export const AppBreadcrumbs = () => {
@@ -40,12 +41,21 @@ export const AppBreadcrumbs = () => {
 
   if (id) {
     const portfolioName = portfolios?.find((p) => p.id === Number(id))?.name;
+    const isAnalyze = pathname.endsWith('/analyze');
     return (
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbPage>{portfolioName ?? `#${id}`}</BreadcrumbPage>
           </BreadcrumbItem>
+          {isAnalyze && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{t('analyze.title')}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          )}
         </BreadcrumbList>
       </Breadcrumb>
     );

@@ -16,7 +16,7 @@ from app.core.exceptions import (
     PortfolioNotFoundException,
     InvalidPortfolioNameException,
 )
-from app.schemas import HoldingResponse, PortfolioStatusResponse, PortfolioPerformanceResponse, PerformanceDataPoint
+from app.schemas import HoldingResponse, PortfolioStatusResponse, PortfolioPerformanceResponse, PerformanceDataPoint, RealizedSaleResponse, RealizedSalesResponse
 from app.services.price_service import PriceService
 
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
@@ -1064,4 +1064,57 @@ class PortfolioService:
 
         return PortfolioPerformanceResponse(
             portfolio_id=0, portfolio_name="Aggregated", data_points=performance_data
+        )
+
+    def get_realized_sales(
+        self, portfolio_id: int, user_id: uuid.UUID
+    ) -> RealizedSalesResponse:
+        """Return per-sell realized gain/loss for a single portfolio.
+
+        Replays transactions chronologically and records the cost basis and
+        realized gain/loss for each Sell transaction.
+        """
+        portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
+        if not portfolio:
+            raise PortfolioNotFoundException(portfolio_id)
+
+        transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
+        state = _TxState()
+        sales: List[RealizedSaleResponse] = []
+        total_realized = _ZERO
+
+        for tx in transactions:
+            if tx.type == TransactionType.SELL and tx.ticker:
+                ticker = tx.ticker
+                quantity = _to_decimal(tx.quantity or 0)
+                total = _to_decimal(tx.total_amount)
+
+                cost_basis = _ZERO
+                if ticker in state.holdings:
+                    h = state.holdings[ticker]
+                    if h['quantity'] > 0:
+                        cost_basis = h['total_cost'] * (quantity / h['quantity'])
+
+                gain = total - cost_basis
+                gain_pct = float((gain / cost_basis) * 100) if cost_basis > 0 else None
+                total_realized += gain
+
+                sales.append(RealizedSaleResponse(
+                    portfolio_id=portfolio_id,
+                    portfolio_name=portfolio.name,
+                    transaction_id=tx.id,
+                    date=tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                    ticker=ticker,
+                    quantity=float(quantity),
+                    sale_proceeds=float(total),
+                    cost_basis=float(cost_basis),
+                    realized_gain_loss=float(gain),
+                    realized_gain_loss_pct=gain_pct,
+                ))
+
+            _apply_transaction(state, tx, strict=False)
+
+        return RealizedSalesResponse(
+            sales=sales,
+            total_realized_gain_loss=float(total_realized),
         )

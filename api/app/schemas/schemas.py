@@ -283,3 +283,27 @@ class PortfolioPerformanceResponse(BaseModel):
 class AggregatedStatusRequest(BaseModel):
     """Schema for requesting aggregated status across multiple portfolios"""
     portfolio_ids: List[int] = Field(min_length=1)
+
+
+# ================== Realized Sales Schemas ==================
+
+class RealizedSaleResponse(BaseModel):
+    """Schema for a single realized sale with gain/loss"""
+    portfolio_id: int
+    portfolio_name: str
+    transaction_id: int
+    date: str  # ISO date string
+    ticker: str
+    quantity: float
+    sale_proceeds: float  # total_amount from the sell transaction
+    cost_basis: float  # proportional cost basis at time of sale
+    realized_gain_loss: float  # sale_proceeds - cost_basis
+    realized_gain_loss_pct: Optional[float] = None  # (gain / cost_basis) * 100
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RealizedSalesResponse(BaseModel):
+    """Schema for list of realized sales"""
+    sales: List[RealizedSaleResponse]
+    total_realized_gain_loss: float

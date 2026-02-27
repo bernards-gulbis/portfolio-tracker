@@ -8,6 +8,7 @@ const en = {
       general: 'General',
       dashboard: 'Dashboard',
       aggregate: 'Aggregate',
+      analyze: 'Analyze',
     },
     header: {
       toggleTheme: 'Toggle theme',
@@ -308,6 +309,21 @@ const en = {
     noSelection: 'Select at least one portfolio to view aggregated data.',
     summary: 'Combined Summary',
     selectedCount: '{{selected}} of {{total}} selected',
+  },
+  analyze: {
+    title: 'Analyze',
+    realizedGains: 'Realized Gains / Losses',
+    totalGainLoss: 'Total Realized G/L',
+    noSells: 'No sell transactions found.',
+    error: 'Error loading realized sales: {{message}}',
+    columns: {
+      date: 'Date',
+      ticker: 'Ticker',
+      quantity: 'Quantity',
+      proceeds: 'Proceeds',
+      costBasis: 'Cost Basis',
+      gainLoss: 'Gain / Loss',
+    },
   },
   settings: {
     menuItem: 'Settings',
