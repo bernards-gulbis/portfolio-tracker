@@ -319,6 +319,7 @@ def _resolve_usd_to_eur_rate(target_date: datetime) -> Optional[float]:
 def _build_holdings_list(
     state: _TxState,
     current_prices: Dict[str, Optional[float]],
+    usd_to_eur_rate: Optional[float] = None,
 ) -> Tuple[List[HoldingResponse], Decimal, Decimal, Decimal, List[str]]:
     """Build the sorted holdings list and aggregate value/cost totals.
 
@@ -330,6 +331,7 @@ def _build_holdings_list(
     holdings_value = _ZERO
     unrealized_gains = _ZERO
     missing_prices: List[str] = []
+    eur_d: Optional[Decimal] = _to_decimal(usd_to_eur_rate) if usd_to_eur_rate else None
 
     for ticker, holding_data in state.holdings.items():
         quantity = holding_data['quantity']
@@ -361,6 +363,11 @@ def _build_holdings_list(
             current_value=_opt_float(current_value_h),
             unrealized_gain_loss=_opt_float(unrealized_gain_loss),
             unrealized_gain_loss_pct=_opt_float(unrealized_gain_loss_pct),
+            average_cost_eur=_opt_float(avg_cost * eur_d) if eur_d is not None else None,
+            total_cost_eur=_opt_float(total_cost * eur_d) if eur_d is not None else None,
+            current_price_eur=float(current_price) * usd_to_eur_rate if current_price and usd_to_eur_rate else None,
+            current_value_eur=_opt_float(current_value_h * eur_d) if eur_d is not None and current_value_h is not None else None,
+            unrealized_gain_loss_eur=_opt_float(unrealized_gain_loss * eur_d) if eur_d is not None and unrealized_gain_loss is not None else None,
         ))
         holdings_cost += total_cost
 
@@ -744,15 +751,23 @@ class PortfolioService:
             logger.error("Error fetching prices for portfolio %s: %s", portfolio_id, e, exc_info=True)
             current_prices = dict.fromkeys(tickers)
 
+        # Fetch EUR rate once for both holdings EUR values and portfolio EUR metrics
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+        except Exception:
+            usd_to_eur_rate = None
+
         # Build holdings list and aggregate metrics
         holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
-            _build_holdings_list(state, current_prices)
+            _build_holdings_list(state, current_prices, usd_to_eur_rate)
 
         current_value = state.cash + holdings_value
 
         unrealized_gains_pct: Optional[Decimal] = None
         if holdings_cost > 0:
             unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
+
+        cash_eur: Optional[float] = float(state.cash) * usd_to_eur_rate if usd_to_eur_rate else None
 
         # EUR conversion
         current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct = \
@@ -779,6 +794,7 @@ class PortfolioService:
             dividends=_normalize_zero(state.dividends),
             dividends_eur=_opt_normalize(dividends_eur),
             cash=_normalize_zero(state.cash),
+            cash_eur=cash_eur,
             holdings=holdings_list,
             holdings_cost=_normalize_zero(holdings_cost),
             holdings_value=_normalize_zero(holdings_value),
@@ -953,14 +969,21 @@ class PortfolioService:
             logger.error("Error fetching prices for aggregated portfolios: %s", e, exc_info=True)
             current_prices = dict.fromkeys(tickers)
 
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+        except Exception:
+            usd_to_eur_rate = None
+
         holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
-            _build_holdings_list(state, current_prices)
+            _build_holdings_list(state, current_prices, usd_to_eur_rate)
 
         current_value = state.cash + holdings_value
 
         unrealized_gains_pct: Optional[Decimal] = None
         if holdings_cost > 0:
             unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
+
+        cash_eur: Optional[float] = float(state.cash) * usd_to_eur_rate if usd_to_eur_rate else None
 
         current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct = \
             _compute_eur_metrics(state, current_value, unrealized_gains, 0)
@@ -982,6 +1005,7 @@ class PortfolioService:
             dividends=_normalize_zero(state.dividends),
             dividends_eur=_opt_normalize(dividends_eur),
             cash=_normalize_zero(state.cash),
+            cash_eur=cash_eur,
             holdings=holdings_list,
             holdings_cost=_normalize_zero(holdings_cost),
             holdings_value=_normalize_zero(holdings_value),

@@ -196,6 +196,7 @@ export const PortfolioStatusContent = ({
           <HoldingsAllocationChart
             holdings={status.holdings}
             cash={status.cash}
+            cash_eur={status.cash_eur}
             loading={false}
           />
         </div>
@@ -232,34 +233,61 @@ export const PortfolioStatusContent = ({
                 <TableCell>-</TableCell>
                 <TableCell>-</TableCell>
                 <TableCell>-</TableCell>
-                <TableCell>{formatCurrency(status.cash, 'USD', locale)}</TableCell>
+                <TableCell>
+                  {status.cash_eur != null
+                    ? formatCurrency(status.cash_eur, 'EUR', locale)
+                    : formatCurrency(status.cash, 'USD', locale)}
+                </TableCell>
                 <TableCell>-</TableCell>
               </TableRow>
               {status.holdings.map((holding) => (
                 <TableRow key={holding.ticker}>
                   <TableCell className="font-semibold">{holding.ticker}</TableCell>
                   <TableCell>{formatQuantity(holding.quantity)}</TableCell>
-                  <TableCell>{formatCurrency(holding.average_cost, 'USD', locale)}</TableCell>
-                  <TableCell>{formatCurrency(holding.total_cost, 'USD', locale)}</TableCell>
                   <TableCell>
-                    {holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale)}
+                    {holding.average_cost_eur != null
+                      ? formatCurrency(holding.average_cost_eur, 'EUR', locale)
+                      : formatCurrency(holding.average_cost, 'USD', locale)}
+                  </TableCell>
+                  <TableCell>
+                    {holding.total_cost_eur != null
+                      ? formatCurrency(holding.total_cost_eur, 'EUR', locale)
+                      : formatCurrency(holding.total_cost, 'USD', locale)}
+                  </TableCell>
+                  <TableCell>
+                    {holding.current_price_eur != null
+                      ? formatCurrency(holding.current_price_eur, 'EUR', locale)
+                      : holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale)}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale)}
+                    {holding.current_value_eur != null
+                      ? formatCurrency(holding.current_value_eur, 'EUR', locale)
+                      : holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale)}
                   </TableCell>
                   <TableCell>
-                    {holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
+                    {holding.unrealized_gain_loss_eur != null && holding.unrealized_gain_loss_pct != null
                       ? (
                         <div className="flex flex-col">
-                          <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
-                            {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
+                          <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss_eur)}`}>
+                            {formatSignedCurrency(holding.unrealized_gain_loss_eur, 'EUR', locale)}
                           </span>
-                          <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
+                          <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss_eur)}`}>
                             {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
                           </span>
                         </div>
                       )
-                      : '-'}
+                      : holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
+                        ? (
+                          <div className="flex flex-col">
+                            <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
+                              {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
+                            </span>
+                            <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
+                              {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
+                            </span>
+                          </div>
+                        )
+                        : '-'}
                   </TableCell>
                 </TableRow>
               ))}

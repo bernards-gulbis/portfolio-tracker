@@ -223,7 +223,12 @@ class HoldingResponse(BaseModel):
     current_value: Optional[float] = None
     unrealized_gain_loss: Optional[float] = None
     unrealized_gain_loss_pct: Optional[float] = None
-    
+    average_cost_eur: Optional[float] = None
+    total_cost_eur: Optional[float] = None
+    current_price_eur: Optional[float] = None
+    current_value_eur: Optional[float] = None
+    unrealized_gain_loss_eur: Optional[float] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -238,6 +243,7 @@ class PortfolioStatusResponse(BaseModel):
     dividends: float
     dividends_eur: Optional[float] = None  # Dividends in EUR
     cash: float
+    cash_eur: Optional[float] = None
     holdings: List[HoldingResponse]
     holdings_cost: float  # Sum of all holdings cost basis
     holdings_value: float  # Sum of current market value of all holdings

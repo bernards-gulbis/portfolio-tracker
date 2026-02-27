@@ -134,6 +134,11 @@ export interface Holding {
   current_value?: number | null;
   unrealized_gain_loss?: number | null;
   unrealized_gain_loss_pct?: number | null;
+  average_cost_eur?: number | null;
+  total_cost_eur?: number | null;
+  current_price_eur?: number | null;
+  current_value_eur?: number | null;
+  unrealized_gain_loss_eur?: number | null;
 }
 
 export interface PortfolioStatus {
@@ -146,6 +151,7 @@ export interface PortfolioStatus {
   dividends: number;
   dividends_eur: number | null;
   cash: number;
+  cash_eur: number | null;
   holdings: Holding[];
   holdings_cost: number;
   holdings_value: number;
