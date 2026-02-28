@@ -249,11 +249,26 @@ export const PortfolioStatusContent = ({
               <TableRow>
                 <TableHead>{t('status.columns.ticker')}</TableHead>
                 <TableHead>{t('status.columns.quantity')}</TableHead>
-                <TableHead>{t('status.columns.avgCost')}</TableHead>
-                <TableHead>{t('status.columns.totalCost')}</TableHead>
-                <TableHead>{t('status.columns.currentPrice')}</TableHead>
-                <TableHead>{t('status.columns.marketValue')}</TableHead>
-                <TableHead>{t('status.columns.unrealizedGL')}</TableHead>
+                <TableHead>
+                  {t('status.columns.avgCost')}
+                  {showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}
+                </TableHead>
+                <TableHead>
+                  {t('status.columns.totalCost')}
+                  {showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}
+                </TableHead>
+                <TableHead>
+                  {t('status.columns.currentPrice')}
+                  {showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}
+                </TableHead>
+                <TableHead>
+                  {t('status.columns.marketValue')}
+                  {showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}
+                </TableHead>
+                <TableHead>
+                  {t('status.columns.unrealizedGL')}
+                  {showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -287,26 +302,21 @@ export const PortfolioStatusContent = ({
                   <TableRow key={holding.ticker}>
                     <TableCell className="font-semibold">{holding.ticker}</TableCell>
                     <TableCell>{formatQuantity(holding.quantity)}</TableCell>
+                    {/* Avg cost — always USD */}
+                    <TableCell>{formatCurrency(holding.average_cost, 'USD', locale)}</TableCell>
+                    {/* Total cost — always USD */}
+                    <TableCell>{formatCurrency(holding.total_cost, 'USD', locale)}</TableCell>
+                    {/* Current price — always USD */}
                     <TableCell>
-                      {eurVals != null
-                        ? formatCurrency(eurVals.average_cost_eur, 'EUR', locale)
-                        : formatCurrency(holding.average_cost, 'USD', locale)}
+                      {holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale)}
                     </TableCell>
-                    <TableCell>
-                      {eurVals != null
-                        ? formatCurrency(eurVals.total_cost_eur, 'EUR', locale)
-                        : formatCurrency(holding.total_cost, 'USD', locale)}
-                    </TableCell>
-                    <TableCell>
-                      {eurVals != null
-                        ? (eurVals.current_price_eur != null ? formatCurrency(eurVals.current_price_eur, 'EUR', locale) : '-')
-                        : (holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale))}
-                    </TableCell>
+                    {/* Market value — EUR when EUR mode is active */}
                     <TableCell className="font-medium">
                       {eurVals != null
                         ? (eurVals.current_value_eur != null ? formatCurrency(eurVals.current_value_eur, 'EUR', locale) : '-')
                         : (holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale))}
                     </TableCell>
+                    {/* Unrealized G/L — EUR when EUR mode is active */}
                     <TableCell>
                       {eurVals != null && eurVals.unrealized_gain_loss_eur != null && holding.unrealized_gain_loss_pct != null
                         ? (
