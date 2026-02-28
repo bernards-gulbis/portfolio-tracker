@@ -8,7 +8,7 @@ const en = {
       general: 'General',
       dashboard: 'Dashboard',
       aggregate: 'Aggregate',
-      analyze: 'Analyze',
+      analytics: 'Analytics',
     },
     header: {
       toggleTheme: 'Toggle theme',
@@ -144,7 +144,7 @@ const en = {
     validation: {
       dateRequired: 'Date is required',
       timeRequired: 'Time is required',
-      tickerRequired: 'Ticker symbol is required',
+      tickerRequired: 'Asset symbol is required',
       quantityPositive: 'Quantity must be greater than 0',
       pricePositive: 'Price per share must be greater than 0',
       splitRatioPositive: 'Split ratio must be greater than 0',
@@ -166,7 +166,7 @@ const en = {
     },
     table: {
       filters: {
-        tickerPlaceholder: 'Search ticker...',
+        tickerPlaceholder: 'Search asset...',
         typeAll: 'All types',
         typeCount: '{{count}} types',
       },
@@ -182,7 +182,7 @@ const en = {
       columns: {
         date: 'Date',
         type: 'Type',
-        ticker: 'Ticker',
+        ticker: 'Asset',
         details: 'Qty and Price',
         detailsFormat: '{{qty}} shares at {{price}}',
         splitFormat: 'Split 1:{{ratio}}',
@@ -217,7 +217,7 @@ const en = {
         datePickerLabel: 'Pick date from calendar',
         time: 'Time',
         type: 'Transaction Type',
-        ticker: 'Ticker',
+        ticker: 'Asset',
         tickerPlaceholder: 'e.g., AAPL',
         quantity: 'Quantity',
         quantityPlaceholder: 'Number of shares',
@@ -276,7 +276,7 @@ const en = {
     afterTaxValue: 'After-tax Value',
     positions: 'Positions',
     columns: {
-      ticker: 'Ticker',
+      ticker: 'Asset',
       quantity: 'Quantity',
       avgCost: 'Avg cost',
       totalCost: 'Total cost',
@@ -317,19 +317,23 @@ const en = {
     summary: 'Combined Summary',
     selectedCount: '{{selected}} of {{total}} selected',
   },
-  analyze: {
-    title: 'Analyze',
+  analytics: {
+    title: 'Analytics',
     realizedGains: 'Realized Gains / Losses',
     totalGainLoss: 'Total Realized G/L',
+    avgWinRate: 'Avg Win Rate',
+    avgProfitFactor: 'Avg Profit Factor',
     noSells: 'No sell transactions found.',
-    filterByTicker: 'Filter by ticker...',
+    filterByTicker: 'Filter by asset...',
     error: 'Error loading realized sales: {{message}}',
     columns: {
-      ticker: 'Ticker',
+      ticker: 'Asset',
       sells: '# Sells',
       proceeds: 'Proceeds',
       costBasis: 'Cost Basis',
       gainLoss: 'Gain / Loss',
+      winRate: 'Win Rate',
+      profitFactor: 'Profit Factor',
     },
   },
   settings: {

@@ -17,7 +17,7 @@ import {
 import { useLocale } from '../hooks/useLocale';
 import { formatSignedCurrency } from '../utils/formatters';
 
-export const AnalyzePage = () => {
+export const AnalyticsPage = () => {
   const { t } = useTranslation();
   const locale = useLocale();
   const portfolioId = useActivePortfolioId();
@@ -56,7 +56,7 @@ export const AnalyzePage = () => {
     return (
       <Card>
         <CardContent className="py-8">
-          <p className="text-center text-destructive">{t('analyze.error', { message: getErrorMessage(error) })}</p>
+          <p className="text-center text-destructive">{t('analytics.error', { message: getErrorMessage(error) })}</p>
         </CardContent>
       </Card>
     );
@@ -64,34 +64,59 @@ export const AnalyzePage = () => {
 
   if (!data) return null;
 
+  const sales = data.sales;
+  const avgWinRate = sales.length > 0
+    ? sales.reduce((sum, s) => sum + s.win_rate, 0) / sales.length
+    : null;
+  const salesWithFactor = sales.filter((s) => s.profit_factor !== null);
+  const avgProfitFactor = salesWithFactor.length > 0
+    ? salesWithFactor.reduce((sum, s) => sum + s.profit_factor!, 0) / salesWithFactor.length
+    : null;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('analyze.realizedGains')}</CardTitle>
-        <CardDescription>
-          {t('analyze.totalGainLoss')}:{' '}
-          <span className={data.total_realized_gain_loss >= 0 ? 'text-positive' : 'text-negative'}>
-            {formatSignedCurrency(data.total_realized_gain_loss, 'USD', locale)}
+        <CardTitle>{t('analytics.realizedGains')}</CardTitle>
+        <CardDescription className="flex flex-wrap gap-x-6 gap-y-1">
+          <span>
+            {t('analytics.totalGainLoss')}:{' '}
+            <span className={`font-medium ${data.total_realized_gain_loss >= 0 ? 'text-positive' : 'text-negative'}`}>
+              {formatSignedCurrency(data.total_realized_gain_loss, 'USD', locale)}
+            </span>
           </span>
+          {avgWinRate !== null && (
+            <span>
+              {t('analytics.avgWinRate')}:{' '}
+              <span className="font-medium text-foreground">{avgWinRate.toFixed(1)}%</span>
+            </span>
+          )}
+          {avgProfitFactor !== null && (
+            <span>
+              {t('analytics.avgProfitFactor')}:{' '}
+              <span className="font-medium text-foreground">{avgProfitFactor.toFixed(2)}</span>
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="mb-4 max-w-xs">
           <Input
-            placeholder={t('analyze.filterByTicker')}
+            placeholder={t('analytics.filterByTicker')}
             value={tickerFilter}
             onChange={(e) => setTickerFilter(e.target.value)}
           />
         </div>
         {data.sales.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">{t('analyze.noSells')}</p>
+          <p className="text-center text-muted-foreground py-8">{t('analytics.noSells')}</p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('analyze.columns.ticker')}</TableHead>
-                  <TableHead className="text-right">{t('analyze.columns.gainLoss')}</TableHead>
+                  <TableHead>{t('analytics.columns.ticker')}</TableHead>
+                  <TableHead className="text-right">{t('analytics.columns.gainLoss')}</TableHead>
+                  <TableHead className="text-right">{t('analytics.columns.winRate')}</TableHead>
+                  <TableHead className="text-right">{t('analytics.columns.profitFactor')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -102,6 +127,12 @@ export const AnalyzePage = () => {
                       <TableCell className="font-medium">{row.ticker}</TableCell>
                       <TableCell className={`text-right font-semibold ${colorClass}`}>
                         {formatSignedCurrency(row.total_gain_loss, 'USD', locale)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {row.win_rate.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {row.profit_factor !== null ? row.profit_factor.toFixed(2) : '—'}
                       </TableCell>
                     </TableRow>
                   );

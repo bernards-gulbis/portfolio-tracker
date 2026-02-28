@@ -41,18 +41,18 @@ export const AppBreadcrumbs = () => {
 
   if (id) {
     const portfolioName = portfolios?.find((p) => p.id === Number(id))?.name;
-    const isAnalyze = pathname.endsWith('/analyze');
+    const isAnalytics = pathname.endsWith('/analytics');
     return (
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbPage>{portfolioName ?? `#${id}`}</BreadcrumbPage>
           </BreadcrumbItem>
-          {isAnalyze && (
+          {isAnalytics && (
             <>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>{t('analyze.title')}</BreadcrumbPage>
+                <BreadcrumbPage>{t('analytics.title')}</BreadcrumbPage>
               </BreadcrumbItem>
             </>
           )}

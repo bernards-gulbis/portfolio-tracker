@@ -3583,6 +3583,8 @@ def test_aggregated_sales_basic(client: TestClient):
     sale = data["sales"][0]
     assert sale["ticker"] == "AAPL"
     assert sale["total_gain_loss"] == pytest.approx(500.0)
+    assert sale["win_rate"] == pytest.approx(100.0)
+    assert sale["profit_factor"] is None  # no losing trades
     assert data["total_realized_gain_loss"] == pytest.approx(500.0)
 
 
@@ -3609,6 +3611,8 @@ def test_aggregated_sales_loss(client: TestClient):
     assert len(data["sales"]) == 1
     sale = data["sales"][0]
     assert sale["total_gain_loss"] == pytest.approx(-250.0)
+    assert sale["win_rate"] == pytest.approx(0.0)
+    assert sale["profit_factor"] == pytest.approx(0.0)  # 0 profit / positive loss
     assert data["total_realized_gain_loss"] == pytest.approx(-250.0)
 
 
@@ -3636,11 +3640,13 @@ def test_aggregated_sales_multiple_sells_same_ticker(client: TestClient):
     response = client.get(f"/portfolios/{pid}/sells")
     data = response.json()
 
-    # Two sells of AAPL → one aggregated row
+    # Two sells of AAPL → one aggregated row; sell 1: +200, sell 2: -200
     assert len(data["sales"]) == 1
     sale = data["sales"][0]
     assert sale["ticker"] == "AAPL"
     assert sale["total_gain_loss"] == pytest.approx(0.0)
+    assert sale["win_rate"] == pytest.approx(50.0)   # 1 win out of 2
+    assert sale["profit_factor"] == pytest.approx(1.0)  # 200 profit / 200 loss
     assert data["total_realized_gain_loss"] == pytest.approx(0.0)
 
 
@@ -3743,6 +3749,46 @@ def test_aggregated_sales_no_sells(client: TestClient):
 
     assert len(data["sales"]) == 0
     assert data["total_realized_gain_loss"] == pytest.approx(0.0)
+
+
+def test_aggregated_sales_win_rate_and_profit_factor(client: TestClient):
+    """Win rate and profit factor are computed correctly per ticker"""
+    portfolio = client.post("/portfolios/", json={"name": "Metrics Test"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 20000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 30.0, "price_per_share": 100.0, "total_amount": -3000.0,
+    })
+    # Win: +300 (sell 10 @ 130, cost 1000 → proceeds 1300)
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 130.0, "total_amount": 1300.0,
+    })
+    # Win: +200 (sell 10 @ 120, cost 1000 → proceeds 1200)
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-02T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 120.0, "total_amount": 1200.0,
+    })
+    # Loss: -200 (sell 10 @ 80, cost 1000 → proceeds 800)
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-03T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 80.0, "total_amount": 800.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/sells")
+    data = response.json()
+
+    assert len(data["sales"]) == 1
+    sale = data["sales"][0]
+    # 2 wins out of 3 sells → 66.67%
+    assert sale["win_rate"] == pytest.approx(200 / 3, rel=1e-3)
+    # total_profit = 300 + 200 = 500, total_loss = 200 → profit_factor = 2.5
+    assert sale["profit_factor"] == pytest.approx(2.5)
+    assert sale["total_gain_loss"] == pytest.approx(300.0)
 
 
 def test_aggregated_sales_nonexistent_portfolio(client: TestClient):

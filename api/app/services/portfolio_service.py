@@ -911,7 +911,7 @@ class PortfolioService:
 
         transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
         state = _TxState()
-        # aggregated: ticker -> total_gain_loss
+        # aggregated: ticker -> {total_gain_loss, sell_count, win_count, total_profit, total_loss}
         aggregated: dict = {}
         total_realized = _ZERO
 
@@ -926,18 +926,40 @@ class PortfolioService:
                     cost_basis = h['total_cost'] * (quantity / h['quantity'])
                     gain = total - cost_basis
                     total_realized += gain
-                    aggregated[ticker] = aggregated.get(ticker, _ZERO) + gain
+
+                    if ticker not in aggregated:
+                        aggregated[ticker] = {
+                            'total_gain_loss': _ZERO,
+                            'sell_count': 0,
+                            'win_count': 0,
+                            'total_profit': _ZERO,
+                            'total_loss': _ZERO,
+                        }
+                    agg = aggregated[ticker]
+                    agg['total_gain_loss'] += gain
+                    agg['sell_count'] += 1
+                    if gain > 0:
+                        agg['win_count'] += 1
+                        agg['total_profit'] += gain
+                    elif gain < 0:
+                        agg['total_loss'] += abs(gain)
 
             _apply_transaction(state, tx, strict=False)
 
         ticker_upper = ticker_filter.upper() if ticker_filter else None
         sales = []
-        for ticker, gain in aggregated.items():
+        for ticker, agg in aggregated.items():
             if ticker_upper and ticker != ticker_upper:
                 continue
+            sell_count = agg['sell_count']
+            win_rate = (agg['win_count'] / sell_count * 100) if sell_count > 0 else 0.0
+            total_loss = agg['total_loss']
+            profit_factor = float(agg['total_profit'] / total_loss) if total_loss > 0 else None
             sales.append(AggregatedSaleResponse(
                 ticker=ticker,
-                total_gain_loss=float(gain),
+                total_gain_loss=float(agg['total_gain_loss']),
+                win_rate=win_rate,
+                profit_factor=profit_factor,
             ))
 
         sales.sort(key=lambda s: s.total_gain_loss, reverse=True)

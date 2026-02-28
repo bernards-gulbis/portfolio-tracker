@@ -375,6 +375,8 @@ export const getAggregatedPerformance = async (
 export interface AggregatedSale {
   ticker: string;
   total_gain_loss: number;
+  win_rate: number;
+  profit_factor: number | null;
 }
 
 export interface AggregatedSalesResponse {

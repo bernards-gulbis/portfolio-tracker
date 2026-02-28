@@ -10,7 +10,7 @@ const lv: Translation = {
       general: 'Vispārīgi',
       dashboard: 'Panelis',
       aggregate: 'Apkopojums',
-      analyze: 'Analīze',
+      analytics: 'Analītika',
     },
     header: {
       toggleTheme: 'Pārslēgt motīvu',
@@ -146,7 +146,7 @@ const lv: Translation = {
     validation: {
       dateRequired: 'Datums ir obligāts',
       timeRequired: 'Laiks ir obligāts',
-      tickerRequired: 'Tīkotāja simbols ir obligāts',
+      tickerRequired: 'Aktīva simbols ir obligāts',
       quantityPositive: 'Daudzumam jābūt lielākam par 0',
       pricePositive: 'Cenai par akciju jābūt lielākai par 0',
       splitRatioPositive: 'Sadalīšanas koeficientam jābūt lielākam par 0',
@@ -168,7 +168,7 @@ const lv: Translation = {
     },
     table: {
       filters: {
-        tickerPlaceholder: 'Meklēt tīkeru...',
+        tickerPlaceholder: 'Meklēt aktīvu...',
         typeAll: 'Visi veidi',
         typeCount: '{{count}} veidi',
       },
@@ -184,7 +184,7 @@ const lv: Translation = {
       columns: {
         date: 'Datums',
         type: 'Veids',
-        ticker: 'Tīkotājs',
+        ticker: 'Aktīvs',
         details: 'Daudz. un Cena',
         detailsFormat: '{{qty}} akcijas par {{price}}',
         splitFormat: 'Sadalīts 1:{{ratio}}',
@@ -219,7 +219,7 @@ const lv: Translation = {
         datePickerLabel: 'Izvēlēties datumu no kalendāra',
         time: 'Laiks',
         type: 'Darījuma veids',
-        ticker: 'Tīkotājs',
+        ticker: 'Aktīvs',
         tickerPlaceholder: 'piem., AAPL',
         quantity: 'Daudzums',
         quantityPlaceholder: 'Akciju skaits',
@@ -278,7 +278,7 @@ const lv: Translation = {
     afterTaxValue: 'Vērtība pēc nodokļa',
     positions: 'Pozīcijas',
     columns: {
-      ticker: 'Tīkotājs',
+      ticker: 'Aktīvs',
       quantity: 'Daudzums',
       avgCost: 'Vid. izmaksas',
       totalCost: 'Kop. izmaksas',
@@ -319,19 +319,23 @@ const lv: Translation = {
     summary: 'Kopējais kopsavilkums',
     selectedCount: '{{selected}} no {{total}} atlasīti',
   },
-  analyze: {
-    title: 'Analīze',
+  analytics: {
+    title: 'Analītika',
     realizedGains: 'Realizētie ienākumi / zaudējumi',
     totalGainLoss: 'Kopējais realizētais I/Z',
+    avgWinRate: 'Vid. uzvaru īpatsvars',
+    avgProfitFactor: 'Vid. peļņas koeficients',
     noSells: 'Nav atrasti pārdošanas darījumi.',
-    filterByTicker: 'Filtrēt pēc simbola...',
+    filterByTicker: 'Filtrēt pēc aktīva...',
     error: 'Kļūda ielādējot realizētos darījumus: {{message}}',
     columns: {
-      ticker: 'Tīkotājs',
+      ticker: 'Aktīvs',
       sells: '# Pārdošanas',
       proceeds: 'Ieņēmumi',
       costBasis: 'Izmaksu bāze',
       gainLoss: 'Ienākums / Zaudējums',
+      winRate: 'Uzvaru īpatsvars',
+      profitFactor: 'Peļņas koeficients',
     },
   },
   settings: {

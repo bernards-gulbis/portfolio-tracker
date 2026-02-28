@@ -285,6 +285,8 @@ class AggregatedSaleResponse(BaseModel):
     """Schema for aggregated realized gain/loss per ticker"""
     ticker: str
     total_gain_loss: float
+    win_rate: float  # percentage of sells that resulted in a profit (0-100)
+    profit_factor: Optional[float] = None  # total_profit / abs(total_loss); None when no losing trades
 
 
 class AggregatedSalesResponse(BaseModel):

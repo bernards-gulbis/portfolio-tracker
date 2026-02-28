@@ -49,7 +49,7 @@ import CreatePortfolioModal from './components/CreatePortfolioModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
 import { AggregatedPage } from './components/AggregatedPage';
-import { AnalyzePage } from './components/AnalyzePage';
+import { AnalyticsPage } from './components/AnalyticsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
@@ -113,9 +113,9 @@ function AppLayout() {
 
   const rememberedId = activePortfolioId ?? lastPortfolioId.current;
   const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
-  const analyzePath = rememberedId ? `/portfolios/${rememberedId}/analyze` : '/';
-  const isAnalyzeActive = pathname.endsWith('/analyze');
-  const isDashboardActive = (pathname === '/' || pathname.startsWith('/portfolios')) && !isAnalyzeActive;
+  const analyticsPath = rememberedId ? `/portfolios/${rememberedId}/analytics` : '/';
+  const isAnalyticsActive = pathname.endsWith('/analytics');
+  const isDashboardActive = (pathname === '/' || pathname.startsWith('/portfolios')) && !isAnalyticsActive;
 
   const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
 
@@ -148,10 +148,10 @@ function AppLayout() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isAnalyzeActive}>
-                    <Link to={analyzePath}>
+                  <SidebarMenuButton asChild isActive={isAnalyticsActive}>
+                    <Link to={analyticsPath}>
                       <TrendingUpDown />
-                      <span>{t('app.sidebar.analyze')}</span>
+                      <span>{t('app.sidebar.analytics')}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -300,7 +300,7 @@ function App() {
                 <Route element={<AppLayout />}>
                   <Route index element={<PortfolioRedirect />} />
                   <Route path="portfolios/:id" element={<PortfolioPage />} />
-                  <Route path="portfolios/:id/analyze" element={<AnalyzePage />} />
+                  <Route path="portfolios/:id/analytics" element={<AnalyticsPage />} />
                   <Route path="aggregate" element={<AggregatedPage />} />
                   <Route path="settings" element={<SettingsLayout />}>
                     <Route index element={<Navigate to="profile" replace />} />

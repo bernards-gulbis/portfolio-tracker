@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { AnalyzePage } from '../components/AnalyzePage';
+import { AnalyticsPage } from '../components/AnalyticsPage';
 
 vi.mock('../hooks/useActivePortfolioId', () => ({
   useActivePortfolioId: vi.fn(),
@@ -30,7 +30,7 @@ const renderPage = () => {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <AnalyzePage />
+        <AnalyticsPage />
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -39,10 +39,12 @@ const renderPage = () => {
 const makeAggregatedSale = (overrides: Partial<AggregatedSale>): AggregatedSale => ({
   ticker: 'AAPL',
   total_gain_loss: 500,
+  win_rate: 100,
+  profit_factor: null,
   ...overrides,
 });
 
-describe('AnalyzePage', () => {
+describe('AnalyticsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useActivePortfolioId).mockReturnValue(1);
@@ -127,7 +129,7 @@ describe('AnalyzePage', () => {
   it('shows total gain/loss in header with sign prefix', () => {
     vi.mocked(useAggregatedSales).mockReturnValue({
       data: {
-        sales: [makeAggregatedSale({ total_gain_loss: 750, gain_pct: 75 })],
+        sales: [makeAggregatedSale({ total_gain_loss: 750 })],
         total_realized_gain_loss: 750,
       },
       isLoading: false,
@@ -139,6 +141,42 @@ describe('AnalyzePage', () => {
     expect(screen.getAllByText(/\+\$750\.00/).length).toBeGreaterThanOrEqual(1);
   });
 
+  it('shows average win rate and profit factor in header summary', () => {
+    vi.mocked(useAggregatedSales).mockReturnValue({
+      data: {
+        sales: [
+          makeAggregatedSale({ ticker: 'AAPL', win_rate: 80, profit_factor: 2.0 }),
+          makeAggregatedSale({ ticker: 'MSFT', win_rate: 60, profit_factor: 1.5 }),
+        ],
+        total_realized_gain_loss: 1000,
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useAggregatedSales>);
+
+    renderPage();
+
+    // avg win rate = (80 + 60) / 2 = 70.0%
+    expect(screen.getByText('70.0%')).toBeInTheDocument();
+    // avg profit factor = (2.0 + 1.5) / 2 = 1.75
+    expect(screen.getByText('1.75')).toBeInTheDocument();
+  });
+
+  it('omits avg profit factor when all tickers have null profit_factor', () => {
+    vi.mocked(useAggregatedSales).mockReturnValue({
+      data: {
+        sales: [makeAggregatedSale({ win_rate: 100, profit_factor: null })],
+        total_realized_gain_loss: 500,
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useAggregatedSales>);
+
+    renderPage();
+
+    expect(screen.queryByText(/Avg Profit Factor/)).not.toBeInTheDocument();
+  });
+
   it('passes ticker filter to hook when user types in filter input', async () => {
     vi.mocked(useAggregatedSales).mockReturnValue({
       data: { sales: [], total_realized_gain_loss: 0 },
@@ -148,7 +186,7 @@ describe('AnalyzePage', () => {
 
     renderPage();
 
-    const input = screen.getByPlaceholderText('Filter by ticker...');
+    const input = screen.getByPlaceholderText('Filter by asset...');
     await userEvent.type(input, 'AAPL');
 
     // Hook should have been called with the uppercased ticker
