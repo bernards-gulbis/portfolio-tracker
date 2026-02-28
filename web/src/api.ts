@@ -370,33 +370,29 @@ export const getAggregatedPerformance = async (
   return response.data;
 };
 
-// ================== Realized Sales Types ==================
+// ================== Aggregated Sales Types ==================
 
-export interface RealizedSale {
-  portfolio_id: number;
-  portfolio_name: string;
-  transaction_id: number;
-  date: string;
+export interface AggregatedSale {
   ticker: string;
-  quantity: number;
-  sale_proceeds: number;
-  cost_basis: number;
-  realized_gain_loss: number;
-  realized_gain_loss_pct: number | null;
+  total_gain_loss: number;
 }
 
-export interface RealizedSalesResponse {
-  sales: RealizedSale[];
+export interface AggregatedSalesResponse {
+  sales: AggregatedSale[];
   total_realized_gain_loss: number;
 }
 
-// ================== Realized Sales API Functions ==================
+// ================== Aggregated Sales API Functions ==================
 
 /**
- * Get realized sales (sells with gain/loss) for a portfolio
+ * Get realized sales aggregated by ticker for a portfolio, optionally filtered by ticker
  */
-export const getPortfolioSells = async (portfolioId: number): Promise<RealizedSalesResponse> => {
-  const response = await api.get<RealizedSalesResponse>(`/portfolios/${portfolioId}/sells`);
+export const getPortfolioAggregatedSells = async (
+  portfolioId: number,
+  ticker?: string,
+): Promise<AggregatedSalesResponse> => {
+  const params = ticker ? { ticker } : undefined;
+  const response = await api.get<AggregatedSalesResponse>(`/portfolios/${portfolioId}/sells`, { params });
   return response.data;
 };
 

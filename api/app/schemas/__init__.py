@@ -20,8 +20,8 @@ from .schemas import (
     PerformanceDataPoint,
     PortfolioPerformanceResponse,
     AggregatedStatusRequest,
-    RealizedSaleResponse,
-    RealizedSalesResponse,
+    AggregatedSaleResponse,
+    AggregatedSalesResponse,
 )
 
 __all__ = [
@@ -44,6 +44,6 @@ __all__ = [
     "PerformanceDataPoint",
     "PortfolioPerformanceResponse",
     "AggregatedStatusRequest",
-    "RealizedSaleResponse",
-    "RealizedSalesResponse",
+    "AggregatedSaleResponse",
+    "AggregatedSalesResponse",
 ]

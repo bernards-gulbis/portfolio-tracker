@@ -281,23 +281,13 @@ class AggregatedStatusRequest(BaseModel):
 
 # ================== Realized Sales Schemas ==================
 
-class RealizedSaleResponse(BaseModel):
-    """Schema for a single realized sale with gain/loss"""
-    portfolio_id: int
-    portfolio_name: str
-    transaction_id: int
-    date: str  # ISO date string
+class AggregatedSaleResponse(BaseModel):
+    """Schema for aggregated realized gain/loss per ticker"""
     ticker: str
-    quantity: float
-    sale_proceeds: float  # total_amount from the sell transaction
-    cost_basis: float  # proportional cost basis at time of sale
-    realized_gain_loss: float  # sale_proceeds - cost_basis
-    realized_gain_loss_pct: Optional[float] = None  # (gain / cost_basis) * 100
-
-    model_config = ConfigDict(from_attributes=True)
+    total_gain_loss: float
 
 
-class RealizedSalesResponse(BaseModel):
-    """Schema for list of realized sales"""
-    sales: List[RealizedSaleResponse]
+class AggregatedSalesResponse(BaseModel):
+    """Schema for aggregated realized sales grouped by ticker"""
+    sales: List[AggregatedSaleResponse]
     total_realized_gain_loss: float

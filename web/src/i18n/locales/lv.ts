@@ -324,6 +324,7 @@ const lv: Translation = {
     realizedGains: 'Realizētie ienākumi / zaudējumi',
     totalGainLoss: 'Kopējais realizētais I/Z',
     noSells: 'Nav atrasti pārdošanas darījumi.',
+    filterByTicker: 'Filtrēt pēc simbola...',
     error: 'Kļūda ielādējot realizētos darījumus: {{message}}',
     columns: {
       ticker: 'Tīkotājs',

@@ -322,6 +322,7 @@ const en = {
     realizedGains: 'Realized Gains / Losses',
     totalGainLoss: 'Total Realized G/L',
     noSells: 'No sell transactions found.',
+    filterByTicker: 'Filter by ticker...',
     error: 'Error loading realized sales: {{message}}',
     columns: {
       ticker: 'Ticker',

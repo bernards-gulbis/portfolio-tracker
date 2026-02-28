@@ -17,7 +17,7 @@ from app.schemas import (
     PortfolioPerformanceResponse,
     PerformanceDataPoint,
     AggregatedStatusRequest,
-    RealizedSalesResponse,
+    AggregatedSalesResponse,
 )
 
 from app.services import PortfolioService
@@ -225,12 +225,13 @@ def get_portfolio_performance(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{portfolio_id}/sells", response_model=RealizedSalesResponse)
-def get_portfolio_sells(
+@router.get("/{portfolio_id}/sells", response_model=AggregatedSalesResponse)
+def get_portfolio_aggregated_sells(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
+    ticker: Annotated[Optional[str], Query(description="Filter by ticker symbol")] = None,
 ):
-    """Get realized sales (sells with gain/loss) for a portfolio"""
+    """Get realized sales aggregated by ticker for a portfolio, optionally filtered by ticker"""
     service = PortfolioService(session)
-    return service.get_realized_sales(portfolio_id, user.id)
+    return service.get_aggregated_sales(portfolio_id, user.id, ticker_filter=ticker)

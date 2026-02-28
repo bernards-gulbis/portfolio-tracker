@@ -3555,11 +3555,11 @@ def test_aggregated_performance_empty_ids_returns_422(client: TestClient):
     assert response.status_code == 422
 
 
-# ================== Realized Sales Tests ==================
+# ================== Aggregated Sales Tests ==================
 
 
-def test_realized_sales_basic(client: TestClient):
-    """Test realized sales endpoint returns per-sell gain/loss data"""
+def test_aggregated_sales_basic(client: TestClient):
+    """Test aggregated sells endpoint returns gain/loss aggregated by ticker"""
     portfolio = client.post("/portfolios/", json={"name": "Sales Test"}).json()
     pid = portfolio["id"]
 
@@ -3582,17 +3582,12 @@ def test_realized_sales_basic(client: TestClient):
     assert len(data["sales"]) == 1
     sale = data["sales"][0]
     assert sale["ticker"] == "AAPL"
-    assert sale["quantity"] == pytest.approx(10.0)
-    assert sale["sale_proceeds"] == pytest.approx(1500.0)
-    assert sale["cost_basis"] == pytest.approx(1000.0)
-    assert sale["realized_gain_loss"] == pytest.approx(500.0)
-    assert sale["realized_gain_loss_pct"] == pytest.approx(50.0)
-    assert sale["portfolio_name"] == "Sales Test"
+    assert sale["total_gain_loss"] == pytest.approx(500.0)
     assert data["total_realized_gain_loss"] == pytest.approx(500.0)
 
 
-def test_realized_sales_loss(client: TestClient):
-    """Test realized sales with a loss"""
+def test_aggregated_sales_loss(client: TestClient):
+    """Test aggregated sells with a loss"""
     portfolio = client.post("/portfolios/", json={"name": "Loss Test"}).json()
     pid = portfolio["id"]
 
@@ -3613,13 +3608,12 @@ def test_realized_sales_loss(client: TestClient):
 
     assert len(data["sales"]) == 1
     sale = data["sales"][0]
-    assert sale["realized_gain_loss"] == pytest.approx(-250.0)
-    assert sale["realized_gain_loss_pct"] == pytest.approx(-25.0)
+    assert sale["total_gain_loss"] == pytest.approx(-250.0)
     assert data["total_realized_gain_loss"] == pytest.approx(-250.0)
 
 
-def test_realized_sales_multiple_sells(client: TestClient):
-    """Test multiple sell transactions"""
+def test_aggregated_sales_multiple_sells_same_ticker(client: TestClient):
+    """Multiple sells of the same ticker are aggregated into one row"""
     portfolio = client.post("/portfolios/", json={"name": "Multi Sell"}).json()
     pid = portfolio["id"]
 
@@ -3642,14 +3636,97 @@ def test_realized_sales_multiple_sells(client: TestClient):
     response = client.get(f"/portfolios/{pid}/sells")
     data = response.json()
 
-    assert len(data["sales"]) == 2
-    assert data["sales"][0]["realized_gain_loss"] == pytest.approx(200.0)
-    assert data["sales"][1]["realized_gain_loss"] == pytest.approx(-200.0)
+    # Two sells of AAPL → one aggregated row
+    assert len(data["sales"]) == 1
+    sale = data["sales"][0]
+    assert sale["ticker"] == "AAPL"
+    assert sale["total_gain_loss"] == pytest.approx(0.0)
     assert data["total_realized_gain_loss"] == pytest.approx(0.0)
 
 
-def test_realized_sales_no_sells(client: TestClient):
-    """Test realized sales with no sell transactions"""
+def test_aggregated_sales_multiple_tickers(client: TestClient):
+    """Sells of different tickers produce separate rows sorted by gain desc"""
+    portfolio = client.post("/portfolios/", json={"name": "Multi Ticker"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 20000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 100.0, "total_amount": -1000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10.0, "price_per_share": 200.0, "total_amount": -2000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 150.0, "total_amount": 1500.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "MSFT",
+        "quantity": 5.0, "price_per_share": 150.0, "total_amount": 750.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/sells")
+    data = response.json()
+
+    assert len(data["sales"]) == 2
+    # Sorted by total_gain_loss descending: AAPL +500, MSFT -250
+    assert data["sales"][0]["ticker"] == "AAPL"
+    assert data["sales"][0]["total_gain_loss"] == pytest.approx(500.0)
+    assert data["sales"][1]["ticker"] == "MSFT"
+    assert data["sales"][1]["total_gain_loss"] == pytest.approx(-250.0)
+    assert data["total_realized_gain_loss"] == pytest.approx(250.0)
+
+
+def test_aggregated_sales_ticker_filter(client: TestClient):
+    """Ticker filter returns only the matching aggregated row"""
+    portfolio = client.post("/portfolios/", json={"name": "Filter Test"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 20000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 100.0, "total_amount": -1000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10.0, "price_per_share": 200.0, "total_amount": -2000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 150.0, "total_amount": 1500.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "MSFT",
+        "quantity": 5.0, "price_per_share": 150.0, "total_amount": 750.0,
+    })
+
+    # Filter to only AAPL
+    response = client.get(f"/portfolios/{pid}/sells", params={"ticker": "AAPL"})
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["sales"]) == 1
+    assert data["sales"][0]["ticker"] == "AAPL"
+    assert data["sales"][0]["total_gain_loss"] == pytest.approx(500.0)
+    assert data["total_realized_gain_loss"] == pytest.approx(500.0)
+
+    # Filter is case-insensitive
+    response_lower = client.get(f"/portfolios/{pid}/sells", params={"ticker": "aapl"})
+    assert len(response_lower.json()["sales"]) == 1
+
+    # Unknown ticker returns empty
+    response_none = client.get(f"/portfolios/{pid}/sells", params={"ticker": "GOOG"})
+    assert len(response_none.json()["sales"]) == 0
+
+
+def test_aggregated_sales_no_sells(client: TestClient):
+    """Test aggregated sells with no sell transactions"""
     portfolio = client.post("/portfolios/", json={"name": "No Sells"}).json()
     pid = portfolio["id"]
 
@@ -3668,7 +3745,7 @@ def test_realized_sales_no_sells(client: TestClient):
     assert data["total_realized_gain_loss"] == pytest.approx(0.0)
 
 
-def test_realized_sales_nonexistent_portfolio(client: TestClient):
+def test_aggregated_sales_nonexistent_portfolio(client: TestClient):
     """Nonexistent portfolio should return 404"""
     response = client.get("/portfolios/999/sells")
     assert response.status_code == 404

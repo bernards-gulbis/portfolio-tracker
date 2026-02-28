@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { AnalyzePage } from '../components/AnalyzePage';
@@ -8,13 +9,13 @@ vi.mock('../hooks/useActivePortfolioId', () => ({
   useActivePortfolioId: vi.fn(),
 }));
 
-vi.mock('../hooks/useRealizedSales', () => ({
-  useRealizedSales: vi.fn(),
+vi.mock('../hooks/useAggregatedSales', () => ({
+  useAggregatedSales: vi.fn(),
 }));
 
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
-import { useRealizedSales } from '../hooks/useRealizedSales';
-import type { RealizedSale } from '../api';
+import { useAggregatedSales } from '../hooks/useAggregatedSales';
+import type { AggregatedSale } from '../api';
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -35,17 +36,9 @@ const renderPage = () => {
   );
 };
 
-const makeSale = (overrides: Partial<RealizedSale>): RealizedSale => ({
-  portfolio_id: 1,
-  portfolio_name: 'Test',
-  transaction_id: 1,
-  date: '2023-01-01T00:00:00',
+const makeAggregatedSale = (overrides: Partial<AggregatedSale>): AggregatedSale => ({
   ticker: 'AAPL',
-  quantity: 10,
-  sale_proceeds: 1500,
-  cost_basis: 1000,
-  realized_gain_loss: 500,
-  realized_gain_loss_pct: 50,
+  total_gain_loss: 500,
   ...overrides,
 });
 
@@ -53,58 +46,54 @@ describe('AnalyzePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useActivePortfolioId).mockReturnValue(1);
-    vi.mocked(useRealizedSales).mockReturnValue({
+    vi.mocked(useAggregatedSales).mockReturnValue({
       data: undefined,
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof useRealizedSales>);
+    } as unknown as ReturnType<typeof useAggregatedSales>);
   });
 
   it('shows empty message when there are no sells', () => {
-    vi.mocked(useRealizedSales).mockReturnValue({
+    vi.mocked(useAggregatedSales).mockReturnValue({
       data: { sales: [], total_realized_gain_loss: 0 },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof useRealizedSales>);
+    } as unknown as ReturnType<typeof useAggregatedSales>);
 
     renderPage();
     expect(screen.getByText('No sell transactions found.')).toBeInTheDocument();
   });
 
-  it('groups multiple sells of the same ticker into one row', () => {
-    vi.mocked(useRealizedSales).mockReturnValue({
+  it('renders one row per aggregated ticker', () => {
+    vi.mocked(useAggregatedSales).mockReturnValue({
       data: {
-        sales: [
-          makeSale({ transaction_id: 1, ticker: 'AAPL', sale_proceeds: 1000, cost_basis: 800, realized_gain_loss: 200, realized_gain_loss_pct: 25 }),
-          makeSale({ transaction_id: 2, ticker: 'AAPL', sale_proceeds: 500, cost_basis: 400, realized_gain_loss: 100, realized_gain_loss_pct: 25 }),
-        ],
+        sales: [makeAggregatedSale({ ticker: 'AAPL', total_gain_loss: 300 })],
         total_realized_gain_loss: 300,
       },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof useRealizedSales>);
+    } as unknown as ReturnType<typeof useAggregatedSales>);
 
     renderPage();
 
     const rows = screen.getAllByRole('row');
-    // header + 1 data row (AAPL grouped)
+    // header + 1 data row
     expect(rows).toHaveLength(2);
     expect(screen.getByText('AAPL')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument(); // sell count
   });
 
   it('shows separate rows for different tickers', () => {
-    vi.mocked(useRealizedSales).mockReturnValue({
+    vi.mocked(useAggregatedSales).mockReturnValue({
       data: {
         sales: [
-          makeSale({ transaction_id: 1, ticker: 'AAPL', realized_gain_loss: 200 }),
-          makeSale({ transaction_id: 2, ticker: 'MSFT', realized_gain_loss: 100 }),
+          makeAggregatedSale({ ticker: 'AAPL', total_gain_loss: 200 }),
+          makeAggregatedSale({ ticker: 'MSFT', total_gain_loss: 100 }),
         ],
         total_realized_gain_loss: 300,
       },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof useRealizedSales>);
+    } as unknown as ReturnType<typeof useAggregatedSales>);
 
     renderPage();
 
@@ -112,19 +101,19 @@ describe('AnalyzePage', () => {
     expect(screen.getByText('MSFT')).toBeInTheDocument();
   });
 
-  it('sorts by biggest gainer first', () => {
-    vi.mocked(useRealizedSales).mockReturnValue({
+  it('renders rows in the order provided by the backend (sorted by gain desc)', () => {
+    vi.mocked(useAggregatedSales).mockReturnValue({
       data: {
         sales: [
-          makeSale({ transaction_id: 1, ticker: 'MSFT', realized_gain_loss: 100 }),
-          makeSale({ transaction_id: 2, ticker: 'AAPL', realized_gain_loss: 500 }),
-          makeSale({ transaction_id: 3, ticker: 'GOOG', realized_gain_loss: -50 }),
+          makeAggregatedSale({ ticker: 'AAPL', total_gain_loss: 500 }),
+          makeAggregatedSale({ ticker: 'MSFT', total_gain_loss: 100 }),
+          makeAggregatedSale({ ticker: 'GOOG', total_gain_loss: -50 }),
         ],
         total_realized_gain_loss: 550,
       },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof useRealizedSales>);
+    } as unknown as ReturnType<typeof useAggregatedSales>);
 
     renderPage();
 
@@ -135,38 +124,34 @@ describe('AnalyzePage', () => {
     expect(tickers[2].textContent).toBe('GOOG');
   });
 
-  it('computes grouped gain percentage from summed totals', () => {
-    vi.mocked(useRealizedSales).mockReturnValue({
-      data: {
-        sales: [
-          makeSale({ transaction_id: 1, ticker: 'AAPL', sale_proceeds: 1200, cost_basis: 1000, realized_gain_loss: 200, realized_gain_loss_pct: 20 }),
-          makeSale({ transaction_id: 2, ticker: 'AAPL', sale_proceeds: 600, cost_basis: 400, realized_gain_loss: 200, realized_gain_loss_pct: 50 }),
-        ],
-        total_realized_gain_loss: 400,
-      },
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof useRealizedSales>);
-
-    renderPage();
-
-    // total gain = 400, total cost_basis = 1400, pct = 400/1400*100 = 28.57%
-    expect(screen.getByText(/28\.57%/)).toBeInTheDocument();
-  });
-
   it('shows total gain/loss in header with sign prefix', () => {
-    vi.mocked(useRealizedSales).mockReturnValue({
+    vi.mocked(useAggregatedSales).mockReturnValue({
       data: {
-        sales: [makeSale({ realized_gain_loss: 750, realized_gain_loss_pct: 75 })],
+        sales: [makeAggregatedSale({ total_gain_loss: 750, gain_pct: 75 })],
         total_realized_gain_loss: 750,
       },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof useRealizedSales>);
+    } as unknown as ReturnType<typeof useAggregatedSales>);
 
     renderPage();
 
-    // +$750.00 appears in the header summary and in the gain cell
     expect(screen.getAllByText(/\+\$750\.00/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('passes ticker filter to hook when user types in filter input', async () => {
+    vi.mocked(useAggregatedSales).mockReturnValue({
+      data: { sales: [], total_realized_gain_loss: 0 },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useAggregatedSales>);
+
+    renderPage();
+
+    const input = screen.getByPlaceholderText('Filter by ticker...');
+    await userEvent.type(input, 'AAPL');
+
+    // Hook should have been called with the uppercased ticker
+    expect(vi.mocked(useAggregatedSales)).toHaveBeenCalledWith(1, 'AAPL');
   });
 });
