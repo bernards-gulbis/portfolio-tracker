@@ -237,8 +237,8 @@ describe('PortfolioStatusView', () => {
     const warningStatus: PortfolioStatus = {
       ...mockStatus,
       warnings: [
-        '[2024-01-02] Cannot sell UNKNOWN: not in holdings (skipped)',
-        '[2024-01-02] Withdrawal of 500 caused negative cash balance (-400)',
+        { code: 'sellNotInHoldings', date: '2024-01-02T10:00:00', params: { ticker: 'UNKNOWN' } },
+        { code: 'withdrawNegativeCash', date: '2024-01-02T14:30:00', params: { amount: '500', balance: '-400' } },
       ],
     };
 

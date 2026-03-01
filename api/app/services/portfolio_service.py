@@ -17,6 +17,7 @@ from app.core.exceptions import (
     InvalidPortfolioNameException,
 )
 from app.schemas import HoldingResponse, PortfolioStatusResponse, PortfolioPerformanceResponse, PerformanceDataPoint, AggregatedSaleResponse, AggregatedSalesResponse
+from app.schemas.schemas import TransactionWarning
 from app.services.price_service import PriceService
 
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
@@ -99,7 +100,7 @@ class _TxState:
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
     holdings: Dict[str, Dict[str, Decimal]] = dc_field(default_factory=dict)
-    warnings: List[str] = dc_field(default_factory=list)
+    warnings: List[Dict[str, object]] = dc_field(default_factory=list)
 
 
 def _eur_from_tx(tx: Transaction, total_amount: Decimal) -> Decimal:
@@ -132,10 +133,11 @@ def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.principal += total
     state.principal_eur += _eur_from_tx(tx, total)
     if strict and state.cash < 0:
-        date_str = tx.date.strftime('%Y-%m-%d')
-        state.warnings.append(
-            f"[{date_str}] Withdrawal of {-total} caused negative cash balance ({state.cash})"
-        )
+        state.warnings.append({
+            'code': 'withdrawNegativeCash',
+            'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+            'params': {'amount': str(-total), 'balance': str(state.cash)},
+        })
 
 
 def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -157,17 +159,21 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         return
     if ticker not in state.holdings:
         if strict:
-            date_str = tx.date.strftime('%Y-%m-%d')
-            state.warnings.append(f"[{date_str}] Cannot sell {ticker}: not in holdings (skipped)")
+            state.warnings.append({
+                'code': 'sellNotInHoldings',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'ticker': ticker},
+            })
         return
     h = state.holdings[ticker]
     if quantity > h['quantity'] + HOLDINGS_EPSILON:
         if strict:
             held = h['quantity']
-            date_str = tx.date.strftime('%Y-%m-%d')
-            state.warnings.append(
-                f"[{date_str}] Cannot sell {quantity} of {ticker}: only {held} available (partial sell applied)"
-            )
+            state.warnings.append({
+                'code': 'sellOversell',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'ticker': ticker, 'quantity': str(quantity), 'available': str(held)},
+            })
             # Partial sell: sell only what is held, with proportional total
             partial_total = total * (held / quantity) if quantity > 0 else _ZERO
             cost_basis = h['total_cost']
@@ -200,8 +206,11 @@ def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
     split_ratio = _to_decimal(tx.split_ratio or 1)
     if split_ratio <= 0:
         if strict:
-            date_str = tx.date.strftime('%Y-%m-%d')
-            state.warnings.append(f"[{date_str}] Invalid split ratio {split_ratio} for {tx.ticker}: must be positive (skipped)")
+            state.warnings.append({
+                'code': 'invalidSplitRatio',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'ticker': tx.ticker or '', 'ratio': str(split_ratio)},
+            })
         return
     if tx.ticker and tx.ticker in state.holdings:
         state.holdings[tx.ticker]['quantity'] *= split_ratio
@@ -233,8 +242,11 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
     handler = _TX_HANDLERS.get(tx.type)
     if handler is None:
         if strict:
-            date_str = tx.date.strftime('%Y-%m-%d')
-            state.warnings.append(f"[{date_str}] Unknown transaction type: {tx.type} (skipped)")
+            state.warnings.append({
+                'code': 'unknownType',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'type': str(tx.type)},
+            })
         return
     handler(state, tx, strict)
 
@@ -706,7 +718,7 @@ class PortfolioService:
             realized_gains=_normalize_zero(state.realized_gains),
             capital_gains_tax_rate=float(tax_rate),
             missing_prices=missing_prices,
-            warnings=state.warnings,
+            warnings=[TransactionWarning(**w) for w in state.warnings],
             usd_to_eur_rate=usd_to_eur_rate,
         )
 
@@ -839,7 +851,7 @@ class PortfolioService:
             realized_gains=_normalize_zero(state.realized_gains),
             capital_gains_tax_rate=float(tax_rate),
             missing_prices=missing_prices,
-            warnings=state.warnings,
+            warnings=[TransactionWarning(**w) for w in state.warnings],
             usd_to_eur_rate=usd_to_eur_rate,
         )
 

@@ -227,6 +227,13 @@ class HoldingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TransactionWarning(BaseModel):
+    """Structured warning from transaction processing, for frontend i18n."""
+    code: str                                    # i18n key suffix, e.g. "sellNotInHoldings"
+    date: str                                    # ISO datetime YYYY-MM-DDTHH:MM:SS of the transaction
+    params: dict[str, str] = Field(default_factory=dict)  # interpolation values
+
+
 class PortfolioStatusResponse(BaseModel):
     """Schema for portfolio status with calculated metrics"""
     portfolio_id: int
@@ -245,7 +252,7 @@ class PortfolioStatusResponse(BaseModel):
     realized_gains: float  # Gains/losses from sells
     capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
     missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
-    warnings: List[str] = Field(default_factory=list)  # Transaction processing warnings
+    warnings: List[TransactionWarning] = Field(default_factory=list)  # Transaction processing warnings
     usd_to_eur_rate: Optional[float] = None  # Live USD→EUR rate; None when unavailable
 
     model_config = ConfigDict(from_attributes=True)

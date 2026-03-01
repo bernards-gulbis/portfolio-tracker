@@ -271,6 +271,13 @@ const lv: Translation = {
     fetchedAt: 'Atjaunināts {{time}}',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
     transactionWarnings: 'Darījumu brīdinājumi',
+    warnings: {
+      sellNotInHoldings: '[{{date}}] Nevar pārdot {{ticker}}: nav turējumos (izlaists)',
+      sellOversell: '[{{date}}] Nevar pārdot {{quantity}} no {{ticker}}: pieejami tikai {{available}} (daļēja pārdošana)',
+      withdrawNegativeCash: '[{{date}}] Izņemšana {{amount}} radīja negatīvu naudas atlikumu ({{balance}})',
+      invalidSplitRatio: '[{{date}}] Nederīgs sadalīšanas koeficients {{ratio}} priekš {{ticker}}: jābūt pozitīvam (izlaists)',
+      unknownType: '[{{date}}] Nezināms darījuma veids: {{type}} (izlaists)',
+    },
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',
     netInvested: 'Neto ieguldīts',

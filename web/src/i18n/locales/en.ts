@@ -269,6 +269,13 @@ const en = {
     fetchedAt: 'Updated {{time}}',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
     transactionWarnings: 'Transaction warnings',
+    warnings: {
+      sellNotInHoldings: '[{{date}}] Cannot sell {{ticker}}: not in holdings (skipped)',
+      sellOversell: '[{{date}}] Cannot sell {{quantity}} of {{ticker}}: only {{available}} available (partial sell applied)',
+      withdrawNegativeCash: '[{{date}}] Withdrawal of {{amount}} caused negative cash balance ({{balance}})',
+      invalidSplitRatio: '[{{date}}] Invalid split ratio {{ratio}} for {{ticker}}: must be positive (skipped)',
+      unknownType: '[{{date}}] Unknown transaction type: {{type}} (skipped)',
+    },
     marketValue: 'Market Value',
     unrealized: 'unrealized',
     netInvested: 'Net Invested',

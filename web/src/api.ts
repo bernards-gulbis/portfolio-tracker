@@ -136,6 +136,12 @@ export interface Holding {
   unrealized_gain_loss_pct?: number | null;
 }
 
+export interface TransactionWarning {
+  code: string;
+  date: string;
+  params: Record<string, string>;
+}
+
 export interface PortfolioStatus {
   portfolio_id: number;
   portfolio_name: string;
@@ -153,7 +159,7 @@ export interface PortfolioStatus {
   realized_gains: number;
   capital_gains_tax_rate: number;
   missing_prices: string[];
-  warnings: string[];
+  warnings: TransactionWarning[];
   usd_to_eur_rate: number | null;
 }
 

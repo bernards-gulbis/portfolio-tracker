@@ -6,9 +6,9 @@ import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatCurrency, formatSignedCurrency, formatQuantity } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatQuantity, formatDate } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
-import { getErrorMessage, PortfolioStatus, PortfolioPerformance } from '../api';
+import { getErrorMessage, PortfolioStatus, PortfolioPerformance, TransactionWarning } from '../api';
 import { useCurrencyPreference } from '../hooks/useCurrencyPreference';
 import { computeEurMetrics, applyRateToHolding } from '../utils/eurMetrics';
 import EditPortfolioModal from './EditPortfolioModal';
@@ -132,8 +132,13 @@ export const PortfolioStatusContent = ({
           <AlertDescription>
             <p className="font-medium">{t('status.transactionWarnings')}</p>
             <ul className="list-disc pl-4 mt-1 text-sm">
-              {status.warnings.map((w, i) => (
-                <li key={i}>{w}</li>
+              {status.warnings.map((w: TransactionWarning, i: number) => (
+                <li key={i}>
+                  {t(`status.warnings.${w.code}`, {
+                    ...w.params,
+                    date: formatDate(w.date, locale),
+                  })}
+                </li>
               ))}
             </ul>
           </AlertDescription>

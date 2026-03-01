@@ -1293,7 +1293,7 @@ def test_portfolio_status_sell_without_holdings(client: TestClient):
     response = client.get(f"/portfolios/{portfolio_id}/status")
     assert response.status_code == 200
     data = response.json()
-    assert any("not in holdings" in w for w in data["warnings"])
+    assert any(w["code"] == "sellNotInHoldings" for w in data["warnings"])
     # Cash should not be inflated by the skipped sell
     assert data["cash"] == 5000.0
 
@@ -1348,7 +1348,7 @@ def test_portfolio_status_overselling(client: TestClient):
     response = client.get(f"/portfolios/{portfolio_id}/status")
     assert response.status_code == 200
     data = response.json()
-    assert any("partial sell" in w for w in data["warnings"])
+    assert any(w["code"] == "sellOversell" for w in data["warnings"])
     # AAPL should be fully sold (partial sell of held 10 shares)
     assert len(data["holdings"]) == 0
 
@@ -3823,8 +3823,9 @@ def test_warning_sell_unknown_ticker_strict():
 
     assert state.cash == Decimal('5000')  # sell skipped
     assert len(state.warnings) == 1
-    assert "not in holdings" in state.warnings[0]
-    assert "[2024-01-02]" in state.warnings[0]
+    assert state.warnings[0]['code'] == 'sellNotInHoldings'
+    assert state.warnings[0]['date'] == '2024-01-02T00:00:00'
+    assert state.warnings[0]['params']['ticker'] == 'UNKNOWN'
 
 
 def test_warning_oversell_partial_strict():
@@ -3845,8 +3846,9 @@ def test_warning_oversell_partial_strict():
     _apply_transaction(state, tx, strict=True)
 
     assert len(state.warnings) == 1
-    assert "partial sell" in state.warnings[0]
-    assert "[2024-01-02]" in state.warnings[0]
+    assert state.warnings[0]['code'] == 'sellOversell'
+    assert state.warnings[0]['date'] == '2024-01-02T00:00:00'
+    assert state.warnings[0]['params']['ticker'] == 'AAPL'
     # Holdings should be cleared (partial sell of all 5 shares)
     assert 'AAPL' not in state.holdings
     # Cash should increase by proportional total: 3000 * (5/20) = 750
@@ -3872,8 +3874,8 @@ def test_warning_withdraw_negative_cash():
     assert state.cash == Decimal('-400')
     assert state.principal == Decimal('-500')
     assert len(state.warnings) == 1
-    assert "negative cash" in state.warnings[0]
-    assert "[2024-01-02]" in state.warnings[0]
+    assert state.warnings[0]['code'] == 'withdrawNegativeCash'
+    assert state.warnings[0]['date'] == '2024-01-02T00:00:00'
 
 
 def test_no_warnings_in_non_strict_mode():
