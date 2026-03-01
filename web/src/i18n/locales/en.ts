@@ -230,6 +230,10 @@ const en = {
         fxRate: 'FX Rate',
         fxRatePlaceholder: 'e.g., 1.0850',
         fxRateDescription: 'Exchange rate used for currency conversion',
+        sellTickerPlaceholder: 'Select holding...',
+        noHoldings: 'No holdings available',
+        sellAll: 'Sell All',
+        availableQuantity: 'Available: {{quantity}} shares',
       },
       types: {
         Deposit: 'Deposit',

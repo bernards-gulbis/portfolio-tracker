@@ -6,7 +6,8 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useTranslation } from 'react-i18next';
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
-import { Transaction, TransactionType, TransactionCreate, getErrorMessage } from '../api';
+import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
+import { Transaction, TransactionType, TransactionCreate, Holding, getErrorMessage } from '../api';
 import {
   Dialog,
   DialogContent,
@@ -355,6 +356,8 @@ const TransactionModal = ({
   const isEdit = !!transaction;
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
+  const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
+  const holdings: Holding[] = portfolioStatus?.holdings ?? [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -363,10 +366,28 @@ const TransactionModal = ({
 
   const { reset, clearErrors } = form;
   const type = form.watch('type');
+  const watchedTicker = form.watch('ticker');
+  const watchedQuantity = form.watch('quantity');
+  const watchedPrice = form.watch('pricePerShare');
+  const watchedFee = form.watch('fee');
+
+  const isSell = type === TransactionType.SELL;
+  const selectedHolding = isSell ? holdings.find(h => h.ticker === watchedTicker) : undefined;
 
   useEffect(() => {
     if (isOpen) reset(getDefaultValues(transaction));
   }, [isOpen, transaction, reset]);
+
+  // Auto-calculate totalAmount for BUY/SELL
+  useEffect(() => {
+    if (![TransactionType.BUY, TransactionType.SELL].includes(type)) return;
+    const qty = Number.parseFloat(watchedQuantity || '0');
+    const price = Number.parseFloat(watchedPrice || '0');
+    const fee = Math.abs(Number.parseFloat(watchedFee || '0'));
+    if (qty > 0 && price > 0) {
+      form.setValue('totalAmount', (qty * price + fee).toFixed(2));
+    }
+  }, [watchedQuantity, watchedPrice, watchedFee, type, form]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -499,14 +520,49 @@ const TransactionModal = ({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-ticker">{t('transaction.modal.fields.ticker')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="tx-ticker"
-                      placeholder={t('transaction.modal.fields.tickerPlaceholder')}
-                      autoComplete="off"
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      aria-invalid={fieldState.invalid}
-                    />
+                    {isSell ? (
+                      <Select
+                        name="tx-ticker"
+                        value={field.value}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          const holding = holdings.find(h => h.ticker === value);
+                          if (holding?.current_price != null) {
+                            form.setValue('pricePerShare', holding.current_price.toFixed(2));
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="tx-ticker" className="w-full" aria-invalid={fieldState.invalid}>
+                          <SelectValue placeholder={t('transaction.modal.fields.sellTickerPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {holdings.length === 0 && (
+                            <SelectItem value="__empty__" disabled>
+                              {t('transaction.modal.fields.noHoldings')}
+                            </SelectItem>
+                          )}
+                          {holdings.map(h => (
+                            <SelectItem key={h.ticker} value={h.ticker}>
+                              {h.ticker} ({h.quantity} shares)
+                            </SelectItem>
+                          ))}
+                          {isEdit && transaction?.ticker && !holdings.some(h => h.ticker === transaction.ticker) && (
+                            <SelectItem value={transaction.ticker}>
+                              {transaction.ticker}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        {...field}
+                        id="tx-ticker"
+                        placeholder={t('transaction.modal.fields.tickerPlaceholder')}
+                        autoComplete="off"
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        aria-invalid={fieldState.invalid}
+                      />
+                    )}
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -521,16 +577,46 @@ const TransactionModal = ({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-quantity">{t('transaction.modal.fields.quantity')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="tx-quantity"
-                      type="number"
-                      step="0.00000001"
-                      min="0.00000001"
-                      placeholder={t('transaction.modal.fields.quantityPlaceholder')}
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                    />
+                    {isSell && selectedHolding ? (
+                      <div className="flex gap-2">
+                        <Input
+                          {...field}
+                          id="tx-quantity"
+                          type="number"
+                          step="0.00000001"
+                          min="0.00000001"
+                          placeholder={t('transaction.modal.fields.quantityPlaceholder')}
+                          autoComplete="off"
+                          aria-invalid={fieldState.invalid}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 self-center"
+                          onClick={() => form.setValue('quantity', String(selectedHolding.quantity))}
+                        >
+                          {t('transaction.modal.fields.sellAll')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input
+                        {...field}
+                        id="tx-quantity"
+                        type="number"
+                        step="0.00000001"
+                        min="0.00000001"
+                        placeholder={t('transaction.modal.fields.quantityPlaceholder')}
+                        autoComplete="off"
+                        aria-invalid={fieldState.invalid}
+                      />
+                    )}
+                    {isSell && selectedHolding && (
+                      <FieldDescription>
+                        {t('transaction.modal.fields.availableQuantity', { quantity: selectedHolding.quantity })}
+                      </FieldDescription>
+                    )}
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

@@ -232,6 +232,10 @@ const lv: Translation = {
         fxRate: 'Valūtas kurss',
         fxRatePlaceholder: 'piem., 1.0850',
         fxRateDescription: 'Valūtas konvertēšanai izmantotais kurss',
+        sellTickerPlaceholder: 'Izvēlēties turējumu...',
+        noHoldings: 'Nav pieejamu turējumu',
+        sellAll: 'Pārdot visu',
+        availableQuantity: 'Pieejams: {{quantity}} akcijas',
       },
       types: {
         Deposit: 'Iemaksa',
