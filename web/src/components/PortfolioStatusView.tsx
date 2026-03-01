@@ -134,7 +134,7 @@ export const PortfolioStatusContent = ({
             <ul className="list-disc pl-4 mt-1 text-sm">
               {status.warnings.map((w: TransactionWarning, i: number) => (
                 <li key={i}>
-                  {t(`status.warnings.${w.code}`, {
+                  {(t as (key: string, options?: Record<string, unknown>) => string)(`status.warnings.${w.code}`, {
                     ...w.params,
                     date: formatDate(w.date, locale),
                   })}

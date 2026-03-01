@@ -658,9 +658,9 @@ const TransactionModal = ({
                     <FieldLabel htmlFor="tx-ticker">{t('transaction.modal.fields.ticker')}</FieldLabel>
                     {showTickerCombobox ? (
                       <TickerCombobox
-                        value={field.value}
+                        value={field.value ?? ''}
                         holdings={holdings}
-                        editTicker={isEdit ? transaction?.ticker : undefined}
+                        editTicker={isEdit ? transaction?.ticker ?? undefined : undefined}
                         invalid={fieldState.invalid}
                         placeholder={t('transaction.modal.fields.sellTickerPlaceholder')}
                         noHoldingsText={t('transaction.modal.fields.noHoldings')}

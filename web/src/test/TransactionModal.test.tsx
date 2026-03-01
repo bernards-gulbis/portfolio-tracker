@@ -64,7 +64,7 @@ const defaultProps = {
   portfolioId: 1,
 };
 
-const renderModal = (props = defaultProps) => {
+const renderModal = (props: { isOpen: boolean; onClose: ReturnType<typeof vi.fn>; portfolioId: number; transaction?: Transaction } = defaultProps) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
