@@ -99,7 +99,7 @@ describe('TransactionModal — sell suggestions', () => {
     } as unknown as ReturnType<typeof useUpdateTransaction>);
 
     vi.mocked(usePortfolioStatus).mockReturnValue({
-      data: { holdings: mockHoldings },
+      data: { holdings: mockHoldings, usd_to_eur_rate: 0.92 },
     } as unknown as ReturnType<typeof usePortfolioStatus>);
   });
 
@@ -252,6 +252,52 @@ describe('TransactionModal — sell suggestions', () => {
     await waitFor(() => {
       const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
       expect(totalInput.value).toBe('1755.00');
+    });
+  });
+
+  it('shows ticker combobox with holdings for Dividend type', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Dividend');
+
+    const tickerSelect = screen.getByRole('combobox', { name: 'Asset' });
+    await user.click(tickerSelect);
+
+    expect(await screen.findByRole('option', { name: 'AAPL (10 shares)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'MSFT (5 shares)' })).toBeInTheDocument();
+  });
+
+  it('allows typing a custom ticker for Dividend type', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Dividend');
+
+    const tickerSelect = screen.getByRole('combobox', { name: 'Asset' });
+    await user.click(tickerSelect);
+
+    // Type a ticker not in holdings
+    const searchInput = screen.getByPlaceholderText('Select holding...');
+    await user.type(searchInput, 'GOOG');
+
+    // Custom option should appear
+    const customOption = await screen.findByRole('option', { name: 'GOOG' });
+    await user.click(customOption);
+
+    // The combobox trigger should now show GOOG
+    expect(screen.getByRole('combobox', { name: 'Asset' })).toHaveTextContent('GOOG');
+  });
+
+  it('auto-fills FX rate with usd_to_eur_rate for Dividend type', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Dividend');
+
+    await waitFor(() => {
+      const fxInput = screen.getByLabelText('FX Rate') as HTMLInputElement;
+      expect(fxInput.value).toBe('0.9200');
     });
   });
 });
