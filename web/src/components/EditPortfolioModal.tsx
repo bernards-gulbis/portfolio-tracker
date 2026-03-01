@@ -119,14 +119,6 @@ const EditPortfolioModal = ({
 
         <DialogFooter>
           <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={updatePortfolio.isPending}
-          >
-            {t('portfolio.edit.cancel')}
-          </Button>
-          <Button
             type="submit"
             form="edit-portfolio-form"
             disabled={updatePortfolio.isPending}

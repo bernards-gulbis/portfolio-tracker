@@ -119,14 +119,6 @@ const CopyPortfolioModal = ({
 
         <DialogFooter>
           <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={copyPortfolio.isPending}
-          >
-            {t('portfolio.copy.cancel')}
-          </Button>
-          <Button
             type="submit"
             form="copy-portfolio-form"
             disabled={copyPortfolio.isPending}

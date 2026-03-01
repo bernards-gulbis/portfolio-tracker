@@ -926,9 +926,6 @@ const TransactionModal = ({
         </form>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
-            {t('transaction.modal.cancel')}
-          </Button>
           <Button type="submit" form="transaction-form" disabled={isPending}>
             {isPending && <Spinner />}
             {isEdit ? t('transaction.modal.update') : t('transaction.modal.add')}
