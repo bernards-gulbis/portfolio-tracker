@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 from urllib.parse import urlencode
 
-from app.core.config import CORS_ORIGINS, LOG_LEVEL
+from app.core.config import CORS_ORIGINS, LOG_LEVEL, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +24,7 @@ from app.core import (
 )
 from app.routers import portfolios_router, transactions_router, transaction_router
 from app.core.database import engine, get_session
-from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL, current_active_user, get_user_manager, UserManager
+from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, current_active_user, get_user_manager, UserManager
 from app.schemas import UserRead, UserCreate, UserUpdate, CloseAccountRequest
 from app.models.user import User
 from app.models.oauth_account import OAuthAccount

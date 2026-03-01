@@ -107,10 +107,8 @@ function AppLayout() {
     (!portfolios || portfolios.some((p) => p.id === activePortfolioId))
   ) {
     setLastPortfolioId(activePortfolioId);
-  }
-
-  // Clear stale state if the remembered portfolio was deleted
-  if (lastPortfolioId !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioId)) {
+  } else if (lastPortfolioId !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioId)) {
+    // Clear stale state if the remembered portfolio was deleted
     setLastPortfolioId(null);
   }
 

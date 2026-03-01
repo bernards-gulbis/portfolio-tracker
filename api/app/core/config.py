@@ -18,13 +18,15 @@ logger = logging.getLogger(__name__)
 _errors: list[str] = []
 _warnings: list[str] = []
 
-
-def _get(name: str, default: str) -> str:
-    return os.getenv(name, default)
+_BOOL_TRUE = {"true", "1", "yes"}
+_BOOL_FALSE = {"false", "0", "no", ""}
 
 
 def _get_bool(name: str, default: bool = False) -> bool:
-    return os.getenv(name, str(default)).lower() == "true"
+    raw = os.getenv(name, str(default)).lower()
+    if raw not in _BOOL_TRUE | _BOOL_FALSE:
+        _warnings.append(f"{name}={raw!r} is not a recognized boolean (expected true/false)")
+    return raw in _BOOL_TRUE
 
 
 def _get_int(name: str, default: int) -> int:
@@ -38,7 +40,7 @@ def _get_int(name: str, default: int) -> int:
 
 # ── Database ──────────────────────────────────────────────
 
-DATABASE_URL: str = _get("DATABASE_URL", "sqlite:///./portfolio_tracker.db")
+DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./portfolio_tracker.db")
 DB_POOL_SIZE: int = _get_int("DB_POOL_SIZE", 5)
 DB_MAX_OVERFLOW: int = _get_int("DB_MAX_OVERFLOW", 10)
 DATABASE_ECHO: bool = _get_bool("DATABASE_ECHO")
@@ -48,38 +50,29 @@ DATABASE_ECHO: bool = _get_bool("DATABASE_ECHO")
 COOKIE_SECURE: bool = _get_bool("COOKIE_SECURE")
 
 _DEFAULT_SECRET = "CHANGE-ME-IN-PRODUCTION"
-SECRET_KEY: str = _get("SECRET_KEY", _DEFAULT_SECRET)
-OAUTH_STATE_SECRET: str = _get("OAUTH_STATE_SECRET", _DEFAULT_SECRET)
-GOOGLE_CLIENT_ID: str = _get("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET: str = _get("GOOGLE_CLIENT_SECRET", "")
-FRONTEND_URL: str = _get("FRONTEND_URL", "http://localhost:3000")
+SECRET_KEY: str = os.getenv("SECRET_KEY", _DEFAULT_SECRET)
+OAUTH_STATE_SECRET: str = os.getenv("OAUTH_STATE_SECRET", _DEFAULT_SECRET)
+GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-if COOKIE_SECURE:
-    if SECRET_KEY == _DEFAULT_SECRET:
-        _errors.append(
-            "SECRET_KEY must be set when COOKIE_SECURE=true. "
-            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
-        )
-    if OAUTH_STATE_SECRET == _DEFAULT_SECRET:
-        _errors.append(
-            "OAUTH_STATE_SECRET must be set when COOKIE_SECURE=true. "
-            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
-        )
-else:
-    if SECRET_KEY == _DEFAULT_SECRET:
-        _warnings.append(
-            "SECRET_KEY is using insecure default — set it in .env before deploying"
-        )
-    if OAUTH_STATE_SECRET == _DEFAULT_SECRET:
-        _warnings.append(
-            "OAUTH_STATE_SECRET is using insecure default — set it in .env before deploying"
-        )
+for _name, _val in [("SECRET_KEY", SECRET_KEY), ("OAUTH_STATE_SECRET", OAUTH_STATE_SECRET)]:
+    if _val == _DEFAULT_SECRET:
+        if COOKIE_SECURE:
+            _errors.append(
+                f"{_name} must be set when COOKIE_SECURE=true. "
+                'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
+            )
+        else:
+            _warnings.append(
+                f"{_name} is using insecure default — set it in .env before deploying"
+            )
 
 # ── CORS ──────────────────────────────────────────────────
 
 CORS_ORIGINS: list[str] = [
     origin.strip()
-    for origin in _get(
+    for origin in os.getenv(
         "CORS_ORIGINS",
         "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173",
     ).split(",")
@@ -88,7 +81,7 @@ CORS_ORIGINS: list[str] = [
 # ── Misc ──────────────────────────────────────────────────
 
 PRICE_CACHE_TTL_MINUTES: int = _get_int("PRICE_CACHE_TTL", 15)
-LOG_LEVEL: str = _get("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # ── Emit warnings / abort on errors ──────────────────────
 
