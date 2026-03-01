@@ -19,6 +19,7 @@ const baseStatus: PortfolioStatus = {
   realized_gains: 0,
   capital_gains_tax_rate: 0.255,
   missing_prices: [],
+  warnings: [],
   usd_to_eur_rate: 0.85,
 };
 

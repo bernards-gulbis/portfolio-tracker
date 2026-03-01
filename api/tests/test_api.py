@@ -1257,13 +1257,13 @@ def test_portfolio_status_nonexistent_portfolio(client: TestClient):
 # ================== Portfolio Status Validation Tests ==================
 
 def test_portfolio_status_sell_without_holdings(client: TestClient):
-    """Test portfolio status validation: cannot sell ticker not in holdings"""
+    """Selling a ticker not in holdings produces a warning and skips the sell"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1274,7 +1274,7 @@ def test_portfolio_status_sell_without_holdings(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Try to sell AAPL without owning it
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1288,21 +1288,24 @@ def test_portfolio_status_sell_without_holdings(client: TestClient):
             "fee": 1.0
         }
     )
-    
-    # Get status - should return 400 for validation error
+
+    # Get status - should return 200 with a warning
     response = client.get(f"/portfolios/{portfolio_id}/status")
-    assert response.status_code == 400  # Bad Request due to validation
-    assert "not in holdings" in response.json()["detail"]
+    assert response.status_code == 200
+    data = response.json()
+    assert any("not in holdings" in w for w in data["warnings"])
+    # Cash should not be inflated by the skipped sell
+    assert data["cash"] == 5000.0
 
 
 def test_portfolio_status_overselling(client: TestClient):
-    """Test portfolio status validation: cannot sell more units than owned"""
+    """Overselling produces a warning and performs a partial sell of the held quantity"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit and buy
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1313,7 +1316,7 @@ def test_portfolio_status_overselling(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
@@ -1326,7 +1329,7 @@ def test_portfolio_status_overselling(client: TestClient):
             "fee": 1.0
         }
     )
-    
+
     # Try to sell more than owned
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1340,11 +1343,14 @@ def test_portfolio_status_overselling(client: TestClient):
             "fee": 1.0
         }
     )
-    
-    # Get status - should return 400 for validation error
+
+    # Get status - should return 200 with a warning and partial sell
     response = client.get(f"/portfolios/{portfolio_id}/status")
-    assert response.status_code == 400  # Bad Request due to validation
-    assert "available" in response.json()["detail"]
+    assert response.status_code == 200
+    data = response.json()
+    assert any("partial sell" in w for w in data["warnings"])
+    # AAPL should be fully sold (partial sell of held 10 shares)
+    assert len(data["holdings"]) == 0
 
 
 def test_portfolio_status_floating_point_precision(client: TestClient):
@@ -3795,3 +3801,99 @@ def test_aggregated_sales_nonexistent_portfolio(client: TestClient):
     """Nonexistent portfolio should return 404"""
     response = client.get("/portfolios/999/realized-sales")
     assert response.status_code == 404
+
+
+# ================== Transaction Warning Unit Tests ==================
+
+def test_warning_sell_unknown_ticker_strict():
+    """Strict sell of unknown ticker appends a warning and skips."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="UNKNOWN",
+        quantity=10.0,
+        total_amount=1500.0,
+    )
+    _apply_transaction(state, tx, strict=True)
+
+    assert state.cash == Decimal('5000')  # sell skipped
+    assert len(state.warnings) == 1
+    assert "not in holdings" in state.warnings[0]
+    assert "[2024-01-02]" in state.warnings[0]
+
+
+def test_warning_oversell_partial_strict():
+    """Strict oversell appends a warning and executes a partial sell."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+    state.holdings['AAPL'] = {'quantity': Decimal('5'), 'total_cost': Decimal('500')}
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="AAPL",
+        quantity=20.0,
+        total_amount=3000.0,
+    )
+    _apply_transaction(state, tx, strict=True)
+
+    assert len(state.warnings) == 1
+    assert "partial sell" in state.warnings[0]
+    assert "[2024-01-02]" in state.warnings[0]
+    # Holdings should be cleared (partial sell of all 5 shares)
+    assert 'AAPL' not in state.holdings
+    # Cash should increase by proportional total: 3000 * (5/20) = 750
+    assert state.cash == Decimal('5750')
+    # Realized gains: 750 proceeds - 500 cost basis = 250
+    assert state.realized_gains == Decimal('250')
+
+
+def test_warning_withdraw_negative_cash():
+    """Withdrawal causing negative cash appends a warning but still applies."""
+    state = _TxState()
+    state.cash = Decimal('100')
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.WITHDRAW,
+        total_amount=-500.0,
+    )
+    _apply_transaction(state, tx, strict=True)
+
+    assert state.cash == Decimal('-400')
+    assert state.principal == Decimal('-500')
+    assert len(state.warnings) == 1
+    assert "negative cash" in state.warnings[0]
+    assert "[2024-01-02]" in state.warnings[0]
+
+
+def test_no_warnings_in_non_strict_mode():
+    """Non-strict mode should never append warnings, only skip silently."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+    state.holdings['AAPL'] = {'quantity': Decimal('5'), 'total_cost': Decimal('500')}
+
+    # Oversell in non-strict mode
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="AAPL",
+        quantity=20.0,
+        total_amount=3000.0,
+    )
+    _apply_transaction(state, tx, strict=False)
+
+    assert len(state.warnings) == 0
+    assert state.cash == Decimal('5000')
+    assert state.holdings['AAPL']['quantity'] == Decimal('5')

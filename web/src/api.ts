@@ -153,6 +153,7 @@ export interface PortfolioStatus {
   realized_gains: number;
   capital_gains_tax_rate: number;
   missing_prices: string[];
+  warnings: string[];
   usd_to_eur_rate: number | null;
 }
 

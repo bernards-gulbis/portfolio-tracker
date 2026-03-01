@@ -125,6 +125,21 @@ export const PortfolioStatusContent = ({
 
   return (
     <CardContent>
+      {/* Transaction Warnings */}
+      {status.warnings.length > 0 && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangleIcon className="h-4 w-4" />
+          <AlertDescription>
+            <p className="font-medium">{t('status.transactionWarnings')}</p>
+            <ul className="list-disc pl-4 mt-1 text-sm">
+              {status.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Currency Toggle */}
       <div className="flex items-center justify-end mb-4 gap-2">
         {showEur && !eurAvailable && (

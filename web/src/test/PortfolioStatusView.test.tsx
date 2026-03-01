@@ -73,6 +73,7 @@ const mockStatus: PortfolioStatus = {
   realized_gains: 0,
   capital_gains_tax_rate: 0.255,
   missing_prices: [],
+  warnings: [],
   usd_to_eur_rate: 0.92,
 };
 
@@ -230,6 +231,40 @@ describe('PortfolioStatusView', () => {
 
     // By default currency is EUR — shows unavailable message
     expect(screen.getByText(/EUR unavailable/i)).toBeInTheDocument();
+  });
+
+  it('renders transaction warnings when present', () => {
+    const warningStatus: PortfolioStatus = {
+      ...mockStatus,
+      warnings: [
+        '[2024-01-02] Cannot sell UNKNOWN: not in holdings (skipped)',
+        '[2024-01-02] Withdrawal of 500 caused negative cash balance (-400)',
+      ],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: warningStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.getByText('Transaction warnings')).toBeInTheDocument();
+    expect(screen.getByText(/Cannot sell UNKNOWN/)).toBeInTheDocument();
+    expect(screen.getByText(/negative cash balance/)).toBeInTheDocument();
+  });
+
+  it('does not render warnings alert when warnings array is empty', () => {
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.queryByText('Transaction warnings')).not.toBeInTheDocument();
   });
 
   it('renders dashes for null monetary values', () => {

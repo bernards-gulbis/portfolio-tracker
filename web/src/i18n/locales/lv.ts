@@ -270,6 +270,7 @@ const lv: Translation = {
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
     fetchedAt: 'Atjaunināts {{time}}',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
+    transactionWarnings: 'Darījumu brīdinājumi',
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',
     netInvested: 'Neto ieguldīts',

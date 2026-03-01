@@ -99,6 +99,7 @@ class _TxState:
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
     holdings: Dict[str, Dict[str, Decimal]] = dc_field(default_factory=dict)
+    warnings: List[str] = dc_field(default_factory=list)
 
 
 def _eur_from_tx(tx: Transaction, total_amount: Decimal) -> Decimal:
@@ -130,6 +131,11 @@ def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.cash += total
     state.principal += total
     state.principal_eur += _eur_from_tx(tx, total)
+    if strict and state.cash < 0:
+        date_str = tx.date.strftime('%Y-%m-%d')
+        state.warnings.append(
+            f"[{date_str}] Withdrawal of {-total} caused negative cash balance ({state.cash})"
+        )
 
 
 def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -151,15 +157,23 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         return
     if ticker not in state.holdings:
         if strict:
-            raise ValueError(f"Cannot sell {ticker}: not in holdings")
+            date_str = tx.date.strftime('%Y-%m-%d')
+            state.warnings.append(f"[{date_str}] Cannot sell {ticker}: not in holdings (skipped)")
         return
     h = state.holdings[ticker]
     if quantity > h['quantity'] + HOLDINGS_EPSILON:
         if strict:
-            raise ValueError(
-                f"Cannot sell {quantity} quantity of {ticker}: "
-                f"only {h['quantity']} available"
+            held = h['quantity']
+            date_str = tx.date.strftime('%Y-%m-%d')
+            state.warnings.append(
+                f"[{date_str}] Cannot sell {quantity} of {ticker}: only {held} available (partial sell applied)"
             )
+            # Partial sell: sell only what is held, with proportional total
+            partial_total = total * (held / quantity) if quantity > 0 else _ZERO
+            cost_basis = h['total_cost']
+            state.cash += partial_total
+            state.realized_gains += partial_total - cost_basis
+            del state.holdings[ticker]
         return
     state.cash += total
     # Proportional cost removal: avoids intermediate avg_cost rounding
@@ -186,8 +200,9 @@ def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
     split_ratio = _to_decimal(tx.split_ratio or 1)
     if split_ratio <= 0:
         if strict:
-            raise ValueError(f"Invalid split ratio {split_ratio}: must be positive")
-        return  # skip silently in non-strict historical replay
+            date_str = tx.date.strftime('%Y-%m-%d')
+            state.warnings.append(f"[{date_str}] Invalid split ratio {split_ratio} for {tx.ticker}: must be positive (skipped)")
+        return
     if tx.ticker and tx.ticker in state.holdings:
         state.holdings[tx.ticker]['quantity'] *= split_ratio
 
@@ -210,14 +225,16 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
     Args:
         state:  Mutable portfolio state to update.
         tx:     The transaction to apply.
-        strict: If True, raise ValueError for invalid operations (oversell, bad split
-                ratio, unknown type). If False, skip the update silently — used for
-                historical/performance calculations where missing data is tolerated.
+        strict: If True, append warnings to state.warnings for invalid operations
+                (oversell, bad split ratio, unknown type).  If False, skip the update
+                silently — used for historical/performance calculations where missing
+                data is tolerated.
     """
     handler = _TX_HANDLERS.get(tx.type)
     if handler is None:
         if strict:
-            raise ValueError(f"Unknown transaction type: {tx.type}")
+            date_str = tx.date.strftime('%Y-%m-%d')
+            state.warnings.append(f"[{date_str}] Unknown transaction type: {tx.type} (skipped)")
         return
     handler(state, tx, strict)
 
@@ -689,6 +706,7 @@ class PortfolioService:
             realized_gains=_normalize_zero(state.realized_gains),
             capital_gains_tax_rate=float(tax_rate),
             missing_prices=missing_prices,
+            warnings=state.warnings,
             usd_to_eur_rate=usd_to_eur_rate,
         )
 
@@ -821,6 +839,7 @@ class PortfolioService:
             realized_gains=_normalize_zero(state.realized_gains),
             capital_gains_tax_rate=float(tax_rate),
             missing_prices=missing_prices,
+            warnings=state.warnings,
             usd_to_eur_rate=usd_to_eur_rate,
         )
 
