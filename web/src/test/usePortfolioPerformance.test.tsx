@@ -38,15 +38,19 @@ const mockPerformanceData: PortfolioPerformance = {
   data_points: [
     {
       date: '2024-01-01',
+      principal: 10870,
       principal_eur: 10000,
-      current_value_eur: 10500,
+      current_value: 11413,
+      fx_rate: 0.92,
       return_pct: 5.0,
       sp500_return_pct: 0,
     },
     {
       date: '2024-01-02',
+      principal: 10870,
       principal_eur: 10000,
-      current_value_eur: 10800,
+      current_value: 11739,
+      fx_rate: 0.92,
       return_pct: 8.0,
       sp500_return_pct: 1.2,
     },
@@ -209,15 +213,19 @@ describe('usePortfolioPerformance', () => {
         data_points: [
           {
             date: '2024-01-01',
+            principal: 10870,
             principal_eur: 10000,
-            current_value_eur: 10500,
+            current_value: 11413,
+            fx_rate: 0.92,
             return_pct: 5.0,
             sp500_return_pct: 0,
           },
           {
             date: '2024-01-02',
+            principal: 10870,
             principal_eur: 10000,
-            current_value_eur: 10800,
+            current_value: 11739,
+            fx_rate: 0.92,
             return_pct: 8.0,
             sp500_return_pct: 1.2,
           },
@@ -246,15 +254,17 @@ describe('usePortfolioPerformance', () => {
       expect(result.current.data?.data_points).toEqual([]);
     });
 
-    it('handles null current_value_eur in data points', async () => {
+    it('handles null current_value in data points', async () => {
       const dataWithNulls: PortfolioPerformance = {
         portfolio_id: 1,
         portfolio_name: 'Test Portfolio',
         data_points: [
           {
             date: '2024-01-01',
+            principal: 10870,
             principal_eur: 10000,
-            current_value_eur: null,
+            current_value: null,
+            fx_rate: null,
             return_pct: null,
             sp500_return_pct: null,
           },
@@ -272,7 +282,7 @@ describe('usePortfolioPerformance', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(result.current.data?.data_points[0].current_value_eur).toBeNull();
+      expect(result.current.data?.data_points[0].current_value).toBeNull();
     });
   });
 

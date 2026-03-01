@@ -32,7 +32,6 @@ const mockStatus: PortfolioStatus = {
   portfolio_id: 0,
   portfolio_name: 'Aggregated',
   current_value: 15000,
-  current_value_eur: 13800,
   principal: 12000,
   principal_eur: 11040,
   dividends: 300,
@@ -43,17 +42,10 @@ const mockStatus: PortfolioStatus = {
   holdings_value: 14000,
   unrealized_gains: 3000,
   unrealized_gains_pct: 27.27,
-  unrealized_gains_eur: 2760,
   realized_gains: 0,
-  currency_gains_eur: 0,
-  currency_gains_pct: 0,
-  capital_gains_eur: 2760,
   capital_gains_tax_rate: 0.255,
-  tax_eur: 703.8,
-  total_return_after_tax_eur: 2056.2,
-  total_return_after_tax_pct: 18.62,
-  current_value_after_tax_eur: 13096.2,
   missing_prices: [],
+  usd_to_eur_rate: 0.92,
 };
 
 describe('useAggregatedStatus', () => {

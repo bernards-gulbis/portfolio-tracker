@@ -32,7 +32,6 @@ const mockStatus: PortfolioStatus = {
   portfolio_id: 1,
   portfolio_name: 'Test Portfolio',
   current_value: 10000,
-  current_value_eur: 9200,
   principal: 8000,
   principal_eur: 7360,
   dividends: 200,
@@ -43,17 +42,10 @@ const mockStatus: PortfolioStatus = {
   holdings_value: 9500,
   unrealized_gains: 2000,
   unrealized_gains_pct: 25,
-  unrealized_gains_eur: 1840,
   realized_gains: 0,
-  currency_gains_eur: 0,
-  currency_gains_pct: 0,
-  capital_gains_eur: 1840,
   capital_gains_tax_rate: 0.255,
-  tax_eur: 460,
-  total_return_after_tax_eur: 1380,
-  total_return_after_tax_pct: 18.75,
-  current_value_after_tax_eur: 8740,
   missing_prices: [],
+  usd_to_eur_rate: 0.92,
 };
 
 describe('usePortfolioStatus', () => {
