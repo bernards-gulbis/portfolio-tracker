@@ -53,7 +53,6 @@ api.ts (Axios + types) -> hooks (TanStack Query) -> components
 | Key | Purpose |
 |-----|---------|
 | `['portfolios']` | List all |
-| `['portfolio', id]` | Single portfolio |
 | `['transactions', portfolioId, page, pageSize]` | Paginated transactions |
 | `['portfolioStatus', portfolioId]` | Status/metrics |
 | `['portfolioPerformance', portfolioId]` | Performance chart |

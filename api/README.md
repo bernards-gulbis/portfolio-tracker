@@ -70,7 +70,7 @@ Routes have no path prefix. The Vite dev server proxies `/api/*` to `localhost:8
 |--------|------|---------|
 | POST | /portfolios/ | Create portfolio |
 | GET | /portfolios/ | List portfolios |
-| GET | /portfolios/{id} | Get portfolio with transactions |
+| GET | /portfolios/{id} | Get portfolio |
 | PUT | /portfolios/{id} | Rename portfolio |
 | DELETE | /portfolios/{id} | Delete portfolio (cascade) |
 | POST | /portfolios/{id}/copy | Copy portfolio with transactions |
