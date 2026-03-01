@@ -122,10 +122,10 @@ describe('CreatePortfolioModal', () => {
     });
   });
 
-  it('cancel button calls onClose', async () => {
+  it('close button calls onClose', async () => {
     renderModal({ isOpen: true, onClose: mockOnClose });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(mockOnClose).toHaveBeenCalled();
   });

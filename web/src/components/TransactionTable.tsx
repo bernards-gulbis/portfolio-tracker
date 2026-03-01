@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, TransactionType, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate } from '../utils/formatters';
+import { formatCurrency, formatDate, formatDateCompact } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { MAX_VISIBLE_PAGES } from '../constants/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -185,6 +185,19 @@ const TransactionTable = ({
     return '-';
   };
 
+  const getTypeBadgeClass = (type: TransactionType): string => {
+    switch (type) {
+      case TransactionType.BUY: return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case TransactionType.SELL: return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case TransactionType.DEPOSIT: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case TransactionType.WITHDRAW: return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+      case TransactionType.DIVIDEND: return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
+      case TransactionType.FEE: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+      case TransactionType.SPLIT: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      default: return '';
+    }
+  };
+
   const hasActiveFilters = tickerSearch !== '' || typeFilter.length > 0;
 
   const startIndex = (responsePage - 1) * responsePageSize;
@@ -283,7 +296,7 @@ const TransactionTable = ({
     <>
       {filterBar}
       <div className="overflow-x-auto" data-table-container>
-        <Table>
+        <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
               <TableHead>
@@ -308,9 +321,9 @@ const TransactionTable = ({
           <TableBody>
             {transactions.map((transaction) => (
               <TableRow key={transaction.id} data-testid="transaction-row">
-                <TableCell>{formatDate(transaction.date, locale)}</TableCell>
+                <TableCell>{formatDateCompact(transaction.date, locale)}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className={getTypeBadgeClass(transaction.type)}>
                     {transactionTypeLabels[transaction.type]}
                   </Badge>
                 </TableCell>

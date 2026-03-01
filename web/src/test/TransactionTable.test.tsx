@@ -158,7 +158,7 @@ describe('TransactionTable', () => {
 
     expect(screen.getByText('No Transactions Yet')).toBeInTheDocument();
     expect(screen.getByText('Upload a CSV file or add transactions manually using the button above.')).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Search ticker...')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search asset...')).not.toBeInTheDocument();
   });
 
   it('shows filter bar when no results but filters are active', () => {
@@ -178,7 +178,7 @@ describe('TransactionTable', () => {
     );
 
     expect(screen.getByText('No Matching Transactions')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search ticker...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search asset...')).toBeInTheDocument();
   });
 
   it('renders edit and delete buttons for each transaction', () => {

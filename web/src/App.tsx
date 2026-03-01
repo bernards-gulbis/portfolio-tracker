@@ -41,13 +41,15 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase, Layers, UserIcon, TrendingUpDown } from 'lucide-react';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import CreatePortfolioModal from './components/CreatePortfolioModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
+import { AggregatedPage } from './components/AggregatedPage';
+import { AnalyticsPage } from './components/AnalyticsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
@@ -111,7 +113,9 @@ function AppLayout() {
 
   const rememberedId = activePortfolioId ?? lastPortfolioId.current;
   const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
-  const isDashboardActive = pathname === '/' || pathname.startsWith('/portfolios');
+  const analyticsPath = rememberedId ? `/portfolios/${rememberedId}/analytics` : '/';
+  const isAnalyticsActive = pathname.endsWith('/analytics');
+  const isDashboardActive = (pathname === '/' || pathname.startsWith('/portfolios')) && !isAnalyticsActive;
 
   const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
 
@@ -132,6 +136,22 @@ function AppLayout() {
                     <Link to={dashboardPath}>
                       <LayoutDashboard />
                       <span>{t('app.sidebar.dashboard')}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === '/aggregate'}>
+                    <Link to="/aggregate">
+                      <Layers />
+                      <span>{t('app.sidebar.aggregate')}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isAnalyticsActive}>
+                    <Link to={analyticsPath}>
+                      <TrendingUpDown />
+                      <span>{t('app.sidebar.analytics')}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -185,7 +205,9 @@ function AppLayout() {
                     <AvatarFallback>
                       {user?.name
                         ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-                        : user?.email?.slice(0, 2).toUpperCase() ?? '??'}
+                        : user?.email
+                          ? user.email.slice(0, 2).toUpperCase()
+                          : <UserIcon className="h-4 w-4" />}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -278,6 +300,8 @@ function App() {
                 <Route element={<AppLayout />}>
                   <Route index element={<PortfolioRedirect />} />
                   <Route path="portfolios/:id" element={<PortfolioPage />} />
+                  <Route path="portfolios/:id/analytics" element={<AnalyticsPage />} />
+                  <Route path="aggregate" element={<AggregatedPage />} />
                   <Route path="settings" element={<SettingsLayout />}>
                     <Route index element={<Navigate to="profile" replace />} />
                     <Route path="profile" element={<ProfileSection />} />

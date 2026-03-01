@@ -136,11 +136,16 @@ export interface Holding {
   unrealized_gain_loss_pct?: number | null;
 }
 
+export interface TransactionWarning {
+  code: string;
+  date: string;
+  params: Record<string, string>;
+}
+
 export interface PortfolioStatus {
   portfolio_id: number;
   portfolio_name: string;
   current_value: number;
-  current_value_eur: number | null;
   principal: number;
   principal_eur: number;
   dividends: number;
@@ -151,23 +156,19 @@ export interface PortfolioStatus {
   holdings_value: number;
   unrealized_gains: number;
   unrealized_gains_pct: number | null;
-  unrealized_gains_eur: number | null;
   realized_gains: number;
-  currency_gains_eur: number | null;
-  currency_gains_pct: number | null;
-  capital_gains_eur: number | null;
   capital_gains_tax_rate: number;
-  tax_eur: number | null;
-  total_return_after_tax_eur: number | null;
-  total_return_after_tax_pct: number | null;
-  current_value_after_tax_eur: number | null;
   missing_prices: string[];
+  warnings: TransactionWarning[];
+  usd_to_eur_rate: number | null;
 }
 
 export interface PerformanceDataPoint {
   date: string;
-  principal_eur: number;
-  current_value_eur: number | null;
+  principal: number;
+  principal_eur: number | null;
+  current_value: number | null;
+  fx_rate: number | null;
   return_pct: number | null;
   sp500_return_pct: number | null;
 }
@@ -339,6 +340,68 @@ export const getPortfolioPerformance = async (
     `/portfolios/${portfolioId}/performance`,
     { params }
   );
+  return response.data;
+};
+
+// ================== Aggregated Portfolio API Functions ==================
+
+/**
+ * Get aggregated portfolio status across multiple portfolios
+ */
+export const getAggregatedStatus = async (portfolioIds: number[]): Promise<PortfolioStatus> => {
+  const response = await api.post<PortfolioStatus>('/portfolios/aggregate/status', {
+    portfolio_ids: portfolioIds,
+  });
+  return response.data;
+};
+
+/**
+ * Get aggregated portfolio performance across multiple portfolios
+ */
+export const getAggregatedPerformance = async (
+  portfolioIds: number[],
+  startDate?: string,
+  endDate?: string,
+  numPoints?: number
+): Promise<PortfolioPerformance> => {
+  const params: PerformanceParams = {};
+  if (startDate) params.start_date = startDate;
+  if (endDate) params.end_date = endDate;
+  if (numPoints) params.num_points = numPoints;
+
+  const response = await api.post<PortfolioPerformance>(
+    '/portfolios/aggregate/performance',
+    { portfolio_ids: portfolioIds },
+    { params }
+  );
+  return response.data;
+};
+
+// ================== Aggregated Sales Types ==================
+
+export interface AggregatedSale {
+  ticker: string;
+  total_gain_loss: number;
+  win_rate: number;
+  profit_factor: number | null;
+}
+
+export interface AggregatedSalesResponse {
+  sales: AggregatedSale[];
+  total_realized_gain_loss: number;
+}
+
+// ================== Aggregated Sales API Functions ==================
+
+/**
+ * Get realized sales aggregated by ticker for a portfolio, optionally filtered by ticker
+ */
+export const getPortfolioAggregatedSells = async (
+  portfolioId: number,
+  ticker?: string,
+): Promise<AggregatedSalesResponse> => {
+  const params = ticker ? { ticker } : undefined;
+  const response = await api.get<AggregatedSalesResponse>(`/portfolios/${portfolioId}/realized-sales`, { params });
   return response.data;
 };
 

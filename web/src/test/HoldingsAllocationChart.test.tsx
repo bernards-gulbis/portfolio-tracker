@@ -26,6 +26,19 @@ const mockHoldings: Holding[] = [
   },
 ];
 
+const mockHoldingsEur: Holding[] = [
+  {
+    ticker: 'AAPL',
+    quantity: 10,
+    average_cost: 150,
+    total_cost: 1500,
+    current_price: 200,
+    current_value: 2000,
+    unrealized_gain_loss: 500,
+    unrealized_gain_loss_pct: 33.33,
+  },
+];
+
 describe('HoldingsAllocationChart', () => {
   it('shows skeleton while loading', () => {
     render(<HoldingsAllocationChart holdings={[]} cash={0} loading={true} />);
@@ -69,5 +82,37 @@ describe('HoldingsAllocationChart', () => {
     render(<HoldingsAllocationChart holdings={[]} cash={1000} loading={false} />);
 
     expect(screen.getByText('CASH')).toBeInTheDocument();
+  });
+
+  it('uses EUR values when eurRate is provided', () => {
+    // eurRate=0.92: cash=500 → €460.00, AAPL current_value=2000 → €1,840.00
+    render(
+      <HoldingsAllocationChart
+        holdings={mockHoldingsEur}
+        cash={500}
+        eurRate={0.92}
+        loading={false}
+      />
+    );
+
+    expect(screen.getByText('AAPL')).toBeInTheDocument();
+    expect(screen.getByText('CASH')).toBeInTheDocument();
+    // EUR amounts should appear in the legend
+    expect(screen.getByText('€460.00')).toBeInTheDocument();
+    expect(screen.getByText('€1,840.00')).toBeInTheDocument();
+  });
+
+  it('falls back to USD when eurRate is null', () => {
+    render(
+      <HoldingsAllocationChart
+        holdings={mockHoldings}
+        cash={500}
+        eurRate={null}
+        loading={false}
+      />
+    );
+
+    expect(screen.getByText('CASH')).toBeInTheDocument();
+    expect(screen.getByText('$500.00')).toBeInTheDocument();
   });
 });

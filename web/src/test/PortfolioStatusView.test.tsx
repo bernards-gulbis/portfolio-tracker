@@ -49,7 +49,6 @@ const mockStatus: PortfolioStatus = {
   portfolio_id: 1,
   portfolio_name: 'Test Portfolio',
   current_value: 10000,
-  current_value_eur: 9200,
   principal: 8000,
   principal_eur: 7360,
   dividends: 200,
@@ -71,17 +70,11 @@ const mockStatus: PortfolioStatus = {
   holdings_value: 9500,
   unrealized_gains: 2000,
   unrealized_gains_pct: 25,
-  unrealized_gains_eur: 1840,
   realized_gains: 0,
-  currency_gains_eur: null,
-  currency_gains_pct: null,
-  capital_gains_eur: 1840,
   capital_gains_tax_rate: 0.255,
-  tax_eur: 460,
-  total_return_after_tax_eur: 1380,
-  total_return_after_tax_pct: 18.75,
-  current_value_after_tax_eur: 8740,
   missing_prices: [],
+  warnings: [],
+  usd_to_eur_rate: 0.92,
 };
 
 describe('PortfolioStatusView', () => {
@@ -175,13 +168,110 @@ describe('PortfolioStatusView', () => {
     expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0);
   });
 
+  it('shows empty portfolio alert when no transactions exist', () => {
+    const emptyStatus: PortfolioStatus = {
+      ...mockStatus,
+      holdings: [],
+      principal_eur: 0,
+      principal: 0,
+      cash: 0,
+      current_value: 0,
+      usd_to_eur_rate: null,
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: emptyStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.getByText(/no transactions yet/i)).toBeInTheDocument();
+  });
+
+  it('does not show empty portfolio alert when transactions exist', () => {
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.queryByText(/no transactions yet/i)).not.toBeInTheDocument();
+  });
+
+  it('shows currency toggle button', () => {
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    // Toggle button shows USD / EUR
+    expect(screen.getByRole('button', { name: /currency/i })).toBeInTheDocument();
+  });
+
+  it('shows EUR unavailable message when rate is null and EUR selected', () => {
+    const noRateStatus: PortfolioStatus = {
+      ...mockStatus,
+      usd_to_eur_rate: null,
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: noRateStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    // By default currency is EUR — shows unavailable message
+    expect(screen.getByText(/EUR unavailable/i)).toBeInTheDocument();
+  });
+
+  it('renders transaction warnings when present', () => {
+    const warningStatus: PortfolioStatus = {
+      ...mockStatus,
+      warnings: [
+        { code: 'sellNotInHoldings', date: '2024-01-02T10:00:00', params: { ticker: 'UNKNOWN' } },
+        { code: 'withdrawNegativeCash', date: '2024-01-02T14:30:00', params: { amount: '500', balance: '-400' } },
+      ],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: warningStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.getByText('Transaction warnings')).toBeInTheDocument();
+    expect(screen.getByText(/Cannot sell UNKNOWN/)).toBeInTheDocument();
+    expect(screen.getByText(/negative cash balance/)).toBeInTheDocument();
+  });
+
+  it('does not render warnings alert when warnings array is empty', () => {
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    renderComponent('/portfolios/1');
+
+    expect(screen.queryByText('Transaction warnings')).not.toBeInTheDocument();
+  });
+
   it('renders dashes for null monetary values', () => {
     const nullStatus: PortfolioStatus = {
       ...mockStatus,
-      current_value_eur: null,
+      usd_to_eur_rate: null,
       dividends_eur: null,
-      tax_eur: null,
-      current_value_after_tax_eur: null,
       holdings: [
         {
           ticker: 'AAPL',

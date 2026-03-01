@@ -16,7 +16,8 @@ from app.core.exceptions import (
     PortfolioNotFoundException,
     InvalidPortfolioNameException,
 )
-from app.schemas import HoldingResponse, PortfolioStatusResponse
+from app.schemas import HoldingResponse, PortfolioStatusResponse, PortfolioPerformanceResponse, PerformanceDataPoint, AggregatedSaleResponse, AggregatedSalesResponse
+from app.schemas.schemas import TransactionWarning
 from app.services.price_service import PriceService
 
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
@@ -95,11 +96,11 @@ class _TxState:
     cash: Decimal = _ZERO
     principal: Decimal = _ZERO        # Net deposits - withdrawals in native currency
     principal_eur: Decimal = _ZERO    # Net deposits - withdrawals in EUR (historical rates)
-    deposits_eur: Decimal = _ZERO     # Cumulative deposits in EUR (inflows only, for return % denominator)
     dividends: Decimal = _ZERO
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
     holdings: Dict[str, Dict[str, Decimal]] = dc_field(default_factory=dict)
+    warnings: List[Dict[str, object]] = dc_field(default_factory=list)
 
 
 def _eur_from_tx(tx: Transaction, total_amount: Decimal) -> Decimal:
@@ -108,6 +109,13 @@ def _eur_from_tx(tx: Transaction, total_amount: Decimal) -> Decimal:
         return _to_decimal(tx.eur_amount)
     if tx.fx_rate is not None and tx.fx_rate > 0:
         return total_amount / _to_decimal(tx.fx_rate)
+    # Fallback: use current USD→EUR rate
+    try:
+        usd_to_eur = PriceService.get_usd_to_eur_rate()
+        if usd_to_eur is not None:
+            return total_amount * _to_decimal(usd_to_eur)
+    except Exception:
+        pass
     return _ZERO
 
 
@@ -117,7 +125,6 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.principal += total
     eur = _eur_from_tx(tx, total)
     state.principal_eur += eur
-    state.deposits_eur += eur
 
 
 def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -125,6 +132,12 @@ def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.cash += total
     state.principal += total
     state.principal_eur += _eur_from_tx(tx, total)
+    if strict and state.cash < 0:
+        state.warnings.append({
+            'code': 'withdrawNegativeCash',
+            'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+            'params': {'amount': str(-total), 'balance': str(state.cash)},
+        })
 
 
 def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -146,15 +159,27 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         return
     if ticker not in state.holdings:
         if strict:
-            raise ValueError(f"Cannot sell {ticker}: not in holdings")
+            state.warnings.append({
+                'code': 'sellNotInHoldings',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'ticker': ticker},
+            })
         return
     h = state.holdings[ticker]
     if quantity > h['quantity'] + HOLDINGS_EPSILON:
         if strict:
-            raise ValueError(
-                f"Cannot sell {quantity} quantity of {ticker}: "
-                f"only {h['quantity']} available"
-            )
+            held = h['quantity']
+            state.warnings.append({
+                'code': 'sellOversell',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'ticker': ticker, 'quantity': str(quantity), 'available': str(held)},
+            })
+            # Partial sell: sell only what is held, with proportional total
+            partial_total = total * (held / quantity) if quantity > 0 else _ZERO
+            cost_basis = h['total_cost']
+            state.cash += partial_total
+            state.realized_gains += partial_total - cost_basis
+            del state.holdings[ticker]
         return
     state.cash += total
     # Proportional cost removal: avoids intermediate avg_cost rounding
@@ -179,8 +204,14 @@ def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
 
 def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
     split_ratio = _to_decimal(tx.split_ratio or 1)
-    if strict and split_ratio <= 0:
-        raise ValueError(f"Invalid split ratio {split_ratio}: must be positive")
+    if split_ratio <= 0:
+        if strict:
+            state.warnings.append({
+                'code': 'invalidSplitRatio',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'ticker': tx.ticker or '', 'ratio': str(split_ratio)},
+            })
+        return
     if tx.ticker and tx.ticker in state.holdings:
         state.holdings[tx.ticker]['quantity'] *= split_ratio
 
@@ -203,14 +234,19 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
     Args:
         state:  Mutable portfolio state to update.
         tx:     The transaction to apply.
-        strict: If True, raise ValueError for invalid operations (oversell, bad split
-                ratio, unknown type). If False, skip the update silently — used for
-                historical/performance calculations where missing data is tolerated.
+        strict: If True, append warnings to state.warnings for invalid operations
+                (oversell, bad split ratio, unknown type).  If False, skip the update
+                silently — used for historical/performance calculations where missing
+                data is tolerated.
     """
     handler = _TX_HANDLERS.get(tx.type)
     if handler is None:
         if strict:
-            raise ValueError(f"Unknown transaction type: {tx.type}")
+            state.warnings.append({
+                'code': 'unknownType',
+                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'params': {'type': str(tx.type)},
+            })
         return
     handler(state, tx, strict)
 
@@ -359,82 +395,6 @@ def _build_holdings_list(
 
     holdings_list.sort(key=lambda h: h.ticker)
     return holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices
-
-
-def _compute_eur_metrics(
-    state: _TxState,
-    current_value: Decimal,
-    unrealized_gains: Decimal,
-    portfolio_id: int,
-) -> Tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
-    """Fetch USD→EUR rate and derive EUR-denominated portfolio metrics.
-
-    Returns:
-        (current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct)
-    """
-    try:
-        usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
-    except Exception as e:
-        logger.error(
-            "Error fetching USD to EUR exchange rate for portfolio %s: %s",
-            portfolio_id, e, exc_info=True,
-        )
-        return None, None, None, None
-
-    if usd_to_eur_rate is None:
-        return None, None, None, None
-
-    usd_to_eur_d = _to_decimal(usd_to_eur_rate)
-    current_value_eur = current_value * usd_to_eur_d
-    unrealized_gains_eur = unrealized_gains * usd_to_eur_d
-
-    principal_at_current_rate = state.principal * usd_to_eur_d
-    currency_gains_eur = principal_at_current_rate - state.principal_eur
-    currency_gains_pct: Optional[Decimal] = None
-    if state.deposits_eur > 0:
-        currency_gains_pct = (currency_gains_eur / state.deposits_eur) * 100
-
-    return current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct
-
-
-def _compute_tax_metrics(
-    state: _TxState,
-    current_value_eur: Optional[Decimal],
-    dividends_eur: Optional[Decimal],
-    tax_rate: Decimal,
-) -> Tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
-    """Compute capital-gains tax and after-tax return metrics.
-
-    Returns:
-        (capital_gains_eur, tax_eur,
-         total_return_after_tax_eur, total_return_after_tax_pct,
-         current_value_after_tax_eur)
-    """
-    if current_value_eur is None:
-        return None, None, None, None, None
-
-    capital_gains_eur: Optional[Decimal] = None
-    tax_eur: Optional[Decimal] = None
-
-    # Skip tax computation when dividends exist but EUR conversion is unavailable
-    if state.dividends == 0 or dividends_eur is not None:
-        dividends_for_tax = dividends_eur if dividends_eur is not None else _ZERO
-        capital_gains_eur = current_value_eur - state.principal_eur - dividends_for_tax
-        tax_eur = capital_gains_eur * tax_rate if capital_gains_eur > 0 else _ZERO
-
-    total_return_after_tax_eur: Optional[Decimal] = None
-    total_return_after_tax_pct: Optional[Decimal] = None
-    current_value_after_tax_eur: Optional[Decimal] = None
-
-    if tax_eur is not None:
-        current_value_after_tax_eur = current_value_eur - tax_eur
-        total_return_after_tax_eur = (current_value_eur - state.principal_eur) - tax_eur
-        if state.deposits_eur > 0:
-            total_return_after_tax_pct = (total_return_after_tax_eur / state.deposits_eur) * 100
-
-    return (capital_gains_eur, tax_eur,
-            total_return_after_tax_eur, total_return_after_tax_pct,
-            current_value_after_tax_eur)
 
 
 # ================== Performance helpers ==================
@@ -591,9 +551,9 @@ def _compute_perf_data_point(
     sorted_fx_dates: List[str],
     sp500_prices: Dict[str, float],
     sorted_sp500_dates: List[str],
-    sp500_base_price_eur: Optional[float],
+    sp500_base_price: Optional[float],
 ) -> Tuple[Dict, Optional[float]]:
-    """Build a single performance data-point dict. Returns (data_point, updated sp500_base_price_eur)."""
+    """Build a single performance data-point dict. Returns (data_point, updated sp500_base_price)."""
     if last_known_tickers:
         logger.debug(
             "Performance %s: using last known price for %s",
@@ -605,47 +565,31 @@ def _compute_perf_data_point(
             date_str, cost_basis_tickers,
         )
 
-    current_value_usd = state.cash + holdings_value
+    current_value = state.cash + holdings_value
     fx_rate = _bisect_lookup(sorted_fx_dates, fx_rates, date_str)
-    current_value_eur = float(current_value_usd * _to_decimal(fx_rate)) if fx_rate is not None else None
 
     return_pct = None
-    if current_value_eur is not None and state.deposits_eur > 0:
-        cv_d = _to_decimal(current_value_eur)
-        return_pct = float((cv_d - state.principal_eur) / state.deposits_eur * Decimal('100'))
+    if state.principal > 0:
+        return_pct = float((current_value - state.principal) / state.principal * Decimal('100'))
 
-    # S&P 500 benchmark return % in EUR
+    # S&P 500 in USD — frontend applies FX rate for EUR mode
     sp500_return_pct = None
     sp500_price = _bisect_lookup(sorted_sp500_dates, sp500_prices, date_str)
-    if sp500_price is not None and sp500_price > 0 and fx_rate is not None:
-        sp500_price_eur = sp500_price * fx_rate
-        if sp500_base_price_eur is None:
-            sp500_base_price_eur = sp500_price_eur
-        sp500_return_pct = (sp500_price_eur / sp500_base_price_eur - 1.0) * 100.0
-
-    if return_pct is not None and return_pct < -50:
-        logger.warning(
-            "Performance %s: large negative return %.2f%% — "
-            "cash=%.2f holdings=%.2f fx=%.6f "
-            "value_usd=%.2f value_eur=%s "
-            "principal_eur=%.2f deposits_eur=%.2f "
-            "held=%s last_known=%s cost_basis=%s",
-            date_str, return_pct,
-            float(state.cash), float(holdings_value),
-            fx_rate if fx_rate is not None else 0,
-            float(current_value_usd), current_value_eur,
-            float(state.principal_eur), float(state.deposits_eur),
-            list(state.holdings.keys()), last_known_tickers, cost_basis_tickers,
-        )
+    if sp500_price is not None and sp500_price > 0:
+        if sp500_base_price is None:
+            sp500_base_price = sp500_price
+        sp500_return_pct = (sp500_price / sp500_base_price - 1.0) * 100.0
 
     data_point = {
         'date': date_str,
+        'principal': float(state.principal),
         'principal_eur': float(state.principal_eur),
-        'current_value_eur': current_value_eur,
+        'current_value': float(current_value),
+        'fx_rate': fx_rate,
         'return_pct': return_pct,
         'sp500_return_pct': sp500_return_pct,
     }
-    return data_point, sp500_base_price_eur
+    return data_point, sp500_base_price
 
 
 # ================== Service ==================
@@ -663,7 +607,7 @@ class PortfolioService:
         stripped = name.strip() if name else ""
         if not stripped:
             raise InvalidPortfolioNameException("Portfolio name cannot be empty")
-        if len(name) > 255:
+        if len(stripped) > 255:
             raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
         return stripped
 
@@ -693,10 +637,6 @@ class PortfolioService:
         """Delete a portfolio (user-scoped)"""
         if not self.portfolio_repo.delete(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
-
-    def portfolio_exists(self, portfolio_id: int, user_id: uuid.UUID) -> bool:
-        """Check if a portfolio exists and belongs to user"""
-        return self.portfolio_repo.exists_for_user(portfolio_id, user_id)
 
     def copy_portfolio(self, portfolio_id: int, new_name: str, user_id: uuid.UUID) -> Portfolio:
         """Copy a portfolio with all its transactions (user-scoped)"""
@@ -737,6 +677,12 @@ class PortfolioService:
             logger.error("Error fetching prices for portfolio %s: %s", portfolio_id, e, exc_info=True)
             current_prices = dict.fromkeys(tickers)
 
+        # Fetch live USD→EUR rate; passed to frontend for client-side EUR conversion
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+        except Exception:
+            usd_to_eur_rate = None
+
         # Build holdings list and aggregate metrics
         holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
             _build_holdings_list(state, current_prices)
@@ -747,26 +693,18 @@ class PortfolioService:
         if holdings_cost > 0:
             unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
 
-        # EUR conversion
-        current_value_eur, unrealized_gains_eur, currency_gains_eur, currency_gains_pct = \
-            _compute_eur_metrics(state, current_value, unrealized_gains, portfolio_id)
-
-        # Normalize dividends_eur:
-        # - dividends exist but no EUR conversion available → None (can't compute accurate tax)
-        # - no dividends at all → None
+        # Normalize dividends_eur (historical per-transaction rates):
+        # - dividends exist but no EUR conversion available → None (dividends_eur == 0)
+        # - no dividends at all → None (dividends == 0)
+        # Note: both cases produce None on the frontend, which is intentional — the
+        # distinction (no dividends vs. dividends with missing EUR rate) is not surfaced in UI.
         has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
         dividends_eur: Optional[Decimal] = state.dividends_eur if has_valid_eur else None
-
-        # Tax on capital gains
-        capital_gains_eur, tax_eur, total_return_after_tax_eur, \
-            total_return_after_tax_pct, current_value_after_tax_eur = \
-            _compute_tax_metrics(state, current_value_eur, dividends_eur, tax_rate)
 
         return PortfolioStatusResponse(
             portfolio_id=portfolio.id,
             portfolio_name=portfolio.name,
             current_value=_normalize_zero(current_value),
-            current_value_eur=_opt_normalize(current_value_eur),
             principal=_normalize_zero(state.principal),
             principal_eur=_normalize_zero(state.principal_eur),
             dividends=_normalize_zero(state.dividends),
@@ -777,79 +715,12 @@ class PortfolioService:
             holdings_value=_normalize_zero(holdings_value),
             unrealized_gains=_normalize_zero(unrealized_gains),
             unrealized_gains_pct=_opt_normalize(unrealized_gains_pct),
-            unrealized_gains_eur=_opt_normalize(unrealized_gains_eur),
             realized_gains=_normalize_zero(state.realized_gains),
-            currency_gains_eur=_opt_normalize(currency_gains_eur),
-            currency_gains_pct=_opt_normalize(currency_gains_pct),
-            capital_gains_eur=_opt_normalize(capital_gains_eur),
             capital_gains_tax_rate=float(tax_rate),
-            tax_eur=_opt_normalize(tax_eur),
-            total_return_after_tax_eur=_opt_normalize(total_return_after_tax_eur),
-            total_return_after_tax_pct=_opt_normalize(total_return_after_tax_pct),
-            current_value_after_tax_eur=_opt_normalize(current_value_after_tax_eur),
             missing_prices=missing_prices,
+            warnings=[TransactionWarning(**w) for w in state.warnings],
+            usd_to_eur_rate=usd_to_eur_rate,
         )
-
-    def calculate_portfolio_status_at_date(
-        self,
-        portfolio_id: int,
-        target_date: datetime,
-        historical_prices: Optional[Dict[str, float]] = None,
-        usd_to_eur_rate: Optional[float] = None,
-        user_id: Optional[uuid.UUID] = None,
-    ) -> Tuple[float, Optional[float]]:
-        """
-        Calculate portfolio value (principal_eur, current_value_eur) at a specific date.
-
-        Args:
-            portfolio_id:      The ID of the portfolio.
-            target_date:       The date to calculate status for.
-            historical_prices: Optional dict of ticker -> price for the target date.
-            usd_to_eur_rate:   Optional USD to EUR exchange rate for the target date.
-            user_id:           Required — used for ownership verification.
-
-        Returns:
-            Tuple of (principal_eur, current_value_eur)
-
-        Raises:
-            PortfolioNotFoundException: If portfolio_id does not exist or belongs to another user.
-            ValueError: If user_id is not provided.
-        """
-        if user_id is None:
-            raise ValueError("user_id is required")
-        portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
-        if not portfolio:
-            raise PortfolioNotFoundException(portfolio_id)
-
-        all_transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
-        transactions = [t for t in all_transactions if t.date.date() <= target_date.date()]
-
-        state = _TxState()
-        for tx in transactions:
-            _apply_transaction(state, tx, strict=False)
-
-        if historical_prices is None:
-            historical_prices = _fetch_historical_prices(
-                list(state.holdings.keys()), target_date
-            )
-
-        forward_split_factors = _compute_forward_split_factors(all_transactions, cutoff_date=target_date)
-
-        holdings_value = _value_holdings_at_date(
-            state, historical_prices, forward_split_factors,
-            target_date.strftime('%Y-%m-%d'),
-        )
-
-        current_value_usd = state.cash + holdings_value
-
-        if usd_to_eur_rate is None:
-            usd_to_eur_rate = _resolve_usd_to_eur_rate(target_date)
-
-        current_value_eur = None
-        if usd_to_eur_rate is not None:
-            current_value_eur = float(current_value_usd * _to_decimal(usd_to_eur_rate))
-
-        return (float(state.principal_eur), current_value_eur)
 
     def get_portfolio_performance(
         self,
@@ -863,7 +734,7 @@ class PortfolioService:
         Get portfolio performance over time as a time series.
 
         Returns (portfolio_name, data_points) where each data point is a dict with
-        keys: date, principal_eur, current_value_eur.
+        keys: date, principal, principal_eur, current_value, fx_rate, return_pct, sp500_return_pct.
 
         Performance: O(N + M) where N = transactions, M = date points.
 
@@ -900,7 +771,7 @@ class PortfolioService:
         performance_data = []
         state = _TxState()
         tx_index = 0
-        sp500_base_price_eur: Optional[float] = None
+        sp500_base_price: Optional[float] = None
 
         for date_point in date_points:
             date_str = date_point.strftime('%Y-%m-%d')
@@ -911,11 +782,223 @@ class PortfolioService:
                 state, sorted_dates_map, historical_data,
                 ticker_last_price, forward_split_factors, date_str,
             )
-            data_point_dict, sp500_base_price_eur = _compute_perf_data_point(
+            data_point_dict, sp500_base_price = _compute_perf_data_point(
                 state, date_str, holdings_value, last_known, cost_basis,
                 fx_rates, sorted_fx_dates, sp500_prices, sorted_sp500_dates,
-                sp500_base_price_eur,
+                sp500_base_price,
             )
             performance_data.append(data_point_dict)
 
         return portfolio.name, performance_data
+
+    def _verify_portfolio_ownership(self, portfolio_ids: List[int], user_id: uuid.UUID) -> None:
+        """Verify all portfolios exist and belong to the user. Raises PortfolioNotFoundException if not."""
+        for pid in portfolio_ids:
+            portfolio = self.portfolio_repo.get_by_id_and_user(pid, user_id)
+            if not portfolio:
+                raise PortfolioNotFoundException(pid)
+
+    def calculate_aggregated_status(
+        self, portfolio_ids: List[int], user_id: uuid.UUID, tax_rate: Decimal = _DEFAULT_TAX_RATE
+    ) -> PortfolioStatusResponse:
+        """Calculate combined status across multiple portfolios."""
+        self._verify_portfolio_ownership(portfolio_ids, user_id)
+
+        transactions = self.transaction_repo.get_by_portfolio_ids(portfolio_ids)
+
+        state = _TxState()
+        for tx in transactions:
+            _apply_transaction(state, tx, strict=True)
+
+        tickers = list(state.holdings.keys())
+        try:
+            current_prices = PriceService.get_current_prices(tickers) if tickers else {}
+        except Exception as e:
+            logger.error("Error fetching prices for aggregated portfolios: %s", e, exc_info=True)
+            current_prices = dict.fromkeys(tickers)
+
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+        except Exception:
+            usd_to_eur_rate = None
+
+        holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
+            _build_holdings_list(state, current_prices)
+
+        current_value = state.cash + holdings_value
+
+        unrealized_gains_pct: Optional[Decimal] = None
+        if holdings_cost > 0:
+            unrealized_gains_pct = (unrealized_gains / holdings_cost) * 100
+
+        has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
+        dividends_eur: Optional[Decimal] = state.dividends_eur if has_valid_eur else None
+
+        return PortfolioStatusResponse(
+            portfolio_id=0,
+            portfolio_name="Aggregated",
+            current_value=_normalize_zero(current_value),
+            principal=_normalize_zero(state.principal),
+            principal_eur=_normalize_zero(state.principal_eur),
+            dividends=_normalize_zero(state.dividends),
+            dividends_eur=_opt_normalize(dividends_eur),
+            cash=_normalize_zero(state.cash),
+            holdings=holdings_list,
+            holdings_cost=_normalize_zero(holdings_cost),
+            holdings_value=_normalize_zero(holdings_value),
+            unrealized_gains=_normalize_zero(unrealized_gains),
+            unrealized_gains_pct=_opt_normalize(unrealized_gains_pct),
+            realized_gains=_normalize_zero(state.realized_gains),
+            capital_gains_tax_rate=float(tax_rate),
+            missing_prices=missing_prices,
+            warnings=[TransactionWarning(**w) for w in state.warnings],
+            usd_to_eur_rate=usd_to_eur_rate,
+        )
+
+    def get_aggregated_performance(
+        self,
+        portfolio_ids: List[int],
+        user_id: uuid.UUID,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        num_points: int = 60,
+    ) -> PortfolioPerformanceResponse:
+        """Get combined performance across multiple portfolios."""
+        self._verify_portfolio_ownership(portfolio_ids, user_id)
+
+        transactions = self.transaction_repo.get_by_portfolio_ids(portfolio_ids)
+        if not transactions:
+            return PortfolioPerformanceResponse(
+                portfolio_id=0, portfolio_name="Aggregated", data_points=[]
+            )
+
+        if start_date is None:
+            start_date = min(t.date for t in transactions)
+        if end_date is None:
+            end_date = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        if start_date >= end_date:
+            raise ValueError(f"start_date ({start_date}) must be before end_date ({end_date})")
+        if num_points < 2:
+            raise ValueError(f"num_points must be at least 2, got {num_points}")
+
+        date_points = _generate_date_points(start_date, end_date, num_points)
+
+        (historical_data, sorted_dates_map, fx_rates, sorted_fx_dates,
+         sp500_prices, sorted_sp500_dates, ticker_last_price) = \
+            _prepare_perf_data(transactions, start_date, end_date)
+
+        forward_split_factors = _compute_forward_split_factors(transactions)
+
+        performance_data: List[Dict] = []
+        state = _TxState()
+        tx_index = 0
+        sp500_base_price: Optional[float] = None
+
+        for date_point in date_points:
+            date_str = date_point.strftime('%Y-%m-%d')
+            tx_index = _replay_transactions_up_to(
+                transactions, tx_index, state, date_point, forward_split_factors,
+            )
+            holdings_value, last_known, cost_basis = _compute_perf_holdings(
+                state, sorted_dates_map, historical_data,
+                ticker_last_price, forward_split_factors, date_str,
+            )
+            data_point_dict, sp500_base_price = _compute_perf_data_point(
+                state, date_str, holdings_value, last_known, cost_basis,
+                fx_rates, sorted_fx_dates, sp500_prices, sorted_sp500_dates,
+                sp500_base_price,
+            )
+            performance_data.append(data_point_dict)
+
+        return PortfolioPerformanceResponse(
+            portfolio_id=0,
+            portfolio_name="Aggregated",
+            data_points=[
+                PerformanceDataPoint(
+                    date=dp['date'],
+                    principal=dp.get('principal', 0.0),
+                    principal_eur=dp.get('principal_eur'),
+                    current_value=dp.get('current_value'),
+                    fx_rate=dp.get('fx_rate'),
+                    return_pct=dp.get('return_pct'),
+                    sp500_return_pct=dp.get('sp500_return_pct'),
+                )
+                for dp in performance_data
+            ],
+        )
+
+    def get_aggregated_sales(
+        self, portfolio_id: int, user_id: uuid.UUID, ticker_filter: Optional[str] = None
+    ) -> AggregatedSalesResponse:
+        """Return realized gain/loss aggregated by ticker for a single portfolio.
+
+        Replays transactions chronologically, accumulates per-ticker totals,
+        and optionally filters to a single ticker.
+        """
+        portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
+        if not portfolio:
+            raise PortfolioNotFoundException(portfolio_id)
+
+        transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
+        state = _TxState()
+        # aggregated: ticker -> {total_gain_loss, sell_count, win_count, total_profit, total_loss}
+        aggregated: dict = {}
+        total_realized = _ZERO
+
+        for tx in transactions:
+            if tx.type == TransactionType.SELL and tx.ticker:
+                ticker = tx.ticker
+                quantity = _to_decimal(tx.quantity or 0)
+                total = _to_decimal(tx.total_amount)
+
+                h = state.holdings.get(ticker)
+                if h and h['quantity'] > 0 and quantity <= h['quantity'] + HOLDINGS_EPSILON:
+                    cost_basis = h['total_cost'] * (quantity / h['quantity'])
+                    gain = total - cost_basis
+                    total_realized += gain
+
+                    if ticker not in aggregated:
+                        aggregated[ticker] = {
+                            'total_gain_loss': _ZERO,
+                            'sell_count': 0,
+                            'win_count': 0,
+                            'total_profit': _ZERO,
+                            'total_loss': _ZERO,
+                        }
+                    agg = aggregated[ticker]
+                    agg['total_gain_loss'] += gain
+                    agg['sell_count'] += 1
+                    if gain > 0:
+                        agg['win_count'] += 1
+                        agg['total_profit'] += gain
+                    elif gain < 0:
+                        agg['total_loss'] += abs(gain)
+
+            _apply_transaction(state, tx, strict=False)
+
+        ticker_upper = ticker_filter.upper() if ticker_filter else None
+        sales = []
+        for ticker, agg in aggregated.items():
+            if ticker_upper and ticker != ticker_upper:
+                continue
+            sell_count = agg['sell_count']
+            win_rate = (agg['win_count'] / sell_count * 100) if sell_count > 0 else 0.0
+            total_loss = agg['total_loss']
+            profit_factor = float(agg['total_profit'] / total_loss) if total_loss > 0 else None
+            sales.append(AggregatedSaleResponse(
+                ticker=ticker,
+                total_gain_loss=float(agg['total_gain_loss']),
+                win_rate=win_rate,
+                profit_factor=profit_factor,
+            ))
+
+        sales.sort(key=lambda s: s.total_gain_loss, reverse=True)
+
+        # When filtering, total reflects only the filtered ticker
+        filtered_total = sum(s.total_gain_loss for s in sales) if ticker_upper else float(total_realized)
+
+        return AggregatedSalesResponse(
+            sales=sales,
+            total_realized_gain_loss=filtered_total,
+        )

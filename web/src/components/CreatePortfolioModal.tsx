@@ -108,14 +108,6 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
 
         <DialogFooter>
           <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={createPortfolio.isPending}
-          >
-            {t('portfolio.create.cancel')}
-          </Button>
-          <Button
             type="submit"
             form="create-portfolio-form"
             disabled={createPortfolio.isPending}

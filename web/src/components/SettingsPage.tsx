@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -68,6 +69,20 @@ const closeAccountConfirmSchema = z.object({
 type CloseAccountPasswordValues = z.infer<typeof closeAccountPasswordSchema>;
 type CloseAccountConfirmValues = z.infer<typeof closeAccountConfirmSchema>;
 
+// ================== Unsaved changes warning ==================
+
+/** Warns the user via the browser's native beforeunload dialog when form state is dirty. */
+const useWarnUnsavedChanges = (isDirty: boolean) => {
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+};
+
 // ================== Nav item helper ==================
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -91,13 +106,13 @@ export const SettingsLayout = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
+    <div className="max-w-3xl mx-auto">
+      <div className="mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
         <p className="text-muted-foreground text-sm">{t('settings.description')}</p>
       </div>
-      <Separator className="mb-6" />
-      <div className="flex flex-col md:flex-row gap-6">
+      <Separator className="mb-4" />
+      <div className="flex flex-col md:flex-row gap-4">
         <nav className="md:w-52 shrink-0">
           <ul className="space-y-1">
             {navItems.map(({ to, label, icon: Icon }) => (
@@ -129,6 +144,8 @@ export const ProfileSection = () => {
     resolver: zodResolver(profileSchema),
     defaultValues: { name: user?.name ?? '' },
   });
+
+  useWarnUnsavedChanges(form.formState.isDirty);
 
   const onSubmit = async (values: ProfileFormValues) => {
     try {
@@ -200,6 +217,8 @@ export const PasswordSection = () => {
     resolver: zodResolver(passwordSchema),
     defaultValues: { newPassword: '', confirmPassword: '' },
   });
+
+  useWarnUnsavedChanges(form.formState.isDirty);
 
   const onSubmit = async (values: PasswordFormValues) => {
     try {
@@ -292,6 +311,8 @@ export const TaxSection = () => {
     resolver: zodResolver(taxSchema),
     defaultValues: { taxRate: (user?.tax_rate ?? 0.255) * 100 },
   });
+
+  useWarnUnsavedChanges(form.formState.isDirty);
 
   const onSubmit = async (values: TaxFormValues) => {
     try {

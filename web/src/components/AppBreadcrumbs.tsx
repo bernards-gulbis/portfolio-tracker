@@ -6,6 +6,7 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 
 export const AppBreadcrumbs = () => {
@@ -13,6 +14,18 @@ export const AppBreadcrumbs = () => {
   const { pathname } = useLocation();
   const { id } = useParams<{ id: string }>();
   const { data: portfolios } = usePortfolios();
+
+  if (pathname === '/aggregate') {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage>{t('aggregate.title')}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
 
   if (pathname.startsWith('/settings')) {
     return (
@@ -28,12 +41,21 @@ export const AppBreadcrumbs = () => {
 
   if (id) {
     const portfolioName = portfolios?.find((p) => p.id === Number(id))?.name;
+    const isAnalytics = pathname.endsWith('/analytics');
     return (
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbPage>{portfolioName ?? `#${id}`}</BreadcrumbPage>
           </BreadcrumbItem>
+          {isAnalytics && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{t('analytics.title')}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          )}
         </BreadcrumbList>
       </Breadcrumb>
     );

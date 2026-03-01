@@ -9,6 +9,8 @@ const lv: Translation = {
     sidebar: {
       general: 'Vispārīgi',
       dashboard: 'Panelis',
+      aggregate: 'Apkopojums',
+      analytics: 'Analītika',
     },
     header: {
       toggleTheme: 'Pārslēgt motīvu',
@@ -144,7 +146,7 @@ const lv: Translation = {
     validation: {
       dateRequired: 'Datums ir obligāts',
       timeRequired: 'Laiks ir obligāts',
-      tickerRequired: 'Tīkotāja simbols ir obligāts',
+      tickerRequired: 'Aktīva simbols ir obligāts',
       quantityPositive: 'Daudzumam jābūt lielākam par 0',
       pricePositive: 'Cenai par akciju jābūt lielākai par 0',
       splitRatioPositive: 'Sadalīšanas koeficientam jābūt lielākam par 0',
@@ -166,7 +168,7 @@ const lv: Translation = {
     },
     table: {
       filters: {
-        tickerPlaceholder: 'Meklēt tīkeru...',
+        tickerPlaceholder: 'Meklēt aktīvu...',
         typeAll: 'Visi veidi',
         typeCount: '{{count}} veidi',
       },
@@ -182,7 +184,7 @@ const lv: Translation = {
       columns: {
         date: 'Datums',
         type: 'Veids',
-        ticker: 'Tīkotājs',
+        ticker: 'Aktīvs',
         details: 'Daudz. un Cena',
         detailsFormat: '{{qty}} akcijas par {{price}}',
         splitFormat: 'Sadalīts 1:{{ratio}}',
@@ -216,7 +218,7 @@ const lv: Translation = {
         datePickerLabel: 'Izvēlēties datumu no kalendāra',
         time: 'Laiks',
         type: 'Darījuma veids',
-        ticker: 'Tīkotājs',
+        ticker: 'Aktīvs',
         tickerPlaceholder: 'piem., AAPL',
         quantity: 'Daudzums',
         quantityPlaceholder: 'Akciju skaits',
@@ -230,6 +232,10 @@ const lv: Translation = {
         fxRate: 'Valūtas kurss',
         fxRatePlaceholder: 'piem., 1.0850',
         fxRateDescription: 'Valūtas konvertēšanai izmantotais kurss',
+        sellTickerPlaceholder: 'Izvēlēties turējumu...',
+        noHoldings: 'Nav pieejamu turējumu',
+        sellAll: 'Pārdot visu',
+        availableQuantity: 'Pieejams: {{quantity}} akcijas',
       },
       types: {
         Deposit: 'Iemaksa',
@@ -260,9 +266,18 @@ const lv: Translation = {
   status: {
     noPortfolio: 'Izvēlieties portfeli, lai skatītu tā statusu',
     noData: 'Nav pieejami statusa dati',
+    emptyPortfolio: 'Šim portfelim vēl nav darījumu. Pievienojiet pirmo darījumu vai importējiet CSV failu, lai sāktu.',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
     fetchedAt: 'Atjaunināts {{time}}',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
+    transactionWarnings: 'Darījumu brīdinājumi',
+    warnings: {
+      sellNotInHoldings: '[{{date}}] Nevar pārdot {{ticker}}: nav turējumos (izlaists)',
+      sellOversell: '[{{date}}] Nevar pārdot {{quantity}} no {{ticker}}: pieejami tikai {{available}} (daļēja pārdošana)',
+      withdrawNegativeCash: '[{{date}}] Izņemšana {{amount}} radīja negatīvu naudas atlikumu ({{balance}})',
+      invalidSplitRatio: '[{{date}}] Nederīgs sadalīšanas koeficients {{ratio}} priekš {{ticker}}: jābūt pozitīvam (izlaists)',
+      unknownType: '[{{date}}] Nezināms darījuma veids: {{type}} (izlaists)',
+    },
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',
     netInvested: 'Neto ieguldīts',
@@ -274,7 +289,7 @@ const lv: Translation = {
     afterTaxValue: 'Vērtība pēc nodokļa',
     positions: 'Pozīcijas',
     columns: {
-      ticker: 'Tīkotājs',
+      ticker: 'Aktīvs',
       quantity: 'Daudzums',
       avgCost: 'Vid. izmaksas',
       totalCost: 'Kop. izmaksas',
@@ -282,11 +297,19 @@ const lv: Translation = {
       marketValue: 'Tirgus vērtība',
       unrealizedGL: 'Nerealizētā P/Z',
     },
+    currency: {
+      toggle: 'Valūta',
+      usdLabel: 'USD',
+      eurLabel: 'EUR',
+      eurUnavailable: 'EUR nav pieejams — kursu neizdevās iegūt',
+    },
   },
   chart: {
     performance: {
       title: 'Sniegums',
       noData: 'Nav pieejami snieguma dati',
+      insufficientData: 'Nepietiekami datu punkti, lai attēlotu snieguma grafiku.',
+      insufficientDataForPeriod: 'Nepietiekami datu punkti šim laika periodam. Izmēģiniet garāku periodu vai "Visi".',
       principal: 'Pamatsumma (EUR)',
       currentValue: 'Pašreizējā vērtība (EUR)',
       returnPct: 'Ienesīgums (%)',
@@ -296,6 +319,34 @@ const lv: Translation = {
       title: 'Sadalījums',
       noData: 'Nav pieejami sadalījuma dati',
       marketValue: 'Tirgus vērtība',
+    },
+  },
+  aggregate: {
+    title: 'Apkopots portfelis',
+    description: 'Atlasiet portfeļus, lai skatītu kopējo turējumu un veiktspējas kopsavilkumu.',
+    selectAll: 'Atlasīt visus',
+    deselectAll: 'Noņemt atlasi',
+    noSelection: 'Atlasiet vismaz vienu portfeli, lai skatītu apkopotos datus.',
+    summary: 'Kopējais kopsavilkums',
+    selectedCount: '{{selected}} no {{total}} atlasīti',
+  },
+  analytics: {
+    title: 'Analītika',
+    realizedGains: 'Realizētie ienākumi / zaudējumi',
+    totalGainLoss: 'Kopējais realizētais I/Z',
+    avgWinRate: 'Vid. uzvaru īpatsvars',
+    avgProfitFactor: 'Vid. peļņas koeficients',
+    noSells: 'Nav atrasti pārdošanas darījumi.',
+    filterByTicker: 'Filtrēt pēc aktīva...',
+    error: 'Kļūda ielādējot realizētos darījumus: {{message}}',
+    columns: {
+      ticker: 'Aktīvs',
+      sells: '# Pārdošanas',
+      proceeds: 'Ieņēmumi',
+      costBasis: 'Izmaksu bāze',
+      gainLoss: 'Ienākums / Zaudējums',
+      winRate: 'Uzvaru īpatsvars',
+      profitFactor: 'Peļņas koeficients',
     },
   },
   settings: {

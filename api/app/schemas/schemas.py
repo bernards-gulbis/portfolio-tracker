@@ -223,8 +223,15 @@ class HoldingResponse(BaseModel):
     current_value: Optional[float] = None
     unrealized_gain_loss: Optional[float] = None
     unrealized_gain_loss_pct: Optional[float] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
+
+
+class TransactionWarning(BaseModel):
+    """Structured warning from transaction processing, for frontend i18n."""
+    code: str                                    # i18n key suffix, e.g. "sellNotInHoldings"
+    date: str                                    # ISO datetime YYYY-MM-DDTHH:MM:SS of the transaction
+    params: dict[str, str] = Field(default_factory=dict)  # interpolation values
 
 
 class PortfolioStatusResponse(BaseModel):
@@ -232,28 +239,21 @@ class PortfolioStatusResponse(BaseModel):
     portfolio_id: int
     portfolio_name: str
     current_value: float  # Cash + Holdings current value
-    current_value_eur: Optional[float] = None  # Portfolio value in EUR
     principal: float  # Deposits - Withdrawals
-    principal_eur: float  # Sum of all eur_amount fields
+    principal_eur: float  # Sum of all eur_amount fields (historical rates)
     dividends: float
-    dividends_eur: Optional[float] = None  # Dividends in EUR
+    dividends_eur: Optional[float] = None  # Dividends in EUR (historical rates)
     cash: float
     holdings: List[HoldingResponse]
     holdings_cost: float  # Sum of all holdings cost basis
     holdings_value: float  # Sum of current market value of all holdings
     unrealized_gains: float  # Total unrealized gains/losses
     unrealized_gains_pct: Optional[float] = None  # Total unrealized gains/losses percentage
-    unrealized_gains_eur: Optional[float] = None  # Unrealized gains in EUR
     realized_gains: float  # Gains/losses from sells
-    currency_gains_eur: Optional[float] = None  # FX gains/losses on principal (principal@current_rate - principal_eur)
-    currency_gains_pct: Optional[float] = None  # FX gains/losses percentage (currency_gains_eur / principal_eur * 100)
-    capital_gains_eur: Optional[float] = None  # Capital gains before tax (current_value_eur - principal_eur - dividends_eur)
     capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
-    tax_eur: Optional[float] = None  # Tax amount in EUR: capital_gains_tax_rate * capital_gains_eur
-    total_return_after_tax_eur: Optional[float] = None  # Total return after tax in EUR
-    total_return_after_tax_pct: Optional[float] = None  # Total return after tax percentage
-    current_value_after_tax_eur: Optional[float] = None  # Portfolio value after taxes: current_value_eur - tax_eur
     missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
+    warnings: List[TransactionWarning] = Field(default_factory=list)  # Transaction processing warnings
+    usd_to_eur_rate: Optional[float] = None  # Live USD→EUR rate; None when unavailable
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -261,10 +261,12 @@ class PortfolioStatusResponse(BaseModel):
 class PerformanceDataPoint(BaseModel):
     """Schema for a single performance data point"""
     date: str  # YYYY-MM-DD format
-    principal_eur: float
-    current_value_eur: Optional[float] = None
-    return_pct: Optional[float] = None  # ((current_value_eur - principal_eur) / deposits_eur) * 100
-    sp500_return_pct: Optional[float] = None  # S&P 500 return % from first data point
+    principal: float = 0.0
+    principal_eur: Optional[float] = None   # Cumulative net deposits in EUR at historical rates
+    current_value: Optional[float] = None
+    fx_rate: Optional[float] = None         # Historical USD→EUR rate at this date
+    return_pct: Optional[float] = None      # ((current_value - principal) / principal) * 100
+    sp500_return_pct: Optional[float] = None  # S&P 500 USD return % from first data point
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -274,5 +276,28 @@ class PortfolioPerformanceResponse(BaseModel):
     portfolio_id: int
     portfolio_name: str
     data_points: List[PerformanceDataPoint]
-    
+
     model_config = ConfigDict(from_attributes=True)
+
+
+# ================== Aggregated Portfolio Schemas ==================
+
+class AggregatedStatusRequest(BaseModel):
+    """Schema for requesting aggregated status across multiple portfolios"""
+    portfolio_ids: List[int] = Field(min_length=1)
+
+
+# ================== Realized Sales Schemas ==================
+
+class AggregatedSaleResponse(BaseModel):
+    """Schema for aggregated realized gain/loss per ticker"""
+    ticker: str
+    total_gain_loss: float
+    win_rate: float  # percentage of sells that resulted in a profit (0-100)
+    profit_factor: Optional[float] = None  # total_profit / abs(total_loss); None when no losing trades
+
+
+class AggregatedSalesResponse(BaseModel):
+    """Schema for aggregated realized sales grouped by ticker"""
+    sales: List[AggregatedSaleResponse]
+    total_realized_gain_loss: float

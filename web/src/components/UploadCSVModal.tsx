@@ -135,14 +135,6 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
 
         <DialogFooter>
           <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={importCSV.isPending}
-          >
-            {t('transaction.csv.cancel')}
-          </Button>
-          <Button
             type="submit"
             form="upload-csv-form"
             disabled={importCSV.isPending}

@@ -21,6 +21,7 @@ import {
 interface HoldingsAllocationChartProps {
   holdings: Holding[];
   cash: number;
+  eurRate?: number | null;
   loading?: boolean;
 }
 
@@ -28,10 +29,11 @@ interface PieCenterLabelProps {
   viewBox?: ViewBox;
   total: number;
   locale: string;
+  currency: string;
   label: string;
 }
 
-const PieCenterLabel = ({ viewBox, total, locale, label }: PieCenterLabelProps) => {
+const PieCenterLabel = ({ viewBox, total, locale, currency, label }: PieCenterLabelProps) => {
   if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
     return (
       <text
@@ -45,7 +47,7 @@ const PieCenterLabel = ({ viewBox, total, locale, label }: PieCenterLabelProps) 
           y={(viewBox.cy || 0) - 10}
           className="fill-foreground text-base font-bold"
         >
-          {formatCurrency(total, 'USD', locale)}
+          {formatCurrency(total, currency, locale)}
         </tspan>
         <tspan
           x={viewBox.cx}
@@ -76,22 +78,28 @@ const COLORS = [
 export const HoldingsAllocationChart = ({
   holdings,
   cash,
+  eurRate,
   loading,
 }: HoldingsAllocationChartProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
 
-  const { chartData, total, chartConfig } = useMemo(() => {
+  const { chartData, total, chartConfig, currency } = useMemo(() => {
+    const useEur = eurRate != null && eurRate > 0;
+    const currency = useEur ? 'EUR' : 'USD';
     const data: Array<{ name: string; value: number; fill: string }> = [];
 
-    if (cash > 0) {
-      data.push({ name: 'CASH', value: cash, fill: COLORS[0] });
+    const cashValue = useEur ? cash * eurRate! : cash;
+    if (cashValue > 0) {
+      data.push({ name: 'CASH', value: cashValue, fill: COLORS[0] });
     }
 
     holdings.forEach((holding) => {
-      if (holding.current_value && holding.current_value > 0) {
+      const rawValue = holding.current_value;
+      const value = useEur && rawValue != null ? rawValue * eurRate! : rawValue;
+      if (value && value > 0) {
         const index = data.length;
-        data.push({ name: holding.ticker, value: holding.current_value, fill: COLORS[index % COLORS.length] });
+        data.push({ name: holding.ticker, value, fill: COLORS[index % COLORS.length] });
       }
     });
 
@@ -105,8 +113,8 @@ export const HoldingsAllocationChart = ({
       return acc;
     }, {} as ChartConfig);
 
-    return { chartData: data, total, chartConfig: config };
-  }, [holdings, cash]);
+    return { chartData: data, total, chartConfig: config, currency };
+  }, [holdings, cash, eurRate]);
 
   if (loading) {
     return (
@@ -147,14 +155,14 @@ export const HoldingsAllocationChart = ({
         <CardTitle>{t('chart.allocation.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px]">
+        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]">
           <PieChart>
             <ChartTooltip
               cursor={false}
               content={
                 <ChartTooltipContent
                   hideLabel
-                  formatter={(value) => formatCurrency(value as number, 'USD', locale)}
+                  formatter={(value) => formatCurrency(value as number, currency, locale)}
                 />
               }
             />
@@ -172,6 +180,7 @@ export const HoldingsAllocationChart = ({
                   <PieCenterLabel
                     total={total}
                     locale={locale}
+                    currency={currency}
                     label={t('chart.allocation.marketValue')}
                   />
                 }
@@ -192,7 +201,7 @@ export const HoldingsAllocationChart = ({
                   <span className="text-muted-foreground">{entry.name}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">{formatCurrency(entry.value, 'USD', locale)}</span>
+                  <span className="text-muted-foreground">{formatCurrency(entry.value, currency, locale)}</span>
                   <span className="font-semibold w-12 text-right">{percentage}%</span>
                 </div>
               </div>

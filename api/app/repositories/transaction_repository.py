@@ -56,6 +56,15 @@ class TransactionRepository:
         )
         return list(self.session.exec(statement).all())
 
+    def get_by_portfolio_ids(self, portfolio_ids: List[int]) -> List[Transaction]:
+        """Get all transactions for multiple portfolios, sorted chronologically."""
+        statement = (
+            select(Transaction)
+            .where(Transaction.portfolio_id.in_(portfolio_ids))
+            .order_by(Transaction.date, Transaction.id)
+        )
+        return list(self.session.exec(statement).all())
+
     def get_by_portfolio_id_paginated(
         self, portfolio_id: int, page: int = 1, page_size: int = 20,
         ticker: Optional[str] = None, transaction_types: Optional[List[str]] = None,

@@ -7,6 +7,8 @@ const en = {
     sidebar: {
       general: 'General',
       dashboard: 'Dashboard',
+      aggregate: 'Aggregate',
+      analytics: 'Analytics',
     },
     header: {
       toggleTheme: 'Toggle theme',
@@ -142,7 +144,7 @@ const en = {
     validation: {
       dateRequired: 'Date is required',
       timeRequired: 'Time is required',
-      tickerRequired: 'Ticker symbol is required',
+      tickerRequired: 'Asset symbol is required',
       quantityPositive: 'Quantity must be greater than 0',
       pricePositive: 'Price per share must be greater than 0',
       splitRatioPositive: 'Split ratio must be greater than 0',
@@ -164,7 +166,7 @@ const en = {
     },
     table: {
       filters: {
-        tickerPlaceholder: 'Search ticker...',
+        tickerPlaceholder: 'Search asset...',
         typeAll: 'All types',
         typeCount: '{{count}} types',
       },
@@ -180,7 +182,7 @@ const en = {
       columns: {
         date: 'Date',
         type: 'Type',
-        ticker: 'Ticker',
+        ticker: 'Asset',
         details: 'Qty and Price',
         detailsFormat: '{{qty}} shares at {{price}}',
         splitFormat: 'Split 1:{{ratio}}',
@@ -214,7 +216,7 @@ const en = {
         datePickerLabel: 'Pick date from calendar',
         time: 'Time',
         type: 'Transaction Type',
-        ticker: 'Ticker',
+        ticker: 'Asset',
         tickerPlaceholder: 'e.g., AAPL',
         quantity: 'Quantity',
         quantityPlaceholder: 'Number of shares',
@@ -228,6 +230,10 @@ const en = {
         fxRate: 'FX Rate',
         fxRatePlaceholder: 'e.g., 1.0850',
         fxRateDescription: 'Exchange rate used for currency conversion',
+        sellTickerPlaceholder: 'Select holding...',
+        noHoldings: 'No holdings available',
+        sellAll: 'Sell All',
+        availableQuantity: 'Available: {{quantity}} shares',
       },
       types: {
         Deposit: 'Deposit',
@@ -258,9 +264,18 @@ const en = {
   status: {
     noPortfolio: 'Select a portfolio to view its status',
     noData: 'No status data available',
+    emptyPortfolio: 'This portfolio has no transactions yet. Add your first transaction or import a CSV file to get started.',
     error: 'Error loading portfolio status: {{message}}',
     fetchedAt: 'Updated {{time}}',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
+    transactionWarnings: 'Transaction warnings',
+    warnings: {
+      sellNotInHoldings: '[{{date}}] Cannot sell {{ticker}}: not in holdings (skipped)',
+      sellOversell: '[{{date}}] Cannot sell {{quantity}} of {{ticker}}: only {{available}} available (partial sell applied)',
+      withdrawNegativeCash: '[{{date}}] Withdrawal of {{amount}} caused negative cash balance ({{balance}})',
+      invalidSplitRatio: '[{{date}}] Invalid split ratio {{ratio}} for {{ticker}}: must be positive (skipped)',
+      unknownType: '[{{date}}] Unknown transaction type: {{type}} (skipped)',
+    },
     marketValue: 'Market Value',
     unrealized: 'unrealized',
     netInvested: 'Net Invested',
@@ -272,7 +287,7 @@ const en = {
     afterTaxValue: 'After-tax Value',
     positions: 'Positions',
     columns: {
-      ticker: 'Ticker',
+      ticker: 'Asset',
       quantity: 'Quantity',
       avgCost: 'Avg cost',
       totalCost: 'Total cost',
@@ -280,11 +295,19 @@ const en = {
       marketValue: 'Market value',
       unrealizedGL: 'Unrealized G/L',
     },
+    currency: {
+      toggle: 'Currency',
+      usdLabel: 'USD',
+      eurLabel: 'EUR',
+      eurUnavailable: 'EUR unavailable — rate could not be fetched',
+    },
   },
   chart: {
     performance: {
       title: 'Performance',
       noData: 'No performance data available',
+      insufficientData: 'Not enough data points to display performance chart.',
+      insufficientDataForPeriod: 'Not enough data points for this time period. Try a longer period or "All".',
       principal: 'Principal (EUR)',
       currentValue: 'Current Value (EUR)',
       returnPct: 'Return (%)',
@@ -294,6 +317,34 @@ const en = {
       title: 'Allocation',
       noData: 'No allocation data available',
       marketValue: 'Market Value',
+    },
+  },
+  aggregate: {
+    title: 'Aggregated Portfolio',
+    description: 'Select portfolios to view a combined summary of holdings and performance.',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+    noSelection: 'Select at least one portfolio to view aggregated data.',
+    summary: 'Combined Summary',
+    selectedCount: '{{selected}} of {{total}} selected',
+  },
+  analytics: {
+    title: 'Analytics',
+    realizedGains: 'Realized Gains / Losses',
+    totalGainLoss: 'Total Realized G/L',
+    avgWinRate: 'Avg Win Rate',
+    avgProfitFactor: 'Avg Profit Factor',
+    noSells: 'No sell transactions found.',
+    filterByTicker: 'Filter by asset...',
+    error: 'Error loading realized sales: {{message}}',
+    columns: {
+      ticker: 'Asset',
+      sells: '# Sells',
+      proceeds: 'Proceeds',
+      costBasis: 'Cost Basis',
+      gainLoss: 'Gain / Loss',
+      winRate: 'Win Rate',
+      profitFactor: 'Profit Factor',
     },
   },
   settings: {

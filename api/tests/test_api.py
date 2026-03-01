@@ -1257,13 +1257,13 @@ def test_portfolio_status_nonexistent_portfolio(client: TestClient):
 # ================== Portfolio Status Validation Tests ==================
 
 def test_portfolio_status_sell_without_holdings(client: TestClient):
-    """Test portfolio status validation: cannot sell ticker not in holdings"""
+    """Selling a ticker not in holdings produces a warning and skips the sell"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1274,7 +1274,7 @@ def test_portfolio_status_sell_without_holdings(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Try to sell AAPL without owning it
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1288,21 +1288,24 @@ def test_portfolio_status_sell_without_holdings(client: TestClient):
             "fee": 1.0
         }
     )
-    
-    # Get status - should return 400 for validation error
+
+    # Get status - should return 200 with a warning
     response = client.get(f"/portfolios/{portfolio_id}/status")
-    assert response.status_code == 400  # Bad Request due to validation
-    assert "not in holdings" in response.json()["detail"]
+    assert response.status_code == 200
+    data = response.json()
+    assert any(w["code"] == "sellNotInHoldings" for w in data["warnings"])
+    # Cash should not be inflated by the skipped sell
+    assert data["cash"] == 5000.0
 
 
 def test_portfolio_status_overselling(client: TestClient):
-    """Test portfolio status validation: cannot sell more units than owned"""
+    """Overselling produces a warning and performs a partial sell of the held quantity"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit and buy
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1313,7 +1316,7 @@ def test_portfolio_status_overselling(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
@@ -1326,7 +1329,7 @@ def test_portfolio_status_overselling(client: TestClient):
             "fee": 1.0
         }
     )
-    
+
     # Try to sell more than owned
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1340,11 +1343,14 @@ def test_portfolio_status_overselling(client: TestClient):
             "fee": 1.0
         }
     )
-    
-    # Get status - should return 400 for validation error
+
+    # Get status - should return 200 with a warning and partial sell
     response = client.get(f"/portfolios/{portfolio_id}/status")
-    assert response.status_code == 400  # Bad Request due to validation
-    assert "available" in response.json()["detail"]
+    assert response.status_code == 200
+    data = response.json()
+    assert any(w["code"] == "sellOversell" for w in data["warnings"])
+    # AAPL should be fully sold (partial sell of held 10 shares)
+    assert len(data["holdings"]) == 0
 
 
 def test_portfolio_status_floating_point_precision(client: TestClient):
@@ -1824,13 +1830,13 @@ def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
 # ================== EUR Conversion and Tax Tests ==================
 
 def test_portfolio_status_with_eur_conversion(client: TestClient):
-    """Test portfolio status with EUR conversion and tax calculation"""
+    """Test portfolio status passes live FX rate and deposits_eur to frontend"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "EUR Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000 with fx_rate = 1.1111 (meaning 1 EUR = 1.1111 USD)
     # This converts to: 10000 / 1.1111 = 9000 EUR
     client.post(
@@ -1843,7 +1849,7 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL at $100 (10 shares = $1000)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1857,62 +1863,40 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Mock current price: AAPL at $150 (50% gain)
     # Mock USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
     mock_prices = {'AAPL': 150.0}
-    
+
     with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
          patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # USD values
     assert data["cash"] == pytest.approx(9000.0)
     assert data["principal"] == pytest.approx(10000.0)
     assert data["current_value"] == pytest.approx(10500.0)  # 9000 cash + 1500 holdings
     assert data["unrealized_gains"] == pytest.approx(500.0)  # 1500 - 1000
-    
-    # EUR values
+
+    # Historical EUR values (unchanged)
     assert abs(data["principal_eur"] - 9000.0) < 0.1  # 10000 / 1.1111 ≈ 9000
-    assert data["current_value_eur"] == pytest.approx(8925.0)  # 10500 * 0.85
-    assert data["unrealized_gains_eur"] == pytest.approx(425.0)  # 500 * 0.85
-    
-    # Currency gains: (principal @ current rate) - principal_eur
-    # principal @ current rate = 10000 * 0.85 = 8500 EUR
-    # currency_gains_eur = 8500 - 9000 = -500 EUR (EUR strengthened, loss for USD holder)
-    principal_at_current_rate = 10000.0 * 0.85
-    expected_currency_gains = principal_at_current_rate - 9000.0
-    assert abs(data["currency_gains_eur"] - expected_currency_gains) < 0.1
-    assert abs(data["currency_gains_eur"] - (-500.0)) < 0.1
-    # currency_gains_pct = -500 / 9000 * 100 ≈ -5.56%
-    expected_currency_gains_pct = (expected_currency_gains / 9000.0) * 100
-    assert abs(data["currency_gains_pct"] - expected_currency_gains_pct) < 0.01
-    
-    # Tax calculation: (current_value_eur - principal_eur - dividends_eur) * 0.255
-    # dividends_eur is None (no dividends), treated as 0
-    capital_gains_eur = 8925.0 - 9000.0  # -75 EUR
-    expected_tax = 0.0  # No tax on negative gains
-    assert abs(data["capital_gains_eur"] - capital_gains_eur) < 0.1
+
+    assert data["usd_to_eur_rate"] == pytest.approx(0.85)
+
     assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
-    assert data["tax_eur"] == expected_tax
-    
-    # After-tax return: (current_value_eur - principal_eur) - tax_eur
-    expected_return = 8925.0 - 9000.0 - expected_tax
-    assert abs(data["total_return_after_tax_eur"] - expected_return) < 0.1
-    assert abs(data["total_return_after_tax_pct"] - (expected_return / 9000.0 * 100)) < 0.01
 
 
 def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
-    """Test tax calculation with positive capital gains"""
+    """Test that live rate and deposits_eur are returned for frontend tax computation"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Tax Test Portfolio"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000 with EUR conversion at 1.0 (for simplicity)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1924,7 +1908,7 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL at $100 (100 shares = $10,000)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -1938,60 +1922,37 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
             "fee": 0.0
         }
     )
-    
-    # Mock current price: AAPL at $200 (100% gain = $10,000 gain)
-    # Mock USD to EUR rate: 1.0 (for simplicity)
+
+    # Mock current price: AAPL at $200, FX rate 1.0
     mock_prices = {'AAPL': 200.0}
-    
+
     with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
          patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # USD values
-    assert data["current_value"] == pytest.approx(20000.0)  # 0 cash + 20000 holdings
+    assert data["current_value"] == pytest.approx(20000.0)
     assert data["principal"] == pytest.approx(10000.0)
     assert data["unrealized_gains"] == pytest.approx(10000.0)
-    
-    # EUR values
-    assert data["current_value_eur"] == pytest.approx(20000.0)
-    assert data["principal_eur"] == pytest.approx(10000.0)
-    
-    # Currency gains: FX rate unchanged (1.0 deposit, 1.0 current) = 0 currency gains
-    assert data["currency_gains_eur"] == pytest.approx(0.0)
-    assert data["currency_gains_pct"] == pytest.approx(0.0)
-    
-    # Tax calculation: (20000 - 10000 - 0) * 0.255 = 2550 EUR
-    capital_gains_eur = 20000.0 - 10000.0 - 0.0
-    expected_tax = capital_gains_eur * 0.255
-    assert data["capital_gains_eur"] == capital_gains_eur
-    assert data["capital_gains_eur"] == pytest.approx(10000.0)
-    assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
-    assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == pytest.approx(2550.0)
-    
-    # After-tax return: (20000 - 10000) - 2550 = 7450 EUR
-    expected_return = 20000.0 - 10000.0 - 2550.0
-    assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == pytest.approx(7450.0)
-    assert data["total_return_after_tax_pct"] == pytest.approx(74.5)  # 7450 / 10000 * 100
 
-    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 7450 = 17450 EUR
-    expected_value_after_tax = 10000.0 + 7450.0
-    assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == pytest.approx(17450.0)
+    # Historical EUR
+    assert data["principal_eur"] == pytest.approx(10000.0)
+
+    assert data["usd_to_eur_rate"] == pytest.approx(1.0)
+    assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
 
 
 def test_portfolio_status_tax_excludes_dividends(client: TestClient):
-    """Test that tax calculation excludes dividends from capital gains base"""
+    """Test that dividends_eur is returned for frontend dividend-aware tax computation"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Dividend Tax Test"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2003,7 +1964,7 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2017,7 +1978,7 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
             "fee": 0.0
         }
     )
-    
+
     # Receive $2,000 dividend
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2040,44 +2001,27 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     
     assert response.status_code == 200
     data = response.json()
-    
+
     # Current value: $2,000 cash + $15,000 holdings = $17,000
     assert data["cash"] == pytest.approx(2000.0)
     assert data["current_value"] == pytest.approx(17000.0)
     assert data["principal"] == pytest.approx(10000.0)
     assert data["dividends"] == pytest.approx(2000.0)
+    # dividends_eur comes from historical per-transaction rate (fx_rate=1.0 → 2000 EUR)
     assert data["dividends_eur"] == pytest.approx(2000.0)
-    
-    # Total gain: 17000 - 10000 = 7000 (includes dividends)
-    # Capital gains (for tax): 17000 - 10000 - 2000 = 5000 (excludes dividends)
-    # Tax: 5000 * 0.255 = 1275 EUR
-    capital_gains_eur = 17000.0 - 10000.0 - 2000.0
-    expected_tax = capital_gains_eur * 0.255
-    assert data["capital_gains_eur"] == capital_gains_eur
-    assert data["capital_gains_eur"] == pytest.approx(5000.0)
     assert data["capital_gains_tax_rate"] == pytest.approx(0.255)
-    assert data["tax_eur"] == expected_tax
-    assert data["tax_eur"] == pytest.approx(1275.0)
-    
-    # After-tax return: (17000 - 10000) - 1275 = 5725 EUR
-    expected_return = 17000.0 - 10000.0 - 1275.0
-    assert data["total_return_after_tax_eur"] == expected_return
-    assert data["total_return_after_tax_eur"] == pytest.approx(5725.0)
 
-    # Current value after tax: principal_eur + total_return_after_tax_eur = 10000 + 5725 = 15725 EUR
-    expected_value_after_tax = 10000.0 + 5725.0
-    assert data["current_value_after_tax_eur"] == expected_value_after_tax
-    assert data["current_value_after_tax_eur"] == pytest.approx(15725.0)
+    assert data["usd_to_eur_rate"] == pytest.approx(1.0)
 
 
-def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
-    """Test that tax_eur is None when dividends exist but EUR conversion is unavailable"""
+def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClient):
+    """Test that dividends without fx_rate fall back to current USD→EUR rate"""
     portfolio_response = client.post(
         "/portfolios/",
-        json={"name": "Missing Dividend EUR Test"}
+        json={"name": "Dividend EUR Fallback Test"}
     )
     portfolio_id = portfolio_response.json()["id"]
-    
+
     # Deposit $10,000
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2089,7 +2033,7 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
             "fee": 0.0
         }
     )
-    
+
     # Buy AAPL
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2103,7 +2047,73 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
             "fee": 0.0
         }
     )
-    
+
+    # Receive dividend WITHOUT fx_rate — should fall back to current rate
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Dividend",
+            "ticker": "AAPL",
+            "total_amount": 1000.0,
+            "fee": 0.0
+        }
+    )
+
+    # Mock current price and USD→EUR rate
+    mock_prices = {'AAPL': 150.0}
+
+    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.92):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Dividends exist in USD
+    assert data["dividends"] == pytest.approx(1000.0)
+
+    # dividends_eur computed via fallback rate (1000 * 0.92 = 920)
+    assert data["dividends_eur"] == pytest.approx(920.0)
+
+    # Live rate available for frontend tax computation
+    assert data["usd_to_eur_rate"] == pytest.approx(0.92)
+
+
+def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestClient):
+    """Test that tax_eur is None when dividends exist and EUR fallback rate is also unavailable"""
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "Missing Dividend EUR Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.0,
+            "fee": 0.0
+        }
+    )
+
+    # Buy AAPL
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0
+        }
+    )
+
     # Receive dividend WITHOUT fx_rate (EUR conversion unavailable)
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
@@ -2115,34 +2125,29 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
             "fee": 0.0
         }
     )
-    
-    # Mock current price
+
+    # Mock current price, but USD→EUR rate returns None (unavailable)
     mock_prices = {'AAPL': 150.0}
-    
+
     with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=None):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Dividends exist in USD
     assert data["dividends"] == pytest.approx(1000.0)
-    
-    # Dividends EUR should be None (no fx_rate provided)
+
+    # dividends_eur is None (no fx_rate and fallback rate unavailable)
     assert data["dividends_eur"] is None
-    
-    # Tax should be None (cannot compute without knowing dividend EUR value)
-    assert data["tax_eur"] is None
-    
-    # After-tax metrics should also be None
-    assert data["total_return_after_tax_eur"] is None
-    assert data["total_return_after_tax_pct"] is None
-    assert data["current_value_after_tax_eur"] is None
+
+    # usd_to_eur_rate is None — frontend knows EUR conversion is unavailable
+    assert data["usd_to_eur_rate"] is None
 
 
 def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestClient):
-    """Test that EUR metrics are None when current exchange rate is unavailable"""
+    """Test that usd_to_eur_rate is None when exchange rate is unavailable"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "No Exchange Rate Test"}
@@ -2188,15 +2193,10 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
     # USD values should be available
     assert data["current_value"] == pytest.approx(15000.0)
     assert data["principal"] == pytest.approx(10000.0)
-    
-    # EUR values should be None
-    assert data["current_value_eur"] is None
-    assert data["unrealized_gains_eur"] is None
-    assert data["tax_eur"] is None
-    assert data["total_return_after_tax_eur"] is None
-    assert data["total_return_after_tax_pct"] is None
-    assert data["current_value_after_tax_eur"] is None
-    
+
+    # usd_to_eur_rate is None — frontend shows '-' for all EUR-derived values
+    assert data["usd_to_eur_rate"] is None
+
     # Historical EUR values should still be available
     assert data["principal_eur"] == pytest.approx(10000.0)  # Converted at historical rate
 
@@ -2242,19 +2242,20 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
     
     assert response.status_code == 200
     data = response.json()
-    
+
     # Principal in USD
     assert data["principal"] == pytest.approx(15000.0)
-    
+
     # Principal in EUR (using historical fx_rates)
     # 10000 / 1.10 + 5000 / 1.05 = 9090.91 + 4761.90 = 13852.81
     expected_principal_eur = 10000.0 / 1.10 + 5000.0 / 1.05
     assert abs(data["principal_eur"] - expected_principal_eur) < 0.01
-    
-    # Current value in EUR (using current rate)
-    # 15000 * 0.85 = 12750.0
-    expected_current_value_eur = 15000.0 * 0.85
-    assert data["current_value_eur"] == expected_current_value_eur
+
+    # Live rate passed to frontend for client-side EUR conversion
+    assert data["usd_to_eur_rate"] == pytest.approx(0.85)
+
+    # principal_eur = sum of all deposit EUR amounts at historical rates (no withdrawals)
+    assert abs(data["principal_eur"] - expected_principal_eur) < 0.01
 
 
 # ================== Health Check Test ==================
@@ -2504,7 +2505,7 @@ def test_performance_chart_split_adjusted_prices(client: TestClient):
     assert len(points) > 0
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # Portfolio is fully invested in one stock — value should always
@@ -2512,7 +2513,7 @@ def test_performance_chart_split_adjusted_prices(client: TestClient):
         # is before or after the split.  Any value far below deposit
         # would indicate the split-adjustment bug.
         assert val == pytest.approx(6000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈6000 "
+            f"date={pt['date']}: current_value={val}, expected ≈6000 "
             f"(return_pct={pt['return_pct']})"
         )
 
@@ -2607,14 +2608,14 @@ def test_performance_chart_multiple_splits(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # 10 × $200 × 6 = 12 000 before both splits
         # 30 × $200 × 2 = 12 000 between splits
         # 60 × $200 × 1 = 12 000 after both splits
         assert val == pytest.approx(12000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈12000"
+            f"date={pt['date']}: current_value={val}, expected ≈12000"
         )
 
 
@@ -2680,12 +2681,12 @@ def test_performance_chart_no_splits(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # 20 × $250 = $5 000 — no split factor needed
         assert val == pytest.approx(5000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈5000"
+            f"date={pt['date']}: current_value={val}, expected ≈5000"
         )
 
 
@@ -2772,7 +2773,7 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # GOOD: 50 × $100 = $5 000
@@ -2780,7 +2781,7 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
         # Total = $10 000 ≈ principal
         # Without the fallback, DELIST would be $0, giving $5 000 — a 50% loss
         assert val == pytest.approx(10000.0, rel=0.01), (
-            f"date={pt['date']}: current_value_eur={val}, expected ≈10000 "
+            f"date={pt['date']}: current_value={val}, expected ≈10000 "
             f"(cost basis fallback for DELIST)"
         )
         # return_pct should be ~0% (no gain/loss)
@@ -2946,7 +2947,7 @@ def test_performance_last_known_price_gap(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         date_str = pt["date"]
@@ -3050,7 +3051,7 @@ def test_performance_delisted_db_fallback(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # Skip points before all buys are applied (buys on Jan 2 and Jan 3)
@@ -3147,7 +3148,7 @@ def test_performance_delisted_no_cache(client: TestClient):
     points = response.json()["data_points"]
 
     for pt in points:
-        val = pt["current_value_eur"]
+        val = pt["current_value"]
         if val is None:
             continue
         # Skip points before all buys are applied (buys on Jan 2 and Jan 3)
@@ -3244,9 +3245,10 @@ def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: Us
     assert response.status_code == 200
     data = response.json()
 
-    # Tax at 15%: capital_gains_eur = 10000, tax = 10000 * 0.15 = 1500
+    # Custom tax rate is returned for frontend computation
     assert data["capital_gains_tax_rate"] == pytest.approx(0.15)
-    assert data["tax_eur"] == pytest.approx(1500.0)
+    # Live rate for frontend to compute tax = 10000 * 0.15 = 1500 EUR
+    assert data["usd_to_eur_rate"] == pytest.approx(1.0)
 
 
 # ==================== TransactionUpdate Validation ====================
@@ -3343,3 +3345,557 @@ def test_transaction_update_api_rejects_negative_fee(client: TestClient):
 
     response = client.put(f"/transactions/{tx_id}", json={"fee": -10.0})
     assert response.status_code == 422
+
+
+# ================== Aggregated Portfolio Tests ==================
+
+
+def test_aggregated_status_single_portfolio_matches_individual(client: TestClient):
+    """Aggregated status for a single portfolio should match the individual portfolio status"""
+    # Create portfolio with a deposit
+    portfolio_response = client.post("/portfolios/", json={"name": "Agg Test 1"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+        },
+    )
+
+    # Get individual status
+    individual = client.get(f"/portfolios/{portfolio_id}/status").json()
+
+    # Get aggregated status for just this one portfolio
+    agg = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [portfolio_id]},
+    )
+    assert agg.status_code == 200
+    agg_data = agg.json()
+
+    assert agg_data["cash"] == pytest.approx(individual["cash"])
+    assert agg_data["principal"] == pytest.approx(individual["principal"])
+    assert agg_data["principal_eur"] == pytest.approx(individual["principal_eur"])
+    assert agg_data["portfolio_id"] == 0
+    assert agg_data["portfolio_name"] == "Aggregated"
+
+
+def test_aggregated_status_multiple_portfolios(client: TestClient):
+    """Aggregated status should combine cash, principal, and holdings from multiple portfolios"""
+    # Portfolio 1: deposit 1000
+    p1 = client.post("/portfolios/", json={"name": "Multi Agg 1"}).json()["id"]
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 1000.0},
+    )
+
+    # Portfolio 2: deposit 2000
+    p2 = client.post("/portfolios/", json={"name": "Multi Agg 2"}).json()["id"]
+    client.post(
+        f"/portfolios/{p2}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 2000.0},
+    )
+
+    agg = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [p1, p2]},
+    )
+    assert agg.status_code == 200
+    data = agg.json()
+
+    assert data["cash"] == pytest.approx(3000.0)
+    assert data["principal"] == pytest.approx(3000.0)
+
+
+def test_aggregated_status_merged_holdings(client: TestClient):
+    """Aggregated status should merge holdings from different portfolios for the same ticker"""
+    # Portfolio 1: buy 10 AAPL
+    p1 = client.post("/portfolios/", json={"name": "Merge 1"}).json()["id"]
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 5000.0},
+    )
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10,
+            "price_per_share": 150.0,
+            "total_amount": -1500.0,
+        },
+    )
+
+    # Portfolio 2: buy 5 AAPL
+    p2 = client.post("/portfolios/", json={"name": "Merge 2"}).json()["id"]
+    client.post(
+        f"/portfolios/{p2}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 5000.0},
+    )
+    client.post(
+        f"/portfolios/{p2}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 5,
+            "price_per_share": 160.0,
+            "total_amount": -800.0,
+        },
+    )
+
+    agg = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [p1, p2]},
+    )
+    assert agg.status_code == 200
+    data = agg.json()
+
+    # Should have merged AAPL holding: 15 shares total
+    assert len(data["holdings"]) == 1
+    assert data["holdings"][0]["ticker"] == "AAPL"
+    assert data["holdings"][0]["quantity"] == pytest.approx(15.0)
+    assert data["holdings"][0]["total_cost"] == pytest.approx(2300.0)  # 1500 + 800
+
+    # Cash: (5000 - 1500) + (5000 - 800) = 7700
+    assert data["cash"] == pytest.approx(7700.0)
+
+
+def test_aggregated_status_empty_portfolio_ids_returns_422(client: TestClient):
+    """Empty portfolio_ids list should return 422 validation error"""
+    response = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": []},
+    )
+    assert response.status_code == 422
+
+
+def test_aggregated_status_nonexistent_portfolio_returns_404(client: TestClient):
+    """Non-existent portfolio in the list should return 404"""
+    response = client.post(
+        "/portfolios/aggregate/status",
+        json={"portfolio_ids": [99999]},
+    )
+    assert response.status_code == 404
+
+
+def test_aggregated_status_other_users_portfolio_returns_404(session: Session):
+    """Including another user's portfolio in aggregation should return 404"""
+    user_a = User(
+        id=uuid.uuid4(), email="agg_a@example.com", hashed_password="x",
+        is_active=True, is_superuser=False, is_verified=True,
+    )
+    user_b = User(
+        id=uuid.uuid4(), email="agg_b@example.com", hashed_password="x",
+        is_active=True, is_superuser=False, is_verified=True,
+    )
+    session.add(user_a)
+    session.add(user_b)
+    session.commit()
+
+    # Create portfolios owned by different users
+    p_a = Portfolio(name="User A Agg", user_id=user_a.id)
+    p_b = Portfolio(name="User B Agg", user_id=user_b.id)
+    session.add(p_a)
+    session.add(p_b)
+    session.commit()
+    session.refresh(p_a)
+    session.refresh(p_b)
+
+    # Request as user_a with user_b's portfolio
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[current_active_user] = lambda: user_a
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/portfolios/aggregate/status",
+            json={"portfolio_ids": [p_a.id, p_b.id]},
+        )
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_aggregated_performance_returns_data_points(client: TestClient):
+    """Aggregated performance should return data points"""
+    p1 = client.post("/portfolios/", json={"name": "Perf Agg 1"}).json()["id"]
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+            "eur_amount": 900.0,
+        },
+    )
+
+    with patch("app.services.portfolio_service.PriceService") as mock_price:
+        mock_price.get_historical_prices_for_multiple_tickers.return_value = {
+            "EURUSD=X": {"2024-01-01": 1.1, "2024-06-01": 1.1},
+            "^GSPC": {"2024-01-01": 4700.0, "2024-06-01": 5100.0},
+        }
+        mock_price.get_last_known_price.return_value = None
+
+        response = client.post(
+            "/portfolios/aggregate/performance",
+            json={"portfolio_ids": [p1]},
+            params={"num_points": 5},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["portfolio_id"] == 0
+        assert data["portfolio_name"] == "Aggregated"
+        assert len(data["data_points"]) >= 2
+
+
+def test_aggregated_performance_empty_ids_returns_422(client: TestClient):
+    """Empty portfolio_ids list for performance should return 422"""
+    response = client.post(
+        "/portfolios/aggregate/performance",
+        json={"portfolio_ids": []},
+    )
+    assert response.status_code == 422
+
+
+# ================== Aggregated Sales Tests ==================
+
+
+def test_aggregated_sales_basic(client: TestClient):
+    """Test aggregated sells endpoint returns gain/loss aggregated by ticker"""
+    portfolio = client.post("/portfolios/", json={"name": "Sales Test"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 10000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 20.0, "price_per_share": 100.0, "total_amount": -2000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 150.0, "total_amount": 1500.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/realized-sales")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["sales"]) == 1
+    sale = data["sales"][0]
+    assert sale["ticker"] == "AAPL"
+    assert sale["total_gain_loss"] == pytest.approx(500.0)
+    assert sale["win_rate"] == pytest.approx(100.0)
+    assert sale["profit_factor"] is None  # no losing trades
+    assert data["total_realized_gain_loss"] == pytest.approx(500.0)
+
+
+def test_aggregated_sales_loss(client: TestClient):
+    """Test aggregated sells with a loss"""
+    portfolio = client.post("/portfolios/", json={"name": "Loss Test"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 10000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10.0, "price_per_share": 200.0, "total_amount": -2000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-03-01T10:00:00", "type": "Sell", "ticker": "MSFT",
+        "quantity": 5.0, "price_per_share": 150.0, "total_amount": 750.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/realized-sales")
+    data = response.json()
+
+    assert len(data["sales"]) == 1
+    sale = data["sales"][0]
+    assert sale["total_gain_loss"] == pytest.approx(-250.0)
+    assert sale["win_rate"] == pytest.approx(0.0)
+    assert sale["profit_factor"] == pytest.approx(0.0)  # 0 profit / positive loss
+    assert data["total_realized_gain_loss"] == pytest.approx(-250.0)
+
+
+def test_aggregated_sales_multiple_sells_same_ticker(client: TestClient):
+    """Multiple sells of the same ticker are aggregated into one row"""
+    portfolio = client.post("/portfolios/", json={"name": "Multi Sell"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 10000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 20.0, "price_per_share": 100.0, "total_amount": -2000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 120.0, "total_amount": 1200.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-03-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 80.0, "total_amount": 800.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/realized-sales")
+    data = response.json()
+
+    # Two sells of AAPL → one aggregated row; sell 1: +200, sell 2: -200
+    assert len(data["sales"]) == 1
+    sale = data["sales"][0]
+    assert sale["ticker"] == "AAPL"
+    assert sale["total_gain_loss"] == pytest.approx(0.0)
+    assert sale["win_rate"] == pytest.approx(50.0)   # 1 win out of 2
+    assert sale["profit_factor"] == pytest.approx(1.0)  # 200 profit / 200 loss
+    assert data["total_realized_gain_loss"] == pytest.approx(0.0)
+
+
+def test_aggregated_sales_multiple_tickers(client: TestClient):
+    """Sells of different tickers produce separate rows sorted by gain desc"""
+    portfolio = client.post("/portfolios/", json={"name": "Multi Ticker"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 20000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 100.0, "total_amount": -1000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10.0, "price_per_share": 200.0, "total_amount": -2000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 150.0, "total_amount": 1500.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "MSFT",
+        "quantity": 5.0, "price_per_share": 150.0, "total_amount": 750.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/realized-sales")
+    data = response.json()
+
+    assert len(data["sales"]) == 2
+    # Sorted by total_gain_loss descending: AAPL +500, MSFT -250
+    assert data["sales"][0]["ticker"] == "AAPL"
+    assert data["sales"][0]["total_gain_loss"] == pytest.approx(500.0)
+    assert data["sales"][1]["ticker"] == "MSFT"
+    assert data["sales"][1]["total_gain_loss"] == pytest.approx(-250.0)
+    assert data["total_realized_gain_loss"] == pytest.approx(250.0)
+
+
+def test_aggregated_sales_ticker_filter(client: TestClient):
+    """Ticker filter returns only the matching aggregated row"""
+    portfolio = client.post("/portfolios/", json={"name": "Filter Test"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 20000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 100.0, "total_amount": -1000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "MSFT",
+        "quantity": 10.0, "price_per_share": 200.0, "total_amount": -2000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 150.0, "total_amount": 1500.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "MSFT",
+        "quantity": 5.0, "price_per_share": 150.0, "total_amount": 750.0,
+    })
+
+    # Filter to only AAPL
+    response = client.get(f"/portfolios/{pid}/realized-sales", params={"ticker": "AAPL"})
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data["sales"]) == 1
+    assert data["sales"][0]["ticker"] == "AAPL"
+    assert data["sales"][0]["total_gain_loss"] == pytest.approx(500.0)
+    assert data["total_realized_gain_loss"] == pytest.approx(500.0)
+
+    # Filter is case-insensitive
+    response_lower = client.get(f"/portfolios/{pid}/realized-sales", params={"ticker": "aapl"})
+    assert len(response_lower.json()["sales"]) == 1
+
+    # Unknown ticker returns empty
+    response_none = client.get(f"/portfolios/{pid}/realized-sales", params={"ticker": "GOOG"})
+    assert len(response_none.json()["sales"]) == 0
+
+
+def test_aggregated_sales_no_sells(client: TestClient):
+    """Test aggregated sells with no sell transactions"""
+    portfolio = client.post("/portfolios/", json={"name": "No Sells"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 5000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 100.0, "total_amount": -1000.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/realized-sales")
+    data = response.json()
+
+    assert len(data["sales"]) == 0
+    assert data["total_realized_gain_loss"] == pytest.approx(0.0)
+
+
+def test_aggregated_sales_win_rate_and_profit_factor(client: TestClient):
+    """Win rate and profit factor are computed correctly per ticker"""
+    portfolio = client.post("/portfolios/", json={"name": "Metrics Test"}).json()
+    pid = portfolio["id"]
+
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 20000.0,
+    })
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-01-02T10:00:00", "type": "Buy", "ticker": "AAPL",
+        "quantity": 30.0, "price_per_share": 100.0, "total_amount": -3000.0,
+    })
+    # Win: +300 (sell 10 @ 130, cost 1000 → proceeds 1300)
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-01T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 130.0, "total_amount": 1300.0,
+    })
+    # Win: +200 (sell 10 @ 120, cost 1000 → proceeds 1200)
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-02T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 120.0, "total_amount": 1200.0,
+    })
+    # Loss: -200 (sell 10 @ 80, cost 1000 → proceeds 800)
+    client.post(f"/portfolios/{pid}/transactions/", json={
+        "date": "2024-02-03T10:00:00", "type": "Sell", "ticker": "AAPL",
+        "quantity": 10.0, "price_per_share": 80.0, "total_amount": 800.0,
+    })
+
+    response = client.get(f"/portfolios/{pid}/realized-sales")
+    data = response.json()
+
+    assert len(data["sales"]) == 1
+    sale = data["sales"][0]
+    # 2 wins out of 3 sells → 66.67%
+    assert sale["win_rate"] == pytest.approx(200 / 3, rel=1e-3)
+    # total_profit = 300 + 200 = 500, total_loss = 200 → profit_factor = 2.5
+    assert sale["profit_factor"] == pytest.approx(2.5)
+    assert sale["total_gain_loss"] == pytest.approx(300.0)
+
+
+def test_aggregated_sales_nonexistent_portfolio(client: TestClient):
+    """Nonexistent portfolio should return 404"""
+    response = client.get("/portfolios/999/realized-sales")
+    assert response.status_code == 404
+
+
+# ================== Transaction Warning Unit Tests ==================
+
+def test_warning_sell_unknown_ticker_strict():
+    """Strict sell of unknown ticker appends a warning and skips."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="UNKNOWN",
+        quantity=10.0,
+        total_amount=1500.0,
+    )
+    _apply_transaction(state, tx, strict=True)
+
+    assert state.cash == Decimal('5000')  # sell skipped
+    assert len(state.warnings) == 1
+    assert state.warnings[0]['code'] == 'sellNotInHoldings'
+    assert state.warnings[0]['date'] == '2024-01-02T00:00:00'
+    assert state.warnings[0]['params']['ticker'] == 'UNKNOWN'
+
+
+def test_warning_oversell_partial_strict():
+    """Strict oversell appends a warning and executes a partial sell."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+    state.holdings['AAPL'] = {'quantity': Decimal('5'), 'total_cost': Decimal('500')}
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="AAPL",
+        quantity=20.0,
+        total_amount=3000.0,
+    )
+    _apply_transaction(state, tx, strict=True)
+
+    assert len(state.warnings) == 1
+    assert state.warnings[0]['code'] == 'sellOversell'
+    assert state.warnings[0]['date'] == '2024-01-02T00:00:00'
+    assert state.warnings[0]['params']['ticker'] == 'AAPL'
+    # Holdings should be cleared (partial sell of all 5 shares)
+    assert 'AAPL' not in state.holdings
+    # Cash should increase by proportional total: 3000 * (5/20) = 750
+    assert state.cash == Decimal('5750')
+    # Realized gains: 750 proceeds - 500 cost basis = 250
+    assert state.realized_gains == Decimal('250')
+
+
+def test_warning_withdraw_negative_cash():
+    """Withdrawal causing negative cash appends a warning but still applies."""
+    state = _TxState()
+    state.cash = Decimal('100')
+
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.WITHDRAW,
+        total_amount=-500.0,
+    )
+    _apply_transaction(state, tx, strict=True)
+
+    assert state.cash == Decimal('-400')
+    assert state.principal == Decimal('-500')
+    assert len(state.warnings) == 1
+    assert state.warnings[0]['code'] == 'withdrawNegativeCash'
+    assert state.warnings[0]['date'] == '2024-01-02T00:00:00'
+
+
+def test_no_warnings_in_non_strict_mode():
+    """Non-strict mode should never append warnings, only skip silently."""
+    state = _TxState()
+    state.cash = Decimal('5000')
+    state.holdings['AAPL'] = {'quantity': Decimal('5'), 'total_cost': Decimal('500')}
+
+    # Oversell in non-strict mode
+    tx = Transaction(
+        id=1,
+        portfolio_id=1,
+        date=datetime(2024, 1, 2),
+        type=TransactionType.SELL,
+        ticker="AAPL",
+        quantity=20.0,
+        total_amount=3000.0,
+    )
+    _apply_transaction(state, tx, strict=False)
+
+    assert len(state.warnings) == 0
+    assert state.cash == Decimal('5000')
+    assert state.holdings['AAPL']['quantity'] == Decimal('5')

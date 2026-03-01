@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
 import i18n from '../i18n/index';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +6,8 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useTranslation } from 'react-i18next';
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
-import { Transaction, TransactionType, TransactionCreate, getErrorMessage } from '../api';
+import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
+import { Transaction, TransactionType, TransactionCreate, Holding, getErrorMessage } from '../api';
 import {
   Dialog,
   DialogContent,
@@ -28,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, ChevronsUpDown, Check } from 'lucide-react';
 import {
   Field,
   FieldDescription,
@@ -125,6 +126,13 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+/** Round a numeric string to 2 decimal places on blur */
+const formatCurrency = (value: string | undefined, onChange: (v: string) => void) => {
+  if (!value) return;
+  const n = Number.parseFloat(value);
+  if (!Number.isNaN(n)) onChange(n.toFixed(2));
+};
 
 /** Returns local date as "YYYY-MM-DD" */
 const toLocalDate = (date: Date): string => {
@@ -335,6 +343,125 @@ const buildTransactionData = (values: FormValues): TransactionCreate => {
   return base;
 };
 
+// ─── Ticker Combobox ────────────────────────────────────────────────────────
+
+interface TickerComboboxProps {
+  value: string;
+  holdings: Holding[];
+  editTicker?: string;
+  invalid?: boolean;
+  placeholder: string;
+  noHoldingsText: string;
+  onChange: (value: string) => void;
+}
+
+const TickerCombobox = ({ value, holdings, editTicker, invalid, placeholder, noHoldingsText, onChange }: TickerComboboxProps) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search) return holdings;
+    const q = search.toUpperCase();
+    return holdings.filter(h => h.ticker.toUpperCase().includes(q));
+  }, [holdings, search]);
+
+  // Show edit ticker as fallback if not in current holdings
+  const showEditFallback = editTicker && !holdings.some(h => h.ticker === editTicker);
+
+  const selectHolding = (ticker: string) => {
+    onChange(ticker);
+    setSearch('');
+    setOpen(false);
+  };
+
+  const listboxId = useId();
+  const searchNorm = search.trim().toUpperCase();
+
+  return (
+    <Popover open={open} onOpenChange={(nextOpen) => {
+      setOpen(nextOpen);
+      if (!nextOpen) setSearch('');
+    }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          id="tx-ticker"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={open ? listboxId : undefined}
+          aria-invalid={invalid}
+          className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-9 w-full items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+        >
+          <span className={value ? '' : 'text-muted-foreground'}>
+            {value || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <div className="flex items-center border-b px-3">
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value.toUpperCase())}
+            placeholder={placeholder}
+            className="border-0 shadow-none focus-visible:ring-0 h-9"
+            autoComplete="off"
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchNorm) {
+                  selectHolding(searchNorm);
+                }
+              }
+            }}
+          />
+        </div>
+        <ul id={listboxId} role="listbox" className="max-h-48 overflow-y-auto">
+          {filtered.length === 0 && !searchNorm && !showEditFallback && (
+            <li className="px-3 py-2 text-sm text-muted-foreground" role="option" aria-disabled="true" aria-selected={false}>
+              {noHoldingsText}
+            </li>
+          )}
+          {filtered.map(h => (
+            <li
+              key={h.ticker}
+              role="option"
+              aria-selected={value === h.ticker}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+              onClick={() => selectHolding(h.ticker)}
+            >
+              <Check className={`h-4 w-4 ${value === h.ticker ? 'opacity-100' : 'opacity-0'}`} />
+              {h.ticker} ({h.quantity} shares)
+            </li>
+          ))}
+          {showEditFallback && (
+            <li
+              role="option"
+              aria-selected={value === editTicker}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+              onClick={() => selectHolding(editTicker!)}
+            >
+              <Check className={`h-4 w-4 ${value === editTicker ? 'opacity-100' : 'opacity-0'}`} />
+              {editTicker}
+            </li>
+          )}
+          {searchNorm && !holdings.some(h => h.ticker === searchNorm) && searchNorm !== editTicker && (
+            <li
+              role="option"
+              aria-selected={false}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+              onClick={() => selectHolding(searchNorm)}
+            >
+              <Check className="h-4 w-4 opacity-0" />
+              {searchNorm}
+            </li>
+          )}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 // ─── Component ─────────────────────────────────────────────────────────────
 
 interface TransactionModalProps {
@@ -355,6 +482,8 @@ const TransactionModal = ({
   const isEdit = !!transaction;
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
+  const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
+  const holdings: Holding[] = portfolioStatus?.holdings ?? [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -363,10 +492,38 @@ const TransactionModal = ({
 
   const { reset, clearErrors } = form;
   const type = form.watch('type');
+  const watchedTicker = form.watch('ticker');
+  const watchedQuantity = form.watch('quantity');
+  const watchedPrice = form.watch('pricePerShare');
+  const watchedFee = form.watch('fee');
+
+  const isSell = type === TransactionType.SELL;
+  const isDividend = type === TransactionType.DIVIDEND;
+  const showTickerCombobox = isSell || isDividend;
+  const selectedHolding = isSell ? holdings.find(h => h.ticker === watchedTicker) : undefined;
 
   useEffect(() => {
     if (isOpen) reset(getDefaultValues(transaction));
   }, [isOpen, transaction, reset]);
+
+  // Auto-calculate totalAmount for BUY/SELL
+  useEffect(() => {
+    if (![TransactionType.BUY, TransactionType.SELL].includes(type)) return;
+    const qty = Number.parseFloat(watchedQuantity || '0');
+    const price = Number.parseFloat(watchedPrice || '0');
+    const fee = Math.abs(Number.parseFloat(watchedFee || '0'));
+    if (qty > 0 && price > 0) {
+      form.setValue('totalAmount', (qty * price + fee).toFixed(2));
+    }
+  }, [watchedQuantity, watchedPrice, watchedFee, type, form]);
+
+  // Auto-fill FX rate for DIVIDEND when empty
+  const eurRate = portfolioStatus?.usd_to_eur_rate;
+  useEffect(() => {
+    if (isDividend && !form.getValues('fxRate') && eurRate != null) {
+      form.setValue('fxRate', eurRate.toFixed(4));
+    }
+  }, [isDividend, eurRate, form]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -499,14 +656,34 @@ const TransactionModal = ({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-ticker">{t('transaction.modal.fields.ticker')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="tx-ticker"
-                      placeholder={t('transaction.modal.fields.tickerPlaceholder')}
-                      autoComplete="off"
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      aria-invalid={fieldState.invalid}
-                    />
+                    {showTickerCombobox ? (
+                      <TickerCombobox
+                        value={field.value}
+                        holdings={holdings}
+                        editTicker={isEdit ? transaction?.ticker : undefined}
+                        invalid={fieldState.invalid}
+                        placeholder={t('transaction.modal.fields.sellTickerPlaceholder')}
+                        noHoldingsText={t('transaction.modal.fields.noHoldings')}
+                        onChange={(value) => {
+                          field.onChange(value);
+                          if (isSell) {
+                            const holding = holdings.find(h => h.ticker === value);
+                            if (holding?.current_price != null) {
+                              form.setValue('pricePerShare', holding.current_price.toFixed(2));
+                            }
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Input
+                        {...field}
+                        id="tx-ticker"
+                        placeholder={t('transaction.modal.fields.tickerPlaceholder')}
+                        autoComplete="off"
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        aria-invalid={fieldState.invalid}
+                      />
+                    )}
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -521,16 +698,46 @@ const TransactionModal = ({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-quantity">{t('transaction.modal.fields.quantity')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="tx-quantity"
-                      type="number"
-                      step="0.00000001"
-                      min="0.00000001"
-                      placeholder={t('transaction.modal.fields.quantityPlaceholder')}
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                    />
+                    {isSell && selectedHolding ? (
+                      <div className="flex gap-2">
+                        <Input
+                          {...field}
+                          id="tx-quantity"
+                          type="number"
+                          step="0.00000001"
+                          min="0.00000001"
+                          placeholder={t('transaction.modal.fields.quantityPlaceholder')}
+                          autoComplete="off"
+                          aria-invalid={fieldState.invalid}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 self-center"
+                          onClick={() => form.setValue('quantity', String(selectedHolding.quantity))}
+                        >
+                          {t('transaction.modal.fields.sellAll')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input
+                        {...field}
+                        id="tx-quantity"
+                        type="number"
+                        step="0.00000001"
+                        min="0.00000001"
+                        placeholder={t('transaction.modal.fields.quantityPlaceholder')}
+                        autoComplete="off"
+                        aria-invalid={fieldState.invalid}
+                      />
+                    )}
+                    {isSell && selectedHolding && (
+                      <FieldDescription>
+                        {t('transaction.modal.fields.availableQuantity', { quantity: selectedHolding.quantity })}
+                      </FieldDescription>
+                    )}
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -558,6 +765,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -586,6 +794,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -615,6 +824,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -643,6 +853,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                       <InputGroupAddon align="inline-end">
                         <InputGroupText>EUR</InputGroupText>
@@ -715,9 +926,6 @@ const TransactionModal = ({
         </form>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
-            {t('transaction.modal.cancel')}
-          </Button>
           <Button type="submit" form="transaction-form" disabled={isPending}>
             {isPending && <Spinner />}
             {isEdit ? t('transaction.modal.update') : t('transaction.modal.add')}
