@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import {
-  getPortfolio,
   getTransactions,
   createTransaction,
   updateTransaction,
@@ -12,17 +11,6 @@ import {
   TransactionUpdate,
 } from '../api';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
-
-/**
- * Hook to fetch a portfolio with transactions
- */
-export const usePortfolio = (portfolioId: number | null) => {
-  return useQuery({
-    queryKey: ['portfolio', portfolioId],
-    queryFn: () => getPortfolio(portfolioId!),
-    enabled: portfolioId !== null,
-  });
-};
 
 /**
  * Hook to fetch transactions for a portfolio
@@ -56,7 +44,6 @@ export const useCreateTransaction = () => {
       createTransaction(portfolioId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
@@ -85,7 +72,6 @@ export const useUpdateTransaction = () => {
         queryKey: ['transactions', variables.portfolioId],
         exact: false
       });
-      queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
@@ -111,7 +97,6 @@ export const useDeleteTransaction = () => {
         queryKey: ['transactions', variables.portfolioId],
         exact: false
       });
-      queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
@@ -137,7 +122,6 @@ export const useImportTransactionsCSV = () => {
         queryKey: ['transactions', variables.portfolioId],
         exact: false
       });
-      queryClient.invalidateQueries({ queryKey: ['portfolio', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });

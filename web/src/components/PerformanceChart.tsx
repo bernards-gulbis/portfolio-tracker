@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { memo, type ComponentProps, useMemo, useState } from 'react';
 import {
   ComposedChart,
   Area,
@@ -95,7 +95,7 @@ const getCutoffDate = (period: TimePeriod): string | null => {
   return cutoff.toISOString().split('T')[0];
 };
 
-const PerformanceTooltipItem = ({
+const PerformanceTooltipItem = memo(({
   value,
   name,
   color,
@@ -136,15 +136,15 @@ const PerformanceTooltipItem = ({
       </div>
     </>
   );
-};
+});
 
-const PerformanceTooltipContent = ({
+const PerformanceTooltipContent = memo(({
   chartConfig,
   locale,
   currency,
   notAvailableLabel,
   ...rest
-}: React.ComponentProps<typeof ChartTooltipContent> & {
+}: ComponentProps<typeof ChartTooltipContent> & {
   chartConfig: ChartConfig;
   locale: string;
   currency: 'EUR' | 'USD';
@@ -171,7 +171,7 @@ const PerformanceTooltipContent = ({
       />
     )}
   />
-);
+));
 
 export const PerformanceChart = ({
   data,

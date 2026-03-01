@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 
 interface Props {
   children: ReactNode;
+  fullScreen?: boolean;
 }
 
 interface State {
@@ -22,8 +23,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const fullScreen = this.props.fullScreen ?? true;
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background text-foreground">
+        <div className={`${fullScreen ? 'min-h-screen bg-background' : ''} flex flex-col items-center justify-center gap-4 py-12 text-foreground`}>
           <h1 className="text-xl font-semibold">Something went wrong</h1>
           <Button onClick={() => this.setState({ hasError: false })}>
             Try again

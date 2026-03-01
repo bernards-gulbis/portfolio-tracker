@@ -299,10 +299,10 @@ function App() {
               <Route element={<AuthGuard />}>
                 <Route element={<AppLayout />}>
                   <Route index element={<PortfolioRedirect />} />
-                  <Route path="portfolios/:id" element={<PortfolioPage />} />
-                  <Route path="portfolios/:id/analytics" element={<AnalyticsPage />} />
-                  <Route path="aggregate" element={<AggregatedPage />} />
-                  <Route path="settings" element={<SettingsLayout />}>
+                  <Route path="portfolios/:id" element={<ErrorBoundary fullScreen={false}><PortfolioPage /></ErrorBoundary>} />
+                  <Route path="portfolios/:id/analytics" element={<ErrorBoundary fullScreen={false}><AnalyticsPage /></ErrorBoundary>} />
+                  <Route path="aggregate" element={<ErrorBoundary fullScreen={false}><AggregatedPage /></ErrorBoundary>} />
+                  <Route path="settings" element={<ErrorBoundary fullScreen={false}><SettingsLayout /></ErrorBoundary>}>
                     <Route index element={<Navigate to="profile" replace />} />
                     <Route path="profile" element={<ProfileSection />} />
                     <Route path="password" element={<PasswordSection />} />

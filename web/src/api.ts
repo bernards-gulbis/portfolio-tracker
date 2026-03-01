@@ -52,10 +52,6 @@ export interface Portfolio {
   created_at: string;
 }
 
-export interface PortfolioWithTransactions extends Portfolio {
-  transactions: Transaction[];
-}
-
 export interface Transaction {
   id: number;
   portfolio_id: number;
@@ -257,14 +253,6 @@ export const closeAccount = async (data: CloseAccountRequest): Promise<void> => 
  */
 export const getPortfolios = async (): Promise<Portfolio[]> => {
   const response = await api.get<Portfolio[]>('/portfolios/');
-  return response.data;
-};
-
-/**
- * Get a specific portfolio with its transactions
- */
-export const getPortfolio = async (portfolioId: number): Promise<PortfolioWithTransactions> => {
-  const response = await api.get<PortfolioWithTransactions>(`/portfolios/${portfolioId}`);
   return response.data;
 };
 

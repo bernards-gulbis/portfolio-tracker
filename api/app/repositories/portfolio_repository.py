@@ -21,10 +21,6 @@ class PortfolioRepository:
         self.session.refresh(portfolio)
         return portfolio
 
-    def _get_by_id(self, portfolio_id: int) -> Optional[Portfolio]:
-        """Get a portfolio by ID with no user ownership check. Internal use only."""
-        return self.session.get(Portfolio, portfolio_id)
-
     def get_by_id_and_user(self, portfolio_id: int, user_id: uuid.UUID) -> Optional[Portfolio]:
         """Get a portfolio by ID scoped to user"""
         statement = select(Portfolio).where(
@@ -32,11 +28,6 @@ class PortfolioRepository:
             Portfolio.user_id == user_id
         )
         return self.session.exec(statement).first()
-
-    def _get_all(self) -> List[Portfolio]:
-        """Get all portfolios with no user filter. Internal use only."""
-        statement = select(Portfolio)
-        return list(self.session.exec(statement).all())
 
     def get_all_for_user(self, user_id: uuid.UUID) -> List[Portfolio]:
         """Get all portfolios for a specific user"""
@@ -76,22 +67,24 @@ class PortfolioRepository:
         self.session.add(new_portfolio)
         self.session.flush()
 
-        for original_transaction in original.transactions:
-            new_transaction = Transaction(
+        new_transactions = [
+            Transaction(
                 portfolio_id=new_portfolio.id,
-                date=original_transaction.date,
-                type=original_transaction.type,
-                ticker=original_transaction.ticker,
-                quantity=original_transaction.quantity,
-                price_per_share=original_transaction.price_per_share,
-                fee=original_transaction.fee,
-                total_amount=original_transaction.total_amount,
-                eur_amount=original_transaction.eur_amount,
-                split_ratio=original_transaction.split_ratio,
-                currency=original_transaction.currency,
-                fx_rate=original_transaction.fx_rate,
+                date=t.date,
+                type=t.type,
+                ticker=t.ticker,
+                quantity=t.quantity,
+                price_per_share=t.price_per_share,
+                fee=t.fee,
+                total_amount=t.total_amount,
+                eur_amount=t.eur_amount,
+                split_ratio=t.split_ratio,
+                currency=t.currency,
+                fx_rate=t.fx_rate,
             )
-            self.session.add(new_transaction)
+            for t in original.transactions
+        ]
+        self.session.add_all(new_transactions)
 
         self.session.commit()
         self.session.refresh(new_portfolio)

@@ -12,7 +12,6 @@ from app.schemas import (
     PortfolioUpdate,
     PortfolioCopy,
     PortfolioResponse,
-    PortfolioWithTransactions,
     PortfolioStatusResponse,
     PortfolioPerformanceResponse,
     PerformanceDataPoint,
@@ -101,13 +100,13 @@ def get_aggregated_performance(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{portfolio_id}", response_model=PortfolioWithTransactions)
+@router.get("/{portfolio_id}", response_model=PortfolioResponse)
 def get_portfolio(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
 ):
-    """Get a specific portfolio with its transactions"""
+    """Get a specific portfolio"""
     service = PortfolioService(session)
     return service.get_portfolio(portfolio_id, user.id)
 

@@ -101,21 +101,18 @@ class _TxState:
     realized_gains: Decimal = _ZERO
     holdings: Dict[str, Dict[str, Decimal]] = dc_field(default_factory=dict)
     warnings: List[Dict[str, object]] = dc_field(default_factory=list)
+    usd_to_eur_fallback: Optional[float] = None
 
 
-def _eur_from_tx(tx: Transaction, total_amount: Decimal) -> Decimal:
+def _eur_from_tx(tx: Transaction, total_amount: Decimal, usd_to_eur_fallback: Optional[float] = None) -> Decimal:
     """Return the EUR equivalent of a transaction, or 0 if no rate is available."""
     if tx.eur_amount is not None:
         return _to_decimal(tx.eur_amount)
     if tx.fx_rate is not None and tx.fx_rate > 0:
         return total_amount / _to_decimal(tx.fx_rate)
-    # Fallback: use current USD→EUR rate
-    try:
-        usd_to_eur = PriceService.get_usd_to_eur_rate()
-        if usd_to_eur is not None:
-            return total_amount * _to_decimal(usd_to_eur)
-    except Exception:
-        pass
+    # Fallback: use pre-fetched USD→EUR rate
+    if usd_to_eur_fallback is not None:
+        return total_amount * _to_decimal(usd_to_eur_fallback)
     return _ZERO
 
 
@@ -123,7 +120,7 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.principal += total
-    eur = _eur_from_tx(tx, total)
+    eur = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
     state.principal_eur += eur
 
 
@@ -131,7 +128,7 @@ def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)  # total is negative
     state.cash += total
     state.principal += total
-    state.principal_eur += _eur_from_tx(tx, total)
+    state.principal_eur += _eur_from_tx(tx, total, state.usd_to_eur_fallback)
     if strict and state.cash < 0:
         state.warnings.append({
             'code': 'withdrawNegativeCash',
@@ -195,7 +192,7 @@ def _apply_dividend(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.dividends += total
-    state.dividends_eur += _eur_from_tx(tx, total)
+    state.dividends_eur += _eur_from_tx(tx, total, state.usd_to_eur_fallback)
 
 
 def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -665,7 +662,15 @@ class PortfolioService:
 
         transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
 
+        # Fetch live USD→EUR rate once; reused for EUR fallback in transaction loop
+        # and returned to frontend for client-side EUR conversion
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+        except Exception:
+            usd_to_eur_rate = None
+
         state = _TxState()
+        state.usd_to_eur_fallback = usd_to_eur_rate
         for tx in transactions:
             _apply_transaction(state, tx, strict=True)
 
@@ -676,12 +681,6 @@ class PortfolioService:
         except Exception as e:
             logger.error("Error fetching prices for portfolio %s: %s", portfolio_id, e, exc_info=True)
             current_prices = dict.fromkeys(tickers)
-
-        # Fetch live USD→EUR rate; passed to frontend for client-side EUR conversion
-        try:
-            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
-        except Exception:
-            usd_to_eur_rate = None
 
         # Build holdings list and aggregate metrics
         holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
@@ -806,7 +805,14 @@ class PortfolioService:
 
         transactions = self.transaction_repo.get_by_portfolio_ids(portfolio_ids)
 
+        # Fetch live USD→EUR rate once; reused for EUR fallback in transaction loop
+        try:
+            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
+        except Exception:
+            usd_to_eur_rate = None
+
         state = _TxState()
+        state.usd_to_eur_fallback = usd_to_eur_rate
         for tx in transactions:
             _apply_transaction(state, tx, strict=True)
 
@@ -816,11 +822,6 @@ class PortfolioService:
         except Exception as e:
             logger.error("Error fetching prices for aggregated portfolios: %s", e, exc_info=True)
             current_prices = dict.fromkeys(tickers)
-
-        try:
-            usd_to_eur_rate = PriceService.get_usd_to_eur_rate()
-        except Exception:
-            usd_to_eur_rate = None
 
         holdings_list, holdings_cost, holdings_value, unrealized_gains, missing_prices = \
             _build_holdings_list(state, current_prices)

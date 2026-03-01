@@ -110,6 +110,3 @@ class TransactionRepository:
             return True
         return False
 
-    def exists(self, transaction_id: int) -> bool:
-        """Check if a transaction exists"""
-        return self.get_by_id(transaction_id) is not None

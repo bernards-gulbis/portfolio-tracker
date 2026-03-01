@@ -56,36 +56,48 @@ class PriceService:
         cls,
         ticker: str,
         start_date: datetime,
-        end_date: datetime
+        end_date: datetime,
+        session: Optional[Session] = None,
     ) -> Dict[str, float]:
         """Retrieve cached historical prices from database"""
         start_str = start_date.strftime('%Y-%m-%d')
         end_str = end_date.strftime('%Y-%m-%d')
 
-        with Session(engine) as session:
+        def _query(s: Session) -> Dict[str, float]:
             statement = select(HistoricalPrice).where(
                 HistoricalPrice.ticker == ticker,
                 HistoricalPrice.date >= start_str,
                 HistoricalPrice.date <= end_str
             )
-            results = session.exec(statement).all()
+            results = s.exec(statement).all()
             return {price.date: price.price for price in results}
 
+        if session is not None:
+            return _query(session)
+        with Session(engine) as s:
+            return _query(s)
+
     @classmethod
-    def _bulk_upsert(cls, model, values: List[dict], index_elements: List[str], update_fields: List[str], label: str) -> None:
+    def _bulk_upsert(cls, model, values: List[dict], index_elements: List[str], update_fields: List[str], label: str, session: Optional[Session] = None) -> None:
         """Bulk upsert rows into a table using ON CONFLICT, silently swallowing errors."""
         if not values:
             return
         try:
-            with Session(engine) as session:
+            def _execute(s: Session) -> None:
                 insert_fn = pg_insert if is_postgresql else sqlite_insert
                 stmt = insert_fn(model).values(values)
                 stmt = stmt.on_conflict_do_update(
                     index_elements=index_elements,
                     set_={k: getattr(stmt.excluded, k) for k in update_fields},
                 )
-                session.execute(stmt)
-                session.commit()
+                s.execute(stmt)
+                s.commit()
+
+            if session is not None:
+                _execute(session)
+            else:
+                with Session(engine) as s:
+                    _execute(s)
             logger.debug("Saved %d %s to cache", len(values), label)
         except Exception as e:
             logger.error("Failed to save %d %s: %s", len(values), label, e, exc_info=True)
@@ -109,19 +121,25 @@ class PriceService:
     def _get_cached_fx_rates(
         cls,
         start_date: datetime,
-        end_date: datetime
+        end_date: datetime,
+        session: Optional[Session] = None,
     ) -> Dict[str, float]:
         """Retrieve cached FX rates from database"""
         start_str = start_date.strftime('%Y-%m-%d')
         end_str = end_date.strftime('%Y-%m-%d')
 
-        with Session(engine) as session:
+        def _query(s: Session) -> Dict[str, float]:
             statement = select(FxRate).where(
                 FxRate.date >= start_str,
                 FxRate.date <= end_str
             )
-            results = session.exec(statement).all()
+            results = s.exec(statement).all()
             return {rate.date: rate.usd_to_eur_rate for rate in results}
+
+        if session is not None:
+            return _query(session)
+        with Session(engine) as s:
+            return _query(s)
 
     @classmethod
     def _save_fx_rates(cls, rates: Dict[str, float]) -> None:
@@ -139,23 +157,28 @@ class PriceService:
         )
     
     @classmethod
-    def get_last_known_price(cls, ticker: str) -> Optional[float]:
+    def get_last_known_price(cls, ticker: str, session: Optional[Session] = None) -> Optional[float]:
         """Return the most recent cached price for a ticker, regardless of date range.
 
         Uses the HistoricalPrice table (composite PK on ticker+date), so
         ORDER BY date DESC LIMIT 1 is index-friendly.
         """
-        with Session(engine) as session:
+        def _query(s: Session) -> Optional[float]:
             statement = (
                 select(HistoricalPrice)
                 .where(HistoricalPrice.ticker == ticker)
                 .order_by(HistoricalPrice.date.desc())
                 .limit(1)
             )
-            result = session.exec(statement).first()
+            result = s.exec(statement).first()
             if result:
                 return result.price
             return None
+
+        if session is not None:
+            return _query(session)
+        with Session(engine) as s:
+            return _query(s)
 
     @classmethod
     def get_current_prices(cls, tickers: List[str], max_workers: int = 3) -> Dict[str, Optional[float]]:

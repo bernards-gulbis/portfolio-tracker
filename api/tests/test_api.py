@@ -115,7 +115,6 @@ def test_get_portfolio(client: TestClient):
     data = response.json()
     assert data["name"] == "Test Portfolio"
     assert data["id"] == portfolio_id
-    assert "transactions" in data
 
 
 def test_get_nonexistent_portfolio(client: TestClient):
@@ -424,11 +423,11 @@ def test_delete_transaction(client: TestClient):
     response = client.delete(f"/transactions/{transaction_id}")
     assert response.status_code == 204
     
-    # Verify it's gone from portfolio (portfolio should still exist with 0 transactions)
-    response = client.get(f"/portfolios/{portfolio_id}")
+    # Verify it's gone via paginated transactions endpoint
+    response = client.get(f"/portfolios/{portfolio_id}/transactions")
     assert response.status_code == 200
     data = response.json()
-    assert len(data["transactions"]) == 0
+    assert data["total"] == 0
 
 
 def test_export_transactions_csv(client: TestClient):
@@ -840,19 +839,16 @@ def test_copy_portfolio_with_transactions(client: TestClient):
     assert copied_portfolio_id != portfolio_id
     
     # Verify original portfolio still has transactions
-    original_response = client.get(f"/portfolios/{portfolio_id}")
-    original_data = original_response.json()
-    assert len(original_data["transactions"]) == 2
-    
+    original_tx_resp = client.get(f"/portfolios/{portfolio_id}/transactions", params={"sort_order": "asc"})
+    original_transactions = original_tx_resp.json()["transactions"]
+    assert len(original_transactions) == 2
+
     # Verify copied portfolio has all transactions
-    copied_response = client.get(f"/portfolios/{copied_portfolio_id}")
-    copied_full_data = copied_response.json()
-    assert len(copied_full_data["transactions"]) == 2
-    
+    copied_tx_resp = client.get(f"/portfolios/{copied_portfolio_id}/transactions", params={"sort_order": "asc"})
+    copied_transactions = copied_tx_resp.json()["transactions"]
+    assert len(copied_transactions) == 2
+
     # Verify transaction data matches (but with different IDs and portfolio_id)
-    original_transactions = sorted(original_data["transactions"], key=lambda x: x["date"])
-    copied_transactions = sorted(copied_full_data["transactions"], key=lambda x: x["date"])
-    
     assert original_transactions[0]["type"] == copied_transactions[0]["type"]
     assert original_transactions[0]["total_amount"] == copied_transactions[0]["total_amount"]
     assert original_transactions[1]["ticker"] == copied_transactions[1]["ticker"]

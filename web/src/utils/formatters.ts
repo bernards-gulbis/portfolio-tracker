@@ -21,13 +21,6 @@ export const formatSignedCurrency = (value: number | null | undefined, currency:
 };
 
 /**
- * Format number with specified decimal places
- */
-export const formatNumber = (value: number, decimals: number = 2): string => {
-  return value.toFixed(decimals);
-};
-
-/**
  * Format quantity — show up to 8 decimals but strip trailing zeros.
  */
 export const formatQuantity = (value: number): string => {
