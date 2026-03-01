@@ -35,7 +35,6 @@ const TransactionView = () => {
     debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
     sortOrder
   );
-  const gainByTxId = new Map<number, { gain: number; gainPct: number | null }>();
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
@@ -190,7 +189,6 @@ const TransactionView = () => {
         <TransactionTable
           transactions={transactions}
           portfolioId={activePortfolioId}
-          gainByTxId={gainByTxId}
           onEdit={handleEdit}
           currentPage={currentPage}
           totalPages={totalPages}

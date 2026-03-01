@@ -225,8 +225,8 @@ def get_portfolio_performance(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{portfolio_id}/sells", response_model=AggregatedSalesResponse)
-def get_portfolio_aggregated_sells(
+@router.get("/{portfolio_id}/realized-sales", response_model=AggregatedSalesResponse)
+def get_portfolio_realized_sales(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],

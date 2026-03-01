@@ -394,7 +394,7 @@ export const getPortfolioAggregatedSells = async (
   ticker?: string,
 ): Promise<AggregatedSalesResponse> => {
   const params = ticker ? { ticker } : undefined;
-  const response = await api.get<AggregatedSalesResponse>(`/portfolios/${portfolioId}/sells`, { params });
+  const response = await api.get<AggregatedSalesResponse>(`/portfolios/${portfolioId}/realized-sales`, { params });
   return response.data;
 };
 

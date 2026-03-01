@@ -3575,7 +3575,7 @@ def test_aggregated_sales_basic(client: TestClient):
         "quantity": 10.0, "price_per_share": 150.0, "total_amount": 1500.0,
     })
 
-    response = client.get(f"/portfolios/{pid}/sells")
+    response = client.get(f"/portfolios/{pid}/realized-sales")
     assert response.status_code == 200
     data = response.json()
 
@@ -3605,7 +3605,7 @@ def test_aggregated_sales_loss(client: TestClient):
         "quantity": 5.0, "price_per_share": 150.0, "total_amount": 750.0,
     })
 
-    response = client.get(f"/portfolios/{pid}/sells")
+    response = client.get(f"/portfolios/{pid}/realized-sales")
     data = response.json()
 
     assert len(data["sales"]) == 1
@@ -3637,7 +3637,7 @@ def test_aggregated_sales_multiple_sells_same_ticker(client: TestClient):
         "quantity": 10.0, "price_per_share": 80.0, "total_amount": 800.0,
     })
 
-    response = client.get(f"/portfolios/{pid}/sells")
+    response = client.get(f"/portfolios/{pid}/realized-sales")
     data = response.json()
 
     # Two sells of AAPL → one aggregated row; sell 1: +200, sell 2: -200
@@ -3675,7 +3675,7 @@ def test_aggregated_sales_multiple_tickers(client: TestClient):
         "quantity": 5.0, "price_per_share": 150.0, "total_amount": 750.0,
     })
 
-    response = client.get(f"/portfolios/{pid}/sells")
+    response = client.get(f"/portfolios/{pid}/realized-sales")
     data = response.json()
 
     assert len(data["sales"]) == 2
@@ -3713,7 +3713,7 @@ def test_aggregated_sales_ticker_filter(client: TestClient):
     })
 
     # Filter to only AAPL
-    response = client.get(f"/portfolios/{pid}/sells", params={"ticker": "AAPL"})
+    response = client.get(f"/portfolios/{pid}/realized-sales", params={"ticker": "AAPL"})
     assert response.status_code == 200
     data = response.json()
 
@@ -3723,11 +3723,11 @@ def test_aggregated_sales_ticker_filter(client: TestClient):
     assert data["total_realized_gain_loss"] == pytest.approx(500.0)
 
     # Filter is case-insensitive
-    response_lower = client.get(f"/portfolios/{pid}/sells", params={"ticker": "aapl"})
+    response_lower = client.get(f"/portfolios/{pid}/realized-sales", params={"ticker": "aapl"})
     assert len(response_lower.json()["sales"]) == 1
 
     # Unknown ticker returns empty
-    response_none = client.get(f"/portfolios/{pid}/sells", params={"ticker": "GOOG"})
+    response_none = client.get(f"/portfolios/{pid}/realized-sales", params={"ticker": "GOOG"})
     assert len(response_none.json()["sales"]) == 0
 
 
@@ -3744,7 +3744,7 @@ def test_aggregated_sales_no_sells(client: TestClient):
         "quantity": 10.0, "price_per_share": 100.0, "total_amount": -1000.0,
     })
 
-    response = client.get(f"/portfolios/{pid}/sells")
+    response = client.get(f"/portfolios/{pid}/realized-sales")
     data = response.json()
 
     assert len(data["sales"]) == 0
@@ -3779,7 +3779,7 @@ def test_aggregated_sales_win_rate_and_profit_factor(client: TestClient):
         "quantity": 10.0, "price_per_share": 80.0, "total_amount": 800.0,
     })
 
-    response = client.get(f"/portfolios/{pid}/sells")
+    response = client.get(f"/portfolios/{pid}/realized-sales")
     data = response.json()
 
     assert len(data["sales"]) == 1
@@ -3793,5 +3793,5 @@ def test_aggregated_sales_win_rate_and_profit_factor(client: TestClient):
 
 def test_aggregated_sales_nonexistent_portfolio(client: TestClient):
     """Nonexistent portfolio should return 404"""
-    response = client.get("/portfolios/999/sells")
+    response = client.get("/portfolios/999/realized-sales")
     assert response.status_code == 404

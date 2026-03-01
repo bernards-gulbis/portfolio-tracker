@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, TransactionType, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatSignedCurrency, formatDate, formatDateCompact } from '../utils/formatters';
+import { formatCurrency, formatDate, formatDateCompact } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { MAX_VISIBLE_PAGES } from '../constants/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +58,6 @@ import { toast } from 'sonner';
 interface TransactionTableProps {
   transactions: Transaction[];
   portfolioId: number;
-  gainByTxId: Map<number, { gain: number; gainPct: number | null }>;
   onEdit: (transaction: Transaction) => void;
   currentPage: number;
   totalPages: number;
@@ -79,7 +78,6 @@ interface TransactionTableProps {
 const TransactionTable = ({
   transactions,
   portfolioId,
-  gainByTxId,
   onEdit,
   currentPage,
   totalPages,
@@ -98,25 +96,6 @@ const TransactionTable = ({
   const { t } = useTranslation();
   const locale = useLocale();
   const deleteTransaction = useDeleteTransaction();
-
-  const renderGainCell = (transactionId: number) => {
-    const entry = gainByTxId.get(transactionId);
-    if (!entry) return <span className="text-muted-foreground">—</span>;
-    const { gain, gainPct } = entry;
-    const colorClass = gain >= 0 ? 'text-positive' : 'text-negative';
-    return (
-      <div className="flex flex-col items-end">
-        <span className={`font-semibold ${colorClass}`}>
-          {formatSignedCurrency(gain, 'USD', locale)}
-        </span>
-        {gainPct != null && (
-          <span className={`text-xs ${colorClass}`}>
-            {gainPct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(gainPct).toFixed(2)}%
-          </span>
-        )}
-      </div>
-    );
-  };
 
   const transactionTypeLabels = useMemo<Record<TransactionType, string>>(() => ({
     [TransactionType.DEPOSIT]: t('transaction.modal.types.Deposit'),
@@ -336,7 +315,6 @@ const TransactionTable = ({
               <TableHead>{t('transaction.table.columns.ticker')}</TableHead>
               <TableHead>{t('transaction.table.columns.details')}</TableHead>
               <TableHead className="text-right">{t('transaction.table.columns.totalAmount')}</TableHead>
-              <TableHead className="text-right">{t('transaction.table.columns.gain')}</TableHead>
               <TableHead className="text-center">{t('transaction.table.columns.actions')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -355,11 +333,6 @@ const TransactionTable = ({
                 </TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(transaction.total_amount, 'USD', locale)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {transaction.type === TransactionType.SELL
-                    ? renderGainCell(transaction.id)
-                    : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 <TableCell className="text-center">
                   <DropdownMenu open={openMenuId === transaction.id} onOpenChange={(open) => setOpenMenuId(open ? transaction.id : null)}>

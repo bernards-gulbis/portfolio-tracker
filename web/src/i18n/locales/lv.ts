@@ -189,7 +189,6 @@ const lv: Translation = {
         detailsFormat: '{{qty}} akcijas par {{price}}',
         splitFormat: 'Sadalīts 1:{{ratio}}',
         totalAmount: 'Kopējā summa',
-        gain: 'Peļņa/Zaudējumi',
         actions: 'Darbības',
       },
       actions: {

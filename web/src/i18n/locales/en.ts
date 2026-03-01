@@ -187,7 +187,6 @@ const en = {
         detailsFormat: '{{qty}} shares at {{price}}',
         splitFormat: 'Split 1:{{ratio}}',
         totalAmount: 'Total Amount',
-        gain: 'Gain/Loss',
         actions: 'Actions',
       },
       actions: {
