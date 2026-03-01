@@ -127,6 +127,13 @@ type FormValues = z.infer<typeof schema>;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
+/** Round a numeric string to 2 decimal places on blur */
+const formatCurrency = (value: string | undefined, onChange: (v: string) => void) => {
+  if (!value) return;
+  const n = Number.parseFloat(value);
+  if (!Number.isNaN(n)) onChange(n.toFixed(2));
+};
+
 /** Returns local date as "YYYY-MM-DD" */
 const toLocalDate = (date: Date): string => {
   const y = date.getFullYear();
@@ -644,6 +651,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -672,6 +680,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -701,6 +710,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -729,6 +739,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onBlur={() => formatCurrency(field.value, field.onChange)}
                       />
                       <InputGroupAddon align="inline-end">
                         <InputGroupText>EUR</InputGroupText>
