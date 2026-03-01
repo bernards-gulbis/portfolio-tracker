@@ -3,11 +3,11 @@ import { vi } from 'vitest';
 import '../i18n/index';
 
 // Recharts uses ResizeObserver which is not available in jsdom
-globalThis.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
 
 // shadcn SidebarProvider uses window.matchMedia which is not available in jsdom
 Object.defineProperty(globalThis, 'matchMedia', {

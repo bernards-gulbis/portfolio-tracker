@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase, Layers, UserIcon, TrendingUpDown } from 'lucide-react';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import CreatePortfolioModal from './components/CreatePortfolioModal';
@@ -53,7 +53,7 @@ import { AnalyticsPage } from './components/AnalyticsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
-export const queryClient = new QueryClient({
+const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
@@ -98,20 +98,23 @@ function AppLayout() {
   const portfolioMatch = useMatch('/portfolios/:id');
   const matchedId = portfolioMatch?.params.id ? Number(portfolioMatch.params.id) : null;
   const activePortfolioId = matchedId && Number.isFinite(matchedId) ? matchedId : null;
-  const lastPortfolioId = useRef<number | null>(null);
+  const [lastPortfolioId, setLastPortfolioId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (activePortfolioId !== null) {
-      lastPortfolioId.current = activePortfolioId;
-    }
-  }, [activePortfolioId]);
-
-  // Clear stale ref if the remembered portfolio was deleted
-  if (lastPortfolioId.current !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioId.current)) {
-    lastPortfolioId.current = null;
+  // Track the last visited portfolio (adjust state during render)
+  if (
+    activePortfolioId !== null &&
+    lastPortfolioId !== activePortfolioId &&
+    (!portfolios || portfolios.some((p) => p.id === activePortfolioId))
+  ) {
+    setLastPortfolioId(activePortfolioId);
   }
 
-  const rememberedId = activePortfolioId ?? lastPortfolioId.current;
+  // Clear stale state if the remembered portfolio was deleted
+  if (lastPortfolioId !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioId)) {
+    setLastPortfolioId(null);
+  }
+
+  const rememberedId = activePortfolioId ?? lastPortfolioId;
   const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
   const analyticsPath = rememberedId ? `/portfolios/${rememberedId}/analytics` : '/';
   const isAnalyticsActive = pathname.endsWith('/analytics');

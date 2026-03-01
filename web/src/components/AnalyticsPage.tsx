@@ -101,6 +101,7 @@ export const AnalyticsPage = () => {
       <CardContent>
         <div className="mb-4 max-w-xs">
           <Input
+            id="ticker-filter"
             placeholder={t('analytics.filterByTicker')}
             value={tickerFilter}
             onChange={(e) => setTickerFilter(e.target.value)}

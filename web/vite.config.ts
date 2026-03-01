@@ -35,6 +35,16 @@ export default defineConfig({
           if (['react-hook-form', '@hookform', 'zod', 'react-day-picker'].includes(pkg)) {
             return 'vendor-forms';
           }
+          if (pkg === 'recharts' || pkg.startsWith('d3-') || pkg === 'victory-vendor') {
+            return 'vendor-recharts';
+          }
+          if (pkg === 'react-router-dom' || pkg === 'react-router') {
+            return 'vendor-router';
+          }
+          if (pkg === 'i18next' || pkg === 'react-i18next' || pkg === 'i18next-browser-languagedetector') {
+            return 'vendor-i18n';
+          }
+          if (pkg === 'lucide-react') return 'vendor-icons';
           return 'vendor';
         },
       },

@@ -431,47 +431,50 @@ export const PerformanceChart = ({
               }
             />
             <ChartLegend content={<ChartLegendContent className="text-[10px] sm:text-xs" />} />
-            {viewMode === 'value' ? (
-              <>
-                <Area
-                  type="monotone"
-                  dataKey="currentValue"
-                  fill="url(#fillPerformanceValue)"
-                  stroke="var(--color-currentValue)"
-                  strokeWidth={2}
-                  dot={false}
-                  connectNulls
-                />
-                <Line
-                  type="monotone"
-                  dataKey="principal"
-                  stroke="var(--color-principal)"
-                  strokeWidth={1.5}
-                  dot={false}
-                  connectNulls
-                />
-              </>
-            ) : (
-              <>
-                <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
-                <Line
-                  type="monotone"
-                  dataKey="returnPct"
-                  stroke="var(--color-returnPct)"
-                  strokeWidth={2}
-                  dot={false}
-                  connectNulls
-                />
-                <Line
-                  type="monotone"
-                  dataKey="sp500ReturnPct"
-                  stroke="var(--color-sp500ReturnPct)"
-                  strokeWidth={1.5}
-                  strokeDasharray="5 3"
-                  dot={false}
-                  connectNulls
-                />
-              </>
+            {viewMode === 'value' && (
+              <Area
+                type="monotone"
+                dataKey="currentValue"
+                fill="url(#fillPerformanceValue)"
+                stroke="var(--color-currentValue)"
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            )}
+            {viewMode === 'value' && (
+              <Line
+                type="monotone"
+                dataKey="principal"
+                stroke="var(--color-principal)"
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls
+              />
+            )}
+            {viewMode !== 'value' && (
+              <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
+            )}
+            {viewMode !== 'value' && (
+              <Line
+                type="monotone"
+                dataKey="returnPct"
+                stroke="var(--color-returnPct)"
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            )}
+            {viewMode !== 'value' && (
+              <Line
+                type="monotone"
+                dataKey="sp500ReturnPct"
+                stroke="var(--color-sp500ReturnPct)"
+                strokeWidth={1.5}
+                strokeDasharray="5 3"
+                dot={false}
+                connectNulls
+              />
             )}
           </ComposedChart>
         </ChartContainer>

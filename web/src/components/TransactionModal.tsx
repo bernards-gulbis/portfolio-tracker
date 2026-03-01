@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
 import i18n from '../i18n/index';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -172,27 +172,21 @@ const DatePickerField = ({ value, onChange, invalid, locale, id, pickerAriaLabel
   // can be parsed back reliably regardless of the active locale.
   const [displayValue, setDisplayValue] = useState(value ?? '');
   const [month, setMonth] = useState<Date | undefined>(parseLocalDate(value));
+  const [prevValue, setPrevValue] = useState(value);
 
-  // Tracks changes we triggered ourselves so we don't overwrite mid-typing
-  const skipNextSyncRef = useRef(false);
-
-  useEffect(() => {
-    if (skipNextSyncRef.current) {
-      skipNextSyncRef.current = false;
-      return;
-    }
-    // External change (form reset) — re-sync display
+  // Sync with external value changes (e.g. form reset) — adjust state during render
+  if (prevValue !== value) {
+    setPrevValue(value);
     setDisplayValue(value ?? '');
     const date = parseLocalDate(value);
     if (date) setMonth(date);
-  }, [value]);
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typed = e.target.value;
     setDisplayValue(typed);
     const parsed = parseLocalDate(typed);
     if (parsed) {
-      skipNextSyncRef.current = true;
       onChange(toLocalDate(parsed));
       setMonth(parsed);
     }
@@ -201,7 +195,6 @@ const DatePickerField = ({ value, onChange, invalid, locale, id, pickerAriaLabel
   const handleCalendarSelect = (date: Date | undefined) => {
     if (date) {
       const ymd = toLocalDate(date);
-      skipNextSyncRef.current = true;
       onChange(ymd);
       setDisplayValue(ymd);
       setMonth(date);
@@ -491,6 +484,7 @@ const TransactionModal = ({
   });
 
   const { reset, clearErrors } = form;
+  // eslint-disable-next-line react-hooks/incompatible-library
   const type = form.watch('type');
   const watchedTicker = form.watch('ticker');
   const watchedQuantity = form.watch('quantity');

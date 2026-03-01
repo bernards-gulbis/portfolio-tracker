@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
@@ -64,7 +64,7 @@ const formatCurrencyWithPercent = (
   percentValue: number | null | undefined,
   currency: string = 'USD',
   locale: string = 'en-US'
-): JSX.Element | string => {
+): React.JSX.Element | string => {
   if (currencyValue == null) return '-';
   const formattedCurrency = formatSignedCurrency(currencyValue, currency, locale);
   const formattedPercent = percentValue == null ? '' : formatSignedPercent(percentValue);

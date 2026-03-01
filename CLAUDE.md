@@ -5,3 +5,10 @@ The role of this file is to describe common mistakes and confusion points that a
 This is a green-field project (not shipped no real users or data) so structure can be changed.
 For UI elements use shadcn components.
 Run unittests and add new ones.
+
+## Known gotchas
+
+### Recharts + React 19: no Fragment wrappers inside charts
+`react-is@18` (bundled with recharts) cannot detect React 19 Fragment elements (`$$typeof` changed from `Symbol(react.element)` to `Symbol(react.transitional.element)`). Recharts' `toArray` uses `isFragment` to flatten Fragments — when it fails, child components (Line, Area, etc.) inside Fragments are invisible to the chart.
+
+**Do not** wrap recharts children in `<>...</>`. Use individual `{condition && <Component />}` expressions instead.

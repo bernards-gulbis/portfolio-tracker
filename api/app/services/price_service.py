@@ -2,7 +2,6 @@
 Service for fetching current stock prices
 """
 import logging
-import os
 from typing import Dict, Optional, Tuple, List
 import requests
 from datetime import datetime, timedelta, timezone
@@ -11,6 +10,7 @@ from threading import Lock, Semaphore
 from sqlmodel import Session, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from app.core.config import PRICE_CACHE_TTL_MINUTES
 from app.core.database import engine, is_postgresql
 from app.models.historical_price import HistoricalPrice, FxRate
 
@@ -22,7 +22,7 @@ class PriceService:
     
     # Class-level cache: ticker -> (price, timestamp)
     _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
-    _cache_ttl: timedelta = timedelta(minutes=int(os.getenv('PRICE_CACHE_TTL', '15')))
+    _cache_ttl: timedelta = timedelta(minutes=PRICE_CACHE_TTL_MINUTES)
     _cache_lock = Lock()  # Thread-safe cache access
     _yahoo_semaphore = Semaphore(5)  # Max 5 concurrent outgoing Yahoo Finance requests
     

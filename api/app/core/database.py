@@ -1,17 +1,11 @@
 from sqlmodel import SQLModel, create_engine, Session
 from typing import Generator
-import os
 import logging
 from sqlalchemy import event, text
 
-logger = logging.getLogger(__name__)
+from app.core.config import DATABASE_URL, DB_POOL_SIZE, DB_MAX_OVERFLOW, DATABASE_ECHO
 
-# Get database URL from environment variable
-# Default to SQLite for local development
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./portfolio_tracker.db"
-)
+logger = logging.getLogger(__name__)
 
 # Determine if we're using PostgreSQL (supports both postgresql:// and postgres:// schemes)
 is_postgresql = DATABASE_URL.startswith(("postgresql://", "postgres://"))
@@ -23,20 +17,16 @@ try:
         connect_args = {
             "sslmode": "require",  # Enforce SSL for security
         }
-        
-        # Get pool configuration from environment or use defaults
-        pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
-        max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
-        
+
         engine = create_engine(
             DATABASE_URL,
-            echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
+            echo=DATABASE_ECHO,
             connect_args=connect_args,
             pool_pre_ping=True,  # Verify connections before using
-            pool_size=pool_size,
-            max_overflow=max_overflow
+            pool_size=DB_POOL_SIZE,
+            max_overflow=DB_MAX_OVERFLOW,
         )
-        logger.info("PostgreSQL engine created (pool_size=%d, max_overflow=%d)", pool_size, max_overflow)
+        logger.info("PostgreSQL engine created (pool_size=%d, max_overflow=%d)", DB_POOL_SIZE, DB_MAX_OVERFLOW)
     else:
         # SQLite configuration
         connect_args = {
@@ -45,8 +35,8 @@ try:
         }
         engine = create_engine(
             DATABASE_URL,
-            echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
-            connect_args=connect_args
+            echo=DATABASE_ECHO,
+            connect_args=connect_args,
         )
         logger.info("SQLite engine created")
         

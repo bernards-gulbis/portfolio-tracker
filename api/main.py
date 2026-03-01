@@ -3,13 +3,11 @@ Portfolio Tracker API - Main Application
 """
 import logging
 import sys
-import os
 from datetime import datetime
 from urllib.parse import urlencode
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+from app.core.config import CORS_ORIGINS, LOG_LEVEL
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
@@ -38,7 +36,7 @@ from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout)
@@ -86,14 +84,9 @@ async def add_security_headers(request: Request, call_next):
 
 # Configure CORS (added after security headers so it wraps outermost —
 # ensures CORS headers are present even on unhandled 500 errors)
-cors_origins = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173"
-).split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in cors_origins],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

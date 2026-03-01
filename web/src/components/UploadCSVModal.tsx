@@ -49,6 +49,7 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
   });
 
   const { reset } = form;
+  // eslint-disable-next-line react-hooks/incompatible-library
   const file = form.watch('file');
 
   useEffect(() => {
