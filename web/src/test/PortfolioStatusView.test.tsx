@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { PortfolioStatusView } from '../components/PortfolioStatusView';
+import { CurrencyProvider } from '../hooks/useCurrencyPreference';
 import type { PortfolioStatus } from '../api';
 
 vi.mock('../hooks/usePortfolioStatus', () => ({
@@ -35,12 +36,14 @@ const renderComponent = (initialEntry: string = '/') => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path="/" element={<PortfolioStatusView />} />
-          <Route path="/portfolios/:id" element={<PortfolioStatusView />} />
-        </Routes>
-      </MemoryRouter>
+      <CurrencyProvider>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path="/" element={<PortfolioStatusView />} />
+            <Route path="/portfolios/:id" element={<PortfolioStatusView />} />
+          </Routes>
+        </MemoryRouter>
+      </CurrencyProvider>
     </QueryClientProvider>
   );
 };
@@ -200,37 +203,6 @@ describe('PortfolioStatusView', () => {
     renderComponent('/portfolios/1');
 
     expect(screen.queryByText(/no transactions yet/i)).not.toBeInTheDocument();
-  });
-
-  it('shows currency toggle button', () => {
-    vi.mocked(usePortfolioStatus).mockReturnValue({
-      data: mockStatus,
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolioStatus>);
-
-    renderComponent('/portfolios/1');
-
-    // Toggle button shows USD / EUR
-    expect(screen.getByRole('button', { name: /currency/i })).toBeInTheDocument();
-  });
-
-  it('shows EUR unavailable message when rate is null and EUR selected', () => {
-    const noRateStatus: PortfolioStatus = {
-      ...mockStatus,
-      usd_to_eur_rate: null,
-    };
-
-    vi.mocked(usePortfolioStatus).mockReturnValue({
-      data: noRateStatus,
-      isLoading: false,
-      error: null,
-    } as unknown as ReturnType<typeof usePortfolioStatus>);
-
-    renderComponent('/portfolios/1');
-
-    // By default currency is EUR — shows unavailable message
-    expect(screen.getByText(/EUR unavailable/i)).toBeInTheDocument();
   });
 
   it('renders transaction warnings when present', () => {

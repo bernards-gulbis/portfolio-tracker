@@ -23,6 +23,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import type { PerformanceDataPoint } from '../api';
+import type { Currency } from '../hooks/useCurrencyPreference';
 
 type TimePeriod = '1month' | '3month' | '6month' | 'ytd' | '1year' | 'all';
 
@@ -37,7 +38,7 @@ interface LiveLastPoint {
 interface PerformanceChartProps {
   data: PerformanceDataPoint[];
   loading?: boolean;
-  currency?: 'EUR' | 'USD';
+  currency?: Currency;
   liveLastPoint?: LiveLastPoint;
 }
 
@@ -48,7 +49,7 @@ const parseYMD = (value: string): Date => {
 };
 
 /** Compact currency label for YAxis (e.g. €1.5M, €10k or $1.5M, $10k). */
-const formatCompactValue = (value: number, currency: 'EUR' | 'USD'): string => {
+const formatCompactValue = (value: number, currency: Currency): string => {
   const symbol = currency === 'EUR' ? '€' : '$';
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `${symbol}${(value / 1_000_000).toFixed(1)}M`;
@@ -107,7 +108,7 @@ const PerformanceTooltipItem = memo(({
   color: string;
   chartConfig: ChartConfig;
   locale: string;
-  currency: 'EUR' | 'USD';
+  currency: Currency;
   notAvailableLabel: string;
 }) => {
   let formatted: string;
@@ -145,7 +146,7 @@ const PerformanceTooltipContent = memo(({
 }: ComponentProps<typeof ChartTooltipContent> & {
   chartConfig: ChartConfig;
   locale: string;
-  currency: 'EUR' | 'USD';
+  currency: Currency;
   notAvailableLabel: string;
 }) => (
   <ChartTooltipContent

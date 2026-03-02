@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import PortfolioSwitcher from '../components/PortfolioSwitcher';
 import type { Portfolio } from '../api';
-import { SidebarProvider } from '../components/ui/sidebar';
 
 vi.mock('../hooks/usePortfolios', () => ({
   usePortfolios: vi.fn(),
@@ -31,17 +30,15 @@ const renderComponent = (activePortfolioId: number | null = null) => {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <SidebarProvider>
-          <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
-        </SidebarProvider>
+        <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
       </MemoryRouter>
     </QueryClientProvider>
   );
 };
 
 const mockPortfolios: Portfolio[] = [
-  { id: 1, name: 'Growth Fund', created_at: '2024-01-01T00:00:00', include_in_aggregation: true },
-  { id: 2, name: 'Dividend Portfolio', created_at: '2024-02-01T00:00:00', include_in_aggregation: true },
+  { id: 1, name: 'Growth Fund', created_at: '2024-01-01T00:00:00' },
+  { id: 2, name: 'Dividend Portfolio', created_at: '2024-02-01T00:00:00' },
 ];
 
 describe('PortfolioSwitcher', () => {

@@ -1,8 +1,9 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency, formatSignedCurrency, formatQuantity } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatQuantity, getValueClass } from '../utils/formatters';
 import { applyRateToHolding, type EurMetrics } from '../utils/eurMetrics';
 import type { Holding } from '../api';
+import type { Currency } from '../hooks/useCurrencyPreference';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Table,
@@ -14,16 +15,11 @@ import {
 } from '@/components/ui/table';
 import { AlertTriangleIcon } from 'lucide-react';
 
-const getValueClass = (value: number | null | undefined): string => {
-  if (value == null) return '';
-  return value >= 0 ? 'text-positive' : 'text-negative';
-};
-
 interface HoldingsTableProps {
   holdings: Holding[];
   missingPrices: string[];
   cash: number;
-  displayCurrency: 'EUR' | 'USD';
+  displayCurrency: Currency;
   showEur: boolean;
   eurMetrics: EurMetrics | null;
   currencyGainsEur: number | null;

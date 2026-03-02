@@ -6,7 +6,7 @@ import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatCurrency, formatSignedCurrency, formatDate } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatDate, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PortfolioStatus, PortfolioPerformance, TransactionWarning } from '../api';
 import { useCurrencyPreference } from '../hooks/useCurrencyPreference';
@@ -22,7 +22,7 @@ const PerformanceChart = lazy(() =>
 const HoldingsAllocationChart = lazy(() =>
   import('./HoldingsAllocationChart').then((m) => ({ default: m.HoldingsAllocationChart }))
 );
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -45,8 +45,9 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, XIcon, RefreshCwIcon } from 'lucide-react';
+import { MoreVertical, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
 
+const EMPTY_DATA_POINTS: never[] = [];
 
 const formatSignedPercent = (value: number | null | undefined): string => {
   if (value == null) return '';
@@ -54,10 +55,6 @@ const formatSignedPercent = (value: number | null | undefined): string => {
   return `${sign}${Math.abs(value).toFixed(2)}%`;
 };
 
-const getValueClass = (value: number | null | undefined): string => {
-  if (value == null) return '';
-  return value >= 0 ? 'text-positive' : 'text-negative';
-};
 
 const formatCurrencyWithPercent = (
   currencyValue: number | null | undefined,
@@ -83,40 +80,74 @@ interface PortfolioStatusContentProps {
   status: PortfolioStatus;
   performance?: PortfolioPerformance;
   performanceLoading: boolean;
+  isEmptyPortfolio?: boolean;
+  toolbar?: React.ReactNode;
 }
 
-export const PortfolioStatusContent = ({
+const PortfolioStatusContent = ({
   status,
   performance,
   performanceLoading,
+  isEmptyPortfolio = false,
+  toolbar,
 }: PortfolioStatusContentProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
-  const { currency, toggle } = useCurrencyPreference();
-  const eurMetrics = useMemo(() => computeEurMetrics(status), [status]);
-
+  const { currency } = useCurrencyPreference();
   const showEur = currency === 'EUR';
-  const eurAvailable = eurMetrics !== null;
-  const taxRate = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
-    status.capital_gains_tax_rate * 100
-  );
+  const eur = useMemo(() => showEur ? computeEurMetrics(status) : null, [status, showEur]);
+  const taxRate = useMemo(() =>
+    new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
+      status.capital_gains_tax_rate * 100
+    ), [locale, status.capital_gains_tax_rate]);
 
-  // Resolve display values based on currency toggle
-  const displayCurrency = showEur ? 'EUR' : 'USD';
-  const marketValue = showEur ? (eurAvailable ? eurMetrics!.currentValueEur : null) : status.current_value;
-  const unrealizedGains = showEur ? (eurAvailable ? eurMetrics!.unrealizedGainsEur : null) : status.unrealized_gains;
+  if (isEmptyPortfolio) {
+    return (
+      <CardContent>
+        {toolbar && <div className="flex justify-end mb-4">{toolbar}</div>}
+        <Alert>
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription>{t('status.emptyPortfolio')}</AlertDescription>
+        </Alert>
+      </CardContent>
+    );
+  }
+
+  // Resolve display values based on currency
+  const marketValue = eur ? eur.currentValueEur : showEur ? null : status.current_value;
+  const unrealizedGains = eur ? eur.unrealizedGainsEur : showEur ? null : status.unrealized_gains;
   const netInvested = showEur ? status.principal_eur : status.principal;
-  const currencyGainsEur = showEur && eurAvailable ? eurMetrics!.currencyGainsEur : null;
-  const currencyGainsPct = showEur && eurAvailable ? eurMetrics!.currencyGainsPct : null;
+  const currencyGainsEur = eur?.currencyGainsEur ?? null;
+  const currencyGainsPct = eur?.currencyGainsPct ?? null;
   const dividends = showEur ? status.dividends_eur : status.dividends;
-  const taxEur = showEur && eurAvailable ? eurMetrics!.taxEur : null;
-  const capitalGainsEur = showEur && eurAvailable ? eurMetrics!.capitalGainsEur : null;
-  const afterTaxValue = showEur && eurAvailable ? eurMetrics!.currentValueAfterTaxEur : null;
-  const totalReturnAfterTax = showEur && eurAvailable ? eurMetrics!.totalReturnAfterTaxEur : null;
-  const eurRate = showEur && eurAvailable ? eurMetrics!.rate : null;
+  const taxEur = eur?.taxEur ?? null;
+  const capitalGainsEur = eur?.capitalGainsEur ?? null;
+  const afterTaxValue = eur?.currentValueAfterTaxEur ?? null;
+  const totalReturnAfterTax = eur?.totalReturnAfterTaxEur ?? null;
+  const eurRate = eur?.rate ?? null;
 
   return (
     <CardContent>
+      {/* Toolbar + Market Value */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <p className="text-sm text-muted-foreground mb-1">{t('status.marketValue')}</p>
+          <p className="text-3xl font-bold">
+            {marketValue === null ? '-' : formatCurrency(marketValue, currency, locale)}
+          </p>
+          <p className={`text-sm mt-1 ${getValueClass(unrealizedGains)}`}>
+            {formatCurrencyWithPercent(
+              unrealizedGains,
+              status.unrealized_gains_pct,
+              currency,
+              locale
+            )}
+            <span className="text-muted-foreground ml-2 font-normal">{t('status.unrealized')}</span>
+          </p>
+        </div>
+        {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
+      </div>
+
       {/* Transaction Warnings */}
       {status.warnings.length > 0 && (
         <Alert variant="destructive" className="mb-4">
@@ -137,56 +168,17 @@ export const PortfolioStatusContent = ({
         </Alert>
       )}
 
-      {/* Currency Toggle */}
-      <div className="flex items-center justify-end mb-4 gap-2">
-        {showEur && !eurAvailable && (
-          <span className="text-xs text-muted-foreground">{t('status.currency.eurUnavailable')}</span>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggle}
-          aria-label={t('status.currency.toggle')}
-          className="h-7 px-2 text-xs font-medium"
-        >
-          <span className={currency === 'USD' ? 'font-bold' : 'text-muted-foreground'}>
-            {t('status.currency.usdLabel')}
-          </span>
-          <span className="mx-1 text-muted-foreground">/</span>
-          <span className={currency === 'EUR' ? 'font-bold' : 'text-muted-foreground'}>
-            {t('status.currency.eurLabel')}
-          </span>
-        </Button>
-      </div>
-
-      {/* Portfolio Value */}
-      <div className="mb-6">
-        <p className="text-sm text-muted-foreground mb-1">{t('status.marketValue')}</p>
-        <p className="text-3xl font-bold">
-          {marketValue === null ? '-' : formatCurrency(marketValue, displayCurrency, locale)}
-        </p>
-        <p className={`text-sm mt-1 ${getValueClass(unrealizedGains)}`}>
-          {formatCurrencyWithPercent(
-            unrealizedGains,
-            status.unrealized_gains_pct,
-            displayCurrency,
-            locale
-          )}
-          <span className="text-muted-foreground ml-2 font-normal">{t('status.unrealized')}</span>
-        </p>
-      </div>
-
       {/* Financial Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
-          <p className="text-lg font-semibold">{formatCurrency(netInvested, displayCurrency, locale)}</p>
+          <p className="text-lg font-semibold">{formatCurrency(netInvested, currency, locale)}</p>
         </div>
 
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.dividends')}</p>
           <p className="text-lg font-semibold">
-            {dividends === null ? '-' : formatCurrency(dividends, displayCurrency, locale)}
+            {dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
           </p>
         </div>
 
@@ -224,7 +216,7 @@ export const PortfolioStatusContent = ({
       >
         <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
           <PerformanceChart
-            data={performance?.data_points || []}
+            data={performance?.data_points ?? EMPTY_DATA_POINTS}
             loading={performanceLoading}
             currency={currency}
             liveLastPoint={{
@@ -246,9 +238,9 @@ export const PortfolioStatusContent = ({
         holdings={status.holdings}
         missingPrices={status.missing_prices}
         cash={status.cash}
-        displayCurrency={displayCurrency}
+        displayCurrency={currency}
         showEur={showEur}
-        eurMetrics={eurMetrics}
+        eurMetrics={eur}
         currencyGainsEur={currencyGainsEur}
         currencyGainsPct={currencyGainsPct}
         locale={locale}
@@ -259,38 +251,12 @@ export const PortfolioStatusContent = ({
 
 // ================== Loading skeleton ==================
 
-export const PortfolioStatusSkeleton = () => (
+const PortfolioStatusSkeleton = () => (
   <div className="mb-6 space-y-6">
     <Card>
-      <CardHeader>
-        <Skeleton className="h-6 w-40" />
-      </CardHeader>
       <CardContent>
-        <div className="mb-6">
-          <Skeleton className="h-4 w-24 mb-2" />
-          <Skeleton className="h-10 w-48 mb-2" />
-          <Skeleton className="h-4 w-36" />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i}>
-              <Skeleton className="h-4 w-24 mb-2" />
-              <Skeleton className="h-6 w-28" />
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
-          <Skeleton className="h-[340px] w-full rounded-lg" />
-          <Skeleton className="h-[340px] w-full rounded-lg" />
-        </div>
-        <div>
-          <Skeleton className="h-4 w-20 mb-3" />
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
-        </div>
+        <Skeleton className="h-4 w-24 mb-2" />
+        <Skeleton className="h-8 w-48" />
       </CardContent>
     </Card>
   </div>
@@ -305,7 +271,6 @@ export const PortfolioStatusView = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [emptyAlertDismissed, setEmptyAlertDismissed] = useState(false);
 
   const navigate = useNavigate();
   const deletePortfolio = useDeletePortfolio();
@@ -384,84 +349,68 @@ export const PortfolioStatusView = () => {
 
   return (
     <>
-      {isEmptyPortfolio && !emptyAlertDismissed && (
-        <Alert className="mb-6">
-          <InfoIcon className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>{t('status.emptyPortfolio')}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0"
-              onClick={() => setEmptyAlertDismissed(true)}
-              aria-label={t('portfolio.delete.cancel')}
-            >
-              <XIcon className="h-4 w-4" />
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
       <div className="mb-6 space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle>{status.portfolio_name}</CardTitle>
-            {dataUpdatedAt > 0 && (
-              <CardDescription className="flex items-center gap-1.5">
-                {t('status.fetchedAt', {
-                  time: new Date(dataUpdatedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                })}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                >
-                  <RefreshCwIcon className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </Button>
-              </CardDescription>
-            )}
-            <CardAction>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t('portfolio.list.item.actionsLabel', { name: status.portfolio_name })}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
-                      <PencilIcon />
-                      {t('portfolio.list.item.rename')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setCopyModalOpen(true)}>
-                      <CopyIcon />
-                      {t('portfolio.list.item.copy')}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setDeleteConfirmOpen(true)}
-                      disabled={deletePortfolio.isPending}
-                    >
-                      <TrashIcon />
-                      {t('portfolio.list.item.delete')}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </CardAction>
-          </CardHeader>
           <PortfolioStatusContent
             status={status}
             performance={performance}
             performanceLoading={performanceLoading}
+            isEmptyPortfolio={isEmptyPortfolio}
+            toolbar={
+              <div className="flex items-center gap-2">
+                {!isEmptyPortfolio && dataUpdatedAt > 0 && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    {t('status.fetchedAt', {
+                      time: new Date(dataUpdatedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    })}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                    >
+                      <RefreshCwIcon className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </span>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label={t('portfolio.list.item.actionsLabel', { name: status.portfolio_name })}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
+                        <PencilIcon />
+                        {t('portfolio.list.item.rename')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setCopyModalOpen(true)}>
+                        <CopyIcon />
+                        {t('portfolio.list.item.copy')}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setDeleteConfirmOpen(true)}
+                        disabled={deletePortfolio.isPending}
+                      >
+                        <TrashIcon />
+                        {t('portfolio.list.item.delete')}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            }
           />
         </Card>
       </div>

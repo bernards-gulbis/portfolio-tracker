@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation, useMatch } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useMatch } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './components/LoginPage';
@@ -9,7 +9,6 @@ import PortfolioSwitcher from './components/PortfolioSwitcher';
 import { usePortfolios } from './hooks/usePortfolios';
 import TransactionView from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
-import { AppBreadcrumbs } from './components/AppBreadcrumbs';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -18,38 +17,22 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarRail,
-  SidebarTrigger,
-} from '@/components/ui/sidebar';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, LayoutDashboard, Briefcase, Layers, UserIcon, TrendingUpDown } from 'lucide-react';
-import { createContext, useCallback, useContext, useState } from 'react';
+import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign } from 'lucide-react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import LanguageSwitcher from './components/LanguageSwitcher';
+import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
+import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
 import CreatePortfolioModal from './components/CreatePortfolioModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
-import { AggregatedPage } from './components/AggregatedPage';
-import { AnalyticsPage } from './components/AnalyticsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
@@ -62,11 +45,31 @@ const queryClient = new QueryClient({
   },
 });
 
+const THEME_OPTIONS = [
+  { value: 'light', key: 'app.header.themeLight' },
+  { value: 'dark', key: 'app.header.themeDark' },
+  { value: 'system', key: 'app.header.themeSystem' },
+] as const;
+
+const CURRENCY_OPTIONS = [
+  { value: 'USD', key: 'status.currency.usdLabel' },
+  { value: 'EUR', key: 'status.currency.eurLabel' },
+] as const;
+
 const CreatePortfolioContext = createContext<(() => void) | null>(null);
 function useCreatePortfolio() {
   const fn = useContext(CreatePortfolioContext);
   if (!fn) throw new Error('useCreatePortfolio must be used within AppLayout');
   return fn;
+}
+
+function CheckedItem({ checked, onClick, children }: { checked: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <DropdownMenuItem onClick={onClick}>
+      {checked ? <Check className="mr-2 h-4 w-4" /> : <span className="mr-2 w-4" />}
+      {children}
+    </DropdownMenuItem>
+  );
 }
 
 function AuthGuard() {
@@ -88,11 +91,12 @@ function AuthGuard() {
 }
 
 function AppLayout() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, preference: themePreference, setPreference: setThemePreference } = useTheme();
   const { user } = useAuth();
   const logoutMutation = useLogout();
-  const { pathname } = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLang = getCurrentLanguage();
+  const { currency, set: setCurrency } = useCurrencyPreference();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { data: portfolios } = usePortfolios();
   const portfolioMatch = useMatch('/portfolios/:id');
@@ -113,134 +117,105 @@ function AppLayout() {
   }
 
   const rememberedId = activePortfolioId ?? lastPortfolioId;
-  const dashboardPath = rememberedId ? `/portfolios/${rememberedId}` : '/';
-  const analyticsPath = rememberedId ? `/portfolios/${rememberedId}/analytics` : '/';
-  const isAnalyticsActive = pathname.endsWith('/analytics');
-  const isDashboardActive = (pathname === '/' || pathname.startsWith('/portfolios')) && !isAnalyticsActive;
 
   const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
 
   return (
     <CreatePortfolioContext.Provider value={openCreateModal}>
-    <SidebarProvider>
-      <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>{t('app.sidebar.general')}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isDashboardActive}>
-                    <Link to={dashboardPath}>
-                      <LayoutDashboard />
-                      <span>{t('app.sidebar.dashboard')}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === '/aggregate'}>
-                    <Link to="/aggregate">
-                      <Layers />
-                      <span>{t('app.sidebar.aggregate')}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isAnalyticsActive}>
-                    <Link to={analyticsPath}>
-                      <TrendingUpDown />
-                      <span>{t('app.sidebar.analytics')}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
-                <Link to="/settings">
-                  <Settings />
-                  <span>{t('settings.menuItem')}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-
-      <SidebarInset>
+      <div className="flex min-h-screen flex-col">
         <header className="border-b px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="mr-2 !h-4" />
-            <AppBreadcrumbs />
+            <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
           </div>
-          <div className="flex items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={toggleTheme} aria-label={t('app.header.toggleTheme')}>
-                    {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {theme === 'light' ? t('app.header.switchToDark') : t('app.header.switchToLight')}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <LanguageSwitcher />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 rounded-full p-0" aria-label={t('app.header.userMenu')}>
-                  <Avatar>
-                    {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? user.email} />}
-                    <AvatarFallback>
-                      {user?.name
-                        ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-                        : user?.email
-                          ? user.email.slice(0, 2).toUpperCase()
-                          : <UserIcon className="h-4 w-4" />}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel className="font-normal">
-                  {user?.name && <p className="text-sm font-medium truncate">{user.name}</p>}
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => logoutMutation.mutate()}
-                  disabled={logoutMutation.isPending}
-                >
-                  {logoutMutation.isPending ? <Spinner className="mr-2" /> : <LogOut className="mr-2 h-4 w-4" />}
-                  {t('app.header.signOut')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 rounded-full p-0" aria-label={t('app.header.userMenu')}>
+                <Avatar>
+                  {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? user.email} />}
+                  <AvatarFallback>
+                    {user?.name
+                      ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+                      : user?.email
+                        ? user.email.slice(0, 2).toUpperCase()
+                        : <UserIcon className="h-4 w-4" />}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="font-normal">
+                {user?.name && <p className="text-sm font-medium truncate">{user.name}</p>}
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  {theme === 'light' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                  {t('app.header.themeLabel')}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {THEME_OPTIONS.map(({ value, key }) => (
+                    <CheckedItem key={value} checked={value === themePreference} onClick={() => setThemePreference(value)}>
+                      {t(key)}
+                    </CheckedItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Languages className="mr-2 h-4 w-4" />
+                  {t('language.switchLabel')}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <CheckedItem key={lang} checked={lang === currentLang} onClick={() => i18n.changeLanguage(lang)}>
+                      {t(`language.${lang}`)}
+                    </CheckedItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  {t('status.currency.toggle')}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {CURRENCY_OPTIONS.map(({ value, key }) => (
+                    <CheckedItem key={value} checked={value === currency} onClick={() => setCurrency(value)}>
+                      {t(key)}
+                    </CheckedItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  {t('settings.menuItem')}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+              >
+                {logoutMutation.isPending ? <Spinner className="mr-2" /> : <LogOut className="mr-2 h-4 w-4" />}
+                {t('app.header.signOut')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
 
         <main className="flex-1 p-6">
           <Outlet />
         </main>
-      </SidebarInset>
+      </div>
 
       <CreatePortfolioModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
       />
-    </SidebarProvider>
     </CreatePortfolioContext.Provider>
   );
 }
@@ -293,31 +268,31 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <ErrorBoundary>
-            <Routes>
-              <Route element={<AuthGuard />}>
-                <Route element={<AppLayout />}>
-                  <Route index element={<PortfolioRedirect />} />
-                  <Route path="portfolios/:id" element={<ErrorBoundary fullScreen={false}><PortfolioPage /></ErrorBoundary>} />
-                  <Route path="portfolios/:id/analytics" element={<ErrorBoundary fullScreen={false}><AnalyticsPage /></ErrorBoundary>} />
-                  <Route path="aggregate" element={<ErrorBoundary fullScreen={false}><AggregatedPage /></ErrorBoundary>} />
-                  <Route path="settings" element={<ErrorBoundary fullScreen={false}><SettingsLayout /></ErrorBoundary>}>
-                    <Route index element={<Navigate to="profile" replace />} />
-                    <Route path="profile" element={<ProfileSection />} />
-                    <Route path="password" element={<PasswordSection />} />
-                    <Route path="tax" element={<TaxSection />} />
-                    <Route path="account" element={<AccountSection />} />
+        <CurrencyProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <ErrorBoundary>
+                <Routes>
+                  <Route element={<AuthGuard />}>
+                    <Route element={<AppLayout />}>
+                      <Route index element={<PortfolioRedirect />} />
+                      <Route path="portfolios/:id" element={<ErrorBoundary fullScreen={false}><PortfolioPage /></ErrorBoundary>} />
+                      <Route path="settings" element={<ErrorBoundary fullScreen={false}><SettingsLayout /></ErrorBoundary>}>
+                        <Route index element={<Navigate to="profile" replace />} />
+                        <Route path="profile" element={<ProfileSection />} />
+                        <Route path="password" element={<PasswordSection />} />
+                        <Route path="tax" element={<TaxSection />} />
+                        <Route path="account" element={<AccountSection />} />
+                      </Route>
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Route>
                   </Route>
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Route>
-              </Route>
-            </Routes>
-            </ErrorBoundary>
-          </AuthProvider>
-        </BrowserRouter>
-        <Toaster position="bottom-right" />
+                </Routes>
+              </ErrorBoundary>
+            </AuthProvider>
+          </BrowserRouter>
+          <Toaster position="bottom-right" />
+        </CurrencyProvider>
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

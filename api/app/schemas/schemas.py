@@ -64,14 +64,7 @@ class PortfolioResponse(PortfolioBase):
     """Schema for portfolio response"""
     id: int
     created_at: datetime
-    include_in_aggregation: bool
-
     model_config = ConfigDict(from_attributes=True)
-
-
-class PortfolioInclusionUpdate(BaseModel):
-    """Schema for toggling portfolio inclusion in aggregation"""
-    include_in_aggregation: bool
 
 
 class PortfolioWithTransactions(PortfolioResponse):
@@ -284,21 +277,3 @@ class PortfolioPerformanceResponse(BaseModel):
     data_points: List[PerformanceDataPoint]
 
     model_config = ConfigDict(from_attributes=True)
-
-
-# ================== Aggregated Portfolio Schemas ==================
-
-# ================== Realized Sales Schemas ==================
-
-class AggregatedSaleResponse(BaseModel):
-    """Schema for aggregated realized gain/loss per ticker"""
-    ticker: str
-    total_gain_loss: float
-    win_rate: float  # percentage of sells that resulted in a profit (0-100)
-    profit_factor: Optional[float] = None  # total_profit / abs(total_loss); None when no losing trades
-
-
-class AggregatedSalesResponse(BaseModel):
-    """Schema for aggregated realized sales grouped by ticker"""
-    sales: List[AggregatedSaleResponse]
-    total_realized_gain_loss: float

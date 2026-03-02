@@ -9,7 +9,6 @@ from .schemas import (
     PortfolioUpdate,
     PortfolioCopy,
     PortfolioResponse,
-    PortfolioInclusionUpdate,
     PortfolioWithTransactions,
     TransactionCreate,
     TransactionUpdate,
@@ -20,8 +19,6 @@ from .schemas import (
     PortfolioStatusResponse,
     PerformanceDataPoint,
     PortfolioPerformanceResponse,
-    AggregatedSaleResponse,
-    AggregatedSalesResponse,
 )
 
 __all__ = [
@@ -33,7 +30,6 @@ __all__ = [
     "PortfolioUpdate",
     "PortfolioCopy",
     "PortfolioResponse",
-    "PortfolioInclusionUpdate",
     "PortfolioWithTransactions",
     "TransactionCreate",
     "TransactionUpdate",
@@ -44,6 +40,4 @@ __all__ = [
     "PortfolioStatusResponse",
     "PerformanceDataPoint",
     "PortfolioPerformanceResponse",
-    "AggregatedSaleResponse",
-    "AggregatedSalesResponse",
 ]

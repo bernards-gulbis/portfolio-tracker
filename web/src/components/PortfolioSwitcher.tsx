@@ -5,6 +5,7 @@ import { ChevronsUpDown, Plus, BriefcaseBusiness } from 'lucide-react';
 import { usePortfolios } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,24 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  SidebarMenu,
-  SidebarMenuItem,
-  useSidebar,
-} from '@/components/ui/sidebar';
-
-const triggerClassName = [
-  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2',
-  'text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding]',
-  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-  'focus-visible:ring-2',
-  'active:bg-sidebar-accent active:text-sidebar-accent-foreground',
-  'disabled:pointer-events-none disabled:opacity-50',
-  'aria-disabled:pointer-events-none aria-disabled:opacity-50',
-  'data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground',
-  'h-12 cursor-pointer group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!',
-  '[&>svg]:size-4 [&>svg]:shrink-0',
-].join(' ');
 
 interface PortfolioSwitcherProps {
   activePortfolioId: number | null;
@@ -40,7 +23,6 @@ interface PortfolioSwitcherProps {
 const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitcherProps) => {
   const { t } = useTranslation();
   const { data: portfolios, isLoading, error } = usePortfolios();
-  const { isMobile } = useSidebar();
   const [open, setOpen] = useState(false);
 
   const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
@@ -77,61 +59,48 @@ const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitch
 
   if (isLoading) {
     return (
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <div className="flex items-center gap-2 px-2 py-1.5">
-            <Skeleton className="h-8 w-8 rounded-md" />
-            <Skeleton className="h-4 w-28" />
-          </div>
-        </SidebarMenuItem>
-      </SidebarMenu>
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-6 w-6 rounded-md" />
+        <Skeleton className="h-4 w-24" />
+      </div>
     );
   }
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu open={open} onOpenChange={setOpen}>
-          <DropdownMenuTrigger asChild>
-            <button className={triggerClassName}>
-              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-md">
-                <BriefcaseBusiness className="size-4" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">
-                  {activePortfolio?.name ?? t('portfolio.list.title')}
-                </span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-            align="start"
-            side={isMobile ? 'bottom' : 'right'}
-            sideOffset={4}
-          >
-            <DropdownMenuLabel className="text-muted-foreground text-xs">
-              {t('portfolio.list.title')}
-            </DropdownMenuLabel>
-            {renderPortfolioItems()}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="gap-2 p-2"
-              onClick={() => {
-                setOpen(false);
-                onCreateClick();
-              }}
-            >
-              <div className="bg-background flex size-6 items-center justify-center rounded-md border">
-                <Plus className="size-4" />
-              </div>
-              <span className="font-medium text-muted-foreground">{t('portfolio.list.createButton')}</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="gap-2 px-2 h-8">
+          <BriefcaseBusiness className="size-4 shrink-0" />
+          <span className="truncate font-medium text-sm max-w-[160px]">
+            {activePortfolio?.name ?? t('portfolio.list.title')}
+          </span>
+          <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="min-w-56 rounded-lg"
+        align="start"
+        sideOffset={8}
+      >
+        <DropdownMenuLabel className="text-muted-foreground text-xs">
+          {t('portfolio.list.title')}
+        </DropdownMenuLabel>
+        {renderPortfolioItems()}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="gap-2 p-2"
+          onClick={() => {
+            setOpen(false);
+            onCreateClick();
+          }}
+        >
+          <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+            <Plus className="size-4" />
+          </div>
+          <span className="font-medium text-muted-foreground">{t('portfolio.list.createButton')}</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 

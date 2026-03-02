@@ -57,24 +57,6 @@ class PortfolioRepository:
         """Check if a portfolio exists and belongs to user"""
         return self.get_by_id_and_user(portfolio_id, user_id) is not None
 
-    def update_inclusion(self, portfolio_id: int, user_id: uuid.UUID, include: bool) -> Optional[Portfolio]:
-        """Update the include_in_aggregation flag (user-scoped)"""
-        portfolio = self.get_by_id_and_user(portfolio_id, user_id)
-        if portfolio:
-            portfolio.include_in_aggregation = include
-            self.session.add(portfolio)
-            self.session.commit()
-            self.session.refresh(portfolio)
-        return portfolio
-
-    def get_included_for_user(self, user_id: uuid.UUID) -> List[Portfolio]:
-        """Get all portfolios for a user where include_in_aggregation is True"""
-        statement = select(Portfolio).where(
-            Portfolio.user_id == user_id,
-            Portfolio.include_in_aggregation == True,  # noqa: E712
-        )
-        return list(self.session.exec(statement).all())
-
     def copy_with_transactions(self, portfolio_id: int, new_name: str, user_id: uuid.UUID) -> Optional[Portfolio]:
         """Copy a portfolio with all its transactions (user-scoped)"""
         original = self.get_by_id_and_user(portfolio_id, user_id)

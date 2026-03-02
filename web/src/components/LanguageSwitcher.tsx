@@ -8,18 +8,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n/index';
+import { SUPPORTED_LANGUAGES, getCurrentLanguage } from '../i18n/index';
 
 const LanguageSwitcher = () => {
   const { i18n, t } = useTranslation();
-  const rawLang = i18n.language?.split('-')[0] ?? 'en';
-  const currentLang: SupportedLanguage = (SUPPORTED_LANGUAGES as readonly string[]).includes(rawLang)
-    ? (rawLang as SupportedLanguage)
-    : 'en';
-
-  const handleSelect = (lang: SupportedLanguage) => {
-    i18n.changeLanguage(lang);
-  };
+  const currentLang = getCurrentLanguage();
 
   return (
     <DropdownMenu>
@@ -32,7 +25,7 @@ const LanguageSwitcher = () => {
         {SUPPORTED_LANGUAGES.map((lang) => (
           <DropdownMenuItem
             key={lang}
-            onClick={() => handleSelect(lang)}
+            onClick={() => i18n.changeLanguage(lang)}
             className={cn(lang === currentLang && 'font-semibold')}
           >
             {t(`language.${lang}`)}

@@ -52,3 +52,11 @@ export const formatDateCompact = (date: string, locale: string = 'en-US'): strin
     minute: '2-digit',
   });
 };
+
+/**
+ * Returns a CSS class for positive/negative values (green/red).
+ */
+export const getValueClass = (value: number | null | undefined): string => {
+  if (value == null) return '';
+  return value >= 0 ? 'text-positive' : 'text-negative';
+};
