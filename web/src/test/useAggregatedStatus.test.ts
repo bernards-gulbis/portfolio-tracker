@@ -54,40 +54,29 @@ describe('useAggregatedStatus', () => {
     vi.clearAllMocks();
   });
 
-  it('does not fetch when portfolioIds is empty', () => {
-    const { result } = renderHook(() => useAggregatedStatus([]), { wrapper: createWrapper() });
+  it('fetches and returns aggregated status', async () => {
+    vi.mocked(api.getAggregatedStatus).mockResolvedValueOnce(mockStatus);
+
+    const { result } = renderHook(() => useAggregatedStatus(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(api.getAggregatedStatus).toHaveBeenCalledWith();
+    expect(result.current.data).toEqual(mockStatus);
+  });
+
+  it('does not fetch when enabled is false', () => {
+    const { result } = renderHook(() => useAggregatedStatus(false), { wrapper: createWrapper() });
 
     expect(result.current.isFetching).toBe(false);
     expect(result.current.data).toBeUndefined();
     expect(api.getAggregatedStatus).not.toHaveBeenCalled();
   });
 
-  it('fetches and returns status when portfolioIds are provided', async () => {
-    vi.mocked(api.getAggregatedStatus).mockResolvedValueOnce(mockStatus);
-
-    const { result } = renderHook(() => useAggregatedStatus([1, 2]), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(api.getAggregatedStatus).toHaveBeenCalledWith([1, 2]);
-    expect(result.current.data).toEqual(mockStatus);
-  });
-
-  it('sorts portfolio IDs for consistent query key', async () => {
-    vi.mocked(api.getAggregatedStatus).mockResolvedValueOnce(mockStatus);
-
-    const { result } = renderHook(() => useAggregatedStatus([3, 1, 2]), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    // Should call with sorted IDs
-    expect(api.getAggregatedStatus).toHaveBeenCalledWith([1, 2, 3]);
-  });
-
   it('handles API errors', async () => {
     vi.mocked(api.getAggregatedStatus).mockRejectedValueOnce(new Error('Server error'));
 
-    const { result } = renderHook(() => useAggregatedStatus([1]), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useAggregatedStatus(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
 

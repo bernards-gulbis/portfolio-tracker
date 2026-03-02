@@ -8,6 +8,7 @@ import type { Portfolio, PortfolioStatus } from '../api';
 
 vi.mock('../hooks/usePortfolios', () => ({
   usePortfolios: vi.fn(),
+  useUpdatePortfolioInclusion: vi.fn(),
 }));
 
 vi.mock('../hooks/useAggregatedStatus', () => ({
@@ -18,7 +19,7 @@ vi.mock('../hooks/useAggregatedPerformance', () => ({
   useAggregatedPerformance: vi.fn(),
 }));
 
-import { usePortfolios } from '../hooks/usePortfolios';
+import { usePortfolios, useUpdatePortfolioInclusion } from '../hooks/usePortfolios';
 import { useAggregatedStatus } from '../hooks/useAggregatedStatus';
 import { useAggregatedPerformance } from '../hooks/useAggregatedPerformance';
 
@@ -31,8 +32,8 @@ const createTestQueryClient = () =>
   });
 
 const mockPortfolios: Portfolio[] = [
-  { id: 1, name: 'Growth Fund', created_at: '2024-01-01T00:00:00' },
-  { id: 2, name: 'Dividend Portfolio', created_at: '2024-02-01T00:00:00' },
+  { id: 1, name: 'Growth Fund', created_at: '2024-01-01T00:00:00', include_in_aggregation: true },
+  { id: 2, name: 'Dividend Portfolio', created_at: '2024-02-01T00:00:00', include_in_aggregation: true },
 ];
 
 const mockAggregatedStatus: PortfolioStatus = {
@@ -56,6 +57,9 @@ const mockAggregatedStatus: PortfolioStatus = {
   usd_to_eur_rate: 0.92,
 };
 
+const mockMutateAsync = vi.fn().mockResolvedValue({});
+const mockInvalidateInclusion = vi.fn();
+
 const renderPage = () => {
   const queryClient = createTestQueryClient();
   return render(
@@ -76,6 +80,11 @@ describe('AggregatedPage', () => {
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof usePortfolios>);
+
+    vi.mocked(useUpdatePortfolioInclusion).mockReturnValue({
+      mutateAsync: mockMutateAsync,
+      invalidateInclusion: mockInvalidateInclusion,
+    } as unknown as ReturnType<typeof useUpdatePortfolioInclusion>);
 
     vi.mocked(useAggregatedStatus).mockReturnValue({
       data: mockAggregatedStatus,
@@ -108,12 +117,28 @@ describe('AggregatedPage', () => {
     expect(screen.getByText('Deselect All')).toBeInTheDocument();
   });
 
-  it('deselect all shows no-selection message', async () => {
+  it('checkbox reflects include_in_aggregation and calls mutation on toggle', async () => {
     renderPage();
 
-    // Click Deselect All
-    await userEvent.click(screen.getByText('Deselect All'));
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(2);
 
+    // Click the first checkbox to toggle off
+    await userEvent.click(checkboxes[0]);
+    expect(mockMutateAsync).toHaveBeenCalledWith({ portfolioId: 1, include: false });
+  });
+
+  it('shows no-selection message when no portfolios are included', () => {
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: [
+        { ...mockPortfolios[0], include_in_aggregation: false },
+        { ...mockPortfolios[1], include_in_aggregation: false },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderPage();
     expect(screen.getByText('Select at least one portfolio to view aggregated data.')).toBeInTheDocument();
   });
 

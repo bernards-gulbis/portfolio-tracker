@@ -646,6 +646,13 @@ class PortfolioService:
 
         return copied_portfolio
 
+    def update_portfolio_inclusion(self, portfolio_id: int, user_id: uuid.UUID, include: bool) -> Portfolio:
+        """Toggle include_in_aggregation flag (user-scoped)"""
+        portfolio = self.portfolio_repo.update_inclusion(portfolio_id, user_id, include)
+        if not portfolio:
+            raise PortfolioNotFoundException(portfolio_id)
+        return portfolio
+
     def calculate_portfolio_status(self, portfolio_id: int, user_id: uuid.UUID, tax_rate: Decimal = _DEFAULT_TAX_RATE) -> PortfolioStatusResponse:
         """
         Calculate comprehensive portfolio status including holdings, cash, and performance metrics.
@@ -790,18 +797,14 @@ class PortfolioService:
 
         return portfolio.name, performance_data
 
-    def _verify_portfolio_ownership(self, portfolio_ids: List[int], user_id: uuid.UUID) -> None:
-        """Verify all portfolios exist and belong to the user. Raises PortfolioNotFoundException if not."""
-        for pid in portfolio_ids:
-            portfolio = self.portfolio_repo.get_by_id_and_user(pid, user_id)
-            if not portfolio:
-                raise PortfolioNotFoundException(pid)
-
     def calculate_aggregated_status(
-        self, portfolio_ids: List[int], user_id: uuid.UUID, tax_rate: Decimal = _DEFAULT_TAX_RATE
+        self, user_id: uuid.UUID, tax_rate: Decimal = _DEFAULT_TAX_RATE
     ) -> PortfolioStatusResponse:
-        """Calculate combined status across multiple portfolios."""
-        self._verify_portfolio_ownership(portfolio_ids, user_id)
+        """Calculate combined status across portfolios flagged for aggregation."""
+        included = self.portfolio_repo.get_included_for_user(user_id)
+        portfolio_ids = [p.id for p in included]
+        if not portfolio_ids:
+            raise ValueError("No portfolios are selected for aggregation")
 
         transactions = self.transaction_repo.get_by_portfolio_ids(portfolio_ids)
 
@@ -858,14 +861,18 @@ class PortfolioService:
 
     def get_aggregated_performance(
         self,
-        portfolio_ids: List[int],
         user_id: uuid.UUID,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         num_points: int = 60,
     ) -> PortfolioPerformanceResponse:
-        """Get combined performance across multiple portfolios."""
-        self._verify_portfolio_ownership(portfolio_ids, user_id)
+        """Get combined performance across portfolios flagged for aggregation."""
+        included = self.portfolio_repo.get_included_for_user(user_id)
+        portfolio_ids = [p.id for p in included]
+        if not portfolio_ids:
+            return PortfolioPerformanceResponse(
+                portfolio_id=0, portfolio_name="Aggregated", data_points=[]
+            )
 
         transactions = self.transaction_repo.get_by_portfolio_ids(portfolio_ids)
         if not transactions:

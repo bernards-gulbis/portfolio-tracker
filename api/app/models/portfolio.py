@@ -19,6 +19,7 @@ class Portfolio(SQLModel, table=True):
         sa_column=Column(sa.Uuid, ForeignKey("user.id", ondelete="CASCADE"),
                          nullable=False, index=True)
     )
+    include_in_aggregation: bool = Field(default=True)
 
     # Relationship
     transactions: List["Transaction"] = Relationship(back_populates="portfolio", sa_relationship_kwargs={"cascade": "all, delete-orphan"})

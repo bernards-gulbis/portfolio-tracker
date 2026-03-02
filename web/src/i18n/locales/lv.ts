@@ -323,7 +323,7 @@ const lv: Translation = {
   },
   aggregate: {
     title: 'Apkopots portfelis',
-    description: 'Atlasiet portfeļus, lai skatītu kopējo turējumu un veiktspējas kopsavilkumu.',
+    description: 'Izvēlieties, kurus portfeļus iekļaut kopējā skatā. Atlase tiek saglabāta automātiski.',
     selectAll: 'Atlasīt visus',
     deselectAll: 'Noņemt atlasi',
     noSelection: 'Atlasiet vismaz vienu portfeli, lai skatītu apkopotos datus.',

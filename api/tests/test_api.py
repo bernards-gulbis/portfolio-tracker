@@ -3346,6 +3346,31 @@ def test_transaction_update_api_rejects_negative_fee(client: TestClient):
 # ================== Aggregated Portfolio Tests ==================
 
 
+def test_new_portfolio_defaults_included(client: TestClient):
+    """New portfolios default to include_in_aggregation=True"""
+    response = client.post("/portfolios/", json={"name": "Default Incl"})
+    assert response.status_code == 201
+    assert response.json()["include_in_aggregation"] is True
+
+
+def test_toggle_inclusion_flag(client: TestClient):
+    """PATCH inclusion toggles the flag and persists it"""
+    pid = client.post("/portfolios/", json={"name": "Toggle Test"}).json()["id"]
+
+    # Turn off
+    resp = client.patch(f"/portfolios/{pid}/inclusion", json={"include_in_aggregation": False})
+    assert resp.status_code == 200
+    assert resp.json()["include_in_aggregation"] is False
+
+    # Verify persisted via GET
+    assert client.get(f"/portfolios/{pid}").json()["include_in_aggregation"] is False
+
+    # Turn on again
+    resp = client.patch(f"/portfolios/{pid}/inclusion", json={"include_in_aggregation": True})
+    assert resp.status_code == 200
+    assert resp.json()["include_in_aggregation"] is True
+
+
 def test_aggregated_status_single_portfolio_matches_individual(client: TestClient):
     """Aggregated status for a single portfolio should match the individual portfolio status"""
     # Create portfolio with a deposit
@@ -3364,11 +3389,8 @@ def test_aggregated_status_single_portfolio_matches_individual(client: TestClien
     # Get individual status
     individual = client.get(f"/portfolios/{portfolio_id}/status").json()
 
-    # Get aggregated status for just this one portfolio
-    agg = client.post(
-        "/portfolios/aggregate/status",
-        json={"portfolio_ids": [portfolio_id]},
-    )
+    # Get aggregated status (all portfolios included by default)
+    agg = client.get("/portfolios/aggregate/status")
     assert agg.status_code == 200
     agg_data = agg.json()
 
@@ -3395,10 +3417,7 @@ def test_aggregated_status_multiple_portfolios(client: TestClient):
         json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 2000.0},
     )
 
-    agg = client.post(
-        "/portfolios/aggregate/status",
-        json={"portfolio_ids": [p1, p2]},
-    )
+    agg = client.get("/portfolios/aggregate/status")
     assert agg.status_code == 200
     data = agg.json()
 
@@ -3444,10 +3463,7 @@ def test_aggregated_status_merged_holdings(client: TestClient):
         },
     )
 
-    agg = client.post(
-        "/portfolios/aggregate/status",
-        json={"portfolio_ids": [p1, p2]},
-    )
+    agg = client.get("/portfolios/aggregate/status")
     assert agg.status_code == 200
     data = agg.json()
 
@@ -3461,26 +3477,43 @@ def test_aggregated_status_merged_holdings(client: TestClient):
     assert data["cash"] == pytest.approx(7700.0)
 
 
-def test_aggregated_status_empty_portfolio_ids_returns_422(client: TestClient):
-    """Empty portfolio_ids list should return 422 validation error"""
-    response = client.post(
-        "/portfolios/aggregate/status",
-        json={"portfolio_ids": []},
+def test_aggregated_excludes_unflagged(client: TestClient):
+    """Aggregated status should exclude portfolios with include_in_aggregation=False"""
+    # Portfolio 1: deposit 1000 (included)
+    p1 = client.post("/portfolios/", json={"name": "Incl"}).json()["id"]
+    client.post(
+        f"/portfolios/{p1}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 1000.0},
     )
-    assert response.status_code == 422
 
-
-def test_aggregated_status_nonexistent_portfolio_returns_404(client: TestClient):
-    """Non-existent portfolio in the list should return 404"""
-    response = client.post(
-        "/portfolios/aggregate/status",
-        json={"portfolio_ids": [99999]},
+    # Portfolio 2: deposit 2000 (excluded)
+    p2 = client.post("/portfolios/", json={"name": "Excl"}).json()["id"]
+    client.post(
+        f"/portfolios/{p2}/transactions/",
+        json={"date": "2024-01-01T10:00:00", "type": "Deposit", "total_amount": 2000.0},
     )
-    assert response.status_code == 404
+    client.patch(f"/portfolios/{p2}/inclusion", json={"include_in_aggregation": False})
+
+    agg = client.get("/portfolios/aggregate/status")
+    assert agg.status_code == 200
+    data = agg.json()
+
+    # Only p1 (1000) should be included
+    assert data["cash"] == pytest.approx(1000.0)
+    assert data["principal"] == pytest.approx(1000.0)
 
 
-def test_aggregated_status_other_users_portfolio_returns_404(session: Session):
-    """Including another user's portfolio in aggregation should return 404"""
+def test_no_included_returns_400(client: TestClient):
+    """When no portfolios are included, aggregation returns 400"""
+    p1 = client.post("/portfolios/", json={"name": "None Incl"}).json()["id"]
+    client.patch(f"/portfolios/{p1}/inclusion", json={"include_in_aggregation": False})
+
+    response = client.get("/portfolios/aggregate/status")
+    assert response.status_code == 400
+
+
+def test_aggregated_status_only_includes_own_portfolios(session: Session):
+    """Aggregation only includes the requesting user's portfolios"""
     user_a = User(
         id=uuid.uuid4(), email="agg_a@example.com", hashed_password="x",
         is_active=True, is_superuser=False, is_verified=True,
@@ -3502,16 +3535,25 @@ def test_aggregated_status_other_users_portfolio_returns_404(session: Session):
     session.refresh(p_a)
     session.refresh(p_b)
 
-    # Request as user_a with user_b's portfolio
+    # Add deposit to each
+    session.add(Transaction(
+        portfolio_id=p_a.id, date=datetime(2024, 1, 1),
+        type=TransactionType.DEPOSIT, total_amount=1000.0,
+    ))
+    session.add(Transaction(
+        portfolio_id=p_b.id, date=datetime(2024, 1, 1),
+        type=TransactionType.DEPOSIT, total_amount=5000.0,
+    ))
+    session.commit()
+
+    # Request as user_a — should only see user_a's 1000
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[current_active_user] = lambda: user_a
     try:
         client = TestClient(app)
-        response = client.post(
-            "/portfolios/aggregate/status",
-            json={"portfolio_ids": [p_a.id, p_b.id]},
-        )
-        assert response.status_code == 404
+        response = client.get("/portfolios/aggregate/status")
+        assert response.status_code == 200
+        assert response.json()["cash"] == pytest.approx(1000.0)
     finally:
         app.dependency_overrides.clear()
 
@@ -3536,9 +3578,8 @@ def test_aggregated_performance_returns_data_points(client: TestClient):
         }
         mock_price.get_last_known_price.return_value = None
 
-        response = client.post(
+        response = client.get(
             "/portfolios/aggregate/performance",
-            json={"portfolio_ids": [p1]},
             params={"num_points": 5},
         )
         assert response.status_code == 200
@@ -3548,13 +3589,15 @@ def test_aggregated_performance_returns_data_points(client: TestClient):
         assert len(data["data_points"]) >= 2
 
 
-def test_aggregated_performance_empty_ids_returns_422(client: TestClient):
-    """Empty portfolio_ids list for performance should return 422"""
-    response = client.post(
-        "/portfolios/aggregate/performance",
-        json={"portfolio_ids": []},
-    )
-    assert response.status_code == 422
+def test_aggregated_performance_no_included_returns_empty(client: TestClient):
+    """When no portfolios are included, aggregated performance returns empty data points"""
+    p1 = client.post("/portfolios/", json={"name": "No Perf Incl"}).json()["id"]
+    client.patch(f"/portfolios/{p1}/inclusion", json={"include_in_aggregation": False})
+
+    response = client.get("/portfolios/aggregate/performance")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["data_points"] == []
 
 
 # ================== Aggregated Sales Tests ==================

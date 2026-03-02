@@ -321,7 +321,7 @@ const en = {
   },
   aggregate: {
     title: 'Aggregated Portfolio',
-    description: 'Select portfolios to view a combined summary of holdings and performance.',
+    description: 'Choose which portfolios to include in the combined view. Your selection is saved automatically.',
     selectAll: 'Select All',
     deselectAll: 'Deselect All',
     noSelection: 'Select at least one portfolio to view aggregated data.',

@@ -50,6 +50,7 @@ export interface Portfolio {
   id: number;
   name: string;
   created_at: string;
+  include_in_aggregation: boolean;
 }
 
 export interface Transaction {
@@ -334,20 +335,17 @@ export const getPortfolioPerformance = async (
 // ================== Aggregated Portfolio API Functions ==================
 
 /**
- * Get aggregated portfolio status across multiple portfolios
+ * Get aggregated portfolio status across included portfolios
  */
-export const getAggregatedStatus = async (portfolioIds: number[]): Promise<PortfolioStatus> => {
-  const response = await api.post<PortfolioStatus>('/portfolios/aggregate/status', {
-    portfolio_ids: portfolioIds,
-  });
+export const getAggregatedStatus = async (): Promise<PortfolioStatus> => {
+  const response = await api.get<PortfolioStatus>('/portfolios/aggregate/status');
   return response.data;
 };
 
 /**
- * Get aggregated portfolio performance across multiple portfolios
+ * Get aggregated portfolio performance across included portfolios
  */
 export const getAggregatedPerformance = async (
-  portfolioIds: number[],
   startDate?: string,
   endDate?: string,
   numPoints?: number
@@ -357,10 +355,23 @@ export const getAggregatedPerformance = async (
   if (endDate) params.end_date = endDate;
   if (numPoints) params.num_points = numPoints;
 
-  const response = await api.post<PortfolioPerformance>(
+  const response = await api.get<PortfolioPerformance>(
     '/portfolios/aggregate/performance',
-    { portfolio_ids: portfolioIds },
     { params }
+  );
+  return response.data;
+};
+
+/**
+ * Toggle whether a portfolio is included in aggregation
+ */
+export const updatePortfolioInclusion = async (
+  portfolioId: number,
+  include: boolean
+): Promise<Portfolio> => {
+  const response = await api.patch<Portfolio>(
+    `/portfolios/${portfolioId}/inclusion`,
+    { include_in_aggregation: include }
   );
   return response.data;
 };

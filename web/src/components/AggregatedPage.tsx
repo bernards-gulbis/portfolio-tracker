@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { usePortfolios } from '../hooks/usePortfolios';
+import { usePortfolios, useUpdatePortfolioInclusion } from '../hooks/usePortfolios';
 import { useAggregatedStatus } from '../hooks/useAggregatedStatus';
 import { useAggregatedPerformance } from '../hooks/useAggregatedPerformance';
 import { PortfolioStatusContent, PortfolioStatusSkeleton } from './PortfolioStatusView';
@@ -17,37 +17,43 @@ export const AggregatedPage = () => {
   const { t } = useTranslation();
   const locale = useLocale();
   const { data: portfolios, isLoading: portfoliosLoading } = usePortfolios();
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-
-  // Default: select all portfolios once loaded
-  useEffect(() => {
-    if (portfolios && portfolios.length > 0 && selectedIds.length === 0) {
-      setSelectedIds(portfolios.map((p) => p.id));
-    }
-  }, [portfolios]); // eslint-disable-line react-hooks/exhaustive-deps
+  const inclusionMutation = useUpdatePortfolioInclusion();
 
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: status, isLoading: statusLoading, error, dataUpdatedAt } = useAggregatedStatus(selectedIds);
+
+  const includedCount = portfolios?.filter((p) => p.include_in_aggregation).length ?? 0;
+  const hasIncluded = includedCount > 0;
+
+  const { data: status, isLoading: statusLoading, error, dataUpdatedAt } = useAggregatedStatus(hasIncluded);
   const { data: performance, isLoading: performanceLoading } = useAggregatedPerformance(
-    selectedIds,
     undefined,
     undefined,
-    365
+    365,
+    hasIncluded
   );
 
-  const togglePortfolio = (id: number) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
+  const togglePortfolio = async (id: number, currentValue: boolean) => {
+    await inclusionMutation.mutateAsync({ portfolioId: id, include: !currentValue });
+    inclusionMutation.invalidateInclusion();
+  };
+
+  const selectAll = async () => {
+    if (!portfolios) return;
+    const toInclude = portfolios.filter((p) => !p.include_in_aggregation);
+    await Promise.all(
+      toInclude.map((p) => inclusionMutation.mutateAsync({ portfolioId: p.id, include: true }))
     );
+    inclusionMutation.invalidateInclusion();
   };
 
-  const selectAll = () => {
-    if (portfolios) setSelectedIds(portfolios.map((p) => p.id));
-  };
-
-  const deselectAll = () => {
-    setSelectedIds([]);
+  const deselectAll = async () => {
+    if (!portfolios) return;
+    const toExclude = portfolios.filter((p) => p.include_in_aggregation);
+    await Promise.all(
+      toExclude.map((p) => inclusionMutation.mutateAsync({ portfolioId: p.id, include: false }))
+    );
+    inclusionMutation.invalidateInclusion();
   };
 
   const handleRefresh = async () => {
@@ -87,7 +93,7 @@ export const AggregatedPage = () => {
                   {t('aggregate.deselectAll')}
                 </Button>
                 <span className="text-sm text-muted-foreground ml-auto">
-                  {t('aggregate.selectedCount', { selected: selectedIds.length, total: portfolios.length })}
+                  {t('aggregate.selectedCount', { selected: includedCount, total: portfolios.length })}
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -97,8 +103,8 @@ export const AggregatedPage = () => {
                     className="flex items-center gap-2 cursor-pointer rounded-md border p-3 hover:bg-accent/50 transition-colors"
                   >
                     <Checkbox
-                      checked={selectedIds.includes(portfolio.id)}
-                      onCheckedChange={() => togglePortfolio(portfolio.id)}
+                      checked={portfolio.include_in_aggregation}
+                      onCheckedChange={() => togglePortfolio(portfolio.id, portfolio.include_in_aggregation)}
                     />
                     <span className="text-sm font-medium">{portfolio.name}</span>
                   </label>
@@ -112,7 +118,7 @@ export const AggregatedPage = () => {
       </Card>
 
       {/* Aggregated Status */}
-      {selectedIds.length === 0 ? (
+      {!hasIncluded ? (
         <Card>
           <CardContent className="py-8">
             <p className="text-center text-muted-foreground">{t('aggregate.noSelection')}</p>

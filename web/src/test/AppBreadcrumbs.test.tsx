@@ -20,8 +20,8 @@ const createTestQueryClient = () =>
   });
 
 const mockPortfolios: Portfolio[] = [
-  { id: 1, name: 'Growth Fund', created_at: '2024-01-01T00:00:00' },
-  { id: 2, name: 'Dividend Portfolio', created_at: '2024-02-01T00:00:00' },
+  { id: 1, name: 'Growth Fund', created_at: '2024-01-01T00:00:00', include_in_aggregation: true },
+  { id: 2, name: 'Dividend Portfolio', created_at: '2024-02-01T00:00:00', include_in_aggregation: true },
 ];
 
 const renderBreadcrumbs = (initialEntry: string) => {

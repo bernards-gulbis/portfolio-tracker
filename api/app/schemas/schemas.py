@@ -64,8 +64,14 @@ class PortfolioResponse(PortfolioBase):
     """Schema for portfolio response"""
     id: int
     created_at: datetime
-    
+    include_in_aggregation: bool
+
     model_config = ConfigDict(from_attributes=True)
+
+
+class PortfolioInclusionUpdate(BaseModel):
+    """Schema for toggling portfolio inclusion in aggregation"""
+    include_in_aggregation: bool
 
 
 class PortfolioWithTransactions(PortfolioResponse):
@@ -281,11 +287,6 @@ class PortfolioPerformanceResponse(BaseModel):
 
 
 # ================== Aggregated Portfolio Schemas ==================
-
-class AggregatedStatusRequest(BaseModel):
-    """Schema for requesting aggregated status across multiple portfolios"""
-    portfolio_ids: List[int] = Field(min_length=1)
-
 
 # ================== Realized Sales Schemas ==================
 

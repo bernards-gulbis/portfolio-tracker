@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import { getPortfolios, createPortfolio, updatePortfolio, deletePortfolio, copyPortfolio, PortfolioCreate, PortfolioUpdate } from '../api';
+import { getPortfolios, createPortfolio, updatePortfolio, deletePortfolio, copyPortfolio, updatePortfolioInclusion, PortfolioCreate, PortfolioUpdate } from '../api';
 
 /**
  * Hook to fetch all portfolios
@@ -77,4 +77,26 @@ export const useCopyPortfolio = () => {
       toast.success(t('portfolio.toasts.copied', { name: portfolio.name }));
     },
   });
+};
+
+/**
+ * Hook to toggle portfolio inclusion in aggregation.
+ * Does NOT auto-invalidate — callers must call invalidateInclusion() after mutations settle
+ * so that batch operations (select all / deselect all) only invalidate once.
+ */
+export const useUpdatePortfolioInclusion = () => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: ({ portfolioId, include }: { portfolioId: number; include: boolean }) =>
+      updatePortfolioInclusion(portfolioId, include),
+  });
+
+  const invalidateInclusion = () => {
+    queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+    queryClient.invalidateQueries({ queryKey: ['aggregatedStatus'] });
+    queryClient.invalidateQueries({ queryKey: ['aggregatedPerformance'] });
+  };
+
+  return { ...mutation, invalidateInclusion };
 };
