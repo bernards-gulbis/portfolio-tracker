@@ -2,15 +2,17 @@ import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
+import { useLivePrices } from '../hooks/useLivePrices';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatCurrency, formatSignedCurrency, formatDate, getValueClass } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDate, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
-import { getErrorMessage, PortfolioStatus, PortfolioPerformance, TransactionWarning } from '../api';
-import { useCurrencyPreference } from '../hooks/useCurrencyPreference';
+import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, LivePrices } from '../api';
+import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPreference';
 import { computeEurMetrics } from '../utils/eurMetrics';
+import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
 import EditPortfolioModal from './EditPortfolioModal';
 import CopyPortfolioModal from './CopyPortfolioModal';
@@ -47,19 +49,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { MoreVertical, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
 
-const EMPTY_DATA_POINTS: never[] = [];
-
-const formatSignedPercent = (value: number | null | undefined): string => {
-  if (value == null) return '';
-  const sign = value >= 0 ? '\u25B2' : '\u25BC';
-  return `${sign}${Math.abs(value).toFixed(2)}%`;
-};
-
+const EMPTY_DATA_POINTS: PerformanceDataPoint[] = [];
+const EMPTY_LIVE: LivePrices = { prices: {}, usd_to_eur_rate: null, timestamp: '' };
 
 const formatCurrencyWithPercent = (
   currencyValue: number | null | undefined,
   percentValue: number | null | undefined,
-  currency: string = 'USD',
+  currency: Currency = 'USD',
   locale: string = 'en-US'
 ): React.JSX.Element | string => {
   if (currencyValue == null) return '-';
@@ -77,7 +73,7 @@ const formatCurrencyWithPercent = (
 // ================== Reusable content component ==================
 
 interface PortfolioStatusContentProps {
-  status: PortfolioStatus;
+  status: PricedPortfolioStatus;
   performance?: PortfolioPerformance;
   performanceLoading: boolean;
   isEmptyPortfolio?: boolean;
@@ -100,6 +96,12 @@ const PortfolioStatusContent = ({
     new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
       status.capital_gains_tax_rate * 100
     ), [locale, status.capital_gains_tax_rate]);
+  const liveLastPoint = useMemo(
+    () => status.current_value != null
+      ? { currentValue: status.current_value, fxRate: status.usd_to_eur_rate }
+      : undefined,
+    [status.current_value, status.usd_to_eur_rate],
+  );
 
   if (isEmptyPortfolio) {
     return (
@@ -219,10 +221,7 @@ const PortfolioStatusContent = ({
             data={performance?.data_points ?? EMPTY_DATA_POINTS}
             loading={performanceLoading}
             currency={currency}
-            liveLastPoint={{
-              currentValue: status.current_value,
-              fxRate: status.usd_to_eur_rate,
-            }}
+            liveLastPoint={liveLastPoint}
           />
           <HoldingsAllocationChart
             holdings={status.holdings}
@@ -279,6 +278,17 @@ export const PortfolioStatusView = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
+  // Live price polling — computes priced status from transaction-derived status + live prices
+  const tickers = useMemo(() => status?.holdings.map((h) => h.ticker) ?? [], [status?.holdings]);
+  const { data: livePrices, dataUpdatedAt: livePricesUpdatedAt } = useLivePrices(
+    tickers,
+    !!status && tickers.length > 0,
+  );
+  const effectiveStatus = useMemo(() => {
+    if (!status) return undefined;
+    return computePricedStatus(status, livePrices ?? EMPTY_LIVE);
+  }, [status, livePrices]);
+
   // Fetch full history — period filtering happens client-side in PerformanceChart
   const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
     portfolioId,
@@ -293,6 +303,7 @@ export const PortfolioStatusView = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] }),
         queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', portfolioId] }),
+        queryClient.invalidateQueries({ queryKey: ['livePrices'] }),
       ]);
     } finally {
       setIsRefreshing(false);
@@ -335,7 +346,7 @@ export const PortfolioStatusView = () => {
     );
   }
 
-  if (!status) {
+  if (!effectiveStatus) {
     return (
       <Card className="mb-6">
         <CardContent className="py-8">
@@ -345,23 +356,24 @@ export const PortfolioStatusView = () => {
     );
   }
 
-  const isEmptyPortfolio = status.holdings.length === 0 && status.principal === 0;
+  const isEmptyPortfolio = effectiveStatus.holdings.length === 0 && effectiveStatus.principal === 0;
+  const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (
     <>
       <div className="mb-6 space-y-6">
         <Card>
           <PortfolioStatusContent
-            status={status}
+            status={effectiveStatus}
             performance={performance}
             performanceLoading={performanceLoading}
             isEmptyPortfolio={isEmptyPortfolio}
             toolbar={
               <div className="flex items-center gap-2">
-                {!isEmptyPortfolio && dataUpdatedAt > 0 && (
+                {!isEmptyPortfolio && latestUpdateAt > 0 && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     {t('status.fetchedAt', {
-                      time: new Date(dataUpdatedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                      time: new Date(latestUpdateAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
                     })}
                     <Button
                       variant="ghost"
@@ -380,7 +392,7 @@ export const PortfolioStatusView = () => {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8"
-                      aria-label={t('portfolio.list.item.actionsLabel', { name: status.portfolio_name })}
+                      aria-label={t('portfolio.list.item.actionsLabel', { name: effectiveStatus.portfolio_name })}
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
@@ -419,14 +431,14 @@ export const PortfolioStatusView = () => {
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}
         portfolioId={portfolioId}
-        currentName={status.portfolio_name}
+        currentName={effectiveStatus.portfolio_name}
       />
 
       <CopyPortfolioModal
         isOpen={copyModalOpen}
         onClose={() => setCopyModalOpen(false)}
         portfolioId={portfolioId}
-        portfolioName={status.portfolio_name}
+        portfolioName={effectiveStatus.portfolio_name}
       />
 
       <AlertDialog

@@ -126,10 +126,13 @@ export interface Holding {
   quantity: number;
   average_cost: number;
   total_cost: number;
-  current_price?: number | null;
-  current_value?: number | null;
-  unrealized_gain_loss?: number | null;
-  unrealized_gain_loss_pct?: number | null;
+}
+
+export interface PricedHolding extends Holding {
+  current_price: number | null;
+  current_value: number | null;
+  unrealized_gain_loss: number | null;
+  unrealized_gain_loss_pct: number | null;
 }
 
 export interface TransactionWarning {
@@ -141,7 +144,6 @@ export interface TransactionWarning {
 export interface PortfolioStatus {
   portfolio_id: number;
   portfolio_name: string;
-  current_value: number;
   principal: number;
   principal_eur: number;
   dividends: number;
@@ -149,14 +151,19 @@ export interface PortfolioStatus {
   cash: number;
   holdings: Holding[];
   holdings_cost: number;
-  holdings_value: number;
-  unrealized_gains: number;
-  unrealized_gains_pct: number | null;
   realized_gains: number;
   capital_gains_tax_rate: number;
-  missing_prices: string[];
   warnings: TransactionWarning[];
   usd_to_eur_rate: number | null;
+}
+
+export interface PricedPortfolioStatus extends Omit<PortfolioStatus, 'holdings'> {
+  holdings: PricedHolding[];
+  current_value: number | null;
+  holdings_value: number | null;
+  unrealized_gains: number | null;
+  unrealized_gains_pct: number | null;
+  missing_prices: string[];
 }
 
 export interface PerformanceDataPoint {
@@ -173,6 +180,12 @@ export interface PortfolioPerformance {
   portfolio_id: number;
   portfolio_name: string;
   data_points: PerformanceDataPoint[];
+}
+
+export interface LivePrices {
+  prices: Record<string, number | null>;
+  usd_to_eur_rate: number | null;
+  timestamp: string;
 }
 
 // ================== API Configuration ==================
@@ -301,6 +314,16 @@ export const copyPortfolio = async (
  */
 export const getPortfolioStatus = async (portfolioId: number): Promise<PortfolioStatus> => {
   const response = await api.get<PortfolioStatus>(`/portfolios/${portfolioId}/status`);
+  return response.data;
+};
+
+/**
+ * Get live prices and FX rate (lightweight, no transaction replay)
+ */
+export const getLivePrices = async (tickers: string[]): Promise<LivePrices> => {
+  const params = new URLSearchParams();
+  tickers.forEach((t) => params.append('tickers', t));
+  const response = await api.get<LivePrices>('/portfolios/prices/live', { params });
   return response.data;
 };
 

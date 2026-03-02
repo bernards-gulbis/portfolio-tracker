@@ -10,7 +10,7 @@ from threading import Lock, Semaphore
 from sqlmodel import Session, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from app.core.config import PRICE_CACHE_TTL_MINUTES
+from app.core.config import PRICE_CACHE_TTL_SECONDS
 from app.core.database import engine, is_postgresql
 from app.models.historical_price import HistoricalPrice, FxRate
 
@@ -22,7 +22,7 @@ class PriceService:
     
     # Class-level cache: ticker -> (price, timestamp)
     _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
-    _cache_ttl: timedelta = timedelta(minutes=PRICE_CACHE_TTL_MINUTES)
+    _cache_ttl: timedelta = timedelta(seconds=PRICE_CACHE_TTL_SECONDS)
     _cache_lock = Lock()  # Thread-safe cache access
     _yahoo_semaphore = Semaphore(5)  # Max 5 concurrent outgoing Yahoo Finance requests
     
@@ -294,6 +294,14 @@ class PriceService:
         if eur_usd_rate and eur_usd_rate > 0:
             return 1.0 / eur_usd_rate
         return None
+
+    @classmethod
+    def get_usd_to_eur_rate_safe(cls) -> Optional[float]:
+        """Like get_usd_to_eur_rate but returns None on any exception."""
+        try:
+            return cls.get_usd_to_eur_rate()
+        except Exception:
+            return None
 
     @classmethod
     def _determine_fetch_ranges(

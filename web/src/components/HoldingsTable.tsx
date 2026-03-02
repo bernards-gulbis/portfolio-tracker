@@ -1,8 +1,8 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency, formatSignedCurrency, formatQuantity, getValueClass } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatQuantity, getValueClass } from '../utils/formatters';
 import { applyRateToHolding, type EurMetrics } from '../utils/eurMetrics';
-import type { Holding } from '../api';
+import type { PricedHolding } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -16,7 +16,7 @@ import {
 import { AlertTriangleIcon } from 'lucide-react';
 
 interface HoldingsTableProps {
-  holdings: Holding[];
+  holdings: PricedHolding[];
   missingPrices: string[];
   cash: number;
   displayCurrency: Currency;
@@ -107,7 +107,7 @@ export const HoldingsTable = memo(({
                     </span>
                     {currencyGainsPct !== null && (
                       <span className={`text-xs ${getValueClass(currencyGainsEur)}`}>
-                        {currencyGainsPct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(currencyGainsPct).toFixed(2)}%
+                        {formatSignedPercent(currencyGainsPct)}
                       </span>
                     )}
                   </div>
@@ -136,7 +136,7 @@ export const HoldingsTable = memo(({
                           {formatSignedCurrency(eurVals.unrealized_gain_loss_eur, 'EUR', locale)}
                         </span>
                         <span className={`text-xs ${getValueClass(eurVals.unrealized_gain_loss_eur)}`}>
-                          {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
+                          {formatSignedPercent(holding.unrealized_gain_loss_pct)}
                         </span>
                       </div>
                     )
@@ -147,7 +147,7 @@ export const HoldingsTable = memo(({
                             {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
                           </span>
                           <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
-                            {holding.unrealized_gain_loss_pct >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(holding.unrealized_gain_loss_pct).toFixed(2)}%
+                            {formatSignedPercent(holding.unrealized_gain_loss_pct)}
                           </span>
                         </div>
                       )

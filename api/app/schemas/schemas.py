@@ -213,15 +213,11 @@ class PaginatedTransactionResponse(BaseModel):
 # ================== Portfolio Status Schemas ==================
 
 class HoldingResponse(BaseModel):
-    """Schema for a single holding"""
+    """Schema for a single holding (transaction-derived only)"""
     ticker: str
     quantity: float
     average_cost: float
     total_cost: float
-    current_price: Optional[float] = None
-    current_value: Optional[float] = None
-    unrealized_gain_loss: Optional[float] = None
-    unrealized_gain_loss_pct: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -234,10 +230,9 @@ class TransactionWarning(BaseModel):
 
 
 class PortfolioStatusResponse(BaseModel):
-    """Schema for portfolio status with calculated metrics"""
+    """Schema for portfolio status (transaction-derived metrics only)"""
     portfolio_id: int
     portfolio_name: str
-    current_value: float  # Cash + Holdings current value
     principal: float  # Deposits - Withdrawals
     principal_eur: float  # Sum of all eur_amount fields (historical rates)
     dividends: float
@@ -245,16 +240,19 @@ class PortfolioStatusResponse(BaseModel):
     cash: float
     holdings: List[HoldingResponse]
     holdings_cost: float  # Sum of all holdings cost basis
-    holdings_value: float  # Sum of current market value of all holdings
-    unrealized_gains: float  # Total unrealized gains/losses
-    unrealized_gains_pct: Optional[float] = None  # Total unrealized gains/losses percentage
     realized_gains: float  # Gains/losses from sells
     capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
-    missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
     warnings: List[TransactionWarning] = Field(default_factory=list)  # Transaction processing warnings
     usd_to_eur_rate: Optional[float] = None  # Live USD→EUR rate; None when unavailable
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LivePricesResponse(BaseModel):
+    """Schema for live price polling (no transaction replay)"""
+    prices: dict[str, Optional[float]]
+    usd_to_eur_rate: Optional[float] = None
+    timestamp: datetime
 
 
 class PerformanceDataPoint(BaseModel):

@@ -80,7 +80,7 @@ CORS_ORIGINS: list[str] = [
 
 # ── Misc ──────────────────────────────────────────────────
 
-PRICE_CACHE_TTL_MINUTES: int = _get_int("PRICE_CACHE_TTL", 15)
+PRICE_CACHE_TTL_SECONDS: int = _get_int("PRICE_CACHE_TTL_SECONDS", 55)
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # ── Emit warnings / abort on errors ──────────────────────

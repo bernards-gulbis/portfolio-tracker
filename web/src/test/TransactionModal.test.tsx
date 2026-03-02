@@ -24,8 +24,13 @@ vi.mock('../hooks/usePortfolioStatus', () => ({
   usePortfolioStatus: vi.fn(),
 }));
 
+vi.mock('../hooks/useLivePrices', () => ({
+  useLivePrices: vi.fn(),
+}));
+
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
+import { useLivePrices } from '../hooks/useLivePrices';
 
 const mockHoldings: Holding[] = [
   {
@@ -33,20 +38,12 @@ const mockHoldings: Holding[] = [
     quantity: 10,
     average_cost: 150,
     total_cost: 1500,
-    current_price: 175.50,
-    current_value: 1755,
-    unrealized_gain_loss: 255,
-    unrealized_gain_loss_pct: 17,
   },
   {
     ticker: 'MSFT',
     quantity: 5,
     average_cost: 300,
     total_cost: 1500,
-    current_price: 420.00,
-    current_value: 2100,
-    unrealized_gain_loss: 600,
-    unrealized_gain_loss_pct: 40,
   },
 ];
 
@@ -101,6 +98,10 @@ describe('TransactionModal — sell suggestions', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: { holdings: mockHoldings, usd_to_eur_rate: 0.92 },
     } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
+    } as unknown as ReturnType<typeof useLivePrices>);
   });
 
   it('renders Select dropdown for ticker when type is SELL', async () => {

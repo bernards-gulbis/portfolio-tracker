@@ -17,6 +17,7 @@ from .schemas import (
     PaginatedTransactionResponse,
     HoldingResponse,
     PortfolioStatusResponse,
+    LivePricesResponse,
     PerformanceDataPoint,
     PortfolioPerformanceResponse,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "PaginatedTransactionResponse",
     "HoldingResponse",
     "PortfolioStatusResponse",
+    "LivePricesResponse",
     "PerformanceDataPoint",
     "PortfolioPerformanceResponse",
 ]

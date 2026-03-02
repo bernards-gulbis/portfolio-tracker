@@ -1468,359 +1468,6 @@ def test_portfolio_status_invalid_split_ratio(client: TestClient):
     assert "Split ratio must be greater than 0" in split_response.text
 
 
-# ================== Portfolio Status with Prices Tests ==================
-
-def test_portfolio_status_with_current_prices(client: TestClient):
-    """Test portfolio status with current prices from Yahoo Finance"""
-    portfolio_response = client.post(
-        "/portfolios/",
-        json={"name": "Investment Portfolio"}
-    )
-    portfolio_id = portfolio_response.json()["id"]
-    
-    # Deposit money
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-01T10:00:00",
-            "type": "Deposit",
-            "total_amount": 10000.0,
-            "fee": 0.0
-        }
-    )
-    
-    # Buy AAPL at $150
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-02T10:00:00",
-            "type": "Buy",
-            "ticker": "AAPL",
-            "quantity": 10.0,
-            "price_per_share": 150.0,
-            "total_amount": -1500.0,
-            "fee": 1.0
-        }
-    )
-    
-    # Buy MSFT at $300
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-03T10:00:00",
-            "type": "Buy",
-            "ticker": "MSFT",
-            "quantity": 5.0,
-            "price_per_share": 300.0,
-            "total_amount": -1500.0,
-            "fee": 1.0
-        }
-    )
-    
-    # Mock current prices: AAPL at $180 (+20%), MSFT at $270 (-10%)
-    mock_prices = {
-        'AAPL': 180.0,
-        'MSFT': 270.0
-    }
-    
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
-        response = client.get(f"/portfolios/{portfolio_id}/status")
-    
-    assert response.status_code == 200
-    data = response.json()
-    
-    # Check cash balance
-    assert data["cash"] == pytest.approx(7000.0)  # 10000 - 1500 - 1500
-    
-    # Check AAPL holding with price data
-    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
-    assert aapl_holding["quantity"] == pytest.approx(10.0)
-    assert aapl_holding["average_cost"] == pytest.approx(150.0)
-    assert aapl_holding["total_cost"] == pytest.approx(1500.0)
-    assert aapl_holding["current_price"] == pytest.approx(180.0)
-    assert aapl_holding["current_value"] == pytest.approx(1800.0)  # 10 * 180
-    assert aapl_holding["unrealized_gain_loss"] == pytest.approx(300.0)  # 1800 - 1500
-    assert abs(aapl_holding["unrealized_gain_loss_pct"] - 20.0) < 0.01
-    
-    # Check MSFT holding with price data
-    msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
-    assert msft_holding["quantity"] == pytest.approx(5.0)
-    assert msft_holding["average_cost"] == pytest.approx(300.0)
-    assert msft_holding["total_cost"] == pytest.approx(1500.0)
-    assert msft_holding["current_price"] == pytest.approx(270.0)
-    assert msft_holding["current_value"] == pytest.approx(1350.0)  # 5 * 270
-    assert msft_holding["unrealized_gain_loss"] == pytest.approx(-150.0)  # 1350 - 1500
-    assert abs(msft_holding["unrealized_gain_loss_pct"] - (-10.0)) < 0.01
-    
-    # Check portfolio totals
-    assert data["holdings_cost"] == pytest.approx(3000.0)
-    assert data["holdings_value"] == pytest.approx(3150.0)  # 1800 + 1350
-    assert data["unrealized_gains"] == pytest.approx(150.0)  # 300 - 150
-    assert data["current_value"] == pytest.approx(10150.0)  # 7000 cash + 3150 holdings
-
-
-def test_portfolio_status_with_missing_prices(client: TestClient):
-    """Test portfolio status when some prices are unavailable"""
-    portfolio_response = client.post(
-        "/portfolios/",
-        json={"name": "Investment Portfolio"}
-    )
-    portfolio_id = portfolio_response.json()["id"]
-    
-    # Deposit and buy stocks
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-01T10:00:00",
-            "type": "Deposit",
-            "total_amount": 5000.0,
-            "fee": 0.0
-        }
-    )
-    
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-02T10:00:00",
-            "type": "Buy",
-            "ticker": "AAPL",
-            "quantity": 10.0,
-            "price_per_share": 150.0,
-            "total_amount": -1500.0,
-            "fee": 0.0
-        }
-    )
-    
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-03T10:00:00",
-            "type": "Buy",
-            "ticker": "UNKNOWN",
-            "quantity": 5.0,
-            "price_per_share": 100.0,
-            "total_amount": -500.0,
-            "fee": 0.0
-        }
-    )
-    
-    # Mock prices: AAPL available, UNKNOWN not available
-    mock_prices = {
-        'AAPL': 180.0,
-        'UNKNOWN': None
-    }
-    
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
-        response = client.get(f"/portfolios/{portfolio_id}/status")
-    
-    assert response.status_code == 200
-    data = response.json()
-    
-    # AAPL should have price data
-    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
-    assert aapl_holding["current_price"] == pytest.approx(180.0)
-    assert aapl_holding["current_value"] == pytest.approx(1800.0)
-    assert aapl_holding["unrealized_gain_loss"] == pytest.approx(300.0)
-    
-    # UNKNOWN should have None for price fields
-    unknown_holding = next(h for h in data["holdings"] if h["ticker"] == "UNKNOWN")
-    assert unknown_holding["current_price"] is None
-    assert unknown_holding["current_value"] is None
-    assert unknown_holding["unrealized_gain_loss"] is None
-    assert unknown_holding["unrealized_gain_loss_pct"] is None
-    
-    # Totals should only include holdings with prices
-    assert data["holdings_value"] == pytest.approx(1800.0)  # Only AAPL
-    assert data["unrealized_gains"] == pytest.approx(300.0)  # Only AAPL gain
-
-
-def test_portfolio_status_with_zero_price(client: TestClient):
-    """Test portfolio status when price is zero (edge case)"""
-    portfolio_response = client.post(
-        "/portfolios/",
-        json={"name": "Investment Portfolio"}
-    )
-    portfolio_id = portfolio_response.json()["id"]
-    
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-01T10:00:00",
-            "type": "Deposit",
-            "total_amount": 1000.0,
-            "fee": 0.0
-        }
-    )
-    
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-02T10:00:00",
-            "type": "Buy",
-            "ticker": "PENNY",
-            "quantity": 1000.0,
-            "price_per_share": 0.50,
-            "total_amount": -500.0,
-            "fee": 0.0
-        }
-    )
-    mock_prices = {'PENNY': 0.0}
-    
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
-        response = client.get(f"/portfolios/{portfolio_id}/status")
-    
-    assert response.status_code == 200
-    data = response.json()
-    
-    # Zero price should not calculate gains
-    penny_holding = next(h for h in data["holdings"] if h["ticker"] == "PENNY")
-    assert penny_holding["current_price"] == pytest.approx(0.0)
-    assert penny_holding["current_value"] is None
-    assert penny_holding["unrealized_gain_loss"] is None
-
-
-def test_portfolio_status_price_service_exception(client: TestClient):
-    """Test portfolio status when PriceService throws an exception"""
-    portfolio_response = client.post(
-        "/portfolios/",
-        json={"name": "Investment Portfolio"}
-    )
-    portfolio_id = portfolio_response.json()["id"]
-    
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-01T10:00:00",
-            "type": "Deposit",
-            "total_amount": 1000.0,
-            "fee": 0.0
-        }
-    )
-    
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-02T10:00:00",
-            "type": "Buy",
-            "ticker": "AAPL",
-            "quantity": 10.0,
-            "price_per_share": 150.0,
-            "total_amount": -1500.0,
-            "fee": 0.0
-        }
-    )
-    
-    # Mock PriceService to raise exception
-    with patch('app.services.price_service.PriceService.get_current_prices', side_effect=Exception("API Error")):
-        # Should not crash, should return 200 with no prices
-        response = client.get(f"/portfolios/{portfolio_id}/status")
-    
-    # Should succeed with no prices (graceful degradation)
-    assert response.status_code == 200
-    data = response.json()
-    
-    # AAPL holding should have None for all price fields
-    aapl_holding = next(h for h in data["holdings"] if h["ticker"] == "AAPL")
-    assert aapl_holding["current_price"] is None
-    assert aapl_holding["current_value"] is None
-    assert aapl_holding["unrealized_gain_loss"] is None
-    assert aapl_holding["unrealized_gain_loss_pct"] is None
-
-
-def test_portfolio_status_with_gains_and_losses_mixed(client: TestClient):
-    """Test portfolio status with multiple stocks having different gain/loss scenarios"""
-    portfolio_response = client.post(
-        "/portfolios/",
-        json={"name": "Diverse Portfolio"}
-    )
-    portfolio_id = portfolio_response.json()["id"]
-    
-    # Deposit
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-01T10:00:00",
-            "type": "Deposit",
-            "total_amount": 20000.0,
-            "fee": 0.0
-        }
-    )
-    
-    # Buy WINNER (will gain 50%)
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-02T10:00:00",
-            "type": "Buy",
-            "ticker": "WINNER",
-            "quantity": 100.0,
-            "price_per_share": 50.0,
-            "total_amount": -5000.0,
-            "fee": 0.0
-        }
-    )
-    
-    # Buy LOSER (will lose 30%)
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-03T10:00:00",
-            "type": "Buy",
-            "ticker": "LOSER",
-            "quantity": 50.0,
-            "price_per_share": 100.0,
-            "total_amount": -5000.0,
-            "fee": 0.0
-        }
-    )
-    
-    # Buy FLAT (no change)
-    client.post(
-        f"/portfolios/{portfolio_id}/transactions/",
-        json={
-            "date": "2024-01-04T10:00:00",
-            "type": "Buy",
-            "ticker": "FLAT",
-            "quantity": 200.0,
-            "price_per_share": 25.0,
-            "total_amount": -5000.0,
-            "fee": 0.0
-        }
-    )
-    
-    # Mock current prices
-    mock_prices = {
-        'WINNER': 75.0,   # +50%
-        'LOSER': 70.0,    # -30%
-        'FLAT': 25.0      # 0%
-    }
-    
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices):
-        response = client.get(f"/portfolios/{portfolio_id}/status")
-    
-    assert response.status_code == 200
-    data = response.json()
-    
-    # Check individual holdings
-    winner = next(h for h in data["holdings"] if h["ticker"] == "WINNER")
-    assert winner["unrealized_gain_loss"] == pytest.approx(2500.0)  # +2500
-    assert abs(winner["unrealized_gain_loss_pct"] - 50.0) < 0.01
-    
-    loser = next(h for h in data["holdings"] if h["ticker"] == "LOSER")
-    assert loser["unrealized_gain_loss"] == pytest.approx(-1500.0)  # -1500
-    assert abs(loser["unrealized_gain_loss_pct"] - (-30.0)) < 0.01
-    
-    flat = next(h for h in data["holdings"] if h["ticker"] == "FLAT")
-    assert flat["unrealized_gain_loss"] == pytest.approx(0.0)  # 0
-    assert abs(flat["unrealized_gain_loss_pct"]) < 0.01
-    
-    # Total unrealized gains: 2500 - 1500 + 0 = 1000
-    assert data["unrealized_gains"] == pytest.approx(1000.0)
-    
-    # Total portfolio value: 5000 cash + (7500 + 3500 + 5000) holdings = 21000
-    assert data["cash"] == pytest.approx(5000.0)
-    assert data["holdings_value"] == pytest.approx(16000.0)
-    assert data["current_value"] == pytest.approx(21000.0)
 
 
 # ================== EUR Conversion and Tax Tests ==================
@@ -1860,22 +1507,16 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
         }
     )
 
-    # Mock current price: AAPL at $150 (50% gain)
     # Mock USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
-    mock_prices = {'AAPL': 150.0}
-
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
     assert response.status_code == 200
     data = response.json()
 
-    # USD values
+    # USD values (transaction-derived only)
     assert data["cash"] == pytest.approx(9000.0)
     assert data["principal"] == pytest.approx(10000.0)
-    assert data["current_value"] == pytest.approx(10500.0)  # 9000 cash + 1500 holdings
-    assert data["unrealized_gains"] == pytest.approx(500.0)  # 1500 - 1000
 
     # Historical EUR values (unchanged)
     assert abs(data["principal_eur"] - 9000.0) < 0.1  # 10000 / 1.1111 ≈ 9000
@@ -1919,20 +1560,15 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
         }
     )
 
-    # Mock current price: AAPL at $200, FX rate 1.0
-    mock_prices = {'AAPL': 200.0}
-
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+    # Mock FX rate 1.0
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
     assert response.status_code == 200
     data = response.json()
 
-    # USD values
-    assert data["current_value"] == pytest.approx(20000.0)
+    # Transaction-derived values
     assert data["principal"] == pytest.approx(10000.0)
-    assert data["unrealized_gains"] == pytest.approx(10000.0)
 
     # Historical EUR
     assert data["principal_eur"] == pytest.approx(10000.0)
@@ -1988,19 +1624,14 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
         }
     )
     
-    # Mock current price: AAPL at $150 ($5,000 unrealized gain)
-    mock_prices = {'AAPL': 150.0}
-    
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
 
-    # Current value: $2,000 cash + $15,000 holdings = $17,000
+    # Transaction-derived values
     assert data["cash"] == pytest.approx(2000.0)
-    assert data["current_value"] == pytest.approx(17000.0)
     assert data["principal"] == pytest.approx(10000.0)
     assert data["dividends"] == pytest.approx(2000.0)
     # dividends_eur comes from historical per-transaction rate (fx_rate=1.0 → 2000 EUR)
@@ -2056,11 +1687,7 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
         }
     )
 
-    # Mock current price and USD→EUR rate
-    mock_prices = {'AAPL': 150.0}
-
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.92):
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.92):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
     assert response.status_code == 200
@@ -2122,11 +1749,8 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
         }
     )
 
-    # Mock current price, but USD→EUR rate returns None (unavailable)
-    mock_prices = {'AAPL': 150.0}
-
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=None):
+    # USD→EUR rate returns None (unavailable)
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=None):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
     assert response.status_code == 200
@@ -2176,18 +1800,14 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
         }
     )
     
-    # Mock current price but NO exchange rate
-    mock_prices = {'AAPL': 150.0}
-    
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value=mock_prices), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=None):
+    # No exchange rate available
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=None):
         response = client.get(f"/portfolios/{portfolio_id}/status")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
-    # USD values should be available
-    assert data["current_value"] == pytest.approx(15000.0)
+
+    # Transaction-derived values
     assert data["principal"] == pytest.approx(10000.0)
 
     # usd_to_eur_rate is None — frontend shows '-' for all EUR-derived values
@@ -2232,8 +1852,7 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
     )
     
     # Mock current USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value={}), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=0.85):
         response = client.get(f"/portfolios/{portfolio_id}/status")
     
     assert response.status_code == 200
@@ -3233,9 +2852,8 @@ def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: Us
         }
     )
 
-    # Mock current price at $200 (100% gain), FX rate 1.0
-    with patch('app.services.price_service.PriceService.get_current_prices', return_value={'AAPL': 200.0}), \
-         patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
+    # Mock FX rate 1.0
+    with patch('app.services.price_service.PriceService.get_usd_to_eur_rate', return_value=1.0):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
     assert response.status_code == 200
@@ -3243,7 +2861,7 @@ def test_portfolio_status_uses_custom_tax_rate(client: TestClient, test_user: Us
 
     # Custom tax rate is returned for frontend computation
     assert data["capital_gains_tax_rate"] == pytest.approx(0.15)
-    # Live rate for frontend to compute tax = 10000 * 0.15 = 1500 EUR
+    # Live rate for frontend
     assert data["usd_to_eur_rate"] == pytest.approx(1.0)
 
 
@@ -3439,3 +3057,49 @@ def test_no_warnings_in_non_strict_mode():
     assert len(state.warnings) == 0
     assert state.cash == Decimal('5000')
     assert state.holdings['AAPL']['quantity'] == Decimal('5')
+
+
+# ================== Live Prices Tests ==================
+
+def test_live_prices_with_tickers(client: TestClient):
+    """Test /prices/live returns prices and FX rate for given tickers"""
+    with patch("app.routers.portfolios.PriceService") as mock_ps:
+        mock_ps.get_current_prices.return_value = {"AAPL": 192.5, "MSFT": 410.0}
+        mock_ps.get_usd_to_eur_rate_safe.return_value = 0.91
+
+        response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL", "MSFT"]})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["prices"] == {"AAPL": 192.5, "MSFT": 410.0}
+    assert data["usd_to_eur_rate"] == 0.91
+    assert "timestamp" in data
+    mock_ps.get_current_prices.assert_called_once_with(["AAPL", "MSFT"])
+
+
+def test_live_prices_empty_tickers(client: TestClient):
+    """Test /prices/live with no tickers returns empty prices dict"""
+    with patch("app.routers.portfolios.PriceService") as mock_ps:
+        mock_ps.get_usd_to_eur_rate_safe.return_value = 0.92
+
+        response = client.get("/portfolios/prices/live")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["prices"] == {}
+    assert data["usd_to_eur_rate"] == 0.92
+    mock_ps.get_current_prices.assert_not_called()
+
+
+def test_live_prices_fx_rate_failure(client: TestClient):
+    """Test /prices/live gracefully handles FX rate fetch failure"""
+    with patch("app.routers.portfolios.PriceService") as mock_ps:
+        mock_ps.get_current_prices.return_value = {"AAPL": 192.5}
+        mock_ps.get_usd_to_eur_rate_safe.return_value = None
+
+        response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["prices"] == {"AAPL": 192.5}
+    assert data["usd_to_eur_rate"] is None

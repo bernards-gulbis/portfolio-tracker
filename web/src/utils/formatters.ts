@@ -54,6 +54,15 @@ export const formatDateCompact = (date: string, locale: string = 'en-US'): strin
 };
 
 /**
+ * Format a percent value with ▲/▼ sign prefix. Returns '' for null/undefined.
+ */
+export const formatSignedPercent = (value: number | null | undefined): string => {
+  if (value == null) return '';
+  const sign = value >= 0 ? '\u25B2' : '\u25BC';
+  return `${sign}${Math.abs(value).toFixed(2)}%`;
+};
+
+/**
  * Returns a CSS class for positive/negative values (green/red).
  */
 export const getValueClass = (value: number | null | undefined): string => {

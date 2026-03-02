@@ -20,9 +20,14 @@ vi.mock('../hooks/usePortfolios', () => ({
   useCopyPortfolio: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
+vi.mock('../hooks/useLivePrices', () => ({
+  useLivePrices: vi.fn(),
+}));
+
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
+import { useLivePrices } from '../hooks/useLivePrices';
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -51,33 +56,28 @@ const renderComponent = (initialEntry: string = '/') => {
 const mockStatus: PortfolioStatus = {
   portfolio_id: 1,
   portfolio_name: 'Test Portfolio',
-  current_value: 10000,
   principal: 8000,
   principal_eur: 7360,
   dividends: 200,
   dividends_eur: 184,
   cash: 500,
   holdings: [
-    {
-      ticker: 'AAPL',
-      quantity: 10,
-      average_cost: 150,
-      total_cost: 1500,
-      current_price: 200,
-      current_value: 2000,
-      unrealized_gain_loss: 500,
-      unrealized_gain_loss_pct: 33.33,
-    },
+    { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1500 },
   ],
   holdings_cost: 7500,
-  holdings_value: 9500,
-  unrealized_gains: 2000,
-  unrealized_gains_pct: 25,
   realized_gains: 0,
   capital_gains_tax_rate: 0.255,
-  missing_prices: [],
   warnings: [],
   usd_to_eur_rate: 0.92,
+};
+
+const mockLivePrices = {
+  data: {
+    prices: { AAPL: 200 },
+    usd_to_eur_rate: 0.92,
+    timestamp: '2026-03-03T12:00:00Z',
+  },
+  dataUpdatedAt: Date.now(),
 };
 
 describe('PortfolioStatusView', () => {
@@ -92,6 +92,9 @@ describe('PortfolioStatusView', () => {
       mutateAsync: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof useDeletePortfolio>);
+    vi.mocked(useLivePrices).mockReturnValue(
+      mockLivePrices as unknown as ReturnType<typeof useLivePrices>,
+    );
   });
 
   it('shows "Select a portfolio" message when no portfolio in URL', () => {
@@ -143,7 +146,7 @@ describe('PortfolioStatusView', () => {
     expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Dividends').length).toBeGreaterThan(0);
-    expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();  // dynamic rate from status.capital_gains_tax_rate
+    expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();
     expect(screen.getByText('After-tax Value')).toBeInTheDocument();
   });
 
@@ -178,7 +181,6 @@ describe('PortfolioStatusView', () => {
       principal_eur: 0,
       principal: 0,
       cash: 0,
-      current_value: 0,
       usd_to_eur_rate: null,
     };
 
@@ -239,27 +241,21 @@ describe('PortfolioStatusView', () => {
     expect(screen.queryByText('Transaction warnings')).not.toBeInTheDocument();
   });
 
-  it('renders dashes for null monetary values', () => {
-    const nullStatus: PortfolioStatus = {
+  it('renders dashes when prices not yet loaded', () => {
+    // No live prices → computePricedStatus returns null price fields → dashes
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: undefined,
+      dataUpdatedAt: 0,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    const nullRateStatus: PortfolioStatus = {
       ...mockStatus,
       usd_to_eur_rate: null,
       dividends_eur: null,
-      holdings: [
-        {
-          ticker: 'AAPL',
-          quantity: 10,
-          average_cost: 150,
-          total_cost: 1500,
-          current_price: null,
-          current_value: null,
-          unrealized_gain_loss: null,
-          unrealized_gain_loss_pct: null,
-        },
-      ],
     };
 
     vi.mocked(usePortfolioStatus).mockReturnValue({
-      data: nullStatus,
+      data: nullRateStatus,
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);

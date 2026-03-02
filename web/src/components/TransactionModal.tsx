@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { useTranslation } from 'react-i18next';
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
+import { useLivePrices } from '../hooks/useLivePrices';
 import { Transaction, TransactionType, TransactionCreate, Holding, getErrorMessage } from '../api';
 import {
   Dialog,
@@ -476,7 +477,9 @@ const TransactionModal = ({
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
   const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
-  const holdings: Holding[] = portfolioStatus?.holdings ?? [];
+  const holdings = useMemo<Holding[]>(() => portfolioStatus?.holdings ?? [], [portfolioStatus?.holdings]);
+  const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
+  const { data: livePrices } = useLivePrices(tickers, tickers.length > 0);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -665,10 +668,10 @@ const TransactionModal = ({
                         noHoldingsText={t('transaction.modal.fields.noHoldings')}
                         onChange={(value) => {
                           field.onChange(value);
-                          if (isSell) {
-                            const holding = holdings.find(h => h.ticker === value);
-                            if (holding?.current_price != null) {
-                              form.setValue('pricePerShare', holding.current_price.toFixed(2));
+                          if (isSell && livePrices) {
+                            const livePrice = livePrices.prices[value];
+                            if (livePrice != null) {
+                              form.setValue('pricePerShare', livePrice.toFixed(2));
                             }
                           }
                         }}

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from typing import Annotated, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core import get_session
 from app.core.auth import current_active_user
@@ -13,6 +13,7 @@ from app.schemas import (
     PortfolioCopy,
     PortfolioResponse,
     PortfolioStatusResponse,
+    LivePricesResponse,
     PortfolioPerformanceResponse,
     PerformanceDataPoint,
 )
@@ -44,6 +45,21 @@ def list_portfolios(
     return service.get_all_portfolios(user.id)
 
 
+@router.get("/prices/live", response_model=LivePricesResponse)
+def get_live_prices(
+    user: Annotated[User, Depends(current_active_user)],
+    tickers: Annotated[List[str], Query()] = [],
+):
+    """Get current prices and FX rate without replaying transactions"""
+    prices = PriceService.get_current_prices(tickers) if tickers else {}
+    usd_to_eur_rate = PriceService.get_usd_to_eur_rate_safe()
+    return LivePricesResponse(
+        prices=prices,
+        usd_to_eur_rate=usd_to_eur_rate,
+        timestamp=datetime.now(timezone.utc),
+    )
+
+
 @router.get("/{portfolio_id}", response_model=PortfolioResponse)
 def get_portfolio(
     portfolio_id: int,
@@ -62,7 +78,6 @@ def get_portfolio_status(
     user: Annotated[User, Depends(current_active_user)],
 ):
     """Get portfolio status with holdings, cash balance, and performance metrics"""
-    PriceService.clear_session_cache()
     service = PortfolioService(session)
     try:
         return service.calculate_portfolio_status(portfolio_id, user.id, tax_rate=user.tax_rate)

@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import type { ViewBox } from 'recharts/types/util/types';
-import { Holding } from '../api';
+import { PricedHolding } from '../api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/chart';
 
 interface HoldingsAllocationChartProps {
-  holdings: Holding[];
+  holdings: PricedHolding[];
   cash: number;
   eurRate?: number | null;
   loading?: boolean;
