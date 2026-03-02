@@ -252,7 +252,7 @@ export const PerformanceChart = ({
         ? liveOverride.fxRate
         : point.fx_rate;
 
-      const rawReturnPct = liveOverride ? liveOverride.returnPct : point.return_pct;
+      const rawReturnPct = liveOverride?.returnPct ?? point.return_pct;
 
       let returnRebased: number | null = null;
       if (rawReturnPct != null && baseReturnFactor != null && baseReturnFactor !== 0) {
