@@ -96,6 +96,7 @@ class _TxState:
     cash: Decimal = _ZERO
     principal: Decimal = _ZERO        # Net deposits - withdrawals in native currency
     principal_eur: Decimal = _ZERO    # Net deposits - withdrawals in EUR (historical rates)
+    total_deposits: Decimal = _ZERO   # Cumulative deposits only (never decremented)
     dividends: Decimal = _ZERO
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
@@ -120,6 +121,7 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.principal += total
+    state.total_deposits += total
     eur = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
     state.principal_eur += eur
 
@@ -566,8 +568,8 @@ def _compute_perf_data_point(
     fx_rate = _bisect_lookup(sorted_fx_dates, fx_rates, date_str)
 
     return_pct = None
-    if state.principal > 0:
-        return_pct = float((current_value - state.principal) / state.principal * Decimal('100'))
+    if state.total_deposits > 0:
+        return_pct = float((current_value - state.principal) / state.total_deposits * Decimal('100'))
 
     # S&P 500 in USD — frontend applies FX rate for EUR mode
     sp500_return_pct = None
