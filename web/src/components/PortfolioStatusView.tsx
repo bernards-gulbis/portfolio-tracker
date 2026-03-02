@@ -230,7 +230,6 @@ export const PortfolioStatusContent = ({
             liveLastPoint={{
               currentValue: status.current_value,
               fxRate: status.usd_to_eur_rate,
-              returnPct: null, // Use backend-computed return_pct from last performance data point
             }}
           />
           <HoldingsAllocationChart

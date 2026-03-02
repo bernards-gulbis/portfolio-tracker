@@ -32,8 +32,6 @@ interface LiveLastPoint {
   currentValue: number;
   /** Live USD→EUR rate (from status response). Used to compute EUR current value. */
   fxRate: number | null;
-  /** Raw (non-rebased) return % for live last point. */
-  returnPct: number | null;
 }
 
 interface PerformanceChartProps {
@@ -252,7 +250,7 @@ export const PerformanceChart = ({
         ? liveOverride.fxRate
         : point.fx_rate;
 
-      const rawReturnPct = liveOverride?.returnPct ?? point.return_pct;
+      const rawReturnPct = point.return_pct;
 
       let returnRebased: number | null = null;
       if (rawReturnPct != null && baseReturnFactor != null && baseReturnFactor !== 0) {
