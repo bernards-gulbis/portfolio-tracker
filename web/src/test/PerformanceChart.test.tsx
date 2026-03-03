@@ -3,15 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PerformanceChart } from '../components/PerformanceChart';
 import { computeBaseFactor, rebasePct } from '../utils/performanceCalc';
+import { toLocalDateStr } from '../utils/formatters';
 import type { PerformanceDataPoint } from '../api';
-
-// Format a Date as YYYY-MM-DD using local time (matches the fix in PerformanceChart)
-const fmtDate = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
 
 // Use recent dates so data falls within the default "1M" period filter
 const today = new Date();
@@ -19,8 +12,8 @@ const yesterday = new Date(today);
 yesterday.setDate(today.getDate() - 1);
 
 const mockData: PerformanceDataPoint[] = [
-  { date: fmtDate(yesterday), principal: 11765, principal_eur: 10824, current_value: 12353, fx_rate: 0.92, return_pct: 5.0, sp500_return_pct: 0 },
-  { date: fmtDate(today), principal: 11765, principal_eur: 10824, current_value: 12706, fx_rate: 0.92, return_pct: 8.0, sp500_return_pct: 1.2 },
+  { date: toLocalDateStr(yesterday), principal: 11765, principal_eur: 10824, current_value: 12353, fx_rate: 0.92, return_pct: 5.0, sp500_return_pct: 0 },
+  { date: toLocalDateStr(today), principal: 11765, principal_eur: 10824, current_value: 12706, fx_rate: 0.92, return_pct: 8.0, sp500_return_pct: 1.2 },
 ];
 
 // Old data that will be filtered out by the default "1M" period
@@ -257,8 +250,8 @@ describe('all-null return_pct handling', () => {
 
   it('renders chart without crash when all return_pct are null', () => {
     const nullReturnData: PerformanceDataPoint[] = [
-      { date: fmtDate(yesterday), principal: 10000, principal_eur: 9200, current_value: 10000, fx_rate: 0.92, return_pct: null, sp500_return_pct: null },
-      { date: fmtDate(today), principal: 10000, principal_eur: 9200, current_value: 10500, fx_rate: 0.92, return_pct: null, sp500_return_pct: null },
+      { date: toLocalDateStr(yesterday), principal: 10000, principal_eur: 9200, current_value: 10000, fx_rate: 0.92, return_pct: null, sp500_return_pct: null },
+      { date: toLocalDateStr(today), principal: 10000, principal_eur: 9200, current_value: 10500, fx_rate: 0.92, return_pct: null, sp500_return_pct: null },
     ];
 
     // Should render without throwing
@@ -271,20 +264,20 @@ describe('all-null return_pct handling', () => {
 // fmtDate helper correctness (timezone-safe)
 // ---------------------------------------------------------------------------
 
-describe('fmtDate helper', () => {
+describe('toLocalDateStr', () => {
   it('formats local midnight date without UTC shift', () => {
     // Midnight Jan 1 local time — toISOString() would shift backward in UTC+ zones
     const jan1 = new Date(2026, 0, 1); // Jan 1, 2026 local
-    expect(fmtDate(jan1)).toBe('2026-01-01');
+    expect(toLocalDateStr(jan1)).toBe('2026-01-01');
   });
 
   it('formats Dec 31 correctly', () => {
     const dec31 = new Date(2025, 11, 31);
-    expect(fmtDate(dec31)).toBe('2025-12-31');
+    expect(toLocalDateStr(dec31)).toBe('2025-12-31');
   });
 
   it('zero-pads single-digit months and days', () => {
     const mar3 = new Date(2026, 2, 3);
-    expect(fmtDate(mar3)).toBe('2026-03-03');
+    expect(toLocalDateStr(mar3)).toBe('2026-03-03');
   });
 });

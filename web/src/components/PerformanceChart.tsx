@@ -10,7 +10,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, toLocalDateStr } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,14 +52,6 @@ interface ChartDataPoint {
 const parseYMD = (value: string): Date => {
   const [y, m, d] = value.split('-').map(Number);
   return new Date(y, m - 1, d);
-};
-
-/** Format a Date as YYYY-MM-DD using local time (avoids UTC shift from toISOString). */
-const toLocalDateStr = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 };
 
 /** Compact currency label for YAxis (e.g. €1.5M, €10k or $1.5M, $10k). */
@@ -194,6 +186,12 @@ const makeActiveDot = (colorVar: string, primary = true) => ({
   stroke: 'var(--background)',
   fill: colorVar,
 });
+
+// Pre-computed active dot configs — avoids creating new object references on every render.
+const ACTIVE_DOT_VALUE = makeActiveDot('var(--color-currentValue)');
+const ACTIVE_DOT_PRINCIPAL = makeActiveDot('var(--color-principal)', false);
+const ACTIVE_DOT_RETURN = makeActiveDot('var(--color-returnPct)');
+const ACTIVE_DOT_SP500 = makeActiveDot('var(--color-sp500ReturnPct)', false);
 
 const CHART_MARGIN = { left: 12, right: 12 };
 
@@ -482,7 +480,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-currentValue)"
                 strokeWidth={2}
                 dot={false}
-                activeDot={makeActiveDot('var(--color-currentValue)')}
+                activeDot={ACTIVE_DOT_VALUE}
                 connectNulls
               />
             )}
@@ -493,7 +491,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-principal)"
                 strokeWidth={1.5}
                 dot={false}
-                activeDot={makeActiveDot('var(--color-principal)', false)}
+                activeDot={ACTIVE_DOT_PRINCIPAL}
                 connectNulls
               />
             )}
@@ -507,7 +505,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-returnPct)"
                 strokeWidth={2}
                 dot={false}
-                activeDot={makeActiveDot('var(--color-returnPct)')}
+                activeDot={ACTIVE_DOT_RETURN}
                 connectNulls
               />
             )}
@@ -519,7 +517,7 @@ export const PerformanceChart = ({
                 strokeWidth={1.5}
                 strokeDasharray="5 3"
                 dot={false}
-                activeDot={makeActiveDot('var(--color-sp500ReturnPct)', false)}
+                activeDot={ACTIVE_DOT_SP500}
                 connectNulls
               />
             )}
