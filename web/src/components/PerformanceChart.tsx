@@ -111,23 +111,28 @@ const getHeaderValues = (
 ) => {
   if (viewMode === 'value') {
     const value = point.currentValue;
+    const principal = point.principal;
     const firstValue = first.currentValue;
-    if (value == null) return { displayValue: '-', change: null, changePct: null, isPositive: true };
+    if (value == null) return { displayValue: '-', principalDisplay: null, change: null, changePct: null, isPositive: true };
     const formatted = formatCurrency(value, currency, locale);
-    if (firstValue == null || firstValue === 0) return { displayValue: formatted, change: null, changePct: null, isPositive: true };
+    const principalDisplay = principal != null ? formatCurrency(principal, currency, locale) : null;
+    if (firstValue == null || firstValue === 0) return { displayValue: formatted, principalDisplay, change: null, changePct: null, isPositive: true };
     const diff = value - firstValue;
     const pct = (diff / firstValue) * 100;
     return {
       displayValue: formatted,
+      principalDisplay,
       change: formatCurrency(Math.abs(diff), currency, locale),
       changePct: Math.abs(pct).toFixed(2),
       isPositive: diff >= 0,
     };
   } else {
     const pct = point.returnPct;
-    if (pct == null) return { displayValue: '-', change: null, changePct: null, isPositive: true };
+    const sp500Pct = point.sp500ReturnPct;
+    if (pct == null) return { displayValue: '-', sp500Display: null, change: null, changePct: null, isPositive: true };
     return {
       displayValue: `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
+      sp500Display: sp500Pct != null ? `${sp500Pct >= 0 ? '+' : ''}${sp500Pct.toFixed(2)}%` : null,
       change: null,
       changePct: null,
       isPositive: pct >= 0,
@@ -384,6 +389,24 @@ export const PerformanceChart = ({
                   {headerInfo.changePct}%
                   {' '}({headerInfo.isPositive ? '+' : '-'}{headerInfo.change})
                 </span>
+              )}
+              {viewMode === 'value' && 'principalDisplay' in headerInfo && headerInfo.principalDisplay != null && (
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  <span
+                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    style={{ backgroundColor: 'var(--chart-2)' }}
+                  />
+                  {t('chart.performance.principal')}: {headerInfo.principalDisplay}
+                </div>
+              )}
+              {viewMode !== 'value' && 'sp500Display' in headerInfo && headerInfo.sp500Display != null && (
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  <span
+                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    style={{ backgroundColor: 'var(--chart-4)' }}
+                  />
+                  {t('chart.performance.sp500')}: {headerInfo.sp500Display}
+                </div>
               )}
             </div>
           )}
