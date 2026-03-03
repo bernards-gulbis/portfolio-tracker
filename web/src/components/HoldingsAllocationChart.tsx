@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   PieChart,
   Pie,
+  Cell,
   Label,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
@@ -13,8 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
 
@@ -27,39 +26,45 @@ interface HoldingsAllocationChartProps {
 
 interface PieCenterLabelProps {
   viewBox?: ViewBox;
-  total: number;
   locale: string;
   currency: string;
-  label: string;
+  activeEntry: { name: string; value: number } | null;
+  total: number;
+  totalLabel: string;
 }
 
-const PieCenterLabel = ({ viewBox, total, locale, currency, label }: PieCenterLabelProps) => {
-  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+const PieCenterLabel = ({ viewBox, locale, currency, activeEntry, total, totalLabel }: PieCenterLabelProps) => {
+  if (!(viewBox && 'cx' in viewBox && 'cy' in viewBox)) return null;
+  const cx = viewBox.cx || 0;
+  const cy = viewBox.cy || 0;
+
+  if (activeEntry) {
+    const pct = ((activeEntry.value / total) * 100).toFixed(1);
     return (
-      <text
-        x={viewBox.cx}
-        y={viewBox.cy}
-        textAnchor="middle"
-        dominantBaseline="middle"
-      >
-        <tspan
-          x={viewBox.cx}
-          y={(viewBox.cy || 0) - 10}
-          className="fill-foreground text-base font-bold"
-        >
-          {formatCurrency(total, currency, locale)}
+      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+        <tspan x={cx} y={cy - 18} className="fill-muted-foreground text-[11px]">
+          {activeEntry.name}
         </tspan>
-        <tspan
-          x={viewBox.cx}
-          y={(viewBox.cy || 0) + 14}
-          className="fill-muted-foreground text-xs"
-        >
-          {label}
+        <tspan x={cx} y={cy + 4} className="fill-foreground text-base font-bold">
+          {formatCurrency(activeEntry.value, currency, locale)}
+        </tspan>
+        <tspan x={cx} y={cy + 22} className="fill-muted-foreground text-xs">
+          {pct}%
         </tspan>
       </text>
     );
   }
-  return null;
+
+  return (
+    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+      <tspan x={cx} y={cy - 10} className="fill-foreground text-base font-bold">
+        {formatCurrency(total, currency, locale)}
+      </tspan>
+      <tspan x={cx} y={cy + 14} className="fill-muted-foreground text-xs">
+        {totalLabel}
+      </tspan>
+    </text>
+  );
 };
 
 const COLORS = [
@@ -83,6 +88,7 @@ export const HoldingsAllocationChart = ({
 }: HoldingsAllocationChartProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const { chartData, total, chartConfig, currency } = useMemo(() => {
     const useEur = eurRate != null && eurRate > 0;
@@ -115,6 +121,14 @@ export const HoldingsAllocationChart = ({
 
     return { chartData: data, total, chartConfig: config, currency };
   }, [holdings, cash, eurRate]);
+
+  const handleMouseEnter = useCallback((_: unknown, index: number) => {
+    setActiveIndex(index);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setActiveIndex(null);
+  }, []);
 
   if (isLoading) {
     return (
@@ -149,6 +163,8 @@ export const HoldingsAllocationChart = ({
     );
   }
 
+  const activeEntry = activeIndex != null ? chartData[activeIndex] : null;
+
   return (
     <Card className="flex flex-col">
       <CardHeader>
@@ -157,15 +173,6 @@ export const HoldingsAllocationChart = ({
       <CardContent className="flex-1 pb-0">
         <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]">
           <PieChart>
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent
-                  hideLabel
-                  formatter={(value) => formatCurrency(value as number, currency, locale)}
-                />
-              }
-            />
             <Pie
               data={chartData}
               dataKey="value"
@@ -174,14 +181,25 @@ export const HoldingsAllocationChart = ({
               outerRadius={108}
               strokeWidth={2}
               stroke="var(--card)"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
             >
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={entry.name}
+                  fill={entry.fill}
+                  opacity={activeIndex == null || activeIndex === index ? 1 : 0.3}
+                  style={{ transition: 'opacity 150ms ease-in-out' }}
+                />
+              ))}
               <Label
                 content={
                   <PieCenterLabel
-                    total={total}
                     locale={locale}
                     currency={currency}
-                    label={t('chart.allocation.marketValue')}
+                    activeEntry={activeEntry}
+                    total={total}
+                    totalLabel={t('chart.allocation.marketValue')}
                   />
                 }
               />
@@ -189,10 +207,17 @@ export const HoldingsAllocationChart = ({
           </PieChart>
         </ChartContainer>
         <div className="mt-3 space-y-1.5">
-          {chartData.map((entry) => {
+          {chartData.map((entry, index) => {
             const percentage = ((entry.value / total) * 100).toFixed(1);
+            const dimmed = activeIndex != null && activeIndex !== index;
             return (
-              <div key={entry.name} className="flex items-center justify-between text-xs">
+              <div
+                key={entry.name}
+                className="flex items-center justify-between text-xs cursor-default"
+                style={{ opacity: dimmed ? 0.3 : 1, transition: 'opacity 150ms ease-in-out' }}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(null)}
+              >
                 <div className="flex items-center gap-2">
                   <span
                     className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"

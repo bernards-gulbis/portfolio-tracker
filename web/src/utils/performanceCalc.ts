@@ -8,7 +8,8 @@ export const computeBaseFactor = (
 ): number | null => {
   const first = points.find(p => getPct(p) != null && (!useEur || p.fx_rate != null));
   if (!first) return null;
-  const pct = getPct(first)!;
+  const pct = getPct(first);
+  if (pct == null) return null;
   const factor = 1 + pct / 100;
   return useEur && first.fx_rate != null ? factor * first.fx_rate : factor;
 };
