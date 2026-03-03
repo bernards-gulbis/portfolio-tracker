@@ -41,14 +41,14 @@ const mockHoldingsEur: PricedHolding[] = [
 
 describe('HoldingsAllocationChart', () => {
   it('shows skeleton while loading', () => {
-    render(<HoldingsAllocationChart holdings={[]} cash={0} loading={true} />);
+    render(<HoldingsAllocationChart holdings={[]} cash={0} isLoading={true} />);
 
     const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('shows "No allocation data available" when no holdings and no cash', () => {
-    render(<HoldingsAllocationChart holdings={[]} cash={0} loading={false} />);
+    render(<HoldingsAllocationChart holdings={[]} cash={0} isLoading={false} />);
 
     expect(screen.getByText('No allocation data available')).toBeInTheDocument();
   });
@@ -66,13 +66,13 @@ describe('HoldingsAllocationChart', () => {
         unrealized_gain_loss_pct: null,
       },
     ];
-    render(<HoldingsAllocationChart holdings={holdingsNoValue} cash={0} loading={false} />);
+    render(<HoldingsAllocationChart holdings={holdingsNoValue} cash={0} isLoading={false} />);
 
     expect(screen.getByText('No allocation data available')).toBeInTheDocument();
   });
 
   it('renders chart container and legend items when data is provided', () => {
-    render(<HoldingsAllocationChart holdings={mockHoldings} cash={500} loading={false} />);
+    render(<HoldingsAllocationChart holdings={mockHoldings} cash={500} isLoading={false} />);
 
     expect(screen.getByText('Allocation')).toBeInTheDocument();
     expect(screen.getByText('AAPL')).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe('HoldingsAllocationChart', () => {
   });
 
   it('renders only cash entry when no holdings have current_value', () => {
-    render(<HoldingsAllocationChart holdings={[]} cash={1000} loading={false} />);
+    render(<HoldingsAllocationChart holdings={[]} cash={1000} isLoading={false} />);
 
     expect(screen.getByText('CASH')).toBeInTheDocument();
   });
@@ -93,7 +93,7 @@ describe('HoldingsAllocationChart', () => {
         holdings={mockHoldingsEur}
         cash={500}
         eurRate={0.92}
-        loading={false}
+        isLoading={false}
       />
     );
 
@@ -110,7 +110,7 @@ describe('HoldingsAllocationChart', () => {
         holdings={mockHoldings}
         cash={500}
         eurRate={null}
-        loading={false}
+        isLoading={false}
       />
     );
 

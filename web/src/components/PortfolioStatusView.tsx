@@ -14,8 +14,8 @@ import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPrefer
 import { computeEurMetrics } from '../utils/eurMetrics';
 import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
-import EditPortfolioModal from './EditPortfolioModal';
-import CopyPortfolioModal from './CopyPortfolioModal';
+import { EditPortfolioModal } from './EditPortfolioModal';
+import { CopyPortfolioModal } from './CopyPortfolioModal';
 import { toast } from 'sonner';
 
 const PerformanceChart = lazy(() =>
@@ -75,7 +75,7 @@ const formatCurrencyWithPercent = (
 interface PortfolioStatusContentProps {
   status: PricedPortfolioStatus;
   performance?: PortfolioPerformance;
-  performanceLoading: boolean;
+  isPerformanceLoading: boolean;
   isEmptyPortfolio?: boolean;
   toolbar?: React.ReactNode;
 }
@@ -83,7 +83,7 @@ interface PortfolioStatusContentProps {
 const PortfolioStatusContent = ({
   status,
   performance,
-  performanceLoading,
+  isPerformanceLoading,
   isEmptyPortfolio = false,
   toolbar,
 }: PortfolioStatusContentProps) => {
@@ -217,7 +217,7 @@ const PortfolioStatusContent = ({
         <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
           <PerformanceChart
             data={performance?.data_points ?? EMPTY_DATA_POINTS}
-            loading={performanceLoading}
+            isLoading={isPerformanceLoading}
             currency={currency}
             liveLastPoint={liveLastPoint}
           />
@@ -225,7 +225,7 @@ const PortfolioStatusContent = ({
             holdings={status.holdings}
             cash={status.cash}
             eurRate={eurRate}
-            loading={false}
+            isLoading={false}
           />
         </div>
       </Suspense>
@@ -263,9 +263,9 @@ export const PortfolioStatusView = () => {
   const portfolioId = useActivePortfolioId();
   const { t } = useTranslation();
   const locale = useLocale();
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [copyModalOpen, setCopyModalOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const navigate = useNavigate();
   const deletePortfolio = useDeletePortfolio();
@@ -286,7 +286,7 @@ export const PortfolioStatusView = () => {
   }, [status, livePrices]);
 
   // Fetch full history — period filtering happens client-side in PerformanceChart
-  const { data: performance, isLoading: performanceLoading } = usePortfolioPerformance(
+  const { data: performance, isLoading: isPerformanceLoading } = usePortfolioPerformance(
     portfolioId,
     undefined,
     undefined,
@@ -314,7 +314,7 @@ export const PortfolioStatusView = () => {
     } catch (err) {
       toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(err) }));
     } finally {
-      setDeleteConfirmOpen(false);
+      setIsDeleteConfirmOpen(false);
     }
   };
 
@@ -362,7 +362,7 @@ export const PortfolioStatusView = () => {
           <PortfolioStatusContent
             status={effectiveStatus}
             performance={performance}
-            performanceLoading={performanceLoading}
+            isPerformanceLoading={isPerformanceLoading}
             isEmptyPortfolio={isEmptyPortfolio}
             toolbar={
               <div className="flex items-center gap-2">
@@ -395,11 +395,11 @@ export const PortfolioStatusView = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuGroup>
-                      <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
+                      <DropdownMenuItem onClick={() => setIsEditModalOpen(true)}>
                         <PencilIcon />
                         {t('portfolio.list.item.rename')}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setCopyModalOpen(true)}>
+                      <DropdownMenuItem onClick={() => setIsCopyModalOpen(true)}>
                         <CopyIcon />
                         {t('portfolio.list.item.copy')}
                       </DropdownMenuItem>
@@ -408,7 +408,7 @@ export const PortfolioStatusView = () => {
                     <DropdownMenuGroup>
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
-                        onClick={() => setDeleteConfirmOpen(true)}
+                        onClick={() => setIsDeleteConfirmOpen(true)}
                         disabled={deletePortfolio.isPending}
                       >
                         <TrashIcon />
@@ -424,22 +424,22 @@ export const PortfolioStatusView = () => {
       </div>
 
       <EditPortfolioModal
-        isOpen={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
         portfolioId={portfolioId}
         currentName={effectiveStatus.portfolio_name}
       />
 
       <CopyPortfolioModal
-        isOpen={copyModalOpen}
-        onClose={() => setCopyModalOpen(false)}
+        isOpen={isCopyModalOpen}
+        onClose={() => setIsCopyModalOpen(false)}
         portfolioId={portfolioId}
         portfolioName={effectiveStatus.portfolio_name}
       />
 
       <AlertDialog
-        open={deleteConfirmOpen}
-        onOpenChange={(open) => !open && setDeleteConfirmOpen(false)}
+        open={isDeleteConfirmOpen}
+        onOpenChange={(open) => !open && setIsDeleteConfirmOpen(false)}
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>

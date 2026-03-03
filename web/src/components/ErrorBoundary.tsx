@@ -28,7 +28,7 @@ class ErrorBoundaryInner extends Component<Props, State> {
       const fullScreen = this.props.fullScreen ?? true;
       return (
         <div className={`${fullScreen ? 'min-h-screen bg-background' : ''} flex flex-col items-center justify-center gap-4 py-12 text-foreground`}>
-          <h1 className="text-xl font-semibold">{t('errorBoundary.title')}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('errorBoundary.title')}</h1>
           <Button onClick={() => this.setState({ hasError: false })}>
             {t('errorBoundary.tryAgain')}
           </Button>

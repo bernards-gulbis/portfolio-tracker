@@ -39,7 +39,7 @@ interface EditPortfolioModalProps {
   currentName: string;
 }
 
-const EditPortfolioModal = ({
+export const EditPortfolioModal = ({
   isOpen,
   onClose,
   portfolioId,
@@ -131,5 +131,3 @@ const EditPortfolioModal = ({
     </Dialog>
   );
 };
-
-export default EditPortfolioModal;

@@ -22,7 +22,7 @@ interface HoldingsAllocationChartProps {
   holdings: PricedHolding[];
   cash: number;
   eurRate?: number | null;
-  loading?: boolean;
+  isLoading?: boolean;
 }
 
 interface PieCenterLabelProps {
@@ -63,23 +63,23 @@ const PieCenterLabel = ({ viewBox, total, locale, currency, label }: PieCenterLa
 };
 
 const COLORS = [
-  '#4f6ef7',
-  '#5bc87c',
-  '#f59e0b',
-  '#a78bfa',
-  '#f472b6',
-  '#14b8a6',
-  '#f97316',
-  '#06b6d4',
-  '#e6fd7f',
-  '#84cc16',
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
 ];
 
 export const HoldingsAllocationChart = ({
   holdings,
   cash,
   eurRate,
-  loading,
+  isLoading,
 }: HoldingsAllocationChartProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -116,7 +116,7 @@ export const HoldingsAllocationChart = ({
     return { chartData: data, total, chartConfig: config, currency };
   }, [holdings, cash, eurRate]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>

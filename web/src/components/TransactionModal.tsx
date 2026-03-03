@@ -129,7 +129,7 @@ const EUR_TYPES = new Set([TransactionType.DEPOSIT, TransactionType.WITHDRAW]);
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 /** Round a numeric string to 2 decimal places on blur */
-const formatCurrency = (value: string | undefined, onChange: (v: string) => void) => {
+const roundCurrencyOnBlur = (value: string | undefined, onChange: (v: string) => void) => {
   if (!value) return;
   const n = Number.parseFloat(value);
   if (!Number.isNaN(n)) onChange(n.toFixed(2));
@@ -377,20 +377,21 @@ const TickerCombobox = ({ value, holdings, editTicker, invalid, placeholder, noH
       if (!nextOpen) setSearch('');
     }}>
       <PopoverTrigger asChild>
-        <button
+        <Button
           type="button"
           id="tx-ticker"
+          variant="outline"
           role="combobox"
           aria-expanded={open}
           aria-controls={open ? listboxId : undefined}
           aria-invalid={invalid}
-          className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-9 w-full items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+          className="w-full justify-between font-normal aria-invalid:border-destructive"
         >
           <span className={value ? '' : 'text-muted-foreground'}>
             {value || placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <div className="flex items-center border-b px-3">
@@ -465,7 +466,7 @@ interface TransactionModalProps {
   transaction?: Transaction;
 }
 
-const TransactionModal = ({
+export const TransactionModal = ({
   isOpen,
   onClose,
   portfolioId,
@@ -767,7 +768,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -796,7 +797,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -826,7 +827,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -855,7 +856,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                       <InputGroupAddon align="inline-end">
                         <InputGroupText>EUR</InputGroupText>
@@ -938,4 +939,3 @@ const TransactionModal = ({
   );
 };
 
-export default TransactionModal;

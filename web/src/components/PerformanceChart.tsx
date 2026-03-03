@@ -37,7 +37,7 @@ interface LiveLastPoint {
 
 interface PerformanceChartProps {
   data: PerformanceDataPoint[];
-  loading?: boolean;
+  isLoading?: boolean;
   currency?: Currency;
   liveLastPoint?: LiveLastPoint;
 }
@@ -174,7 +174,7 @@ const PerformanceTooltipContent = memo(({
 
 export const PerformanceChart = ({
   data,
-  loading,
+  isLoading,
   currency = 'EUR',
   liveLastPoint,
 }: PerformanceChartProps) => {
@@ -293,7 +293,7 @@ export const PerformanceChart = ({
     });
   }, [data, timePeriod, currency, liveLastPoint]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>

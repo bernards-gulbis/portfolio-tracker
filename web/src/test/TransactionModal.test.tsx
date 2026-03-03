@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TransactionModal from '../components/TransactionModal';
+import { TransactionModal } from '../components/TransactionModal';
 import { Holding, TransactionType, Transaction } from '../api';
 
 // Radix Select uses APIs not available in jsdom

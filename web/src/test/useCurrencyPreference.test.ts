@@ -29,7 +29,7 @@ describe('useCurrencyPreference', () => {
     expect(result.current.currency).toBe('EUR');
 
     act(() => {
-      result.current.set('USD');
+      result.current.setCurrency('USD');
     });
 
     expect(result.current.currency).toBe('USD');
@@ -40,7 +40,7 @@ describe('useCurrencyPreference', () => {
     const { result } = renderHook(() => useCurrencyPreference(), { wrapper });
 
     act(() => {
-      result.current.set('EUR');
+      result.current.setCurrency('EUR');
     });
 
     expect(result.current.currency).toBe('EUR');
@@ -50,7 +50,7 @@ describe('useCurrencyPreference', () => {
     const { result } = renderHook(() => useCurrencyPreference(), { wrapper });
 
     act(() => {
-      result.current.set('USD');
+      result.current.setCurrency('USD');
     });
 
     expect(localStorage.getItem(STORAGE_KEY)).toBe('USD');
@@ -67,7 +67,7 @@ describe('useCurrencyPreference', () => {
     const { result } = renderHook(() => useCurrencyPreference(), { wrapper });
 
     act(() => {
-      result.current.set('EUR');
+      result.current.setCurrency('EUR');
     });
 
     expect(localStorage.getItem(STORAGE_KEY)).toBe('EUR');

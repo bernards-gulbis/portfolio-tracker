@@ -15,11 +15,11 @@ export interface EurMetrics {
 }
 
 export interface HoldingEurValues {
-  average_cost_eur: number;
-  total_cost_eur: number;
-  current_price_eur: number | null;
-  current_value_eur: number | null;
-  unrealized_gain_loss_eur: number | null;
+  averageCostEur: number;
+  totalCostEur: number;
+  currentPriceEur: number | null;
+  currentValueEur: number | null;
+  unrealizedGainLossEur: number | null;
 }
 
 /**
@@ -75,10 +75,10 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
  * Compute EUR values for a single holding by applying the live rate to USD fields.
  */
 export const applyRateToHolding = (holding: PricedHolding, rate: number): HoldingEurValues => ({
-  average_cost_eur: holding.average_cost * rate,
-  total_cost_eur: holding.total_cost * rate,
-  current_price_eur: holding.current_price != null ? holding.current_price * rate : null,
-  current_value_eur: holding.current_value != null ? holding.current_value * rate : null,
-  unrealized_gain_loss_eur:
+  averageCostEur: holding.average_cost * rate,
+  totalCostEur: holding.total_cost * rate,
+  currentPriceEur: holding.current_price != null ? holding.current_price * rate : null,
+  currentValueEur: holding.current_value != null ? holding.current_value * rate : null,
+  unrealizedGainLossEur:
     holding.unrealized_gain_loss != null ? holding.unrealized_gain_loss * rate : null,
 });

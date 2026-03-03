@@ -40,7 +40,7 @@ interface ImportCSVModalProps {
   portfolioId: number;
 }
 
-const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) => {
+export const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) => {
   const { t } = useTranslation();
   const importCSV = useImportTransactionsCSV();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,4 +149,3 @@ const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalProps) =
   );
 };
 
-export default ImportCSVModal;

@@ -5,9 +5,9 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { useLogout } from './hooks/useAuth';
-import PortfolioSwitcher from './components/PortfolioSwitcher';
+import { PortfolioSwitcher } from './components/PortfolioSwitcher';
 import { usePortfolios } from './hooks/usePortfolios';
-import TransactionView from './components/TransactionView';
+import { TransactionView } from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -26,11 +26,11 @@ import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign } from 'lucide-react';
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
-import CreatePortfolioModal from './components/CreatePortfolioModal';
+import { CreatePortfolioModal } from './components/CreatePortfolioModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
@@ -96,23 +96,32 @@ function AppLayout() {
   const logoutMutation = useLogout();
   const { t, i18n } = useTranslation();
   const currentLang = getCurrentLanguage();
-  const { currency, set: setCurrency } = useCurrencyPreference();
+  const { currency, setCurrency } = useCurrencyPreference();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { data: portfolios } = usePortfolios();
   const portfolioMatch = useMatch('/portfolios/:id');
   const matchedId = portfolioMatch?.params.id ? Number(portfolioMatch.params.id) : null;
   const activePortfolioId = matchedId && Number.isFinite(matchedId) ? matchedId : null;
-  const lastPortfolioRef = useRef<number | null>(null);
+  // Derive the "remembered" portfolio ID from the current route and portfolio list.
+  // Uses useMemo so we never need a ref or setState during render/effects.
+  const [prevActiveId, setPrevActiveId] = useState<number | null>(null);
+  const [lastPortfolioId, setLastPortfolioId] = useState<number | null>(null);
 
-  // Track the last visited portfolio
-  if (activePortfolioId !== null) {
-    lastPortfolioRef.current = activePortfolioId;
-  }
-  if (lastPortfolioRef.current !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioRef.current)) {
-    lastPortfolioRef.current = null;
+  // Adjust state during render (React-recommended pattern for deriving state from props)
+  if (activePortfolioId !== prevActiveId) {
+    setPrevActiveId(activePortfolioId);
+    if (activePortfolioId !== null) {
+      setLastPortfolioId(activePortfolioId);
+    }
   }
 
-  const rememberedId = activePortfolioId ?? lastPortfolioRef.current;
+  const rememberedId = useMemo(() => {
+    if (activePortfolioId !== null) return activePortfolioId;
+    if (lastPortfolioId !== null && portfolios?.some((p) => p.id === lastPortfolioId)) {
+      return lastPortfolioId;
+    }
+    return null;
+  }, [activePortfolioId, lastPortfolioId, portfolios]);
 
   const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
 

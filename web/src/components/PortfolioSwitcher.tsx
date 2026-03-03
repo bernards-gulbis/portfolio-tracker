@@ -20,7 +20,7 @@ interface PortfolioSwitcherProps {
   onCreateClick: () => void;
 }
 
-const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitcherProps) => {
+export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitcherProps) => {
   const { t } = useTranslation();
   const { data: portfolios, isLoading, error } = usePortfolios();
   const [open, setOpen] = useState(false);
@@ -42,8 +42,8 @@ const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitch
             to={`/portfolios/${portfolio.id}`}
             onClick={() => setOpen(false)}
           >
-            <div className="flex size-6 items-center justify-center rounded-sm border">
-              <BriefcaseBusiness className="size-4 shrink-0" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
+              <BriefcaseBusiness className="h-4 w-4 shrink-0" />
             </div>
             <span className="truncate">{portfolio.name}</span>
           </Link>
@@ -70,11 +70,11 @@ const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitch
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="gap-2 px-2 h-8">
-          <BriefcaseBusiness className="size-4 shrink-0" />
+          <BriefcaseBusiness className="h-4 w-4 shrink-0" />
           <span className="truncate font-medium text-sm max-w-[160px]">
             {activePortfolio?.name ?? t('portfolio.list.title')}
           </span>
-          <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -94,8 +94,8 @@ const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitch
             onCreateClick();
           }}
         >
-          <div className="bg-background flex size-6 items-center justify-center rounded-md border">
-            <Plus className="size-4" />
+          <div className="bg-background flex h-6 w-6 items-center justify-center rounded-md border">
+            <Plus className="h-4 w-4" />
           </div>
           <span className="font-medium text-muted-foreground">{t('portfolio.list.createButton')}</span>
         </DropdownMenuItem>
@@ -103,5 +103,3 @@ const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitch
     </DropdownMenu>
   );
 };
-
-export default PortfolioSwitcher;

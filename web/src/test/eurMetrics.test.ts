@@ -163,11 +163,11 @@ describe('applyRateToHolding', () => {
 
   it('converts all fields correctly', () => {
     const result = applyRateToHolding(holding, 0.92);
-    expect(result.average_cost_eur).toBeCloseTo(150 * 0.92);
-    expect(result.total_cost_eur).toBeCloseTo(1500 * 0.92);
-    expect(result.current_price_eur).toBeCloseTo(200 * 0.92);
-    expect(result.current_value_eur).toBeCloseTo(2000 * 0.92);
-    expect(result.unrealized_gain_loss_eur).toBeCloseTo(500 * 0.92);
+    expect(result.averageCostEur).toBeCloseTo(150 * 0.92);
+    expect(result.totalCostEur).toBeCloseTo(1500 * 0.92);
+    expect(result.currentPriceEur).toBeCloseTo(200 * 0.92);
+    expect(result.currentValueEur).toBeCloseTo(2000 * 0.92);
+    expect(result.unrealizedGainLossEur).toBeCloseTo(500 * 0.92);
   });
 
   it('returns null for optional fields when source is null', () => {
@@ -178,8 +178,8 @@ describe('applyRateToHolding', () => {
       unrealized_gain_loss: null,
     };
     const result = applyRateToHolding(holdingNoPrice, 0.92);
-    expect(result.current_price_eur).toBeNull();
-    expect(result.current_value_eur).toBeNull();
-    expect(result.unrealized_gain_loss_eur).toBeNull();
+    expect(result.currentPriceEur).toBeNull();
+    expect(result.currentValueEur).toBeNull();
+    expect(result.unrealizedGainLossEur).toBeNull();
   });
 });

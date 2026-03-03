@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from '../i18n/index';
 
-const LanguageSwitcher = () => {
+export const LanguageSwitcher = () => {
   const { i18n, t } = useTranslation();
   const currentLang = getCurrentLanguage();
 
@@ -18,7 +18,7 @@ const LanguageSwitcher = () => {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon" aria-label={t('language.switchLabel')}>
-          <Languages className="h-[1.2rem] w-[1.2rem]" />
+          <Languages className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -35,5 +35,3 @@ const LanguageSwitcher = () => {
     </DropdownMenu>
   );
 };
-
-export default LanguageSwitcher;

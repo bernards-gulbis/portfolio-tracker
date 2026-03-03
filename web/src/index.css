@@ -37,6 +37,20 @@
   --color-chart-5: var(--chart-5);
   --color-positive: var(--positive);
   --color-negative: var(--negative);
+  --color-badge-buy-bg: var(--badge-buy-bg);
+  --color-badge-buy-fg: var(--badge-buy-fg);
+  --color-badge-sell-bg: var(--badge-sell-bg);
+  --color-badge-sell-fg: var(--badge-sell-fg);
+  --color-badge-deposit-bg: var(--badge-deposit-bg);
+  --color-badge-deposit-fg: var(--badge-deposit-fg);
+  --color-badge-withdraw-bg: var(--badge-withdraw-bg);
+  --color-badge-withdraw-fg: var(--badge-withdraw-fg);
+  --color-badge-dividend-bg: var(--badge-dividend-bg);
+  --color-badge-dividend-fg: var(--badge-dividend-fg);
+  --color-badge-fee-bg: var(--badge-fee-bg);
+  --color-badge-fee-fg: var(--badge-fee-fg);
+  --color-badge-split-bg: var(--badge-split-bg);
+  --color-badge-split-fg: var(--badge-split-fg);
 }
 
 :root {
@@ -66,6 +80,20 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --positive: oklch(0.45 0.15 145);
   --negative: oklch(0.5 0.2 25);
+  --badge-buy-bg: oklch(0.95 0.05 145);
+  --badge-buy-fg: oklch(0.35 0.15 145);
+  --badge-sell-bg: oklch(0.95 0.05 25);
+  --badge-sell-fg: oklch(0.4 0.15 25);
+  --badge-deposit-bg: oklch(0.95 0.04 250);
+  --badge-deposit-fg: oklch(0.4 0.12 250);
+  --badge-withdraw-bg: oklch(0.95 0.05 60);
+  --badge-withdraw-fg: oklch(0.45 0.15 60);
+  --badge-dividend-bg: oklch(0.95 0.04 300);
+  --badge-dividend-fg: oklch(0.4 0.12 300);
+  --badge-fee-bg: oklch(0.95 0 0);
+  --badge-fee-fg: oklch(0.4 0 0);
+  --badge-split-bg: oklch(0.95 0.05 85);
+  --badge-split-fg: oklch(0.4 0.15 85);
 }
 
 .dark {
@@ -94,6 +122,20 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --positive: oklch(0.65 0.2 145);
   --negative: oklch(0.65 0.2 25);
+  --badge-buy-bg: oklch(0.3 0.05 145);
+  --badge-buy-fg: oklch(0.75 0.15 145);
+  --badge-sell-bg: oklch(0.3 0.05 25);
+  --badge-sell-fg: oklch(0.75 0.15 25);
+  --badge-deposit-bg: oklch(0.3 0.04 250);
+  --badge-deposit-fg: oklch(0.75 0.12 250);
+  --badge-withdraw-bg: oklch(0.3 0.05 60);
+  --badge-withdraw-fg: oklch(0.75 0.15 60);
+  --badge-dividend-bg: oklch(0.3 0.04 300);
+  --badge-dividend-fg: oklch(0.75 0.12 300);
+  --badge-fee-bg: oklch(0.3 0 0);
+  --badge-fee-fg: oklch(0.7 0 0);
+  --badge-split-bg: oklch(0.3 0.05 85);
+  --badge-split-fg: oklch(0.75 0.15 85);
 }
 
 @layer base {

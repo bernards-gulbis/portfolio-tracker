@@ -22,26 +22,26 @@ const oldMockData = [
 
 describe('PerformanceChart', () => {
   it('shows skeleton while loading', () => {
-    render(<PerformanceChart data={[]} loading={true} />);
+    render(<PerformanceChart data={[]} isLoading={true} />);
 
     const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('shows "No performance data available" when data is empty', () => {
-    render(<PerformanceChart data={[]} loading={false} />);
+    render(<PerformanceChart data={[]} isLoading={false} />);
 
     expect(screen.getByText('No performance data available')).toBeInTheDocument();
   });
 
   it('renders chart container when data is provided', () => {
-    render(<PerformanceChart data={mockData} loading={false} />);
+    render(<PerformanceChart data={mockData} isLoading={false} />);
 
     expect(screen.getByText('Performance')).toBeInTheDocument();
   });
 
   it('renders all period tab triggers', () => {
-    render(<PerformanceChart data={mockData} loading={false} />);
+    render(<PerformanceChart data={mockData} isLoading={false} />);
 
     expect(screen.getByRole('tab', { name: '1M' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '3M' })).toBeInTheDocument();
@@ -52,20 +52,20 @@ describe('PerformanceChart', () => {
   });
 
   it('renders view mode toggle (EUR / %)', () => {
-    render(<PerformanceChart data={mockData} loading={false} />);
+    render(<PerformanceChart data={mockData} isLoading={false} />);
 
     expect(screen.getByRole('tab', { name: 'EUR' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '%' })).toBeInTheDocument();
   });
 
   it('does not render tabs when loading', () => {
-    render(<PerformanceChart data={[]} loading={true} />);
+    render(<PerformanceChart data={[]} isLoading={true} />);
 
     expect(screen.queryByRole('tab', { name: '1M' })).not.toBeInTheDocument();
   });
 
   it('switches period without error when tab is clicked', async () => {
-    render(<PerformanceChart data={mockData} loading={false} />);
+    render(<PerformanceChart data={mockData} isLoading={false} />);
 
     // Should not throw — period switching is client-side only
     await userEvent.click(screen.getByRole('tab', { name: 'All' }));
@@ -73,14 +73,14 @@ describe('PerformanceChart', () => {
   });
 
   it('switches view mode when % tab is clicked', async () => {
-    render(<PerformanceChart data={mockData} loading={false} />);
+    render(<PerformanceChart data={mockData} isLoading={false} />);
 
     await userEvent.click(screen.getByRole('tab', { name: '%' }));
     expect(screen.getByRole('tab', { name: '%' })).toHaveAttribute('data-state', 'active');
   });
 
   it('shows insufficient data message when filtered data has < 2 points', () => {
-    render(<PerformanceChart data={oldMockData} loading={false} />);
+    render(<PerformanceChart data={oldMockData} isLoading={false} />);
 
     // Data exists (raw length >= 2) but after 1M filter, < 2 points remain
     expect(screen.getByText(/Not enough data points for this time period/)).toBeInTheDocument();

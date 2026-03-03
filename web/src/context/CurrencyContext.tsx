@@ -15,7 +15,7 @@ function readPreference(): Currency {
 
 interface CurrencyContextType {
   currency: Currency;
-  set: (c: Currency) => void;
+  setCurrency: (c: Currency) => void;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
@@ -23,7 +23,7 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 export const CurrencyProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [currency, setCurrencyState] = useState<Currency>(readPreference);
 
-  const set = useCallback((c: Currency) => {
+  const setCurrency = useCallback((c: Currency) => {
     setCurrencyState(c);
     try {
       localStorage.setItem(STORAGE_KEY, c);
@@ -32,7 +32,7 @@ export const CurrencyProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   }, []);
 
-  const value = useMemo(() => ({ currency, set }), [currency, set]);
+  const value = useMemo(() => ({ currency, setCurrency }), [currency, setCurrency]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 };
