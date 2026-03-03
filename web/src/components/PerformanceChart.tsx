@@ -10,7 +10,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/chart';
 import type { PerformanceDataPoint } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
+import { computeBaseFactor, rebasePct } from '../utils/performanceCalc';
 
 type TimePeriod = '1month' | '3month' | '6month' | 'ytd' | '1year' | 'all';
 
@@ -51,6 +52,14 @@ interface ChartDataPoint {
 const parseYMD = (value: string): Date => {
   const [y, m, d] = value.split('-').map(Number);
   return new Date(y, m - 1, d);
+};
+
+/** Format a Date as YYYY-MM-DD using local time (avoids UTC shift from toISOString). */
+const toLocalDateStr = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 };
 
 /** Compact currency label for YAxis (e.g. €1.5M, €10k or $1.5M, $10k). */
@@ -96,8 +105,28 @@ const getCutoffDate = (period: TimePeriod): string | null => {
       cutoff = subtractMonths(now, 12);
       break;
   }
-  return cutoff.toISOString().split('T')[0];
+  return toLocalDateStr(cutoff);
 };
+
+/** Header display values for value mode. */
+interface ValueHeaderInfo {
+  mode: 'value';
+  displayValue: string;
+  principalDisplay: string | null;
+  changeDisplay: string | null;
+  pctDisplay: string;
+  isPositive: boolean;
+}
+
+/** Header display values for percentage mode. */
+interface PctHeaderInfo {
+  mode: 'pct';
+  displayValue: string;
+  sp500Display: string | null;
+  isPositive: boolean;
+}
+
+type HeaderInfo = ValueHeaderInfo | PctHeaderInfo;
 
 /** Compute the header display values.
  *  Uses the TWR return_pct (rebased) for the percentage — avoids division by near-zero principal.
@@ -109,35 +138,33 @@ const getHeaderValues = (
   currency: Currency,
   locale: string,
   isAllTime: boolean,
-) => {
+): HeaderInfo => {
   if (viewMode === 'value') {
     const value = point.currentValue;
     const principal = point.principal;
-    if (value == null) return { displayValue: '-', principalDisplay: null, change: null, changePct: null, isPositive: true };
+    if (value == null) return { mode: 'value', displayValue: '-', principalDisplay: null, changeDisplay: null, pctDisplay: '', isPositive: true };
     const formatted = formatCurrency(value, currency, locale);
     const principalDisplay = principal != null ? formatCurrency(principal, currency, locale) : null;
-    // Absolute change: vs principal for "all", vs period start for shorter periods
     const base = isAllTime ? principal : first.currentValue;
-    if (base == null) return { displayValue: formatted, principalDisplay, change: null, changePct: null, isPositive: true };
+    if (base == null) return { mode: 'value', displayValue: formatted, principalDisplay, changeDisplay: null, pctDisplay: '', isPositive: true };
     const diff = value - base;
-    // Use TWR return % for the percentage (already rebased on the frontend)
     const twrPct = point.returnPct;
     return {
+      mode: 'value',
       displayValue: formatted,
       principalDisplay,
-      change: formatCurrency(Math.abs(diff), currency, locale),
-      changePct: twrPct != null ? Math.abs(twrPct).toFixed(2) : null,
+      changeDisplay: formatSignedCurrency(diff, currency, locale),
+      pctDisplay: formatSignedPercent(twrPct),
       isPositive: diff >= 0,
     };
   } else {
     const pct = point.returnPct;
     const sp500Pct = point.sp500ReturnPct;
-    if (pct == null) return { displayValue: '-', sp500Display: null, change: null, changePct: null, isPositive: true };
+    if (pct == null) return { mode: 'pct', displayValue: '-', sp500Display: null, isPositive: true };
     return {
+      mode: 'pct',
       displayValue: `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
       sp500Display: sp500Pct != null ? `${sp500Pct >= 0 ? '+' : ''}${sp500Pct.toFixed(2)}%` : null,
-      change: null,
-      changePct: null,
       isPositive: pct >= 0,
     };
   }
@@ -159,6 +186,16 @@ const CrosshairCursor = ({ points, height }: { points?: { x: number; y: number }
     />
   );
 };
+
+/** Active dot config for chart series. Primary series use r=5, secondary use r=4. */
+const makeActiveDot = (colorVar: string, primary = true) => ({
+  r: primary ? 5 : 4,
+  strokeWidth: 2,
+  stroke: 'var(--background)',
+  fill: colorVar,
+});
+
+const CHART_MARGIN = { left: 12, right: 12 };
 
 export const PerformanceChart = ({
   data,
@@ -206,26 +243,8 @@ export const PerformanceChart = ({
     // visible point. Both series use the same FX-adjustment pattern:
     //   factor_D = (1 + return_D/100) × fx_D
     //   rebased  = factor_D / factor_0 − 1
-    // fx_inception cancels, so only per-point fx_rate values are needed.
-    const firstReturnPoint = filtered.find((p) =>
-      p.return_pct != null && (!useEurMode || p.fx_rate != null)
-    );
-    const firstReturnPct = firstReturnPoint?.return_pct ?? null;
-    const firstReturnFx = firstReturnPoint?.fx_rate ?? null;
-    const baseReturnFactor = firstReturnPct == null ? null
-      : useEurMode && firstReturnFx != null
-        ? (1 + firstReturnPct / 100) * firstReturnFx
-        : 1 + firstReturnPct / 100;
-    // S&P 500 rebasing base
-    const firstSp500Point = filtered.find((p) =>
-      p.sp500_return_pct != null && (!useEurMode || p.fx_rate != null)
-    );
-    const firstSp500Pct = firstSp500Point?.sp500_return_pct ?? null;
-    const firstSp500Fx = firstSp500Point?.fx_rate ?? null;
-    const baseSp500Factor = firstSp500Pct == null ? null
-      : useEurMode && firstSp500Fx != null
-        ? (1 + firstSp500Pct / 100) * firstSp500Fx
-        : 1 + firstSp500Pct / 100;
+    const baseReturnFactor = computeBaseFactor(filtered, p => p.return_pct, useEurMode);
+    const baseSp500Factor = computeBaseFactor(filtered, p => p.sp500_return_pct, useEurMode);
 
     return filtered.map((point, index) => {
       const isLast = index === filtered.length - 1;
@@ -235,22 +254,8 @@ export const PerformanceChart = ({
         ? liveOverride.fxRate
         : point.fx_rate;
 
-      const rawReturnPct = point.return_pct;
-
-      let returnRebased: number | null = null;
-      if (rawReturnPct != null && baseReturnFactor != null && baseReturnFactor !== 0) {
-        const returnFactor = useEurMode && effectiveFxRate != null
-          ? (1 + rawReturnPct / 100) * effectiveFxRate
-          : (1 + rawReturnPct / 100);
-        returnRebased = (returnFactor / baseReturnFactor - 1) * 100;
-      }
-      let sp500Rebased: number | null = null;
-      if (point.sp500_return_pct != null && baseSp500Factor != null && baseSp500Factor !== 0) {
-        const sp500Factor = useEurMode && effectiveFxRate != null
-          ? (1 + point.sp500_return_pct / 100) * effectiveFxRate
-          : (1 + point.sp500_return_pct / 100);
-        sp500Rebased = (sp500Factor / baseSp500Factor - 1) * 100;
-      }
+      const returnRebased = rebasePct(point.return_pct, effectiveFxRate, baseReturnFactor, useEurMode);
+      const sp500Rebased = rebasePct(point.sp500_return_pct, effectiveFxRate, baseSp500Factor, useEurMode);
 
       const rawCurrentValue = isLast && liveOverride
         ? liveOverride.currentValue
@@ -289,6 +294,11 @@ export const PerformanceChart = ({
 
     return { ...values, date: dateStr, isHovering: activeIndex != null };
   }, [chartData, activeIndex, viewMode, currency, locale, timePeriod]);
+
+  const xAxisTickFormatter = useCallback(
+    (value: string) => parseYMD(value).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+    [locale],
+  );
 
   const handleMouseMove = useCallback((state: { activeTooltipIndex?: number }) => {
     if (state.activeTooltipIndex != null) {
@@ -386,14 +396,13 @@ export const PerformanceChart = ({
               <span className="text-2xl font-bold tabular-nums">
                 {headerInfo.displayValue}
               </span>
-              {viewMode === 'value' && headerInfo.change != null && headerInfo.changePct != null && (
+              {headerInfo.mode === 'value' && headerInfo.changeDisplay != null && (
                 <span className={`text-sm ml-2 ${headerInfo.isPositive ? 'text-positive' : 'text-negative'}`}>
-                  {headerInfo.isPositive ? '\u25B2' : '\u25BC'}
-                  {headerInfo.changePct}%
-                  {' '}({headerInfo.isPositive ? '+' : '-'}{headerInfo.change})
+                  {headerInfo.changeDisplay}
+                  {headerInfo.pctDisplay && <span className="font-bold ml-1.5">{headerInfo.pctDisplay}</span>}
                 </span>
               )}
-              {viewMode === 'value' && 'principalDisplay' in headerInfo && headerInfo.principalDisplay != null && (
+              {headerInfo.mode === 'value' && headerInfo.principalDisplay != null && (
                 <div className="text-xs text-muted-foreground mt-0.5">
                   <span
                     className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
@@ -402,7 +411,7 @@ export const PerformanceChart = ({
                   {t('chart.performance.principal')}: {headerInfo.principalDisplay}
                 </div>
               )}
-              {viewMode !== 'value' && 'sp500Display' in headerInfo && headerInfo.sp500Display != null && (
+              {headerInfo.mode === 'pct' && headerInfo.sp500Display != null && (
                 <div className="text-xs text-muted-foreground mt-0.5">
                   <span
                     className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
@@ -431,7 +440,7 @@ export const PerformanceChart = ({
           <ComposedChart
             accessibilityLayer
             data={chartData}
-            margin={{ left: 12, right: 12 }}
+            margin={CHART_MARGIN}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
@@ -447,28 +456,19 @@ export const PerformanceChart = ({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value: string) =>
-                parseYMD(value).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-              }
+              tickFormatter={xAxisTickFormatter}
               minTickGap={50}
             />
-            {viewMode === 'value' ? (
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={4}
-                width={60}
-                tickFormatter={(v: number) => formatCompactValue(v, currency)}
-              />
-            ) : (
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={4}
-                width={50}
-                tickFormatter={(v: number) => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`}
-              />
-            )}
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickMargin={4}
+              width={viewMode === 'value' ? 60 : 50}
+              tickFormatter={viewMode === 'value'
+                ? (v: number) => formatCompactValue(v, currency)
+                : (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`
+              }
+            />
             <Tooltip
               content={() => null}
               cursor={<CrosshairCursor />}
@@ -482,7 +482,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-currentValue)"
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--background)', fill: 'var(--color-currentValue)' }}
+                activeDot={makeActiveDot('var(--color-currentValue)')}
                 connectNulls
               />
             )}
@@ -493,7 +493,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-principal)"
                 strokeWidth={1.5}
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)', fill: 'var(--color-principal)' }}
+                activeDot={makeActiveDot('var(--color-principal)', false)}
                 connectNulls
               />
             )}
@@ -507,7 +507,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-returnPct)"
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--background)', fill: 'var(--color-returnPct)' }}
+                activeDot={makeActiveDot('var(--color-returnPct)')}
                 connectNulls
               />
             )}
@@ -519,7 +519,7 @@ export const PerformanceChart = ({
                 strokeWidth={1.5}
                 strokeDasharray="5 3"
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)', fill: 'var(--color-sp500ReturnPct)' }}
+                activeDot={makeActiveDot('var(--color-sp500ReturnPct)', false)}
                 connectNulls
               />
             )}

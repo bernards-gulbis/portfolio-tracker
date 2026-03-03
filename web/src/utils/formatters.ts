@@ -1,13 +1,27 @@
+/** Cache for Intl.NumberFormat instances — avoids re-creating formatters on every call
+ *  (e.g. during rapid mouse-hover updates on the performance chart). */
+const currencyFormatterCache = new Map<string, Intl.NumberFormat>();
+
+const getCurrencyFormatter = (locale: string, currency: string): Intl.NumberFormat => {
+  const key = `${locale}:${currency}`;
+  let fmt = currencyFormatterCache.get(key);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    currencyFormatterCache.set(key, fmt);
+  }
+  return fmt;
+};
+
 /**
  * Format currency value. Pass the locale returned by useLocale() for reactive formatting.
  */
 export const formatCurrency = (value: number, currency: string = 'USD', locale: string = 'en-US'): string => {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  return getCurrencyFormatter(locale, currency).format(value);
 };
 
 /**
