@@ -67,6 +67,8 @@ const PieCenterLabel = ({ viewBox, locale, currency, activeEntry, total, totalLa
   );
 };
 
+const TRANSITION_STYLE = { transition: 'opacity 150ms ease-in-out' };
+
 const COLORS = [
   'var(--chart-1)',
   'var(--chart-2)',
@@ -189,7 +191,7 @@ export const HoldingsAllocationChart = ({
                   key={entry.name}
                   fill={entry.fill}
                   opacity={activeIndex == null || activeIndex === index ? 1 : 0.3}
-                  style={{ transition: 'opacity 150ms ease-in-out' }}
+                  style={TRANSITION_STYLE}
                 />
               ))}
               <Label
@@ -214,7 +216,7 @@ export const HoldingsAllocationChart = ({
               <div
                 key={entry.name}
                 className="flex items-center justify-between text-xs cursor-default"
-                style={{ opacity: dimmed ? 0.3 : 1, transition: 'opacity 150ms ease-in-out' }}
+                style={{ opacity: dimmed ? 0.3 : 1, ...TRANSITION_STYLE }}
                 onMouseEnter={() => setActiveIndex(index)}
                 onMouseLeave={() => setActiveIndex(null)}
               >
