@@ -17,8 +17,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   type ChartConfig,
 } from '@/components/ui/chart';
 import type { PerformanceDataPoint } from '../api';
@@ -101,29 +99,34 @@ const getCutoffDate = (period: TimePeriod): string | null => {
   return cutoff.toISOString().split('T')[0];
 };
 
-/** Compute the header display values for a given data point relative to the first point. */
+/** Compute the header display values.
+ *  Uses the TWR return_pct (rebased) for the percentage — avoids division by near-zero principal.
+ *  Absolute change: "all" period uses value − principal; shorter periods use value − first value. */
 const getHeaderValues = (
   point: ChartDataPoint,
   first: ChartDataPoint,
   viewMode: ViewMode,
   currency: Currency,
   locale: string,
+  isAllTime: boolean,
 ) => {
   if (viewMode === 'value') {
     const value = point.currentValue;
     const principal = point.principal;
-    const firstValue = first.currentValue;
     if (value == null) return { displayValue: '-', principalDisplay: null, change: null, changePct: null, isPositive: true };
     const formatted = formatCurrency(value, currency, locale);
     const principalDisplay = principal != null ? formatCurrency(principal, currency, locale) : null;
-    if (firstValue == null || firstValue === 0) return { displayValue: formatted, principalDisplay, change: null, changePct: null, isPositive: true };
-    const diff = value - firstValue;
-    const pct = (diff / firstValue) * 100;
+    // Absolute change: vs principal for "all", vs period start for shorter periods
+    const base = isAllTime ? principal : first.currentValue;
+    if (base == null) return { displayValue: formatted, principalDisplay, change: null, changePct: null, isPositive: true };
+    const diff = value - base;
+    // Use TWR return % for the percentage (already rebased on the frontend)
+    const twrPct = point.returnPct;
     return {
       displayValue: formatted,
       principalDisplay,
       change: formatCurrency(Math.abs(diff), currency, locale),
-      changePct: Math.abs(pct).toFixed(2),
+      changePct: twrPct != null ? Math.abs(twrPct).toFixed(2) : null,
       isPositive: diff >= 0,
     };
   } else {
@@ -277,7 +280,7 @@ export const PerformanceChart = ({
     const displayPoint = activeIndex != null ? chartData[activeIndex] : chartData[chartData.length - 1];
     if (!displayPoint) return null;
 
-    const values = getHeaderValues(displayPoint, first, viewMode, currency, locale);
+    const values = getHeaderValues(displayPoint, first, viewMode, currency, locale, timePeriod === 'all');
     const dateStr = parseYMD(displayPoint.date).toLocaleDateString(locale, {
       month: 'short',
       day: 'numeric',
@@ -285,7 +288,7 @@ export const PerformanceChart = ({
     });
 
     return { ...values, date: dateStr, isHovering: activeIndex != null };
-  }, [chartData, activeIndex, viewMode, currency, locale]);
+  }, [chartData, activeIndex, viewMode, currency, locale, timePeriod]);
 
   const handleMouseMove = useCallback((state: { activeTooltipIndex?: number }) => {
     if (state.activeTooltipIndex != null) {
@@ -471,7 +474,6 @@ export const PerformanceChart = ({
               cursor={<CrosshairCursor />}
               isAnimationActive={false}
             />
-            <ChartLegend content={<ChartLegendContent className="text-[10px] sm:text-xs" />} />
             {viewMode === 'value' && (
               <Area
                 type="monotone"

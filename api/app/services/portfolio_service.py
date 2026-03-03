@@ -513,8 +513,18 @@ def _compute_perf_holdings(
     return holdings_value, last_known_tickers, cost_basis_tickers
 
 
+@dataclass
+class _TwrState:
+    """Running state for Time-Weighted Return calculation."""
+    prev_value: Decimal = _ZERO
+    prev_principal: Decimal = _ZERO
+    twr_factor: Decimal = _ONE  # cumulative (1+r1)(1+r2)…
+    started: bool = False
+
+
 def _compute_perf_data_point(
     state: _TxState,
+    twr: _TwrState,
     date_str: str,
     holdings_value: Decimal,
     last_known_tickers: List[str],
@@ -540,9 +550,26 @@ def _compute_perf_data_point(
     current_value = state.cash + holdings_value
     fx_rate = _bisect_lookup(sorted_fx_dates, fx_rates, date_str)
 
+    # Time-Weighted Return: chain sub-period returns between cash-flow events.
+    # Sub-period return: r = V_end / (V_start + CF) - 1
+    # where CF = net cash flow (deposits − withdrawals) since last point.
     return_pct = None
-    if state.total_deposits > 0:
-        return_pct = float((current_value - state.principal) / state.total_deposits * Decimal('100'))
+    if not twr.started:
+        # First data point — just seed the TWR state
+        if current_value > 0:
+            twr.started = True
+        return_pct = 0.0 if current_value > 0 else None
+    else:
+        cf = state.principal - twr.prev_principal
+        base = twr.prev_value + cf
+        if base > 0:
+            sub_return = current_value / base
+            twr.twr_factor *= sub_return
+        # If base <= 0 (e.g. everything withdrawn), skip sub-period
+        return_pct = float((twr.twr_factor - _ONE) * Decimal('100'))
+
+    twr.prev_value = current_value
+    twr.prev_principal = state.principal
 
     # S&P 500 in USD — frontend applies FX rate for EUR mode
     sp500_return_pct = None
@@ -722,6 +749,7 @@ class PortfolioService:
         performance_data = []
         state = _TxState()
         state.usd_to_eur_fallback = _resolve_usd_to_eur_rate(end_date)
+        twr = _TwrState()
         tx_index = 0
         sp500_base_price: Optional[float] = None
 
@@ -735,7 +763,7 @@ class PortfolioService:
                 ticker_last_price, forward_split_factors, date_str,
             )
             data_point_dict, sp500_base_price = _compute_perf_data_point(
-                state, date_str, holdings_value, last_known, cost_basis,
+                state, twr, date_str, holdings_value, last_known, cost_basis,
                 fx_rates, sorted_fx_dates, sp500_prices, sorted_sp500_dates,
                 sp500_base_price,
             )
