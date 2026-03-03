@@ -31,7 +31,7 @@ export const formatQuantity = (value: number): string => {
 /**
  * Format date. Pass the locale returned by useLocale() for reactive formatting.
  */
-export const formatDate = (date: string, locale: string = 'en-US'): string => {
+export const formatDateTime = (date: string, locale: string = 'en-US'): string => {
   return new Date(date).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',

@@ -111,6 +111,30 @@ describe('computePricedStatus', () => {
     expect(status.holdings).toEqual(originalHoldings);
   });
 
+  it('returns null unrealized_gain_loss_pct when total_cost is 0', () => {
+    const status = makeStatus({
+      holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0 }],
+      holdings_cost: 0,
+    });
+    const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: 10 } }));
+
+    const free = result.holdings.find((h) => h.ticker === 'FREE')!;
+    expect(free.current_value).toBe(50);
+    expect(free.unrealized_gain_loss).toBe(50);
+    expect(free.unrealized_gain_loss_pct).toBeNull();
+  });
+
+  it('returns null unrealized_gains_pct when holdings_cost is 0', () => {
+    const status = makeStatus({
+      holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0 }],
+      holdings_cost: 0,
+    });
+    const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: 10 } }));
+
+    expect(result.unrealized_gains_pct).toBeNull();
+    expect(result.unrealized_gains).toBe(50); // 50 - 0
+  });
+
   it('preserves transaction-derived fields', () => {
     const status = makeStatus();
     const result = computePricedStatus(status, makeLivePrices());

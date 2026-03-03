@@ -4,7 +4,7 @@ Service for fetching current stock prices
 import logging
 from typing import Dict, Optional, Tuple, List
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock, Semaphore
 from sqlmodel import Session, select
@@ -309,7 +309,7 @@ class PriceService:
         cached_prices: Dict[str, float],
         start_date: datetime,
         end_date: datetime,
-        yesterday,
+        yesterday: date,
     ) -> List[Tuple[datetime, datetime]]:
         """Compute date ranges that need to be fetched from the API given cached data."""
         if not cached_prices:

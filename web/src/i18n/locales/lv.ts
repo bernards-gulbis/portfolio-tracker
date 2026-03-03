@@ -4,6 +4,10 @@ const lv: Translation = {
   common: {
     notAvailable: 'N/A',
   },
+  errorBoundary: {
+    title: 'Kaut kas nogāja greizi',
+    tryAgain: 'Mēģināt vēlreiz',
+  },
   app: {
     header: {
       toggleTheme: 'Pārslēgt motīvu',

@@ -26,7 +26,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign } from 'lucide-react';
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
@@ -57,9 +57,9 @@ const CURRENCY_OPTIONS = [
 ] as const;
 
 const CreatePortfolioContext = createContext<(() => void) | null>(null);
-function useCreatePortfolio() {
+function useOpenCreateModal() {
   const fn = useContext(CreatePortfolioContext);
-  if (!fn) throw new Error('useCreatePortfolio must be used within AppLayout');
+  if (!fn) throw new Error('useOpenCreateModal must be used within AppLayout');
   return fn;
 }
 
@@ -102,21 +102,17 @@ function AppLayout() {
   const portfolioMatch = useMatch('/portfolios/:id');
   const matchedId = portfolioMatch?.params.id ? Number(portfolioMatch.params.id) : null;
   const activePortfolioId = matchedId && Number.isFinite(matchedId) ? matchedId : null;
-  const [lastPortfolioId, setLastPortfolioId] = useState<number | null>(null);
+  const lastPortfolioRef = useRef<number | null>(null);
 
-  // Track the last visited portfolio (adjust state during render)
-  if (
-    activePortfolioId !== null &&
-    lastPortfolioId !== activePortfolioId &&
-    (!portfolios || portfolios.some((p) => p.id === activePortfolioId))
-  ) {
-    setLastPortfolioId(activePortfolioId);
-  } else if (lastPortfolioId !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioId)) {
-    // Clear stale state if the remembered portfolio was deleted
-    setLastPortfolioId(null);
+  // Track the last visited portfolio
+  if (activePortfolioId !== null) {
+    lastPortfolioRef.current = activePortfolioId;
+  }
+  if (lastPortfolioRef.current !== null && portfolios && !portfolios.some((p) => p.id === lastPortfolioRef.current)) {
+    lastPortfolioRef.current = null;
   }
 
-  const rememberedId = activePortfolioId ?? lastPortfolioId;
+  const rememberedId = activePortfolioId ?? lastPortfolioRef.current;
 
   const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
 
@@ -223,7 +219,7 @@ function AppLayout() {
 function PortfolioRedirect() {
   const { data: portfolios, isLoading } = usePortfolios();
   const { t } = useTranslation();
-  const openCreateModal = useCreatePortfolio();
+  const openCreateModal = useOpenCreateModal();
 
   if (isLoading) {
     return (

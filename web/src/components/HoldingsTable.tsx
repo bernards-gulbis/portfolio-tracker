@@ -22,8 +22,6 @@ interface HoldingsTableProps {
   displayCurrency: Currency;
   showEur: boolean;
   eurMetrics: EurMetrics | null;
-  currencyGainsEur: number | null;
-  currencyGainsPct: number | null;
   locale: string;
 }
 
@@ -34,13 +32,13 @@ export const HoldingsTable = memo(({
   displayCurrency,
   showEur,
   eurMetrics,
-  currencyGainsEur,
-  currencyGainsPct,
   locale,
 }: HoldingsTableProps) => {
   const { t } = useTranslation();
   const eurAvailable = eurMetrics !== null;
   const cashDisplay = showEur && eurAvailable ? eurMetrics!.cashEur : cash;
+  const currencyGainsEur = eurMetrics?.currencyGainsEur ?? null;
+  const currencyGainsPct = eurMetrics?.currencyGainsPct ?? null;
 
   const holdingsWithEur = useMemo(() => {
     if (!showEur || !eurAvailable) return null;

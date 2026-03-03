@@ -56,6 +56,12 @@ describe('useCurrencyPreference', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('USD');
   });
 
+  it('defaults to EUR when localStorage has invalid value', () => {
+    localStorage.setItem(STORAGE_KEY, 'GBP');
+    const { result } = renderHook(() => useCurrencyPreference(), { wrapper });
+    expect(result.current.currency).toBe('EUR');
+  });
+
   it('persists back to EUR in localStorage', () => {
     localStorage.setItem(STORAGE_KEY, 'USD');
     const { result } = renderHook(() => useCurrencyPreference(), { wrapper });

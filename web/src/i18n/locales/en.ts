@@ -2,6 +2,10 @@ const en = {
   common: {
     notAvailable: 'N/A',
   },
+  errorBoundary: {
+    title: 'Something went wrong',
+    tryAgain: 'Try again',
+  },
   app: {
     header: {
       toggleTheme: 'Toggle theme',

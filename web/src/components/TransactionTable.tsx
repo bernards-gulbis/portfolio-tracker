@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, TransactionType, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate, formatDateCompact } from '../utils/formatters';
+import { formatCurrency, formatDateTime, formatDateCompact } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { MAX_VISIBLE_PAGES } from '../constants/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -342,7 +342,7 @@ const TransactionTable = ({
                         size="icon"
                         className="h-8 w-8"
                         disabled={deletingId === transaction.id}
-                        aria-label={t('transaction.table.actions.label', { ticker: transaction.ticker || '-', date: formatDate(transaction.date, locale) })}
+                        aria-label={t('transaction.table.actions.label', { ticker: transaction.ticker || '-', date: formatDateTime(transaction.date, locale) })}
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>

@@ -1473,7 +1473,7 @@ def test_portfolio_status_invalid_split_ratio(client: TestClient):
 # ================== EUR Conversion and Tax Tests ==================
 
 def test_portfolio_status_with_eur_conversion(client: TestClient):
-    """Test portfolio status passes live FX rate and deposits_eur to frontend"""
+    """Test portfolio status passes live FX rate and principal_eur to frontend"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "EUR Test Portfolio"}
@@ -1527,7 +1527,7 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
 
 
 def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
-    """Test that live rate and deposits_eur are returned for frontend tax computation"""
+    """Test that live rate and principal_eur are returned for frontend tax computation"""
     portfolio_response = client.post(
         "/portfolios/",
         json={"name": "Tax Test Portfolio"}

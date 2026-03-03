@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatDate } from '../utils/formatters';
+import { formatCurrency, formatDateTime } from '../utils/formatters';
 
 describe('Formatters', () => {
   describe('formatCurrency', () => {
@@ -15,10 +15,10 @@ describe('Formatters', () => {
     });
   });
 
-  describe('formatDate', () => {
+  describe('formatDateTime', () => {
     it('formats date correctly', () => {
       const date = '2020-12-02T20:14:40';
-      const formatted = formatDate(date);
+      const formatted = formatDateTime(date);
       expect(formatted).toContain('Dec');
       expect(formatted).toContain('2020');
     });

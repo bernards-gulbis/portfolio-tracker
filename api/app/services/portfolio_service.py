@@ -721,6 +721,7 @@ class PortfolioService:
 
         performance_data = []
         state = _TxState()
+        state.usd_to_eur_fallback = _resolve_usd_to_eur_rate(end_date)
         tx_index = 0
         sp500_base_price: Optional[float] = None
 

@@ -7,7 +7,7 @@ import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDate, getValueClass } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, LivePrices } from '../api';
 import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPreference';
@@ -119,8 +119,6 @@ const PortfolioStatusContent = ({
   const marketValue = eur ? eur.currentValueEur : showEur ? null : status.current_value;
   const unrealizedGains = eur ? eur.unrealizedGainsEur : showEur ? null : status.unrealized_gains;
   const netInvested = showEur ? status.principal_eur : status.principal;
-  const currencyGainsEur = eur?.currencyGainsEur ?? null;
-  const currencyGainsPct = eur?.currencyGainsPct ?? null;
   const dividends = showEur ? status.dividends_eur : status.dividends;
   const taxEur = eur?.taxEur ?? null;
   const capitalGainsEur = eur?.capitalGainsEur ?? null;
@@ -161,7 +159,7 @@ const PortfolioStatusContent = ({
                 <li key={i}>
                   {(t as (key: string, options?: Record<string, unknown>) => string)(`status.warnings.${w.code}`, {
                     ...w.params,
-                    date: formatDate(w.date, locale),
+                    date: formatDateTime(w.date, locale),
                   })}
                 </li>
               ))}
@@ -240,8 +238,6 @@ const PortfolioStatusContent = ({
         displayCurrency={currency}
         showEur={showEur}
         eurMetrics={eur}
-        currencyGainsEur={currencyGainsEur}
-        currencyGainsPct={currencyGainsPct}
         locale={locale}
       />
     </CardContent>
