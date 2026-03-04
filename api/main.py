@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 from urllib.parse import urlencode
 
-from app.core.config import CORS_ORIGINS, LOG_LEVEL, OAUTH_STATE_SECRET, COOKIE_SECURE, FRONTEND_URL
+from app.core.config import CORS_ORIGINS, LOG_LEVEL, OAUTH_STATE_SECRET, COOKIE_SECURE, COOKIE_SAMESITE, FRONTEND_URL
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -240,6 +240,7 @@ app.include_router(
         associate_by_email=True,
         is_verified_by_default=True,
         csrf_token_cookie_secure=COOKIE_SECURE,
+        csrf_token_cookie_samesite=COOKIE_SAMESITE,
     ),
     prefix="/auth/google",
     tags=["auth"],
