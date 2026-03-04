@@ -93,7 +93,7 @@ const PortfolioStatusContent = ({
   const locale = useLocale();
   const { currency } = useCurrencyPreference();
   const showEur = currency === 'EUR';
-  const eur = useMemo(() => showEur ? computeEurMetrics(status) : null, [status, showEur]);
+  const eur = useMemo(() => computeEurMetrics(status), [status]);
   const taxRate = useMemo(() =>
     new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
       status.capital_gains_tax_rate * 100
@@ -118,8 +118,8 @@ const PortfolioStatusContent = ({
   }
 
   // Resolve display values based on currency
-  const marketValue = eur ? eur.currentValueEur : showEur ? null : status.current_value;
-  const unrealizedGains = eur ? eur.unrealizedGainsEur : showEur ? null : status.unrealized_gains;
+  const marketValue = showEur ? (eur?.currentValueEur ?? null) : status.current_value;
+  const unrealizedGains = showEur ? (eur?.unrealizedGainsEur ?? null) : status.unrealized_gains;
   const netInvested = showEur ? status.principal_eur : status.principal;
   const dividends = showEur ? status.dividends_eur : status.dividends;
   const taxEur = eur?.taxEur ?? null;
@@ -277,7 +277,7 @@ export const PortfolioStatusView = () => {
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
   // Live price polling — computes priced status from transaction-derived status + live prices
-  const tickers = useMemo(() => status?.holdings.map((h) => h.ticker) ?? [], [status?.holdings]);
+  const tickers = useMemo(() => Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])), [status?.holdings]);
   const { data: livePrices, isFetching: isLivePricesFetching, dataUpdatedAt: livePricesUpdatedAt, error: livePricesError } = useLivePrices(
     tickers,
     !!status && tickers.length > 0,

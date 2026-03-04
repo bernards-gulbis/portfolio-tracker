@@ -517,6 +517,15 @@ export const TransactionModal = ({
     }
   }, [watchedQuantity, watchedPrice, watchedFee, type, isSell, form]);
 
+  // Auto-fill sell price when livePrices arrives after ticker was already selected
+  useEffect(() => {
+    if (!isSell || !watchedTicker || !livePrices) return;
+    const livePrice = livePrices.prices[watchedTicker];
+    if (livePrice != null && !form.getValues('pricePerShare')) {
+      form.setValue('pricePerShare', livePrice.toFixed(2));
+    }
+  }, [isSell, watchedTicker, livePrices, form]);
+
   // Auto-fill FX rate for DIVIDEND when empty
   const eurRate = portfolioStatus?.usd_to_eur_rate;
   useEffect(() => {

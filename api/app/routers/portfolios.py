@@ -5,8 +5,6 @@ from sqlmodel import Session
 from typing import Annotated, List, Optional
 from datetime import datetime, timezone
 
-logger = logging.getLogger(__name__)
-
 from app.core import get_session
 from app.core.auth import current_active_user
 from app.models.user import User
@@ -23,6 +21,8 @@ from app.schemas import (
 
 from app.services import PortfolioService
 from app.services.price_service import PriceService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
