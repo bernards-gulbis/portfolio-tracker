@@ -44,6 +44,7 @@ export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioAction
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const handleDeleteConfirm = async () => {
+    if (deletePortfolio.isPending) return;
     try {
       await deletePortfolio.mutateAsync(portfolioId);
       await queryClient.invalidateQueries({ queryKey: ['portfolios'] });
@@ -123,7 +124,7 @@ export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioAction
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel variant="outline">{t('portfolio.delete.cancel')}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm} disabled={deletePortfolio.isPending}>
               {t('portfolio.delete.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -96,8 +96,8 @@ function AppLayout() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { data: portfolios } = usePortfolios();
   const portfolioMatch = useMatch('/portfolios/:id');
-  const matchedId = portfolioMatch?.params.id ? Number(portfolioMatch.params.id) : null;
-  const activePortfolioId = matchedId && Number.isFinite(matchedId) ? matchedId : null;
+  const matchedId = portfolioMatch?.params.id != null ? Number(portfolioMatch.params.id) : null;
+  const activePortfolioId = Number.isFinite(matchedId) ? matchedId : null;
   // Derive the "remembered" portfolio ID from the current route and portfolio list.
   // Uses useMemo so we never need a ref or setState during render/effects.
   const [prevActiveId, setPrevActiveId] = useState<number | null>(null);
@@ -127,12 +127,12 @@ function AppLayout() {
         <header className="border-b px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-1">
             <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
-            {rememberedId != null && portfolios && (
-              <PortfolioActions
-                portfolioId={rememberedId}
-                portfolioName={portfolios.find((p) => p.id === rememberedId)?.name ?? ''}
-              />
-            )}
+            {(() => {
+              const matched = portfolios?.find((p) => p.id === rememberedId);
+              return matched ? (
+                <PortfolioActions portfolioId={matched.id} portfolioName={matched.name} />
+              ) : null;
+            })()}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
