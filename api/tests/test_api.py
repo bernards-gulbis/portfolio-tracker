@@ -65,8 +65,12 @@ def client_fixture(session: Session, test_user: User):
     """Create a test client with dependency overrides for session and auth"""
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[current_active_user] = lambda: test_user
-    client = TestClient(app)
-    yield client
+    # PriceService uses the global engine directly (not get_session),
+    # so patch it to use the test engine for historical_prices / fx_rates tables.
+    with patch("app.services.price_service.engine", session.get_bind()), \
+         patch("app.services.price_service.is_postgresql", False):
+        client = TestClient(app)
+        yield client
     app.dependency_overrides.clear()
 
 
