@@ -51,9 +51,10 @@ def list_portfolios(
 @router.get("/prices/live", response_model=LivePricesResponse)
 def get_live_prices(
     user: Annotated[User, Depends(current_active_user)],
-    tickers: Annotated[List[str], Query()] = [],
+    tickers: Annotated[List[str], Query()] = None,
 ):
     """Get current prices and FX rate without replaying transactions"""
+    tickers = tickers or []
     try:
         prices = PriceService.get_current_prices(tickers) if tickers else {}
     except Exception as e:

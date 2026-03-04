@@ -268,6 +268,7 @@ const lv: Translation = {
     noData: 'Nav pieejami statusa dati',
     emptyPortfolio: 'Portfeļa kopsavilkums parādīsies, kad pievienosiet darījumus zemāk.',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
+    refreshPortfolio: 'Atjaunināt portfeli',
     fetchedAt: 'Atjaunināts {{time}}',
     livePriceError: 'Tiešsaistes cenas īslaicīgi nav pieejamas',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',

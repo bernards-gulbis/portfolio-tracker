@@ -21,7 +21,7 @@ export const rebasePct = (
   baseFactor: number | null,
   useEur: boolean,
 ): number | null => {
-  if (rawPct == null || baseFactor == null || baseFactor === 0) return null;
+  if (rawPct == null || baseFactor == null || baseFactor <= 0) return null;
   const factor = 1 + rawPct / 100;
   const adjusted = useEur && fxRate != null ? factor * fxRate : factor;
   return (adjusted / baseFactor - 1) * 100;

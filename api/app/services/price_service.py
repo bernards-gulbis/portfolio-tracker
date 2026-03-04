@@ -300,7 +300,11 @@ class PriceService:
         """Like get_usd_to_eur_rate but returns None on any exception."""
         try:
             return cls.get_usd_to_eur_rate()
-        except Exception:
+        except requests.exceptions.RequestException as e:
+            logger.warning("Network error fetching USD/EUR rate: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error fetching USD/EUR rate: %s", e, exc_info=True)
             return None
 
     @classmethod

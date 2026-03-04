@@ -60,6 +60,7 @@ export const computePricedStatus = (
   let unrealizedGainsPct: number | null = null;
 
   if (hasLivePrices) {
+    // Holdings with null current_value (missing price) are treated as zero
     holdingsValue = pricedHoldings.reduce(
       (sum, h) => sum + (h.current_value ?? 0),
       0,

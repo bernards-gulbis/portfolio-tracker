@@ -480,7 +480,7 @@ export const TransactionModal = ({
   const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
   const holdings = useMemo<Holding[]>(() => portfolioStatus?.holdings ?? [], [portfolioStatus?.holdings]);
   const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
-  const { data: livePrices } = useLivePrices(tickers, tickers.length > 0);
+  const { data: livePrices } = useLivePrices(tickers, tickers.length > 0 && isOpen);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -512,9 +512,10 @@ export const TransactionModal = ({
     const price = Number.parseFloat(watchedPrice || '0');
     const fee = Math.abs(Number.parseFloat(watchedFee || '0'));
     if (qty > 0 && price > 0) {
-      form.setValue('totalAmount', (qty * price + fee).toFixed(2));
+      const total = isSell ? qty * price - fee : qty * price + fee;
+      form.setValue('totalAmount', total.toFixed(2));
     }
-  }, [watchedQuantity, watchedPrice, watchedFee, type, form]);
+  }, [watchedQuantity, watchedPrice, watchedFee, type, isSell, form]);
 
   // Auto-fill FX rate for DIVIDEND when empty
   const eurRate = portfolioStatus?.usd_to_eur_rate;
@@ -673,6 +674,8 @@ export const TransactionModal = ({
                             const livePrice = livePrices.prices[value];
                             if (livePrice != null) {
                               form.setValue('pricePerShare', livePrice.toFixed(2));
+                            } else {
+                              form.setValue('pricePerShare', '');
                             }
                           }
                         }}

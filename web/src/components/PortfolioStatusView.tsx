@@ -76,6 +76,7 @@ interface PortfolioStatusContentProps {
   status: PricedPortfolioStatus;
   performance?: PortfolioPerformance;
   isPerformanceLoading: boolean;
+  isAllocationLoading?: boolean;
   isEmptyPortfolio?: boolean;
   toolbar?: React.ReactNode;
 }
@@ -84,6 +85,7 @@ const PortfolioStatusContent = ({
   status,
   performance,
   isPerformanceLoading,
+  isAllocationLoading = false,
   isEmptyPortfolio = false,
   toolbar,
 }: PortfolioStatusContentProps) => {
@@ -225,7 +227,7 @@ const PortfolioStatusContent = ({
             holdings={status.holdings}
             cash={status.cash}
             eurRate={eurRate}
-            isLoading={false}
+            isLoading={isAllocationLoading}
           />
         </div>
       </Suspense>
@@ -276,7 +278,7 @@ export const PortfolioStatusView = () => {
 
   // Live price polling — computes priced status from transaction-derived status + live prices
   const tickers = useMemo(() => status?.holdings.map((h) => h.ticker) ?? [], [status?.holdings]);
-  const { data: livePrices, dataUpdatedAt: livePricesUpdatedAt, error: livePricesError } = useLivePrices(
+  const { data: livePrices, isFetching: isLivePricesFetching, dataUpdatedAt: livePricesUpdatedAt, error: livePricesError } = useLivePrices(
     tickers,
     !!status && tickers.length > 0,
   );
@@ -353,7 +355,10 @@ export const PortfolioStatusView = () => {
     );
   }
 
-  const isEmptyPortfolio = effectiveStatus.holdings.length === 0 && effectiveStatus.principal === 0;
+  const isEmptyPortfolio = effectiveStatus.holdings.length === 0
+    && effectiveStatus.principal === 0
+    && effectiveStatus.cash === 0
+    && effectiveStatus.dividends === 0;
   const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (
@@ -364,6 +369,7 @@ export const PortfolioStatusView = () => {
             status={effectiveStatus}
             performance={performance}
             isPerformanceLoading={isPerformanceLoading}
+            isAllocationLoading={isLivePricesFetching && !livePrices}
             isEmptyPortfolio={isEmptyPortfolio}
             toolbar={
               <div className="flex items-center gap-2">
@@ -384,6 +390,7 @@ export const PortfolioStatusView = () => {
                       className="h-5 w-5"
                       onClick={handleRefresh}
                       disabled={isRefreshing}
+                      aria-label={t('status.refreshPortfolio')}
                     >
                       <RefreshCwIcon className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </Button>

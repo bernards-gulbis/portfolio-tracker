@@ -5,6 +5,7 @@ import type { PerformanceDataPoint } from '../api';
 const point = (pct: number | null, fxRate: number | null = null): PerformanceDataPoint => ({
   date: '2024-01-01',
   principal: 1000,
+  principal_eur: null,
   current_value: 1100,
   fx_rate: fxRate,
   return_pct: pct,
@@ -85,8 +86,8 @@ describe('rebasePct', () => {
   });
 
   it('handles negative base correctly', () => {
-    // baseFactor = 0 is guarded, but negative should also return null
-    expect(rebasePct(10, null, 0, false)).toBeNull();
+    // baseFactor <= 0 is guarded
+    expect(rebasePct(10, null, -1, false)).toBeNull();
   });
 
   it('falls back to USD when fxRate is null in EUR mode', () => {

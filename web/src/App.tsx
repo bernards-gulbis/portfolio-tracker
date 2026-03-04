@@ -26,7 +26,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign } from 'lucide-react';
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
@@ -57,11 +57,6 @@ const CURRENCY_OPTIONS = [
 ] as const;
 
 const CreatePortfolioContext = createContext<(() => void) | null>(null);
-function useOpenCreateModal() {
-  const fn = useContext(CreatePortfolioContext);
-  if (!fn) throw new Error('useOpenCreateModal must be used within AppLayout');
-  return fn;
-}
 
 function CheckedItem({ checked, onClick, children }: { checked: boolean; onClick: () => void; children: ReactNode }) {
   return (

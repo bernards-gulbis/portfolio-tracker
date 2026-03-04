@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getLivePrices, LivePrices } from '../api';
 
@@ -6,10 +7,15 @@ export const useLivePrices = (
   enabled = true,
   intervalMs = 60_000,
 ) => {
+  const normalizedTickers = useMemo(
+    () => [...new Set(tickers)].sort(),
+    [tickers],
+  );
+
   return useQuery<LivePrices>({
-    queryKey: ['livePrices', [...tickers].sort()],
-    queryFn: () => getLivePrices(tickers),
-    enabled: enabled && tickers.length > 0,
+    queryKey: ['livePrices', normalizedTickers],
+    queryFn: () => getLivePrices(normalizedTickers),
+    enabled: enabled && normalizedTickers.length > 0,
     refetchInterval: intervalMs,
     refetchIntervalInBackground: false,
   });

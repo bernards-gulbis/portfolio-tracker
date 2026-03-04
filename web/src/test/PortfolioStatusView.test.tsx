@@ -181,6 +181,8 @@ describe('PortfolioStatusView', () => {
       principal_eur: 0,
       principal: 0,
       cash: 0,
+      dividends: 0,
+      dividends_eur: 0,
       usd_to_eur_rate: null,
     };
 

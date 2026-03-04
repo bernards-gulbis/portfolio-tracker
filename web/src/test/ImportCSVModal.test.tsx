@@ -42,7 +42,7 @@ const setFileOnInput = (input: HTMLElement, file: File) => {
   fireEvent.change(input, { target: { files: { 0: file, length: 1 } } });
 };
 
-describe('UploadCSVModal', () => {
+describe('ImportCSVModal', () => {
   const mockMutateAsync = vi.fn();
   const mockOnClose = vi.fn();
 
