@@ -3,9 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useLivePrices } from '../hooks/useLivePrices';
-import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
-import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
@@ -14,9 +12,6 @@ import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPrefer
 import { computeEurMetrics } from '../utils/eurMetrics';
 import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
-import { EditPortfolioModal } from './EditPortfolioModal';
-import { CopyPortfolioModal } from './CopyPortfolioModal';
-import { toast } from 'sonner';
 
 const PerformanceChart = lazy(() =>
   import('./PerformanceChart').then((m) => ({ default: m.PerformanceChart }))
@@ -28,26 +23,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { MoreVertical, PencilIcon, CopyIcon, TrashIcon, Trash2Icon, AlertTriangleIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
+import { AlertTriangleIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
 
 const EMPTY_DATA_POINTS: PerformanceDataPoint[] = [];
 const EMPTY_LIVE: LivePrices = { prices: {}, usd_to_eur_rate: null, timestamp: '' };
@@ -265,19 +241,13 @@ export const PortfolioStatusView = () => {
   const portfolioId = useActivePortfolioId();
   const { t } = useTranslation();
   const locale = useLocale();
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-
-  const navigate = useNavigate();
-  const deletePortfolio = useDeletePortfolio();
 
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
   // Live price polling — computes priced status from transaction-derived status + live prices
-  const tickers = useMemo(() => Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])), [status?.holdings]);
+  const tickers = useMemo(() => Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])).sort(), [status?.holdings]);
   const { data: livePrices, isFetching: isLivePricesFetching, dataUpdatedAt: livePricesUpdatedAt, error: livePricesError } = useLivePrices(
     tickers,
     !!status && tickers.length > 0,
@@ -305,19 +275,6 @@ export const PortfolioStatusView = () => {
       ]);
     } finally {
       setIsRefreshing(false);
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (portfolioId == null) return;
-    try {
-      await deletePortfolio.mutateAsync(portfolioId);
-      await queryClient.invalidateQueries({ queryKey: ['portfolios'] });
-      navigate('/', { replace: true });
-    } catch (err) {
-      toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(err) }));
-    } finally {
-      setIsDeleteConfirmOpen(false);
     }
   };
 
@@ -397,83 +354,12 @@ export const PortfolioStatusView = () => {
                     </Button>
                   </span>
                 )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      aria-label={t('portfolio.list.item.actionsLabel', { name: effectiveStatus.portfolio_name })}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem onClick={() => setIsEditModalOpen(true)}>
-                        <PencilIcon />
-                        {t('portfolio.list.item.rename')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setIsCopyModalOpen(true)}>
-                        <CopyIcon />
-                        {t('portfolio.list.item.copy')}
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => setIsDeleteConfirmOpen(true)}
-                        disabled={deletePortfolio.isPending}
-                      >
-                        <TrashIcon />
-                        {t('portfolio.list.item.delete')}
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             }
           />
         </Card>
       </div>
 
-      <EditPortfolioModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        portfolioId={portfolioId}
-        currentName={effectiveStatus.portfolio_name}
-      />
-
-      <CopyPortfolioModal
-        isOpen={isCopyModalOpen}
-        onClose={() => setIsCopyModalOpen(false)}
-        portfolioId={portfolioId}
-        portfolioName={effectiveStatus.portfolio_name}
-      />
-
-      <AlertDialog
-        open={isDeleteConfirmOpen}
-        onOpenChange={(open) => !open && setIsDeleteConfirmOpen(false)}
-      >
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
-              <Trash2Icon />
-            </AlertDialogMedia>
-            <AlertDialogTitle>{t('portfolio.delete.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('portfolio.delete.description')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel variant="outline">{t('portfolio.delete.cancel')}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
-              {t('portfolio.delete.confirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

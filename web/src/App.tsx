@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
 import { CreatePortfolioModal } from './components/CreatePortfolioModal';
+import { PortfolioActions } from './components/PortfolioActions';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
@@ -124,8 +125,14 @@ function AppLayout() {
     <CreatePortfolioContext.Provider value={openCreateModal}>
       <div className="flex min-h-screen flex-col">
         <header className="border-b px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
+            {rememberedId != null && portfolios && (
+              <PortfolioActions
+                portfolioId={rememberedId}
+                portfolioName={portfolios.find((p) => p.id === rememberedId)?.name ?? ''}
+              />
+            )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

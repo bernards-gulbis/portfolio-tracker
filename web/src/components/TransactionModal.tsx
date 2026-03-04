@@ -479,8 +479,6 @@ export const TransactionModal = ({
   const updateTransaction = useUpdateTransaction();
   const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
   const holdings = useMemo<Holding[]>(() => portfolioStatus?.holdings ?? [], [portfolioStatus?.holdings]);
-  const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
-  const { data: livePrices } = useLivePrices(tickers, tickers.length > 0 && isOpen);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -498,6 +496,9 @@ export const TransactionModal = ({
 
   const isSell = type === TransactionType.SELL;
   const isDividend = type === TransactionType.DIVIDEND;
+
+  const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
+  const { data: livePrices } = useLivePrices(tickers, tickers.length > 0 && isOpen && isSell);
   const showTickerCombobox = isSell || isDividend;
   const selectedHolding = isSell ? holdings.find(h => h.ticker === watchedTicker) : undefined;
 
@@ -541,6 +542,8 @@ export const TransactionModal = ({
     const total = Number.parseFloat(watchedTotal || '0');
     if (total > 0) {
       form.setValue('valueEur', (total * eurRate).toFixed(2));
+    } else {
+      form.setValue('valueEur', '');
     }
   }, [watchedTotal, eurRate, showValueEur, form]);
 

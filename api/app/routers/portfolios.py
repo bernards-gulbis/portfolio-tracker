@@ -24,6 +24,8 @@ from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
 
+MAX_TICKERS = 100
+
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
@@ -55,6 +57,11 @@ def get_live_prices(
 ):
     """Get current prices and FX rate without replaying transactions"""
     tickers = tickers or []
+    if len(tickers) > MAX_TICKERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
+        )
     try:
         prices = PriceService.get_current_prices(tickers) if tickers else {}
     except Exception as e:
