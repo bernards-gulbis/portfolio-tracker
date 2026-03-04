@@ -2,9 +2,10 @@ import { useMemo, useState, useCallback } from 'react';
 import {
   PieChart,
   Pie,
-  Cell,
+  Sector,
   Label,
 } from 'recharts';
+import type { PieSectorShapeProps } from 'recharts/types/polar/Pie';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
@@ -178,17 +179,10 @@ export const HoldingsAllocationChart = ({
               outerRadius={108}
               strokeWidth={2}
               stroke="var(--card)"
+              shape={(props: PieSectorShapeProps) => <Sector {...props} opacity={activeIndex == null || props.index === activeIndex ? 1 : 0.3} style={TRANSITION_STYLE} />}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
             >
-              {chartData.map((entry, index) => (
-                <Cell
-                  key={entry.name}
-                  fill={entry.fill}
-                  opacity={activeIndex == null || activeIndex === index ? 1 : 0.3}
-                  style={TRANSITION_STYLE}
-                />
-              ))}
               <Label
                 content={
                   <PieCenterLabel

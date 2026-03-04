@@ -9,7 +9,7 @@ Run unittests and add new ones.
 ## Code style
 
 ### Prefer `globalThis.window` over bare `window`
-Use `typeof globalThis.window === 'undefined'` instead of `typeof window === 'undefined'`. This is consistent with how we already use `globalThis.matchMedia` and avoids direct global references.
+Use `globalThis.window === undefined` instead of `typeof window === 'undefined'`. Since `globalThis` is always defined, property access is safe and direct comparison is cleaner than `typeof`.
 
 ### No negated conditions in ternaries
 Use `x == null ? null : value` instead of `x != null ? value : null`. The linter flags negated conditions (`!=`, `!==`) in ternaries. Always put the positive/equality check first.

@@ -15,12 +15,12 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 function getSystemTheme(): ResolvedTheme {
-  if (typeof globalThis.window === 'undefined') return 'dark';
+  if (globalThis.window === undefined) return 'dark';
   return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function readPreference(): ThemePreference {
-  if (typeof globalThis.window === 'undefined') return 'system';
+  if (globalThis.window === undefined) return 'system';
   try {
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
@@ -35,17 +35,17 @@ function resolve(pref: ThemePreference): ResolvedTheme {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [preference, setPreferenceState] = useState<ThemePreference>(readPreference);
+  const [preference, setPreference] = useState<ThemePreference>(readPreference);
   const [resolved, setResolved] = useState<ResolvedTheme>(() => resolve(preference));
 
-  const setPreference = useCallback((p: ThemePreference) => {
-    setPreferenceState(p);
+  const persistAndSetPreference = useCallback((p: ThemePreference) => {
+    setPreference(p);
     try {
       localStorage.setItem('theme', p);
     } catch {
       // localStorage unavailable
     }
-  }, []);
+  }, [setPreference]);
 
   // Re-resolve when preference changes
   useEffect(() => {
@@ -54,7 +54,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Listen for OS theme changes when preference is "system"
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined' || preference !== 'system') return;
+    if (globalThis.window === undefined || preference !== 'system') return;
     const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => setResolved(mq.matches ? 'dark' : 'light');
     mq.addEventListener('change', handler);
@@ -63,17 +63,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Apply to document
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     document.documentElement.classList.toggle('dark', resolved === 'dark');
   }, [resolved]);
 
   const toggleTheme = useCallback(() => {
-    setPreference(resolved === 'light' ? 'dark' : 'light');
-  }, [resolved, setPreference]);
+    persistAndSetPreference(resolved === 'light' ? 'dark' : 'light');
+  }, [resolved, persistAndSetPreference]);
 
   const value = useMemo(
-    () => ({ preference, theme: resolved, setPreference, toggleTheme }),
-    [preference, resolved, setPreference, toggleTheme]
+    () => ({ preference, theme: resolved, setPreference: persistAndSetPreference, toggleTheme }),
+    [preference, resolved, persistAndSetPreference, toggleTheme]
   );
 
   return (

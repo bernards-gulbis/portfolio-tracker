@@ -140,7 +140,7 @@ const getValueHeaderInfo = (
   if (value == null) return EMPTY_VALUE_HEADER;
 
   const formatted = formatCurrency(value, currency, locale);
-  const principalDisplay = point.principal != null ? formatCurrency(point.principal, currency, locale) : null;
+  const principalDisplay = point.principal == null ? null : formatCurrency(point.principal, currency, locale);
   const base = isAllTime ? point.principal : first.currentValue;
   if (base == null) return { ...EMPTY_VALUE_HEADER, displayValue: formatted, principalDisplay };
 
@@ -162,7 +162,7 @@ const getPctHeaderInfo = (point: ChartDataPoint): PctHeaderInfo => {
   return {
     mode: 'pct',
     displayValue: formatPctDisplay(pct),
-    sp500Display: sp500Pct != null ? formatPctDisplay(sp500Pct) : null,
+    sp500Display: sp500Pct == null ? null : formatPctDisplay(sp500Pct),
     isPositive: pct >= 0,
   };
 };
@@ -303,7 +303,7 @@ export const PerformanceChart = ({
   const headerInfo = useMemo(() => {
     if (chartData.length === 0) return null;
     const first = chartData[0];
-    const displayPoint = activeIndex != null ? chartData[activeIndex] : chartData[chartData.length - 1];
+    const displayPoint = activeIndex == null ? chartData[chartData.length - 1] : chartData[activeIndex];
     if (!displayPoint) return null;
 
     const values = getHeaderValues(displayPoint, first, viewMode, currency, locale, timePeriod === 'all');

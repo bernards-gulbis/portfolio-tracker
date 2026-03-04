@@ -46,7 +46,7 @@ function ChartContainer({
   >["children"]
 }) {
   const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const chartId = `chart-${id || uniqueId.replaceAll(":", "")}`
   const contextValue = React.useMemo(() => ({ config }), [config])
 
   return (
@@ -138,7 +138,7 @@ function ChartTooltipContent({
     const itemConfig = getPayloadConfigFromPayload(config, item, key)
     const value =
       !labelKey && typeof label === "string"
-        ? config[label as keyof typeof config]?.label || label
+        ? config[label]?.label || label
         : itemConfig?.label
 
     if (labelFormatter) {
@@ -177,7 +177,7 @@ function ChartTooltipContent({
         className
       )}
     >
-      {!nestLabel ? tooltipLabel : null}
+      {nestLabel ? null : tooltipLabel}
       <div className="grid gap-1.5">
         {payload
           .filter((item: RechartsPrimitive.TooltipPayloadEntry<ValueType, NameType>) => item.type !== "none")
@@ -344,7 +344,7 @@ function getPayloadConfigFromPayload(
 
   return configLabelKey in config
     ? config[configLabelKey]
-    : config[key as keyof typeof config]
+    : config[key]
 }
 
 export {

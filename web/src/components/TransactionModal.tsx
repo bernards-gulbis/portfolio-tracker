@@ -422,8 +422,8 @@ const TickerCombobox = ({ value, holdings, editTicker, invalid, placeholder, noH
               ))}
               {showEditFallback && (
                 <CommandItem
-                  value={editTicker!}
-                  onSelect={() => selectHolding(editTicker!)}
+                  value={editTicker}
+                  onSelect={() => selectHolding(editTicker)}
                 >
                   <Check className={`h-4 w-4 ${value === editTicker ? 'opacity-100' : 'opacity-0'}`} />
                   {editTicker}
@@ -673,10 +673,10 @@ export const TransactionModal = ({
                           field.onChange(value);
                           if (isSell) {
                             const livePrice = livePrices?.prices[value];
-                            if (livePrice != null) {
-                              form.setValue('pricePerShare', livePrice.toFixed(2));
-                            } else {
+                            if (livePrice == null) {
                               form.setValue('pricePerShare', '');
+                            } else {
+                              form.setValue('pricePerShare', livePrice.toFixed(2));
                             }
                           }
                         }}

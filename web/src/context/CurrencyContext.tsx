@@ -21,18 +21,18 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 export const CurrencyProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [currency, setCurrencyState] = useState<Currency>(readPreference);
+  const [currency, setCurrency] = useState<Currency>(readPreference);
 
-  const setCurrency = useCallback((c: Currency) => {
-    setCurrencyState(c);
+  const persistAndSetCurrency = useCallback((c: Currency) => {
+    setCurrency(c);
     try {
       localStorage.setItem(STORAGE_KEY, c);
     } catch {
       // localStorage unavailable
     }
-  }, []);
+  }, [setCurrency]);
 
-  const value = useMemo(() => ({ currency, setCurrency }), [currency, setCurrency]);
+  const value = useMemo(() => ({ currency, setCurrency: persistAndSetCurrency }), [currency, persistAndSetCurrency]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 };

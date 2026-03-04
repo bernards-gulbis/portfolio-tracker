@@ -75,9 +75,9 @@ const PortfolioStatusContent = ({
       status.capital_gains_tax_rate * 100
     ), [locale, status.capital_gains_tax_rate]);
   const liveLastPoint = useMemo(
-    () => status.current_value != null
-      ? { currentValue: status.current_value, fxRate: status.usd_to_eur_rate }
-      : undefined,
+    () => status.current_value == null
+      ? undefined
+      : { currentValue: status.current_value, fxRate: status.usd_to_eur_rate },
     [status.current_value, status.usd_to_eur_rate],
   );
 
@@ -349,8 +349,7 @@ export const PortfolioStatusView = () => {
   const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (
-    <>
-      <div className="mb-6 space-y-6">
+    <div className="mb-6 space-y-6">
         <Card>
           <PortfolioStatusContent
             status={effectiveStatus}
@@ -387,8 +386,6 @@ export const PortfolioStatusView = () => {
             }
           />
         </Card>
-      </div>
-
-    </>
+    </div>
   );
 };
