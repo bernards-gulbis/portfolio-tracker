@@ -4,9 +4,9 @@ import { useTransactions } from '../hooks/useTransactions';
 import { useDebounce } from '../hooks/useDebounce';
 import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
-import TransactionTable from './TransactionTable';
-import ImportCSVModal from './UploadCSVModal';
-import TransactionModal from './TransactionModal';
+import { TransactionTable } from './TransactionTable';
+import { ImportCSVModal } from './ImportCSVModal';
+import { TransactionModal } from './TransactionModal';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Plus, MoreVertical, UploadIcon, DownloadIcon } from 'lucide-react';
 
-const TransactionView = () => {
+export const TransactionView = () => {
   const { t } = useTranslation();
   const activePortfolioId = useActivePortfolioId();
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,7 +102,7 @@ const TransactionView = () => {
   if (!activePortfolioId) {
     return (
       <Card>
-        <CardContent className="py-12">
+        <CardContent className="py-8">
           <div className="text-center text-muted-foreground">
             <h2 className="text-lg font-medium mb-1">{t('transaction.view.noPortfolio.title')}</h2>
             <p className="text-sm">{t('transaction.view.noPortfolio.description')}</p>
@@ -116,7 +116,7 @@ const TransactionView = () => {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-normal">{t('transaction.view.title')}</CardTitle>
+          <CardTitle>{t('transaction.view.title')}</CardTitle>
         </CardHeader>
         <Separator />
         <CardContent className="pt-4">
@@ -135,7 +135,7 @@ const TransactionView = () => {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-normal">{t('transaction.view.title')}</CardTitle>
+          <CardTitle>{t('transaction.view.title')}</CardTitle>
         </CardHeader>
         <Separator />
         <CardContent className="py-8">
@@ -148,7 +148,7 @@ const TransactionView = () => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-normal">{t('transaction.view.title')}</CardTitle>
+        <CardTitle>{t('transaction.view.title')}</CardTitle>
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={handleAddTransaction}>
             <Plus className="h-4 w-4 mr-1" />
@@ -222,4 +222,3 @@ const TransactionView = () => {
   );
 };
 
-export default TransactionView;

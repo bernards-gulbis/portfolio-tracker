@@ -1,4 +1,4 @@
-import { memo, type ComponentProps, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ComposedChart,
   Area,
@@ -7,22 +7,21 @@ import {
   YAxis,
   CartesianGrid,
   ReferenceLine,
+  Tooltip,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, toLocalDateStr } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
   type ChartConfig,
 } from '@/components/ui/chart';
 import type { PerformanceDataPoint } from '../api';
+import type { Currency } from '../hooks/useCurrencyPreference';
+import { computeBaseFactor, rebasePct } from '../utils/performanceCalc';
 
 type TimePeriod = '1month' | '3month' | '6month' | 'ytd' | '1year' | 'all';
 
@@ -32,15 +31,21 @@ interface LiveLastPoint {
   currentValue: number;
   /** Live USD→EUR rate (from status response). Used to compute EUR current value. */
   fxRate: number | null;
-  /** Raw (non-rebased) return % for live last point. */
-  returnPct: number | null;
 }
 
 interface PerformanceChartProps {
   data: PerformanceDataPoint[];
-  loading?: boolean;
-  currency?: 'EUR' | 'USD';
+  isLoading?: boolean;
+  currency?: Currency;
   liveLastPoint?: LiveLastPoint;
+}
+
+interface ChartDataPoint {
+  date: string;
+  principal: number | null;
+  currentValue: number | null;
+  returnPct: number | null;
+  sp500ReturnPct: number | null;
 }
 
 /** Parse a YYYY-MM-DD string as a local date (avoids UTC shift in negative-offset timezones). */
@@ -50,7 +55,7 @@ const parseYMD = (value: string): Date => {
 };
 
 /** Compact currency label for YAxis (e.g. €1.5M, €10k or $1.5M, $10k). */
-const formatCompactValue = (value: number, currency: 'EUR' | 'USD'): string => {
+const formatCompactValue = (value: number, currency: Currency): string => {
   const symbol = currency === 'EUR' ? '€' : '$';
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `${symbol}${(value / 1_000_000).toFixed(1)}M`;
@@ -92,90 +97,107 @@ const getCutoffDate = (period: TimePeriod): string | null => {
       cutoff = subtractMonths(now, 12);
       break;
   }
-  return cutoff.toISOString().split('T')[0];
+  return toLocalDateStr(cutoff);
 };
 
-const PerformanceTooltipItem = memo(({
-  value,
-  name,
-  color,
-  chartConfig,
-  locale,
-  currency,
-  notAvailableLabel,
-}: {
-  value: number | string;
-  name: string;
-  color: string;
-  chartConfig: ChartConfig;
-  locale: string;
-  currency: 'EUR' | 'USD';
-  notAvailableLabel: string;
-}) => {
-  let formatted: string;
-  if (value == null) {
-    formatted = notAvailableLabel;
-  } else if (name === 'returnPct' || name === 'sp500ReturnPct') {
-    formatted = `${(value as number).toFixed(2)}%`;
+/** Header display values for value mode. */
+interface ValueHeaderInfo {
+  mode: 'value';
+  displayValue: string;
+  principalDisplay: string | null;
+  changeDisplay: string | null;
+  pctDisplay: string;
+  isPositive: boolean;
+}
+
+/** Header display values for percentage mode. */
+interface PctHeaderInfo {
+  mode: 'pct';
+  displayValue: string;
+  sp500Display: string | null;
+  isPositive: boolean;
+}
+
+type HeaderInfo = ValueHeaderInfo | PctHeaderInfo;
+
+/** Compute the header display values.
+ *  Uses the TWR return_pct (rebased) for the percentage — avoids division by near-zero principal.
+ *  Absolute change: "all" period uses value − principal; shorter periods use value − first value. */
+const getHeaderValues = (
+  point: ChartDataPoint,
+  first: ChartDataPoint,
+  viewMode: ViewMode,
+  currency: Currency,
+  locale: string,
+  isAllTime: boolean,
+): HeaderInfo => {
+  if (viewMode === 'value') {
+    const value = point.currentValue;
+    const principal = point.principal;
+    if (value == null) return { mode: 'value', displayValue: '-', principalDisplay: null, changeDisplay: null, pctDisplay: '', isPositive: true };
+    const formatted = formatCurrency(value, currency, locale);
+    const principalDisplay = principal != null ? formatCurrency(principal, currency, locale) : null;
+    const base = isAllTime ? principal : first.currentValue;
+    if (base == null) return { mode: 'value', displayValue: formatted, principalDisplay, changeDisplay: null, pctDisplay: '', isPositive: true };
+    const diff = value - base;
+    const twrPct = point.returnPct;
+    return {
+      mode: 'value',
+      displayValue: formatted,
+      principalDisplay,
+      changeDisplay: formatSignedCurrency(diff, currency, locale),
+      pctDisplay: formatSignedPercent(twrPct),
+      isPositive: diff >= 0,
+    };
   } else {
-    formatted = formatCurrency(value as number, currency, locale);
+    const pct = point.returnPct;
+    const sp500Pct = point.sp500ReturnPct;
+    if (pct == null) return { mode: 'pct', displayValue: '-', sp500Display: null, isPositive: true };
+    return {
+      mode: 'pct',
+      displayValue: `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
+      sp500Display: sp500Pct != null ? `${sp500Pct >= 0 ? '+' : ''}${sp500Pct.toFixed(2)}%` : null,
+      isPositive: pct >= 0,
+    };
   }
+};
+
+/** Vertical crosshair cursor rendered on hover. */
+const CrosshairCursor = ({ points, height }: { points?: { x: number; y: number }[]; height?: number }) => {
+  if (!points || points.length === 0) return null;
+  const { x } = points[0];
   return (
-    <>
-      <div
-        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-        style={{ backgroundColor: color }}
-      />
-      <div className="flex flex-1 justify-between items-center leading-none">
-        <span className="text-muted-foreground">
-          {chartConfig[name as keyof typeof chartConfig]?.label || name}
-        </span>
-        <span className="font-mono font-medium tabular-nums ml-2">
-          {formatted}
-        </span>
-      </div>
-    </>
+    <line
+      x1={x}
+      x2={x}
+      y1={0}
+      y2={height ?? 0}
+      stroke="var(--border)"
+      strokeWidth={1}
+      strokeDasharray="3 3"
+    />
   );
+};
+
+/** Active dot config for chart series. Primary series use r=5, secondary use r=4. */
+const makeActiveDot = (colorVar: string, primary = true) => ({
+  r: primary ? 5 : 4,
+  strokeWidth: 2,
+  stroke: 'var(--background)',
+  fill: colorVar,
 });
 
-const PerformanceTooltipContent = memo(({
-  chartConfig,
-  locale,
-  currency,
-  notAvailableLabel,
-  ...rest
-}: ComponentProps<typeof ChartTooltipContent> & {
-  chartConfig: ChartConfig;
-  locale: string;
-  currency: 'EUR' | 'USD';
-  notAvailableLabel: string;
-}) => (
-  <ChartTooltipContent
-    {...rest}
-    labelFormatter={(value) =>
-      parseYMD(value as string).toLocaleDateString(locale, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    }
-    formatter={(value, name, item) => (
-      <PerformanceTooltipItem
-        value={value as number | string}
-        name={name as string}
-        color={item.color ?? ''}
-        chartConfig={chartConfig}
-        locale={locale}
-        currency={currency}
-        notAvailableLabel={notAvailableLabel}
-      />
-    )}
-  />
-));
+// Pre-computed active dot configs — avoids creating new object references on every render.
+const ACTIVE_DOT_VALUE = makeActiveDot('var(--color-currentValue)');
+const ACTIVE_DOT_PRINCIPAL = makeActiveDot('var(--color-principal)', false);
+const ACTIVE_DOT_RETURN = makeActiveDot('var(--color-returnPct)');
+const ACTIVE_DOT_SP500 = makeActiveDot('var(--color-sp500ReturnPct)', false);
+
+const CHART_MARGIN = { left: 12, right: 12 };
 
 export const PerformanceChart = ({
   data,
-  loading,
+  isLoading,
   currency = 'EUR',
   liveLastPoint,
 }: PerformanceChartProps) => {
@@ -183,6 +205,7 @@ export const PerformanceChart = ({
   const locale = useLocale();
   const [viewMode, setViewMode] = useState<ViewMode>('value');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('1month');
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const chartConfig = useMemo(
     () =>
@@ -218,68 +241,27 @@ export const PerformanceChart = ({
     // visible point. Both series use the same FX-adjustment pattern:
     //   factor_D = (1 + return_D/100) × fx_D
     //   rebased  = factor_D / factor_0 − 1
-    // fx_inception cancels, so only per-point fx_rate values are needed.
-    const firstReturnPoint = filtered.find((p) =>
-      p.return_pct != null && (!useEurMode || p.fx_rate != null)
-    );
-    const firstReturnPct = firstReturnPoint?.return_pct ?? null;
-    const firstReturnFx = firstReturnPoint?.fx_rate ?? null;
-    const baseReturnFactor = firstReturnPct == null ? null
-      : useEurMode && firstReturnFx != null
-        ? (1 + firstReturnPct / 100) * firstReturnFx
-        : 1 + firstReturnPct / 100;
-    // S&P 500 rebasing base: in EUR mode include the FX rate at the first visible sp500 point
-    // so the benchmark also reflects EUR/USD movements. Formula derivation:
-    //   sp500_eur_D = sp500_usd_factor_D × (fx_D / fx_inception)
-    //   sp500_eur_rebased = sp500_eur_D / sp500_eur_firstVisible − 1
-    // fx_inception cancels, leaving: (sp500_usd_factor_D × fx_D) / (sp500_usd_factor_0 × fx_0) − 1
-    const firstSp500Point = filtered.find((p) =>
-      p.sp500_return_pct != null && (!useEurMode || p.fx_rate != null)
-    );
-    const firstSp500Pct = firstSp500Point?.sp500_return_pct ?? null;
-    const firstSp500Fx = firstSp500Point?.fx_rate ?? null;
-    const baseSp500Factor = firstSp500Pct == null ? null
-      : useEurMode && firstSp500Fx != null
-        ? (1 + firstSp500Pct / 100) * firstSp500Fx
-        : 1 + firstSp500Pct / 100;
+    const baseReturnFactor = computeBaseFactor(filtered, p => p.return_pct, useEurMode);
+    const baseSp500Factor = computeBaseFactor(filtered, p => p.sp500_return_pct, useEurMode);
 
     return filtered.map((point, index) => {
       const isLast = index === filtered.length - 1;
       const liveOverride = isLast ? liveLastPoint : undefined;
 
-      // Resolve the FX rate for this point: live rate for last point, historical otherwise
       const effectiveFxRate = isLast && liveOverride?.fxRate != null
         ? liveOverride.fxRate
         : point.fx_rate;
 
-      const rawReturnPct = liveOverride ? liveOverride.returnPct : point.return_pct;
+      const returnRebased = rebasePct(point.return_pct, effectiveFxRate, baseReturnFactor, useEurMode);
+      const sp500Rebased = rebasePct(point.sp500_return_pct, effectiveFxRate, baseSp500Factor, useEurMode);
 
-      let returnRebased: number | null = null;
-      if (rawReturnPct != null && baseReturnFactor != null && baseReturnFactor !== 0) {
-        const returnFactor = useEurMode && effectiveFxRate != null
-          ? (1 + rawReturnPct / 100) * effectiveFxRate
-          : (1 + rawReturnPct / 100);
-        returnRebased = (returnFactor / baseReturnFactor - 1) * 100;
-      }
-      let sp500Rebased: number | null = null;
-      if (point.sp500_return_pct != null && baseSp500Factor != null && baseSp500Factor !== 0) {
-        // In EUR mode multiply by fx_rate so the benchmark includes currency effects
-        const sp500Factor = useEurMode && effectiveFxRate != null
-          ? (1 + point.sp500_return_pct / 100) * effectiveFxRate
-          : (1 + point.sp500_return_pct / 100);
-        sp500Rebased = (sp500Factor / baseSp500Factor - 1) * 100;
-      }
-
-      // Current value: use live override for last point, otherwise historical
       const rawCurrentValue = isLast && liveOverride
         ? liveOverride.currentValue
         : point.current_value;
-      // Convert to EUR using the effective FX rate when currency is EUR
       const currentValue = useEurMode && effectiveFxRate != null
         ? (rawCurrentValue != null ? rawCurrentValue * effectiveFxRate : null)
         : rawCurrentValue;
 
-      // Principal in selected currency — EUR uses historical-rate value from backend
       const principal = useEurMode
         ? (point.principal_eur ?? null)
         : point.principal;
@@ -294,7 +276,39 @@ export const PerformanceChart = ({
     });
   }, [data, timePeriod, currency, liveLastPoint]);
 
-  if (loading) {
+  // Header display: show hovered point or latest point
+  const headerInfo = useMemo(() => {
+    if (chartData.length === 0) return null;
+    const first = chartData[0];
+    const displayPoint = activeIndex != null ? chartData[activeIndex] : chartData[chartData.length - 1];
+    if (!displayPoint) return null;
+
+    const values = getHeaderValues(displayPoint, first, viewMode, currency, locale, timePeriod === 'all');
+    const dateStr = parseYMD(displayPoint.date).toLocaleDateString(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    return { ...values, date: dateStr, isHovering: activeIndex != null };
+  }, [chartData, activeIndex, viewMode, currency, locale, timePeriod]);
+
+  const xAxisTickFormatter = useCallback(
+    (value: string) => parseYMD(value).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+    [locale],
+  );
+
+  const handleMouseMove = useCallback((state: { activeTooltipIndex?: number }) => {
+    if (state.activeTooltipIndex != null) {
+      setActiveIndex(state.activeTooltipIndex);
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setActiveIndex(null);
+  }, []);
+
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
@@ -366,7 +380,47 @@ export const PerformanceChart = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('chart.performance.title')}</CardTitle>
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t('chart.performance.title')}
+            </CardTitle>
+            {headerInfo?.isHovering && (
+              <span className="text-xs text-muted-foreground">{headerInfo.date}</span>
+            )}
+          </div>
+          {headerInfo && (
+            <div>
+              <span className="text-2xl font-bold tabular-nums">
+                {headerInfo.displayValue}
+              </span>
+              {headerInfo.mode === 'value' && headerInfo.changeDisplay != null && (
+                <span className={`text-sm ml-2 ${headerInfo.isPositive ? 'text-positive' : 'text-negative'}`}>
+                  {headerInfo.changeDisplay}
+                  {headerInfo.pctDisplay && <span className="font-bold ml-1.5">{headerInfo.pctDisplay}</span>}
+                </span>
+              )}
+              {headerInfo.mode === 'value' && headerInfo.principalDisplay != null && (
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  <span
+                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    style={{ backgroundColor: 'var(--chart-2)' }}
+                  />
+                  {t('chart.performance.principal')}: {headerInfo.principalDisplay}
+                </div>
+              )}
+              {headerInfo.mode === 'pct' && headerInfo.sp500Display != null && (
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  <span
+                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    style={{ backgroundColor: 'var(--chart-4)' }}
+                  />
+                  {t('chart.performance.sp500')}: {headerInfo.sp500Display}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <CardAction>
           <div className="flex items-center gap-2">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
@@ -384,7 +438,9 @@ export const PerformanceChart = ({
           <ComposedChart
             accessibilityLayer
             data={chartData}
-            margin={{ left: 12, right: 12 }}
+            margin={CHART_MARGIN}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
           >
             <defs>
               <linearGradient id="fillPerformanceValue" x1="0" y1="0" x2="0" y2="1">
@@ -398,39 +454,24 @@ export const PerformanceChart = ({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value: string) =>
-                parseYMD(value).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-              }
+              tickFormatter={xAxisTickFormatter}
               minTickGap={50}
             />
-            {viewMode === 'value' ? (
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={4}
-                width={60}
-                tickFormatter={(v: number) => formatCompactValue(v, currency)}
-              />
-            ) : (
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={4}
-                width={50}
-                tickFormatter={(v: number) => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`}
-              />
-            )}
-            <ChartTooltip
-              content={
-                <PerformanceTooltipContent
-                  chartConfig={chartConfig}
-                  locale={locale}
-                  currency={currency}
-                  notAvailableLabel={t('common.notAvailable')}
-                />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickMargin={4}
+              width={viewMode === 'value' ? 60 : 50}
+              tickFormatter={viewMode === 'value'
+                ? (v: number) => formatCompactValue(v, currency)
+                : (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`
               }
             />
-            <ChartLegend content={<ChartLegendContent className="text-[10px] sm:text-xs" />} />
+            <Tooltip
+              content={() => null}
+              cursor={<CrosshairCursor />}
+              isAnimationActive={false}
+            />
             {viewMode === 'value' && (
               <Area
                 type="monotone"
@@ -439,6 +480,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-currentValue)"
                 strokeWidth={2}
                 dot={false}
+                activeDot={ACTIVE_DOT_VALUE}
                 connectNulls
               />
             )}
@@ -449,6 +491,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-principal)"
                 strokeWidth={1.5}
                 dot={false}
+                activeDot={ACTIVE_DOT_PRINCIPAL}
                 connectNulls
               />
             )}
@@ -462,6 +505,7 @@ export const PerformanceChart = ({
                 stroke="var(--color-returnPct)"
                 strokeWidth={2}
                 dot={false}
+                activeDot={ACTIVE_DOT_RETURN}
                 connectNulls
               />
             )}
@@ -473,6 +517,7 @@ export const PerformanceChart = ({
                 strokeWidth={1.5}
                 strokeDasharray="5 3"
                 dot={false}
+                activeDot={ACTIVE_DOT_SP500}
                 connectNulls
               />
             )}

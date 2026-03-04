@@ -1,8 +1,9 @@
 """Portfolio API routes"""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from typing import Annotated, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core import get_session
 from app.core.auth import current_active_user
@@ -13,14 +14,17 @@ from app.schemas import (
     PortfolioCopy,
     PortfolioResponse,
     PortfolioStatusResponse,
+    LivePricesResponse,
     PortfolioPerformanceResponse,
     PerformanceDataPoint,
-    AggregatedStatusRequest,
-    AggregatedSalesResponse,
 )
 
 from app.services import PortfolioService
 from app.services.price_service import PriceService
+
+logger = logging.getLogger(__name__)
+
+MAX_TICKERS = 100
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -46,58 +50,29 @@ def list_portfolios(
     return service.get_all_portfolios(user.id)
 
 
-@router.post("/aggregate/status", response_model=PortfolioStatusResponse, responses={400: {"description": "Invalid portfolio data"}})
-def get_aggregated_status(
-    body: AggregatedStatusRequest,
-    session: Annotated[Session, Depends(get_session)],
-    user: Annotated[User, Depends(current_active_user)],
+@router.get("/prices/live", response_model=LivePricesResponse)
+def get_live_prices(
+    _user: Annotated[User, Depends(current_active_user)],
+    tickers: Annotated[Optional[List[str]], Query()] = None,
 ):
-    """Get aggregated portfolio status across multiple portfolios"""
-    PriceService.clear_session_cache()
-    service = PortfolioService(session)
-    try:
-        return service.calculate_aggregated_status(body.portfolio_ids, user.id, tax_rate=user.tax_rate)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/aggregate/performance", response_model=PortfolioPerformanceResponse, responses={400: {"description": "Invalid date range"}})
-def get_aggregated_performance(
-    body: AggregatedStatusRequest,
-    session: Annotated[Session, Depends(get_session)],
-    user: Annotated[User, Depends(current_active_user)],
-    start_date: Annotated[Optional[str], Query(description="Start date in YYYY-MM-DD format")] = None,
-    end_date: Annotated[Optional[str], Query(description="End date in YYYY-MM-DD format")] = None,
-    num_points: Annotated[int, Query(ge=2, le=365, description="Number of data points to return")] = 60,
-):
-    """Get aggregated portfolio performance across multiple portfolios"""
-    service = PortfolioService(session)
-
-    start_dt = None
-    end_dt = None
-
-    try:
-        if start_date:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-        if end_date:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-
-        if start_dt and end_dt and start_dt >= end_dt:
-            raise HTTPException(status_code=400, detail="start_date must be before end_date")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
-
-    try:
-        PriceService.clear_session_cache()
-        return service.get_aggregated_performance(
-            body.portfolio_ids,
-            user_id=user.id,
-            start_date=start_dt,
-            end_date=end_dt,
-            num_points=num_points,
+    """Get current prices and FX rate without replaying transactions"""
+    tickers = tickers or []
+    if len(tickers) > MAX_TICKERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    try:
+        prices = PriceService.get_current_prices(tickers) if tickers else {}
+    except Exception as e:
+        logger.error("Error fetching live prices: %s", e, exc_info=True)
+        prices = dict.fromkeys(tickers)
+    usd_to_eur_rate = PriceService.get_usd_to_eur_rate_safe()
+    return LivePricesResponse(
+        prices=prices,
+        usd_to_eur_rate=usd_to_eur_rate,
+        timestamp=datetime.now(timezone.utc),
+    )
 
 
 @router.get("/{portfolio_id}", response_model=PortfolioResponse)
@@ -118,7 +93,6 @@ def get_portfolio_status(
     user: Annotated[User, Depends(current_active_user)],
 ):
     """Get portfolio status with holdings, cash balance, and performance metrics"""
-    PriceService.clear_session_cache()
     service = PortfolioService(session)
     try:
         return service.calculate_portfolio_status(portfolio_id, user.id, tax_rate=user.tax_rate)
@@ -224,13 +198,3 @@ def get_portfolio_performance(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{portfolio_id}/realized-sales", response_model=AggregatedSalesResponse)
-def get_portfolio_realized_sales(
-    portfolio_id: int,
-    session: Annotated[Session, Depends(get_session)],
-    user: Annotated[User, Depends(current_active_user)],
-    ticker: Annotated[Optional[str], Query(description="Filter by ticker symbol")] = None,
-):
-    """Get realized sales aggregated by ticker for a portfolio, optionally filtered by ticker"""
-    service = PortfolioService(session)
-    return service.get_aggregated_sales(portfolio_id, user.id, ticker_filter=ticker)

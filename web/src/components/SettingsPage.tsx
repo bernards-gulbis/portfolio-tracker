@@ -4,7 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api';
@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
-import { User, KeyRound, ShieldAlert, Receipt, Info } from 'lucide-react';
+import { User, KeyRound, ShieldAlert, Receipt, Info, ArrowLeft } from 'lucide-react';
 
 // ================== Schemas ==================
 
@@ -108,6 +108,10 @@ export const SettingsLayout = () => {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-4">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2">
+          <ArrowLeft className="h-4 w-4" />
+          {t('settings.backToPortfolio')}
+        </Link>
         <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
         <p className="text-muted-foreground text-sm">{t('settings.description')}</p>
       </div>

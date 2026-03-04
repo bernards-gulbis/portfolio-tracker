@@ -4,18 +4,17 @@ const lv: Translation = {
   common: {
     notAvailable: 'N/A',
   },
+  errorBoundary: {
+    title: 'Kaut kas nogāja greizi',
+    tryAgain: 'Mēģināt vēlreiz',
+  },
   app: {
-    title: 'Portfeļa izsekotājs',
-    sidebar: {
-      general: 'Vispārīgi',
-      dashboard: 'Panelis',
-      aggregate: 'Apkopojums',
-      analytics: 'Analītika',
-    },
     header: {
       toggleTheme: 'Pārslēgt motīvu',
-      switchToDark: 'Pārslēgties uz tumšo motīvu',
-      switchToLight: 'Pārslēgties uz gaišo motīvu',
+      themeLabel: 'Motīvs',
+      themeLight: 'Gaišais',
+      themeDark: 'Tumšais',
+      themeSystem: 'Sistēmas',
       userMenu: 'Lietotāja izvēlne',
       signOut: 'Izrakstīties',
     },
@@ -89,7 +88,8 @@ const lv: Translation = {
       createButton: 'Jauns portfelis',
       empty: {
         title: 'Vēl nav portfeļu',
-        description: 'Sāciet, izveidojot savu pirmo portfeli.',
+        description: 'Izmantojiet portfeļa izvēlni galvenē, lai izveidotu savu pirmo portfeli.',
+        switcherHint: 'Vēl nav portfeļu. Izveidojiet zemāk.',
         newButton: 'Jauns portfelis',
       },
       item: {
@@ -180,7 +180,7 @@ const lv: Translation = {
         title: 'Nav atbilstošu darījumu',
         description: 'Neviens darījums neatbilst filtriem.',
       },
-      showing: 'Rāda {{from}}-{{to}} no {{total}} darījumiem',
+      showing: 'Rāda {{from}}-{{to}} no {{total}}',
       columns: {
         date: 'Datums',
         type: 'Veids',
@@ -266,9 +266,11 @@ const lv: Translation = {
   status: {
     noPortfolio: 'Izvēlieties portfeli, lai skatītu tā statusu',
     noData: 'Nav pieejami statusa dati',
-    emptyPortfolio: 'Šim portfelim vēl nav darījumu. Pievienojiet pirmo darījumu vai importējiet CSV failu, lai sāktu.',
+    emptyPortfolio: 'Portfeļa kopsavilkums parādīsies, kad pievienosiet darījumus zemāk.',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
+    refreshPortfolio: 'Atjaunināt portfeli',
     fetchedAt: 'Atjaunināts {{time}}',
+    livePriceError: 'Tiešsaistes cenas īslaicīgi nav pieejamas',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
     transactionWarnings: 'Darījumu brīdinājumi',
     warnings: {
@@ -301,7 +303,6 @@ const lv: Translation = {
       toggle: 'Valūta',
       usdLabel: 'USD',
       eurLabel: 'EUR',
-      eurUnavailable: 'EUR nav pieejams — kursu neizdevās iegūt',
     },
   },
   chart: {
@@ -310,8 +311,8 @@ const lv: Translation = {
       noData: 'Nav pieejami snieguma dati',
       insufficientData: 'Nepietiekami datu punkti, lai attēlotu snieguma grafiku.',
       insufficientDataForPeriod: 'Nepietiekami datu punkti šim laika periodam. Izmēģiniet garāku periodu vai "Visi".',
-      principal: 'Pamatsumma (EUR)',
-      currentValue: 'Pašreizējā vērtība (EUR)',
+      principal: 'Pamatsumma',
+      currentValue: 'Pašreizējā vērtība',
       returnPct: 'Ienesīgums (%)',
       sp500: 'S&P 500 (%)',
     },
@@ -321,38 +322,11 @@ const lv: Translation = {
       marketValue: 'Tirgus vērtība',
     },
   },
-  aggregate: {
-    title: 'Apkopots portfelis',
-    description: 'Atlasiet portfeļus, lai skatītu kopējo turējumu un veiktspējas kopsavilkumu.',
-    selectAll: 'Atlasīt visus',
-    deselectAll: 'Noņemt atlasi',
-    noSelection: 'Atlasiet vismaz vienu portfeli, lai skatītu apkopotos datus.',
-    summary: 'Kopējais kopsavilkums',
-    selectedCount: '{{selected}} no {{total}} atlasīti',
-  },
-  analytics: {
-    title: 'Analītika',
-    realizedGains: 'Realizētie ienākumi / zaudējumi',
-    totalGainLoss: 'Kopējais realizētais I/Z',
-    avgWinRate: 'Vid. uzvaru īpatsvars',
-    avgProfitFactor: 'Vid. peļņas koeficients',
-    noSells: 'Nav atrasti pārdošanas darījumi.',
-    filterByTicker: 'Filtrēt pēc aktīva...',
-    error: 'Kļūda ielādējot realizētos darījumus: {{message}}',
-    columns: {
-      ticker: 'Aktīvs',
-      sells: '# Pārdošanas',
-      proceeds: 'Ieņēmumi',
-      costBasis: 'Izmaksu bāze',
-      gainLoss: 'Ienākums / Zaudējums',
-      winRate: 'Uzvaru īpatsvars',
-      profitFactor: 'Peļņas koeficients',
-    },
-  },
   settings: {
     menuItem: 'Iestatījumi',
     title: 'Iestatījumi',
     description: 'Pārvaldiet sava konta iestatījumus un preferences.',
+    backToPortfolio: 'Atpakaļ uz portfeli',
     profile: {
       tab: 'Profils',
       nameLabel: 'Vārds',

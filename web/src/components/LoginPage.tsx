@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { getGoogleAuthorizeUrl, getErrorMessage } from '../api';
 import { useLogin, useRegister } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
-import LanguageSwitcher from './LanguageSwitcher';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,7 +54,7 @@ const registerSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 type RegisterValues = z.infer<typeof registerSchema>;
 
-export function LoginPage() {
+export const LoginPage = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -125,7 +125,7 @@ export function LoginPage() {
           onClick={toggleTheme}
           aria-label={t('app.header.toggleTheme')}
         >
-          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
       </div>
       <Card className="w-full max-w-sm">
@@ -302,4 +302,4 @@ export function LoginPage() {
       </Card>
     </div>
   );
-}
+};

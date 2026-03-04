@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import ImportCSVModal from '../components/UploadCSVModal';
+import { ImportCSVModal } from '../components/ImportCSVModal';
 
 vi.mock('../hooks/useTransactions', () => ({
   useImportTransactionsCSV: vi.fn(),
@@ -42,7 +42,7 @@ const setFileOnInput = (input: HTMLElement, file: File) => {
   fireEvent.change(input, { target: { files: { 0: file, length: 1 } } });
 };
 
-describe('UploadCSVModal', () => {
+describe('ImportCSVModal', () => {
   const mockMutateAsync = vi.fn();
   const mockOnClose = vi.fn();
 

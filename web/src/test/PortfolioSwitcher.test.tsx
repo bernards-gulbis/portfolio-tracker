@@ -3,9 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import PortfolioSwitcher from '../components/PortfolioSwitcher';
+import { PortfolioSwitcher } from '../components/PortfolioSwitcher';
 import type { Portfolio } from '../api';
-import { SidebarProvider } from '../components/ui/sidebar';
 
 vi.mock('../hooks/usePortfolios', () => ({
   usePortfolios: vi.fn(),
@@ -31,9 +30,7 @@ const renderComponent = (activePortfolioId: number | null = null) => {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <SidebarProvider>
-          <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
-        </SidebarProvider>
+        <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -129,7 +126,7 @@ describe('PortfolioSwitcher', () => {
     const trigger = screen.getByRole('button');
     await userEvent.click(trigger);
 
-    expect(screen.getByText('Get started by creating your first portfolio.')).toBeInTheDocument();
+    expect(screen.getByText('No portfolios yet. Create one below.')).toBeInTheDocument();
   });
 
   it('shows "New Portfolio" button in dropdown', async () => {

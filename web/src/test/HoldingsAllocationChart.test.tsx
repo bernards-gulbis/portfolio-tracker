@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { HoldingsAllocationChart } from '../components/HoldingsAllocationChart';
-import type { Holding } from '../api';
+import type { PricedHolding } from '../api';
 
-const mockHoldings: Holding[] = [
+const mockHoldings: PricedHolding[] = [
   {
     ticker: 'AAPL',
     quantity: 10,
@@ -26,7 +26,7 @@ const mockHoldings: Holding[] = [
   },
 ];
 
-const mockHoldingsEur: Holding[] = [
+const mockHoldingsEur: PricedHolding[] = [
   {
     ticker: 'AAPL',
     quantity: 10,
@@ -41,20 +41,20 @@ const mockHoldingsEur: Holding[] = [
 
 describe('HoldingsAllocationChart', () => {
   it('shows skeleton while loading', () => {
-    render(<HoldingsAllocationChart holdings={[]} cash={0} loading={true} />);
+    render(<HoldingsAllocationChart holdings={[]} cash={0} isLoading={true} />);
 
     const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('shows "No allocation data available" when no holdings and no cash', () => {
-    render(<HoldingsAllocationChart holdings={[]} cash={0} loading={false} />);
+    render(<HoldingsAllocationChart holdings={[]} cash={0} isLoading={false} />);
 
     expect(screen.getByText('No allocation data available')).toBeInTheDocument();
   });
 
   it('shows "No allocation data available" when holdings have no current_value', () => {
-    const holdingsNoValue: Holding[] = [
+    const holdingsNoValue: PricedHolding[] = [
       {
         ticker: 'AAPL',
         quantity: 10,
@@ -62,15 +62,17 @@ describe('HoldingsAllocationChart', () => {
         total_cost: 1500,
         current_price: null,
         current_value: null,
+        unrealized_gain_loss: null,
+        unrealized_gain_loss_pct: null,
       },
     ];
-    render(<HoldingsAllocationChart holdings={holdingsNoValue} cash={0} loading={false} />);
+    render(<HoldingsAllocationChart holdings={holdingsNoValue} cash={0} isLoading={false} />);
 
     expect(screen.getByText('No allocation data available')).toBeInTheDocument();
   });
 
   it('renders chart container and legend items when data is provided', () => {
-    render(<HoldingsAllocationChart holdings={mockHoldings} cash={500} loading={false} />);
+    render(<HoldingsAllocationChart holdings={mockHoldings} cash={500} isLoading={false} />);
 
     expect(screen.getByText('Allocation')).toBeInTheDocument();
     expect(screen.getByText('AAPL')).toBeInTheDocument();
@@ -79,7 +81,7 @@ describe('HoldingsAllocationChart', () => {
   });
 
   it('renders only cash entry when no holdings have current_value', () => {
-    render(<HoldingsAllocationChart holdings={[]} cash={1000} loading={false} />);
+    render(<HoldingsAllocationChart holdings={[]} cash={1000} isLoading={false} />);
 
     expect(screen.getByText('CASH')).toBeInTheDocument();
   });
@@ -91,7 +93,7 @@ describe('HoldingsAllocationChart', () => {
         holdings={mockHoldingsEur}
         cash={500}
         eurRate={0.92}
-        loading={false}
+        isLoading={false}
       />
     );
 
@@ -108,7 +110,7 @@ describe('HoldingsAllocationChart', () => {
         holdings={mockHoldings}
         cash={500}
         eurRate={null}
-        loading={false}
+        isLoading={false}
       />
     );
 

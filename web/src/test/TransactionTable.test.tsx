@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TransactionTable from '../components/TransactionTable';
+import { TransactionTable } from '../components/TransactionTable';
 import { Transaction, TransactionType } from '../api';
 import { toast } from 'sonner';
 import { useDeleteTransaction } from '../hooks/useTransactions';

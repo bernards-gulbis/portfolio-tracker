@@ -25,4 +25,13 @@ i18n
 
 export const SUPPORTED_LANGUAGES = ['en', 'lv'] as const;
 export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
+
+/** Resolve the current i18n language to a validated SupportedLanguage. */
+export const getCurrentLanguage = (): SupportedLanguage => {
+  const raw = i18n.language?.split('-')[0] ?? 'en';
+  return (SUPPORTED_LANGUAGES as readonly string[]).includes(raw)
+    ? (raw as SupportedLanguage)
+    : 'en';
+};
+
 export default i18n;
