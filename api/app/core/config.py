@@ -75,13 +75,8 @@ for _name, _val in [("SECRET_KEY", SECRET_KEY), ("OAUTH_STATE_SECRET", OAUTH_STA
 
 # ── CORS ──────────────────────────────────────────────────
 
-CORS_ORIGINS: list[str] = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173",
-    ).split(",")
-]
+_cors_raw = os.getenv("CORS_ORIGINS", "")
+CORS_ORIGINS: list[str] = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 
 # ── Misc ──────────────────────────────────────────────────
 
