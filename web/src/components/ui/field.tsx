@@ -18,7 +18,7 @@ const Field = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEleme
 Field.displayName = 'Field';
 
 const FieldLabel = React.forwardRef<
-  React.ElementRef<typeof Label>,
+  React.ComponentRef<typeof Label>,
   React.ComponentPropsWithoutRef<typeof Label>
 >(({ className, ...props }, ref) => (
   <Label ref={ref} className={cn(className)} {...props} />

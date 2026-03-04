@@ -8,7 +8,7 @@ export const useLivePrices = (
   intervalMs = 60_000,
 ) => {
   const normalizedTickers = useMemo(
-    () => [...new Set(tickers)].sort(),
+    () => [...new Set(tickers)].sort((a, b) => a.localeCompare(b)),
     [tickers],
   );
 

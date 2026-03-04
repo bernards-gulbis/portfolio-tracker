@@ -50,7 +50,11 @@ def list_portfolios(
     return service.get_all_portfolios(user.id)
 
 
-@router.get("/prices/live", response_model=LivePricesResponse)
+@router.get(
+    "/prices/live",
+    response_model=LivePricesResponse,
+    responses={400: {"description": "Too many tickers requested"}},
+)
 def get_live_prices(
     _user: Annotated[User, Depends(current_active_user)],
     tickers: Annotated[Optional[List[str]], Query()] = None,

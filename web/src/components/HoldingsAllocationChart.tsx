@@ -92,14 +92,14 @@ export const HoldingsAllocationChart = ({
     const currency = useEur ? 'EUR' : 'USD';
     const data: Array<{ name: string; value: number; fill: string }> = [];
 
-    const cashValue = useEur ? cash * eurRate! : cash;
+    const cashValue = useEur ? cash * eurRate : cash;
     if (cashValue > 0) {
       data.push({ name: 'CASH', value: cashValue, fill: COLORS[0] });
     }
 
     holdings.forEach((holding) => {
       const rawValue = holding.current_value;
-      const value = useEur && rawValue != null ? rawValue * eurRate! : rawValue;
+      const value = useEur && rawValue != null ? rawValue * eurRate : rawValue;
       if (value && value > 0) {
         const index = data.length;
         data.push({ name: holding.ticker, value, fill: COLORS[index % COLORS.length] });
@@ -160,7 +160,7 @@ export const HoldingsAllocationChart = ({
     );
   }
 
-  const activeEntry = activeIndex != null ? chartData[activeIndex] : null;
+  const activeEntry = activeIndex == null ? null : chartData[activeIndex];
 
   return (
     <Card className="flex flex-col">

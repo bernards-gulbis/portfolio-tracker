@@ -59,7 +59,7 @@ const CURRENCY_OPTIONS = [
 
 const CreatePortfolioContext = createContext<(() => void) | null>(null);
 
-function CheckedItem({ checked, onClick, children }: { checked: boolean; onClick: () => void; children: ReactNode }) {
+function CheckedItem({ checked, onClick, children }: Readonly<{ checked: boolean; onClick: () => void; children: ReactNode }>) {
   return (
     <DropdownMenuItem onClick={onClick}>
       {checked ? <Check className="mr-2 h-4 w-4" /> : <span className="mr-2 w-4" />}
@@ -96,7 +96,7 @@ function AppLayout() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { data: portfolios } = usePortfolios();
   const portfolioMatch = useMatch('/portfolios/:id');
-  const matchedId = portfolioMatch?.params.id != null ? Number(portfolioMatch.params.id) : null;
+  const matchedId = portfolioMatch?.params.id == null ? null : Number(portfolioMatch.params.id);
   const activePortfolioId = Number.isFinite(matchedId) ? matchedId : null;
   // Derive the "remembered" portfolio ID from the current route and portfolio list.
   // Uses useMemo so we never need a ref or setState during render/effects.
@@ -140,11 +140,15 @@ function AppLayout() {
                 <Avatar>
                   {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? user.email} />}
                   <AvatarFallback>
-                    {user?.name
-                      ? user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-                      : user?.email
-                        ? user.email.slice(0, 2).toUpperCase()
-                        : <UserIcon className="h-4 w-4" />}
+                    {(() => {
+                      if (user?.name) {
+                        return user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                      }
+                      if (user?.email) {
+                        return user.email.slice(0, 2).toUpperCase();
+                      }
+                      return <UserIcon className="h-4 w-4" />;
+                    })()}
                   </AvatarFallback>
                 </Avatar>
               </Button>

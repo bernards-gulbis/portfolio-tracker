@@ -4,9 +4,15 @@ import '../i18n/index';
 
 // Recharts uses ResizeObserver which is not available in jsdom
 globalThis.ResizeObserver = class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  observe() {
+    // no-op stub for jsdom
+  }
+  unobserve() {
+    // no-op stub for jsdom
+  }
+  disconnect() {
+    // no-op stub for jsdom
+  }
 };
 
 // shadcn SidebarProvider uses window.matchMedia which is not available in jsdom

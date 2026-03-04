@@ -37,7 +37,7 @@ export const HoldingsTable = memo(({
 }: HoldingsTableProps) => {
   const { t } = useTranslation();
   const eurAvailable = eurMetrics !== null;
-  const cashDisplay = showEur && eurAvailable ? eurMetrics!.cashEur : cash;
+  const cashDisplay = showEur && eurAvailable ? eurMetrics.cashEur : cash;
   const currencyGainsEur = eurMetrics?.currencyGainsEur ?? null;
   const currencyGainsPct = eurMetrics?.currencyGainsPct ?? null;
 
@@ -45,7 +45,7 @@ export const HoldingsTable = memo(({
     if (!showEur || !eurAvailable) return null;
     return holdings.map((h) => ({
       holding: h,
-      eurVals: applyRateToHolding(h, eurMetrics!.rate),
+      eurVals: applyRateToHolding(h, eurMetrics.rate),
     }));
   }, [holdings, showEur, eurAvailable, eurMetrics]);
 
@@ -99,7 +99,7 @@ export const HoldingsTable = memo(({
                 {formatCurrency(cashDisplay, displayCurrency, locale)}
               </TableCell>
               <TableCell>
-                {currencyGainsEur !== null ? (
+                {currencyGainsEur === null ? '-' : (
                   <div className="flex flex-col">
                     <span className={`font-semibold ${getValueClass(currencyGainsEur)}`}>
                       {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
@@ -110,7 +110,7 @@ export const HoldingsTable = memo(({
                       </span>
                     )}
                   </div>
-                ) : '-'}
+                )}
               </TableCell>
             </TableRow>
             {(holdingsWithEur ?? holdings.map((h) => ({ holding: h, eurVals: null }))).map(({ holding, eurVals }) => (
@@ -123,24 +123,29 @@ export const HoldingsTable = memo(({
                   {holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale)}
                 </TableCell>
                 <TableCell className="font-medium">
-                  {eurVals != null
-                    ? (eurVals.currentValueEur != null ? formatCurrency(eurVals.currentValueEur, 'EUR', locale) : '-')
-                    : (holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale))}
+                  {(() => {
+                    if (eurVals == null) {
+                      return holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale);
+                    }
+                    return eurVals.currentValueEur == null ? '-' : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
+                  })()}
                 </TableCell>
                 <TableCell>
-                  {eurVals != null && eurVals.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null
-                    ? (
-                      <div className="flex flex-col">
-                        <span className={`font-semibold ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
-                          {formatSignedCurrency(eurVals.unrealizedGainLossEur, 'EUR', locale)}
-                        </span>
-                        <span className={`text-xs ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
-                          {formatSignedPercent(holding.unrealized_gain_loss_pct)}
-                        </span>
-                      </div>
-                    )
-                    : holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null
-                      ? (
+                  {(() => {
+                    if (eurVals != null && eurVals.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null) {
+                      return (
+                        <div className="flex flex-col">
+                          <span className={`font-semibold ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
+                            {formatSignedCurrency(eurVals.unrealizedGainLossEur, 'EUR', locale)}
+                          </span>
+                          <span className={`text-xs ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
+                            {formatSignedPercent(holding.unrealized_gain_loss_pct)}
+                          </span>
+                        </div>
+                      );
+                    }
+                    if (holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null) {
+                      return (
                         <div className="flex flex-col">
                           <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
                             {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
@@ -149,8 +154,10 @@ export const HoldingsTable = memo(({
                             {formatSignedPercent(holding.unrealized_gain_loss_pct)}
                           </span>
                         </div>
-                      )
-                      : '-'}
+                      );
+                    }
+                    return '-';
+                  })()}
                 </TableCell>
               </TableRow>
             ))}

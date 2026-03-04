@@ -31,8 +31,8 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
   const rate = status.usd_to_eur_rate;
   if (rate === null || rate === undefined) return null;
 
-  const currentValueEur = status.current_value != null ? status.current_value * rate : null;
-  const unrealizedGainsEur = status.unrealized_gains != null ? status.unrealized_gains * rate : null;
+  const currentValueEur = status.current_value == null ? null : status.current_value * rate;
+  const unrealizedGainsEur = status.unrealized_gains == null ? null : status.unrealized_gains * rate;
   const currencyGainsEur = status.principal * rate - status.principal_eur;
   const currencyGainsPct =
     status.principal_eur > 0 ? (currencyGainsEur / status.principal_eur) * 100 : null;
@@ -77,8 +77,8 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
 export const applyRateToHolding = (holding: PricedHolding, rate: number): HoldingEurValues => ({
   averageCostEur: holding.average_cost * rate,
   totalCostEur: holding.total_cost * rate,
-  currentPriceEur: holding.current_price != null ? holding.current_price * rate : null,
-  currentValueEur: holding.current_value != null ? holding.current_value * rate : null,
+  currentPriceEur: holding.current_price == null ? null : holding.current_price * rate,
+  currentValueEur: holding.current_value == null ? null : holding.current_value * rate,
   unrealizedGainLossEur:
-    holding.unrealized_gain_loss != null ? holding.unrealized_gain_loss * rate : null,
+    holding.unrealized_gain_loss == null ? null : holding.unrealized_gain_loss * rate,
 });

@@ -43,7 +43,7 @@ export const computePricedStatus = (
     const currentValue = price * h.quantity;
     const unrealizedGainLoss = currentValue - h.total_cost;
     const unrealizedGainLossPct =
-      h.total_cost !== 0 ? (unrealizedGainLoss / h.total_cost) * 100 : null;
+      h.total_cost === 0 ? null : (unrealizedGainLoss / h.total_cost) * 100;
 
     return {
       ...h,
@@ -68,9 +68,9 @@ export const computePricedStatus = (
     currentValue = status.cash + holdingsValue;
     unrealizedGains = holdingsValue - status.holdings_cost;
     unrealizedGainsPct =
-      status.holdings_cost !== 0
-        ? (unrealizedGains / status.holdings_cost) * 100
-        : null;
+      status.holdings_cost === 0
+        ? null
+        : (unrealizedGains / status.holdings_cost) * 100;
   }
 
   return {

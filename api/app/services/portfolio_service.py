@@ -25,6 +25,8 @@ HOLDINGS_EPSILON = Decimal('1e-6')
 
 _DEFAULT_TAX_RATE = Decimal('0.255')
 
+_ISO_DATETIME_FMT = '%Y-%m-%dT%H:%M:%S'
+
 # Shorthand for Decimal constants
 _ZERO = Decimal('0')
 _ONE = Decimal('1')
@@ -132,7 +134,7 @@ def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     if strict and state.cash < 0:
         state.warnings.append({
             'code': 'withdrawNegativeCash',
-            'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+            'date': tx.date.strftime(_ISO_DATETIME_FMT),
             'params': {'amount': str(-total), 'balance': str(state.cash)},
         })
 
@@ -158,7 +160,7 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         if strict:
             state.warnings.append({
                 'code': 'sellNotInHoldings',
-                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'date': tx.date.strftime(_ISO_DATETIME_FMT),
                 'params': {'ticker': ticker},
             })
         return
@@ -168,7 +170,7 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
             held = h['quantity']
             state.warnings.append({
                 'code': 'sellOversell',
-                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'date': tx.date.strftime(_ISO_DATETIME_FMT),
                 'params': {'ticker': ticker, 'quantity': str(quantity), 'available': str(held)},
             })
             # Partial sell: sell only what is held, with proportional total
@@ -205,7 +207,7 @@ def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
         if strict:
             state.warnings.append({
                 'code': 'invalidSplitRatio',
-                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'date': tx.date.strftime(_ISO_DATETIME_FMT),
                 'params': {'ticker': tx.ticker or '', 'ratio': str(split_ratio)},
             })
         return
@@ -241,7 +243,7 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
         if strict:
             state.warnings.append({
                 'code': 'unknownType',
-                'date': tx.date.strftime('%Y-%m-%dT%H:%M:%S'),
+                'date': tx.date.strftime(_ISO_DATETIME_FMT),
                 'params': {'type': str(tx.type)},
             })
         return

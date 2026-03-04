@@ -15,12 +15,12 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 function getSystemTheme(): ResolvedTheme {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof globalThis.window === 'undefined') return 'dark';
   return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function readPreference(): ThemePreference {
-  if (typeof window === 'undefined') return 'system';
+  if (typeof globalThis.window === 'undefined') return 'system';
   try {
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
@@ -54,7 +54,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Listen for OS theme changes when preference is "system"
   useEffect(() => {
-    if (typeof window === 'undefined' || preference !== 'system') return;
+    if (typeof globalThis.window === 'undefined' || preference !== 'system') return;
     const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => setResolved(mq.matches ? 'dark' : 'light');
     mq.addEventListener('change', handler);
@@ -63,7 +63,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Apply to document
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof globalThis.window === 'undefined') return;
     document.documentElement.classList.toggle('dark', resolved === 'dark');
   }, [resolved]);
 
