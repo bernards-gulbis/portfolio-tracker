@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
 import i18n from '../i18n/index';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { CalendarIcon, ChevronsUpDown, Check } from 'lucide-react';
 import {
   Field,
@@ -368,7 +369,6 @@ const TickerCombobox = ({ value, holdings, editTicker, invalid, placeholder, noH
     setOpen(false);
   };
 
-  const listboxId = useId();
   const searchNorm = search.trim().toUpperCase();
 
   return (
@@ -383,7 +383,6 @@ const TickerCombobox = ({ value, holdings, editTicker, invalid, placeholder, noH
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-controls={open ? listboxId : undefined}
           aria-invalid={invalid}
           className="w-full justify-between font-normal aria-invalid:border-destructive"
         >
@@ -394,64 +393,54 @@ const TickerCombobox = ({ value, holdings, editTicker, invalid, placeholder, noH
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <div className="flex items-center border-b px-3">
-          <Input
+        <Command shouldFilter={false}>
+          <CommandInput
             value={search}
-            onChange={e => setSearch(e.target.value.toUpperCase())}
+            onValueChange={v => setSearch(v.toUpperCase())}
             placeholder={placeholder}
-            className="border-0 shadow-none focus-visible:ring-0 h-9"
-            autoComplete="off"
             onKeyDown={e => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && searchNorm) {
                 e.preventDefault();
-                if (searchNorm) {
-                  selectHolding(searchNorm);
-                }
+                selectHolding(searchNorm);
               }
             }}
           />
-        </div>
-        <ul id={listboxId} role="listbox" className="max-h-48 overflow-y-auto">
-          {filtered.length === 0 && !searchNorm && !showEditFallback && (
-            <li className="px-3 py-2 text-sm text-muted-foreground" role="option" aria-disabled="true" aria-selected={false}>
-              {noHoldingsText}
-            </li>
-          )}
-          {filtered.map(h => (
-            <li
-              key={h.ticker}
-              role="option"
-              aria-selected={value === h.ticker}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-              onClick={() => selectHolding(h.ticker)}
-            >
-              <Check className={`h-4 w-4 ${value === h.ticker ? 'opacity-100' : 'opacity-0'}`} />
-              {h.ticker} ({h.quantity} shares)
-            </li>
-          ))}
-          {showEditFallback && (
-            <li
-              role="option"
-              aria-selected={value === editTicker}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-              onClick={() => selectHolding(editTicker!)}
-            >
-              <Check className={`h-4 w-4 ${value === editTicker ? 'opacity-100' : 'opacity-0'}`} />
-              {editTicker}
-            </li>
-          )}
-          {searchNorm && !holdings.some(h => h.ticker === searchNorm) && searchNorm !== editTicker && (
-            <li
-              role="option"
-              aria-selected={false}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-              onClick={() => selectHolding(searchNorm)}
-            >
-              <Check className="h-4 w-4 opacity-0" />
-              {searchNorm}
-            </li>
-          )}
-        </ul>
+          <CommandList className="max-h-48">
+            {filtered.length === 0 && !searchNorm && !showEditFallback && (
+              <CommandEmpty>{noHoldingsText}</CommandEmpty>
+            )}
+            <CommandGroup>
+              {filtered.map(h => (
+                <CommandItem
+                  key={h.ticker}
+                  value={h.ticker}
+                  onSelect={() => selectHolding(h.ticker)}
+                >
+                  <Check className={`h-4 w-4 ${value === h.ticker ? 'opacity-100' : 'opacity-0'}`} />
+                  {h.ticker} ({h.quantity} shares)
+                </CommandItem>
+              ))}
+              {showEditFallback && (
+                <CommandItem
+                  value={editTicker!}
+                  onSelect={() => selectHolding(editTicker!)}
+                >
+                  <Check className={`h-4 w-4 ${value === editTicker ? 'opacity-100' : 'opacity-0'}`} />
+                  {editTicker}
+                </CommandItem>
+              )}
+              {searchNorm && !holdings.some(h => h.ticker === searchNorm) && searchNorm !== editTicker && (
+                <CommandItem
+                  value={searchNorm}
+                  onSelect={() => selectHolding(searchNorm)}
+                >
+                  <Check className="h-4 w-4 opacity-0" />
+                  {searchNorm}
+                </CommandItem>
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
       </PopoverContent>
     </Popover>
   );

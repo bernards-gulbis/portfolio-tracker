@@ -280,8 +280,9 @@ export const PerformanceChart = ({
       const rawCurrentValue = isLast && liveOverride
         ? liveOverride.currentValue
         : point.current_value;
+      const eurConvertedValue = rawCurrentValue == null ? null : rawCurrentValue * effectiveFxRate!;
       const currentValue = useEurMode && effectiveFxRate != null
-        ? (rawCurrentValue != null ? rawCurrentValue * effectiveFxRate : null)
+        ? eurConvertedValue
         : rawCurrentValue;
 
       const principal = useEurMode

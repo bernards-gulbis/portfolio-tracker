@@ -203,12 +203,12 @@ export const HoldingsAllocationChart = ({
             </Pie>
           </PieChart>
         </ChartContainer>
-        <div className="mt-3 space-y-1.5">
+        <ul className="mt-3 space-y-1.5 list-none p-0 m-0">
           {chartData.map((entry, index) => {
             const percentage = total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0.0';
             const dimmed = activeIndex != null && activeIndex !== index;
             return (
-              <div
+              <li
                 key={entry.name}
                 className="flex items-center justify-between text-xs cursor-default"
                 style={{ opacity: dimmed ? 0.3 : 1, ...TRANSITION_STYLE }}
@@ -226,10 +226,10 @@ export const HoldingsAllocationChart = ({
                   <span className="text-muted-foreground">{formatCurrency(entry.value, currency, locale)}</span>
                   <span className="font-semibold w-12 text-right">{percentage}%</span>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </CardContent>
     </Card>
   );

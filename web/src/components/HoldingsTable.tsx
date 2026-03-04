@@ -132,7 +132,7 @@ export const HoldingsTable = memo(({
                 </TableCell>
                 <TableCell>
                   {(() => {
-                    if (eurVals != null && eurVals.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null) {
+                    if (eurVals?.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null) {
                       return (
                         <div className="flex flex-col">
                           <span className={`font-semibold ${getValueClass(eurVals.unrealizedGainLossEur)}`}>

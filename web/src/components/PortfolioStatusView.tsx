@@ -133,8 +133,8 @@ const PortfolioStatusContent = ({
           <AlertDescription>
             <p className="font-medium">{t('status.transactionWarnings')}</p>
             <ul className="list-disc pl-4 mt-1 text-sm">
-              {status.warnings.map((w: TransactionWarning, i: number) => (
-                <li key={i}>
+              {status.warnings.map((w: TransactionWarning) => (
+                <li key={`${w.code}-${w.date}`}>
                   {(t as (key: string, options?: Record<string, unknown>) => string)(`status.warnings.${w.code}`, {
                     ...w.params,
                     date: formatDateTime(w.date, locale),
@@ -247,7 +247,7 @@ export const PortfolioStatusView = () => {
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
   // Live price polling — computes priced status from transaction-derived status + live prices
-  const tickers = useMemo(() => Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])).sort(), [status?.holdings]);
+  const tickers = useMemo(() => Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])).sort((a, b) => a.localeCompare(b)), [status?.holdings]);
   const { data: livePrices, isFetching: isLivePricesFetching, dataUpdatedAt: livePricesUpdatedAt, error: livePricesError } = useLivePrices(
     tickers,
     !!status && tickers.length > 0,
