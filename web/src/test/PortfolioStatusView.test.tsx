@@ -192,7 +192,7 @@ describe('PortfolioStatusView', () => {
 
     renderComponent('/portfolios/1');
 
-    expect(screen.getByText(/no transactions yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/once you add transactions below/i)).toBeInTheDocument();
   });
 
   it('does not show empty portfolio alert when transactions exist', () => {
@@ -204,7 +204,7 @@ describe('PortfolioStatusView', () => {
 
     renderComponent('/portfolios/1');
 
-    expect(screen.queryByText(/no transactions yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/once you add transactions below/i)).not.toBeInTheDocument();
   });
 
   it('renders transaction warnings when present', () => {

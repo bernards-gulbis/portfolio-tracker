@@ -263,7 +263,7 @@ const en = {
   status: {
     noPortfolio: 'Select a portfolio to view its status',
     noData: 'No status data available',
-    emptyPortfolio: 'This portfolio has no transactions yet. Add your first transaction or import a CSV file to get started.',
+    emptyPortfolio: 'Portfolio summary will appear here once you add transactions below.',
     error: 'Error loading portfolio status: {{message}}',
     fetchedAt: 'Updated {{time}}',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
@@ -321,6 +321,7 @@ const en = {
     menuItem: 'Settings',
     title: 'Settings',
     description: 'Manage your account settings and preferences.',
+    backToPortfolio: 'Back to portfolio',
     profile: {
       tab: 'Profile',
       nameLabel: 'Name',
