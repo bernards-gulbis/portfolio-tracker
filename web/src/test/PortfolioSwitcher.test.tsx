@@ -126,7 +126,7 @@ describe('PortfolioSwitcher', () => {
     const trigger = screen.getByRole('button');
     await userEvent.click(trigger);
 
-    expect(screen.getByText('Get started by creating your first portfolio.')).toBeInTheDocument();
+    expect(screen.getByText('No portfolios yet. Create one below.')).toBeInTheDocument();
   });
 
   it('shows "New Portfolio" button in dropdown', async () => {

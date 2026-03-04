@@ -52,7 +52,7 @@ export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: Portfoli
     }
     return (
       <div className="px-2 py-1.5 text-xs text-muted-foreground">
-        {t('portfolio.list.empty.description')}
+        {t('portfolio.list.empty.switcherHint')}
       </div>
     );
   };

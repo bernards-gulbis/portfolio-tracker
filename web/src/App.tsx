@@ -33,7 +33,7 @@ import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPref
 import { CreatePortfolioModal } from './components/CreatePortfolioModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 const queryClient = new QueryClient({
@@ -228,7 +228,6 @@ function AppLayout() {
 function PortfolioRedirect() {
   const { data: portfolios, isLoading } = usePortfolios();
   const { t } = useTranslation();
-  const openCreateModal = useOpenCreateModal();
 
   if (isLoading) {
     return (
@@ -251,11 +250,6 @@ function PortfolioRedirect() {
         <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
         <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
       </EmptyHeader>
-      <EmptyContent>
-        <Button onClick={openCreateModal}>
-          {t('portfolio.list.empty.newButton')}
-        </Button>
-      </EmptyContent>
     </Empty>
   );
 }

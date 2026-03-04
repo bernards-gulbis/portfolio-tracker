@@ -310,6 +310,7 @@ export const PortfolioStatusView = () => {
     if (portfolioId == null) return;
     try {
       await deletePortfolio.mutateAsync(portfolioId);
+      await queryClient.invalidateQueries({ queryKey: ['portfolios'] });
       navigate('/', { replace: true });
     } catch (err) {
       toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(err) }));

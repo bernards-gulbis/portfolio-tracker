@@ -88,7 +88,8 @@ const lv: Translation = {
       createButton: 'Jauns portfelis',
       empty: {
         title: 'Vēl nav portfeļu',
-        description: 'Sāciet, izveidojot savu pirmo portfeli.',
+        description: 'Izmantojiet portfeļa izvēlni galvenē, lai izveidotu savu pirmo portfeli.',
+        switcherHint: 'Vēl nav portfeļu. Izveidojiet zemāk.',
         newButton: 'Jauns portfelis',
       },
       item: {

@@ -86,7 +86,8 @@ const en = {
       createButton: 'New Portfolio',
       empty: {
         title: 'No Portfolios Yet',
-        description: 'Get started by creating your first portfolio.',
+        description: 'Use the portfolio selector in the header to create your first portfolio.',
+        switcherHint: 'No portfolios yet. Create one below.',
         newButton: 'New Portfolio',
       },
       item: {
