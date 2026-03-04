@@ -16,7 +16,7 @@ from sqlalchemy import func as sa_func
 
 from app.core.config import (
     SECRET_KEY, OAUTH_STATE_SECRET, GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET, COOKIE_SECURE, FRONTEND_URL,
+    GOOGLE_CLIENT_SECRET, COOKIE_SECURE, COOKIE_SAMESITE, FRONTEND_URL,
 )
 from app.core.database import get_session
 from app.models.user import User
@@ -31,7 +31,7 @@ cookie_transport = CookieTransport(
     cookie_name="pt_auth",
     cookie_max_age=604800,  # 7 days
     cookie_httponly=True,
-    cookie_samesite="lax",
+    cookie_samesite=COOKIE_SAMESITE,
     cookie_secure=COOKIE_SECURE,
 )
 
@@ -66,7 +66,7 @@ oauth_cookie_transport = OAuthRedirectCookieTransport(
     cookie_name="pt_auth",
     cookie_max_age=604800,  # 7 days
     cookie_httponly=True,
-    cookie_samesite="lax",
+    cookie_samesite=COOKIE_SAMESITE,
     cookie_secure=COOKIE_SECURE,
 )
 

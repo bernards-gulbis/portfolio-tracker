@@ -48,6 +48,11 @@ DATABASE_ECHO: bool = _get_bool("DATABASE_ECHO")
 # ── Auth ──────────────────────────────────────────────────
 
 COOKIE_SECURE: bool = _get_bool("COOKIE_SECURE")
+COOKIE_SAMESITE: str = os.getenv("COOKIE_SAMESITE", "lax").lower()
+if COOKIE_SAMESITE not in ("lax", "strict", "none"):
+    _errors.append(f"COOKIE_SAMESITE={COOKIE_SAMESITE!r} is invalid (expected lax/strict/none)")
+if COOKIE_SAMESITE == "none" and not COOKIE_SECURE:
+    _errors.append("COOKIE_SECURE must be true when COOKIE_SAMESITE=none")
 
 _DEFAULT_SECRET = "CHANGE-ME-IN-PRODUCTION"
 SECRET_KEY: str = os.getenv("SECRET_KEY", _DEFAULT_SECRET)

@@ -17,6 +17,6 @@ Use `x == null ? null : value` instead of `x != null ? value : null`. The linter
 ## Known gotchas
 
 ### Recharts + React 19: no Fragment wrappers inside charts
-`react-is@18` (bundled with recharts) cannot detect React 19 Fragment elements (`$$typeof` changed from `Symbol(react.element)` to `Symbol(react.transitional.element)`). Recharts' `toArray` uses `isFragment` to flatten Fragments — when it fails, child components (Line, Area, etc.) inside Fragments are invisible to the chart.
+`react-is@17` (resolved by npm for recharts 3) cannot detect React 19 Fragment elements (`$$typeof` changed from `Symbol(react.element)` to `Symbol(react.transitional.element)`). Recharts' `toArray` uses `isFragment` to flatten Fragments — when it fails, child components (Line, Area, etc.) inside Fragments are invisible to the chart. Still present in recharts 3.7.0.
 
 **Do not** wrap recharts children in `<>...</>`. Use individual `{condition && <Component />}` expressions instead.

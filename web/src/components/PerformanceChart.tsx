@@ -321,9 +321,11 @@ export const PerformanceChart = ({
     [locale],
   );
 
-  const handleMouseMove = useCallback((state: { activeTooltipIndex?: number }) => {
-    if (state.activeTooltipIndex != null) {
-      setActiveIndex(state.activeTooltipIndex);
+  const handleMouseMove = useCallback((state: { activeTooltipIndex?: number | string | null }) => {
+    const idx = state.activeTooltipIndex;
+    if (idx != null) {
+      const num = typeof idx === "number" ? idx : Number(idx);
+      if (!Number.isNaN(num)) setActiveIndex(num);
     }
   }, []);
 

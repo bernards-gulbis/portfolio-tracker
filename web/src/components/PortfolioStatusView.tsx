@@ -228,8 +228,37 @@ const PortfolioStatusSkeleton = () => (
   <div className="mb-6 space-y-6">
     <Card>
       <CardContent>
-        <Skeleton className="h-4 w-24 mb-2" />
-        <Skeleton className="h-8 w-48" />
+        {/* Market Value header */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <Skeleton className="h-4 w-24 mb-2" />
+            <Skeleton className="h-9 w-48 mb-1" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+          <Skeleton className="h-5 w-32" />
+        </div>
+
+        {/* Financial Summary grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i}>
+              <Skeleton className="h-4 w-20 mb-2" />
+              <Skeleton className="h-6 w-28" />
+            </div>
+          ))}
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
+          <Skeleton className="h-[340px] w-full rounded-lg" />
+          <Skeleton className="h-[340px] w-full rounded-lg" />
+        </div>
+
+        {/* Holdings table */}
+        <Skeleton className="h-8 w-full mb-2 rounded" />
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-10 w-full mb-1 rounded" />
+        ))}
       </CardContent>
     </Card>
   </div>

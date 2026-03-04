@@ -31,7 +31,7 @@ export default defineConfig({
             return 'vendor-react';
           }
           if (pkg === '@tanstack') return 'vendor-query';
-          if (pkg === 'radix-ui' || pkg === '@radix-ui') return 'vendor-radix';
+
           if (['react-hook-form', '@hookform', 'zod', 'react-day-picker'].includes(pkg)) {
             return 'vendor-forms';
           }
