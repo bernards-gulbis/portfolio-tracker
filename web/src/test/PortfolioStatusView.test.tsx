@@ -247,6 +247,8 @@ describe('PortfolioStatusView', () => {
     // No live prices → computePricedStatus returns null price fields → dashes
     vi.mocked(useLivePrices).mockReturnValue({
       data: undefined,
+      isLoading: true,
+      isFetching: true,
       dataUpdatedAt: 0,
     } as unknown as ReturnType<typeof useLivePrices>);
 
@@ -264,8 +266,8 @@ describe('PortfolioStatusView', () => {
 
     renderComponent('/portfolios/1');
 
-    // All null monetary values should render as '-'
+    // Null monetary values (market value, dividends, tax, after-tax) render as '-'
     const dashes = screen.getAllByText('-');
-    expect(dashes.length).toBeGreaterThan(0);
+    expect(dashes.length).toBeGreaterThanOrEqual(3);
   });
 });

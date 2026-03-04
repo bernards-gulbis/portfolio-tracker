@@ -670,8 +670,8 @@ export const TransactionModal = ({
                         noHoldingsText={t('transaction.modal.fields.noHoldings')}
                         onChange={(value) => {
                           field.onChange(value);
-                          if (isSell && livePrices) {
-                            const livePrice = livePrices.prices[value];
+                          if (isSell) {
+                            const livePrice = livePrices?.prices[value];
                             if (livePrice != null) {
                               form.setValue('pricePerShare', livePrice.toFixed(2));
                             } else {
