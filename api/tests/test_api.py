@@ -2777,6 +2777,178 @@ def test_performance_delisted_no_cache(client: TestClient):
         )
 
 
+# ================== Time-Weighted Return Tests ==================
+
+def test_performance_twr_mid_period_deposit(client: TestClient):
+    """TWR should not be inflated by a mid-period deposit.
+
+    Scenario:
+      - Day 1: Deposit $10,000, buy 100 shares at $100
+      - Day 5: Deposit another $10,000 (cash only)
+      - All days: price stays at $100
+
+    Expected: return_pct ≈ 0% throughout (no price change → no return).
+    A naive return formula would show ~0% early but jump when the deposit
+    inflates the denominator. TWR chains sub-period returns and stays at 0%.
+    """
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "TWR Mid-Deposit Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Day 1: Deposit + Buy
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        }
+    )
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Buy",
+            "ticker": "FLAT",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Day 5: Another deposit (cash only, no buy)
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-05T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        }
+    )
+
+    # Mock: FLAT always $100
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0
+                    else:
+                        prices[date_str] = 100.0
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 10},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+    assert len(points) > 0
+
+    for pt in points:
+        rp = pt["return_pct"]
+        if rp is None:
+            continue
+        # TWR should be ~0% everywhere since price never changed
+        assert rp == pytest.approx(0.0, abs=0.1), (
+            f"date={pt['date']}: return_pct={rp}, expected ≈0%"
+        )
+
+
+def test_performance_twr_price_gain(client: TestClient):
+    """TWR correctly reflects pure price appreciation.
+
+    Scenario:
+      - Day 1: Deposit $10,000, buy 100 shares at $100
+      - All days after: price = $110 (10% gain)
+    """
+    portfolio_response = client.post(
+        "/portfolios/",
+        json={"name": "TWR Gain Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        }
+    )
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Buy",
+            "ticker": "GAIN",
+            "quantity": 100.0,
+            "price_per_share": 100.0,
+            "total_amount": -10000.0,
+            "fee": 0.0,
+        }
+    )
+
+    def mock_historical_prices(tickers, start_date, end_date, max_workers=5, per_ticker_start=None):
+        result = {}
+        for ticker in tickers:
+            prices = {}
+            current = start_date
+            while current <= end_date:
+                date_str = current.strftime('%Y-%m-%d')
+                if current.weekday() < 5:
+                    if ticker == 'EURUSD=X':
+                        prices[date_str] = 1.0
+                    elif date_str == '2024-01-01':
+                        prices[date_str] = 100.0
+                    else:
+                        prices[date_str] = 110.0
+                current += timedelta(days=1)
+            result[ticker] = prices
+        return result
+
+    with patch(
+        'app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers',
+        side_effect=mock_historical_prices,
+    ):
+        response = client.get(
+            f"/portfolios/{portfolio_id}/performance",
+            params={"num_points": 10},
+        )
+
+    assert response.status_code == 200
+    points = response.json()["data_points"]
+
+    # Check last few points — all should show ~10% TWR
+    for pt in points:
+        rp = pt["return_pct"]
+        if rp is None or pt["date"] <= "2024-01-01":
+            continue
+        assert rp == pytest.approx(10.0, abs=0.5), (
+            f"date={pt['date']}: return_pct={rp}, expected ≈10%"
+        )
+
+
 # ================== Tax Rate Tests ==================
 
 def test_user_default_tax_rate(session: Session):

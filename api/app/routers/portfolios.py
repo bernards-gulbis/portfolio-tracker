@@ -1,8 +1,11 @@
 """Portfolio API routes"""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from typing import Annotated, List, Optional
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 from app.core import get_session
 from app.core.auth import current_active_user
@@ -51,7 +54,11 @@ def get_live_prices(
     tickers: Annotated[List[str], Query()] = [],
 ):
     """Get current prices and FX rate without replaying transactions"""
-    prices = PriceService.get_current_prices(tickers) if tickers else {}
+    try:
+        prices = PriceService.get_current_prices(tickers) if tickers else {}
+    except Exception as e:
+        logger.error("Error fetching live prices: %s", e, exc_info=True)
+        prices = dict.fromkeys(tickers)
     usd_to_eur_rate = PriceService.get_usd_to_eur_rate_safe()
     return LivePricesResponse(
         prices=prices,

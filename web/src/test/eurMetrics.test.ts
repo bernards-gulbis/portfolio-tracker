@@ -131,6 +131,18 @@ describe('computeEurMetrics', () => {
     expect(result.cashEur).toBeCloseTo(9000 * 0.85);
   });
 
+  it('returns null unrealizedGainsEur when unrealized_gains is null', () => {
+    const status: PricedPortfolioStatus = {
+      ...baseStatus,
+      unrealized_gains: null,
+      unrealized_gains_pct: null,
+    };
+    const result = computeEurMetrics(status)!;
+    expect(result.unrealizedGainsEur).toBeNull();
+    // current_value still present, so currentValueEur should be computed
+    expect(result.currentValueEur).toBeCloseTo(10500 * 0.85);
+  });
+
   it('returns currencyGainsPct as null when principal_eur is 0', () => {
     const status = { ...baseStatus, principal_eur: 0 };
     const result = computeEurMetrics(status)!;

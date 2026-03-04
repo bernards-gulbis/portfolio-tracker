@@ -96,7 +96,6 @@ class _TxState:
     cash: Decimal = _ZERO
     principal: Decimal = _ZERO        # Net deposits - withdrawals in native currency
     principal_eur: Decimal = _ZERO    # Net deposits - withdrawals in EUR (historical rates)
-    total_deposits: Decimal = _ZERO   # Cumulative deposits only (never decremented)
     dividends: Decimal = _ZERO
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
@@ -121,7 +120,6 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.principal += total
-    state.total_deposits += total
     eur = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
     state.principal_eur += eur
 

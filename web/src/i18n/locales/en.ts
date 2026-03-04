@@ -267,6 +267,7 @@ const en = {
     emptyPortfolio: 'Portfolio summary will appear here once you add transactions below.',
     error: 'Error loading portfolio status: {{message}}',
     fetchedAt: 'Updated {{time}}',
+    livePriceError: 'Live prices temporarily unavailable',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
     transactionWarnings: 'Transaction warnings',
     warnings: {

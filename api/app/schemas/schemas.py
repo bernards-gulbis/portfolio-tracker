@@ -262,7 +262,7 @@ class PerformanceDataPoint(BaseModel):
     principal_eur: Optional[float] = None   # Cumulative net deposits in EUR at historical rates
     current_value: Optional[float] = None
     fx_rate: Optional[float] = None         # Historical USD→EUR rate at this date
-    return_pct: Optional[float] = None      # ((current_value - principal) / total_deposits) * 100
+    return_pct: Optional[float] = None      # Time-weighted return (TWR) %
     sp500_return_pct: Optional[float] = None  # S&P 500 USD return % from first data point
 
     model_config = ConfigDict(from_attributes=True)

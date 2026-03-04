@@ -39,7 +39,7 @@ const PieCenterLabel = ({ viewBox, locale, currency, activeEntry, total, totalLa
   const cy = viewBox.cy || 0;
 
   if (activeEntry) {
-    const pct = ((activeEntry.value / total) * 100).toFixed(1);
+    const pct = total > 0 ? ((activeEntry.value / total) * 100).toFixed(1) : '0.0';
     return (
       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
         <tspan x={cx} y={cy - 18} className="fill-muted-foreground text-[11px]">
@@ -70,11 +70,6 @@ const PieCenterLabel = ({ viewBox, locale, currency, activeEntry, total, totalLa
 const TRANSITION_STYLE = { transition: 'opacity 150ms ease-in-out' };
 
 const COLORS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
   'var(--chart-1)',
   'var(--chart-2)',
   'var(--chart-3)',
@@ -210,7 +205,7 @@ export const HoldingsAllocationChart = ({
         </ChartContainer>
         <div className="mt-3 space-y-1.5">
           {chartData.map((entry, index) => {
-            const percentage = ((entry.value / total) * 100).toFixed(1);
+            const percentage = total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0.0';
             const dimmed = activeIndex != null && activeIndex !== index;
             return (
               <div

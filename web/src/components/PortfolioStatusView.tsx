@@ -276,7 +276,7 @@ export const PortfolioStatusView = () => {
 
   // Live price polling — computes priced status from transaction-derived status + live prices
   const tickers = useMemo(() => status?.holdings.map((h) => h.ticker) ?? [], [status?.holdings]);
-  const { data: livePrices, dataUpdatedAt: livePricesUpdatedAt } = useLivePrices(
+  const { data: livePrices, dataUpdatedAt: livePricesUpdatedAt, error: livePricesError } = useLivePrices(
     tickers,
     !!status && tickers.length > 0,
   );
@@ -367,6 +367,12 @@ export const PortfolioStatusView = () => {
             isEmptyPortfolio={isEmptyPortfolio}
             toolbar={
               <div className="flex items-center gap-2">
+                {!isEmptyPortfolio && livePricesError && (
+                  <span className="flex items-center gap-1 text-xs text-destructive">
+                    <AlertTriangleIcon className="h-3.5 w-3.5" />
+                    {t('status.livePriceError')}
+                  </span>
+                )}
                 {!isEmptyPortfolio && latestUpdateAt > 0 && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     {t('status.fetchedAt', {
