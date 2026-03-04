@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EditPortfolioModal } from '../components/EditPortfolioModal';
@@ -117,7 +117,8 @@ describe('EditPortfolioModal', () => {
 
     const input = screen.getByLabelText('Portfolio Name');
     await userEvent.clear(input);
-    await userEvent.type(input, 'a'.repeat(256));
+    // Use fireEvent to set a long value instantly (userEvent.type is too slow for 256 chars)
+    fireEvent.change(input, { target: { value: 'a'.repeat(256) } });
 
     await userEvent.click(screen.getByRole('button', { name: 'Update Portfolio' }));
 

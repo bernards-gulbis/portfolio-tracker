@@ -1,7 +1,12 @@
 name: SonarQube Analysis
 
 on:
-  workflow_dispatch: # manual trigger only
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   tests:
