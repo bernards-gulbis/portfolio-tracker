@@ -75,7 +75,6 @@ export const useUpdateTaxRate = () => {
     onSuccess: (user) => {
       setUser(user);
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus'] });
-      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'aggregatedStatus' });
       toast.success(t('settings.toasts.taxRateUpdated'));
     },
   });

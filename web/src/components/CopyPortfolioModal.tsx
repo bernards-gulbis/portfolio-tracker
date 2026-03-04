@@ -40,7 +40,7 @@ interface CopyPortfolioModalProps {
   portfolioName: string;
 }
 
-const CopyPortfolioModal = ({
+export const CopyPortfolioModal = ({
   isOpen,
   onClose,
   portfolioId,
@@ -131,5 +131,3 @@ const CopyPortfolioModal = ({
     </Dialog>
   );
 };
-
-export default CopyPortfolioModal;

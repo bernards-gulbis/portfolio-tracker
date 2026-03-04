@@ -38,7 +38,7 @@ interface CreatePortfolioModalProps {
   onClose: () => void;
 }
 
-const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) => {
+export const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const createPortfolio = useCreatePortfolio();
@@ -120,5 +120,3 @@ const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) =>
     </Dialog>
   );
 };
-
-export default CreatePortfolioModal;

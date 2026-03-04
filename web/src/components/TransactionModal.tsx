@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { useTranslation } from 'react-i18next';
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
+import { useLivePrices } from '../hooks/useLivePrices';
 import { Transaction, TransactionType, TransactionCreate, Holding, getErrorMessage } from '../api';
 import {
   Dialog,
@@ -68,14 +69,7 @@ const schema = z
   .superRefine((data, ctx) => {
     const { type } = data;
 
-    if (
-      [
-        TransactionType.BUY,
-        TransactionType.SELL,
-        TransactionType.DIVIDEND,
-        TransactionType.SPLIT,
-      ].includes(type)
-    ) {
+    if (TICKER_TYPES.has(type)) {
       if (!data.ticker?.trim()) {
         ctx.addIssue({
           code: "custom",
@@ -85,7 +79,7 @@ const schema = z
       }
     }
 
-    if ([TransactionType.BUY, TransactionType.SELL].includes(type)) {
+    if (BUY_SELL_TYPES.has(type)) {
       if (Number.parseFloat(data.quantity || '0') <= 0) {
         ctx.addIssue({
           code: "custom",
@@ -125,10 +119,17 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
+// ─── Constants ────────────────────────────────────────────────────────────
+
+const TICKER_TYPES = new Set([TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND, TransactionType.SPLIT]);
+const BUY_SELL_TYPES = new Set([TransactionType.BUY, TransactionType.SELL]);
+const FEE_TYPES = new Set([TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND]);
+const EUR_TYPES = new Set([TransactionType.DEPOSIT, TransactionType.WITHDRAW]);
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 /** Round a numeric string to 2 decimal places on blur */
-const formatCurrency = (value: string | undefined, onChange: (v: string) => void) => {
+const roundCurrencyOnBlur = (value: string | undefined, onChange: (v: string) => void) => {
   if (!value) return;
   const n = Number.parseFloat(value);
   if (!Number.isNaN(n)) onChange(n.toFixed(2));
@@ -376,20 +377,21 @@ const TickerCombobox = ({ value, holdings, editTicker, invalid, placeholder, noH
       if (!nextOpen) setSearch('');
     }}>
       <PopoverTrigger asChild>
-        <button
+        <Button
           type="button"
           id="tx-ticker"
+          variant="outline"
           role="combobox"
           aria-expanded={open}
           aria-controls={open ? listboxId : undefined}
           aria-invalid={invalid}
-          className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-9 w-full items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+          className="w-full justify-between font-normal aria-invalid:border-destructive"
         >
           <span className={value ? '' : 'text-muted-foreground'}>
             {value || placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <div className="flex items-center border-b px-3">
@@ -464,7 +466,7 @@ interface TransactionModalProps {
   transaction?: Transaction;
 }
 
-const TransactionModal = ({
+export const TransactionModal = ({
   isOpen,
   onClose,
   portfolioId,
@@ -476,7 +478,7 @@ const TransactionModal = ({
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
   const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
-  const holdings: Holding[] = portfolioStatus?.holdings ?? [];
+  const holdings = useMemo<Holding[]>(() => portfolioStatus?.holdings ?? [], [portfolioStatus?.holdings]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -490,9 +492,13 @@ const TransactionModal = ({
   const watchedQuantity = form.watch('quantity');
   const watchedPrice = form.watch('pricePerShare');
   const watchedFee = form.watch('fee');
+  const watchedTotal = form.watch('totalAmount');
 
   const isSell = type === TransactionType.SELL;
   const isDividend = type === TransactionType.DIVIDEND;
+
+  const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
+  const { data: livePrices } = useLivePrices(tickers, tickers.length > 0 && isOpen && isSell);
   const showTickerCombobox = isSell || isDividend;
   const selectedHolding = isSell ? holdings.find(h => h.ticker === watchedTicker) : undefined;
 
@@ -502,14 +508,24 @@ const TransactionModal = ({
 
   // Auto-calculate totalAmount for BUY/SELL
   useEffect(() => {
-    if (![TransactionType.BUY, TransactionType.SELL].includes(type)) return;
+    if (!BUY_SELL_TYPES.has(type)) return;
     const qty = Number.parseFloat(watchedQuantity || '0');
     const price = Number.parseFloat(watchedPrice || '0');
     const fee = Math.abs(Number.parseFloat(watchedFee || '0'));
     if (qty > 0 && price > 0) {
-      form.setValue('totalAmount', (qty * price + fee).toFixed(2));
+      const total = isSell ? qty * price - fee : qty * price + fee;
+      form.setValue('totalAmount', total.toFixed(2));
     }
-  }, [watchedQuantity, watchedPrice, watchedFee, type, form]);
+  }, [watchedQuantity, watchedPrice, watchedFee, type, isSell, form]);
+
+  // Auto-fill sell price when livePrices arrives after ticker was already selected
+  useEffect(() => {
+    if (!isSell || !watchedTicker || !livePrices) return;
+    const livePrice = livePrices.prices[watchedTicker];
+    if (livePrice != null && !form.getValues('pricePerShare')) {
+      form.setValue('pricePerShare', livePrice.toFixed(2));
+    }
+  }, [isSell, watchedTicker, livePrices, form]);
 
   // Auto-fill FX rate for DIVIDEND when empty
   const eurRate = portfolioStatus?.usd_to_eur_rate;
@@ -518,6 +534,18 @@ const TransactionModal = ({
       form.setValue('fxRate', eurRate.toFixed(4));
     }
   }, [isDividend, eurRate, form]);
+
+  // Auto-calculate EUR amount for DEPOSIT/WITHDRAW when totalAmount changes
+  const showValueEur = EUR_TYPES.has(type);
+  useEffect(() => {
+    if (!showValueEur || eurRate == null) return;
+    const total = Number.parseFloat(watchedTotal || '0');
+    if (total > 0) {
+      form.setValue('valueEur', (total * eurRate).toFixed(2));
+    } else {
+      form.setValue('valueEur', '');
+    }
+  }, [watchedTotal, eurRate, showValueEur, form]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -540,17 +568,11 @@ const TransactionModal = ({
 
   const isPending = createTransaction.isPending || updateTransaction.isPending;
 
-  const showTicker = [
-    TransactionType.BUY,
-    TransactionType.SELL,
-    TransactionType.DIVIDEND,
-    TransactionType.SPLIT,
-  ].includes(type);
-  const showQuantity = [TransactionType.BUY, TransactionType.SELL].includes(type);
-  const showPricePerShare = [TransactionType.BUY, TransactionType.SELL].includes(type);
-  const showFee = [TransactionType.BUY, TransactionType.SELL, TransactionType.DIVIDEND].includes(type);
+  const showTicker = TICKER_TYPES.has(type);
+  const showQuantity = BUY_SELL_TYPES.has(type);
+  const showPricePerShare = BUY_SELL_TYPES.has(type);
+  const showFee = FEE_TYPES.has(type);
   const showTotalAmount = type !== TransactionType.SPLIT;
-  const showValueEur = [TransactionType.DEPOSIT, TransactionType.WITHDRAW].includes(type);
   const showSplitRatio = type === TransactionType.SPLIT;
   const showFxRate = type === TransactionType.DIVIDEND;
 
@@ -661,9 +683,11 @@ const TransactionModal = ({
                         onChange={(value) => {
                           field.onChange(value);
                           if (isSell) {
-                            const holding = holdings.find(h => h.ticker === value);
-                            if (holding?.current_price != null) {
-                              form.setValue('pricePerShare', holding.current_price.toFixed(2));
+                            const livePrice = livePrices?.prices[value];
+                            if (livePrice != null) {
+                              form.setValue('pricePerShare', livePrice.toFixed(2));
+                            } else {
+                              form.setValue('pricePerShare', '');
                             }
                           }
                         }}
@@ -759,7 +783,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -788,7 +812,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -818,7 +842,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                     </InputGroup>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -847,7 +871,7 @@ const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
-                        onBlur={() => formatCurrency(field.value, field.onChange)}
+                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                       <InputGroupAddon align="inline-end">
                         <InputGroupText>EUR</InputGroupText>
@@ -930,4 +954,3 @@ const TransactionModal = ({
   );
 };
 
-export default TransactionModal;

@@ -201,7 +201,7 @@ describe('useCopyPortfolio', () => {
 
     await result.current.mutateAsync({ portfolioId: 1, newName: 'Copy' });
 
-    expect(api.copyPortfolio).toHaveBeenCalledWith(1, 'Copy');
+    expect(api.copyPortfolio).toHaveBeenCalledWith(1, { new_name: 'Copy' });
   });
 
   it('shows success toast with the copied portfolio name', async () => {

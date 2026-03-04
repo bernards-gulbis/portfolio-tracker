@@ -4,13 +4,13 @@ Service for fetching current stock prices
 import logging
 from typing import Dict, Optional, Tuple, List
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock, Semaphore
 from sqlmodel import Session, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from app.core.config import PRICE_CACHE_TTL_MINUTES
+from app.core.config import PRICE_CACHE_TTL_SECONDS
 from app.core.database import engine, is_postgresql
 from app.models.historical_price import HistoricalPrice, FxRate
 
@@ -22,7 +22,7 @@ class PriceService:
     
     # Class-level cache: ticker -> (price, timestamp)
     _price_cache: Dict[str, Tuple[Optional[float], datetime]] = {}
-    _cache_ttl: timedelta = timedelta(minutes=PRICE_CACHE_TTL_MINUTES)
+    _cache_ttl: timedelta = timedelta(seconds=PRICE_CACHE_TTL_SECONDS)
     _cache_lock = Lock()  # Thread-safe cache access
     _yahoo_semaphore = Semaphore(5)  # Max 5 concurrent outgoing Yahoo Finance requests
     
@@ -296,12 +296,24 @@ class PriceService:
         return None
 
     @classmethod
+    def get_usd_to_eur_rate_safe(cls) -> Optional[float]:
+        """Like get_usd_to_eur_rate but returns None on any exception."""
+        try:
+            return cls.get_usd_to_eur_rate()
+        except requests.exceptions.RequestException as e:
+            logger.warning("Network error fetching USD/EUR rate: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error fetching USD/EUR rate: %s", e, exc_info=True)
+            return None
+
+    @classmethod
     def _determine_fetch_ranges(
         cls,
         cached_prices: Dict[str, float],
         start_date: datetime,
         end_date: datetime,
-        yesterday,
+        yesterday: date,
     ) -> List[Tuple[datetime, datetime]]:
         """Compute date ranges that need to be fetched from the API given cached data."""
         if not cached_prices:

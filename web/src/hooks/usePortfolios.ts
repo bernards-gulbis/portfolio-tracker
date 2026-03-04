@@ -71,10 +71,11 @@ export const useCopyPortfolio = () => {
 
   return useMutation({
     mutationFn: ({ portfolioId, newName }: { portfolioId: number; newName: string }) =>
-      copyPortfolio(portfolioId, newName),
+      copyPortfolio(portfolioId, { new_name: newName }),
     onSuccess: (portfolio) => {
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });
       toast.success(t('portfolio.toasts.copied', { name: portfolio.name }));
     },
   });
 };
+

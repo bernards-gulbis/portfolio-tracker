@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { computeEurMetrics, applyRateToHolding } from '../utils/eurMetrics';
-import type { PortfolioStatus, Holding } from '../api';
+import type { PricedPortfolioStatus, PricedHolding } from '../api';
 
-const baseStatus: PortfolioStatus = {
+const baseStatus: PricedPortfolioStatus = {
   portfolio_id: 1,
   portfolio_name: 'Test',
   current_value: 10500,
@@ -59,7 +59,7 @@ describe('computeEurMetrics', () => {
   });
 
   it('computes tax with positive capital gains', () => {
-    const status: PortfolioStatus = {
+    const status: PricedPortfolioStatus = {
       ...baseStatus,
       current_value: 20000,
       principal: 10000,
@@ -81,7 +81,7 @@ describe('computeEurMetrics', () => {
   });
 
   it('excludes dividends from capital gains', () => {
-    const status: PortfolioStatus = {
+    const status: PricedPortfolioStatus = {
       ...baseStatus,
       current_value: 17000,
       principal: 10000,
@@ -99,7 +99,7 @@ describe('computeEurMetrics', () => {
   });
 
   it('skips tax when dividends exist but dividends_eur is null', () => {
-    const status: PortfolioStatus = {
+    const status: PricedPortfolioStatus = {
       ...baseStatus,
       dividends: 1000,
       dividends_eur: null,
@@ -109,6 +109,38 @@ describe('computeEurMetrics', () => {
     expect(result.taxEur).toBeNull();
     expect(result.totalReturnAfterTaxEur).toBeNull();
     expect(result.currentValueAfterTaxEur).toBeNull();
+  });
+
+  it('skips tax when current_value is null (prices not loaded)', () => {
+    const status: PricedPortfolioStatus = {
+      ...baseStatus,
+      current_value: null,
+      holdings_value: null,
+      unrealized_gains: null,
+      unrealized_gains_pct: null,
+    };
+    const result = computeEurMetrics(status)!;
+    expect(result.currentValueEur).toBeNull();
+    expect(result.unrealizedGainsEur).toBeNull();
+    expect(result.capitalGainsEur).toBeNull();
+    expect(result.taxEur).toBeNull();
+    expect(result.totalReturnAfterTaxEur).toBeNull();
+    expect(result.currentValueAfterTaxEur).toBeNull();
+    // Non-price-dependent fields still computed
+    expect(result.currencyGainsEur).toBeCloseTo(-500);
+    expect(result.cashEur).toBeCloseTo(9000 * 0.85);
+  });
+
+  it('returns null unrealizedGainsEur when unrealized_gains is null', () => {
+    const status: PricedPortfolioStatus = {
+      ...baseStatus,
+      unrealized_gains: null,
+      unrealized_gains_pct: null,
+    };
+    const result = computeEurMetrics(status)!;
+    expect(result.unrealizedGainsEur).toBeNull();
+    // current_value still present, so currentValueEur should be computed
+    expect(result.currentValueEur).toBeCloseTo(10500 * 0.85);
   });
 
   it('returns currencyGainsPct as null when principal_eur is 0', () => {
@@ -122,14 +154,15 @@ describe('computeEurMetrics', () => {
     expect(result.cashEur).toBeCloseTo(9000 * 0.85);
   });
 
-  it('sets available=true when rate is present', () => {
-    const result = computeEurMetrics(baseStatus)!;
-    expect(result.available).toBe(true);
+  it('returns non-null result when rate is present', () => {
+    const result = computeEurMetrics(baseStatus);
+    expect(result).not.toBeNull();
+    expect(result!.rate).toBe(0.85);
   });
 });
 
 describe('applyRateToHolding', () => {
-  const holding: Holding = {
+  const holding: PricedHolding = {
     ticker: 'AAPL',
     quantity: 10,
     average_cost: 150,
@@ -142,23 +175,23 @@ describe('applyRateToHolding', () => {
 
   it('converts all fields correctly', () => {
     const result = applyRateToHolding(holding, 0.92);
-    expect(result.average_cost_eur).toBeCloseTo(150 * 0.92);
-    expect(result.total_cost_eur).toBeCloseTo(1500 * 0.92);
-    expect(result.current_price_eur).toBeCloseTo(200 * 0.92);
-    expect(result.current_value_eur).toBeCloseTo(2000 * 0.92);
-    expect(result.unrealized_gain_loss_eur).toBeCloseTo(500 * 0.92);
+    expect(result.averageCostEur).toBeCloseTo(150 * 0.92);
+    expect(result.totalCostEur).toBeCloseTo(1500 * 0.92);
+    expect(result.currentPriceEur).toBeCloseTo(200 * 0.92);
+    expect(result.currentValueEur).toBeCloseTo(2000 * 0.92);
+    expect(result.unrealizedGainLossEur).toBeCloseTo(500 * 0.92);
   });
 
   it('returns null for optional fields when source is null', () => {
-    const holdingNoPrice: Holding = {
+    const holdingNoPrice: PricedHolding = {
       ...holding,
       current_price: null,
       current_value: null,
       unrealized_gain_loss: null,
     };
     const result = applyRateToHolding(holdingNoPrice, 0.92);
-    expect(result.current_price_eur).toBeNull();
-    expect(result.current_value_eur).toBeNull();
-    expect(result.unrealized_gain_loss_eur).toBeNull();
+    expect(result.currentPriceEur).toBeNull();
+    expect(result.currentValueEur).toBeNull();
+    expect(result.unrealizedGainLossEur).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, TransactionType, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
-import { formatCurrency, formatDate, formatDateCompact } from '../utils/formatters';
+import { formatCurrency, formatDateTime, formatDateCompact } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { MAX_VISIBLE_PAGES } from '../constants/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -75,7 +75,7 @@ interface TransactionTableProps {
 }
 
 
-const TransactionTable = ({
+export const TransactionTable = ({
   transactions,
   portfolioId,
   onEdit,
@@ -187,13 +187,13 @@ const TransactionTable = ({
 
   const getTypeBadgeClass = (type: TransactionType): string => {
     switch (type) {
-      case TransactionType.BUY: return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case TransactionType.SELL: return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      case TransactionType.DEPOSIT: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case TransactionType.WITHDRAW: return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case TransactionType.DIVIDEND: return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
-      case TransactionType.FEE: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-      case TransactionType.SPLIT: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case TransactionType.BUY: return 'bg-badge-buy-bg text-badge-buy-fg';
+      case TransactionType.SELL: return 'bg-badge-sell-bg text-badge-sell-fg';
+      case TransactionType.DEPOSIT: return 'bg-badge-deposit-bg text-badge-deposit-fg';
+      case TransactionType.WITHDRAW: return 'bg-badge-withdraw-bg text-badge-withdraw-fg';
+      case TransactionType.DIVIDEND: return 'bg-badge-dividend-bg text-badge-dividend-fg';
+      case TransactionType.FEE: return 'bg-badge-fee-bg text-badge-fee-fg';
+      case TransactionType.SPLIT: return 'bg-badge-split-bg text-badge-split-fg';
       default: return '';
     }
   };
@@ -300,16 +300,17 @@ const TransactionTable = ({
           <TableHeader>
             <TableRow>
               <TableHead>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 hover:text-foreground cursor-pointer"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 -ml-2 h-auto p-1"
                   onClick={() => onSortOrderChange(sortOrder === 'desc' ? 'asc' : 'desc')}
                 >
                   {t('transaction.table.columns.date')}
                   {sortOrder === 'desc'
                     ? <ArrowDownIcon className="h-3.5 w-3.5" />
                     : <ArrowUpIcon className="h-3.5 w-3.5" />}
-                </button>
+                </Button>
               </TableHead>
               <TableHead>{t('transaction.table.columns.type')}</TableHead>
               <TableHead>{t('transaction.table.columns.ticker')}</TableHead>
@@ -342,7 +343,7 @@ const TransactionTable = ({
                         size="icon"
                         className="h-8 w-8"
                         disabled={deletingId === transaction.id}
-                        aria-label={t('transaction.table.actions.label', { ticker: transaction.ticker || '-', date: formatDate(transaction.date, locale) })}
+                        aria-label={t('transaction.table.actions.label', { ticker: transaction.ticker || '-', date: formatDateTime(transaction.date, locale) })}
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
@@ -443,4 +444,3 @@ const TransactionTable = ({
   );
 };
 
-export default TransactionTable;

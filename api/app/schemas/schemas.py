@@ -64,7 +64,6 @@ class PortfolioResponse(PortfolioBase):
     """Schema for portfolio response"""
     id: int
     created_at: datetime
-    
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -214,15 +213,11 @@ class PaginatedTransactionResponse(BaseModel):
 # ================== Portfolio Status Schemas ==================
 
 class HoldingResponse(BaseModel):
-    """Schema for a single holding"""
+    """Schema for a single holding (transaction-derived only)"""
     ticker: str
     quantity: float
     average_cost: float
     total_cost: float
-    current_price: Optional[float] = None
-    current_value: Optional[float] = None
-    unrealized_gain_loss: Optional[float] = None
-    unrealized_gain_loss_pct: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -235,10 +230,9 @@ class TransactionWarning(BaseModel):
 
 
 class PortfolioStatusResponse(BaseModel):
-    """Schema for portfolio status with calculated metrics"""
+    """Schema for portfolio status (transaction-derived metrics only)"""
     portfolio_id: int
     portfolio_name: str
-    current_value: float  # Cash + Holdings current value
     principal: float  # Deposits - Withdrawals
     principal_eur: float  # Sum of all eur_amount fields (historical rates)
     dividends: float
@@ -246,16 +240,19 @@ class PortfolioStatusResponse(BaseModel):
     cash: float
     holdings: List[HoldingResponse]
     holdings_cost: float  # Sum of all holdings cost basis
-    holdings_value: float  # Sum of current market value of all holdings
-    unrealized_gains: float  # Total unrealized gains/losses
-    unrealized_gains_pct: Optional[float] = None  # Total unrealized gains/losses percentage
     realized_gains: float  # Gains/losses from sells
     capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
-    missing_prices: List[str] = Field(default_factory=list)  # Tickers for which current price could not be fetched
     warnings: List[TransactionWarning] = Field(default_factory=list)  # Transaction processing warnings
     usd_to_eur_rate: Optional[float] = None  # Live USD→EUR rate; None when unavailable
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LivePricesResponse(BaseModel):
+    """Schema for live price polling (no transaction replay)"""
+    prices: dict[str, Optional[float]]
+    usd_to_eur_rate: Optional[float] = None
+    timestamp: datetime
 
 
 class PerformanceDataPoint(BaseModel):
@@ -265,7 +262,7 @@ class PerformanceDataPoint(BaseModel):
     principal_eur: Optional[float] = None   # Cumulative net deposits in EUR at historical rates
     current_value: Optional[float] = None
     fx_rate: Optional[float] = None         # Historical USD→EUR rate at this date
-    return_pct: Optional[float] = None      # ((current_value - principal) / principal) * 100
+    return_pct: Optional[float] = None      # Time-weighted return (TWR) %
     sp500_return_pct: Optional[float] = None  # S&P 500 USD return % from first data point
 
     model_config = ConfigDict(from_attributes=True)
@@ -278,26 +275,3 @@ class PortfolioPerformanceResponse(BaseModel):
     data_points: List[PerformanceDataPoint]
 
     model_config = ConfigDict(from_attributes=True)
-
-
-# ================== Aggregated Portfolio Schemas ==================
-
-class AggregatedStatusRequest(BaseModel):
-    """Schema for requesting aggregated status across multiple portfolios"""
-    portfolio_ids: List[int] = Field(min_length=1)
-
-
-# ================== Realized Sales Schemas ==================
-
-class AggregatedSaleResponse(BaseModel):
-    """Schema for aggregated realized gain/loss per ticker"""
-    ticker: str
-    total_gain_loss: float
-    win_rate: float  # percentage of sells that resulted in a profit (0-100)
-    profit_factor: Optional[float] = None  # total_profit / abs(total_loss); None when no losing trades
-
-
-class AggregatedSalesResponse(BaseModel):
-    """Schema for aggregated realized sales grouped by ticker"""
-    sales: List[AggregatedSaleResponse]
-    total_realized_gain_loss: float

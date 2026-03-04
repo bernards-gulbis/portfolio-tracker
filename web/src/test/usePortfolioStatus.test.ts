@@ -31,7 +31,6 @@ const createWrapper = () => {
 const mockStatus: PortfolioStatus = {
   portfolio_id: 1,
   portfolio_name: 'Test Portfolio',
-  current_value: 10000,
   principal: 8000,
   principal_eur: 7360,
   dividends: 200,
@@ -39,12 +38,8 @@ const mockStatus: PortfolioStatus = {
   cash: 500,
   holdings: [],
   holdings_cost: 7500,
-  holdings_value: 9500,
-  unrealized_gains: 2000,
-  unrealized_gains_pct: 25,
   realized_gains: 0,
   capital_gains_tax_rate: 0.255,
-  missing_prices: [],
   warnings: [],
   usd_to_eur_rate: 0.92,
 };

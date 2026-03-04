@@ -2,18 +2,17 @@ const en = {
   common: {
     notAvailable: 'N/A',
   },
+  errorBoundary: {
+    title: 'Something went wrong',
+    tryAgain: 'Try again',
+  },
   app: {
-    title: 'Portfolio Tracker',
-    sidebar: {
-      general: 'General',
-      dashboard: 'Dashboard',
-      aggregate: 'Aggregate',
-      analytics: 'Analytics',
-    },
     header: {
       toggleTheme: 'Toggle theme',
-      switchToDark: 'Switch to dark mode',
-      switchToLight: 'Switch to light mode',
+      themeLabel: 'Theme',
+      themeLight: 'Light',
+      themeDark: 'Dark',
+      themeSystem: 'System',
       userMenu: 'User menu',
       signOut: 'Sign out',
     },
@@ -87,7 +86,8 @@ const en = {
       createButton: 'New Portfolio',
       empty: {
         title: 'No Portfolios Yet',
-        description: 'Get started by creating your first portfolio.',
+        description: 'Use the portfolio selector in the header to create your first portfolio.',
+        switcherHint: 'No portfolios yet. Create one below.',
         newButton: 'New Portfolio',
       },
       item: {
@@ -178,7 +178,7 @@ const en = {
         title: 'No Matching Transactions',
         description: 'No transactions match your current filters.',
       },
-      showing: 'Showing {{from}}-{{to}} of {{total}} transactions',
+      showing: 'Showing {{from}}-{{to}} of {{total}}',
       columns: {
         date: 'Date',
         type: 'Type',
@@ -264,9 +264,11 @@ const en = {
   status: {
     noPortfolio: 'Select a portfolio to view its status',
     noData: 'No status data available',
-    emptyPortfolio: 'This portfolio has no transactions yet. Add your first transaction or import a CSV file to get started.',
+    emptyPortfolio: 'Portfolio summary will appear here once you add transactions below.',
     error: 'Error loading portfolio status: {{message}}',
+    refreshPortfolio: 'Refresh portfolio',
     fetchedAt: 'Updated {{time}}',
+    livePriceError: 'Live prices temporarily unavailable',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
     transactionWarnings: 'Transaction warnings',
     warnings: {
@@ -299,7 +301,6 @@ const en = {
       toggle: 'Currency',
       usdLabel: 'USD',
       eurLabel: 'EUR',
-      eurUnavailable: 'EUR unavailable — rate could not be fetched',
     },
   },
   chart: {
@@ -308,8 +309,8 @@ const en = {
       noData: 'No performance data available',
       insufficientData: 'Not enough data points to display performance chart.',
       insufficientDataForPeriod: 'Not enough data points for this time period. Try a longer period or "All".',
-      principal: 'Principal (EUR)',
-      currentValue: 'Current Value (EUR)',
+      principal: 'Principal',
+      currentValue: 'Current Value',
       returnPct: 'Return (%)',
       sp500: 'S&P 500 (%)',
     },
@@ -319,38 +320,11 @@ const en = {
       marketValue: 'Market Value',
     },
   },
-  aggregate: {
-    title: 'Aggregated Portfolio',
-    description: 'Select portfolios to view a combined summary of holdings and performance.',
-    selectAll: 'Select All',
-    deselectAll: 'Deselect All',
-    noSelection: 'Select at least one portfolio to view aggregated data.',
-    summary: 'Combined Summary',
-    selectedCount: '{{selected}} of {{total}} selected',
-  },
-  analytics: {
-    title: 'Analytics',
-    realizedGains: 'Realized Gains / Losses',
-    totalGainLoss: 'Total Realized G/L',
-    avgWinRate: 'Avg Win Rate',
-    avgProfitFactor: 'Avg Profit Factor',
-    noSells: 'No sell transactions found.',
-    filterByTicker: 'Filter by asset...',
-    error: 'Error loading realized sales: {{message}}',
-    columns: {
-      ticker: 'Asset',
-      sells: '# Sells',
-      proceeds: 'Proceeds',
-      costBasis: 'Cost Basis',
-      gainLoss: 'Gain / Loss',
-      winRate: 'Win Rate',
-      profitFactor: 'Profit Factor',
-    },
-  },
   settings: {
     menuItem: 'Settings',
     title: 'Settings',
     description: 'Manage your account settings and preferences.',
+    backToPortfolio: 'Back to portfolio',
     profile: {
       tab: 'Profile',
       nameLabel: 'Name',
