@@ -56,14 +56,13 @@ export const formatDateTime = (date: string, locale: string = 'en-US'): string =
 };
 
 /**
- * Compact date format for tables — drops year to save space.
+ * Compact date format for tables — includes year, no time.
  */
 export const formatDateCompact = (date: string, locale: string = 'en-US'): string => {
   return new Date(date).toLocaleDateString(locale, {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   });
 };
 

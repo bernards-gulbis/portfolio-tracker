@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AlertTriangleIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
 interface HoldingsTableProps {
   holdings: PricedHolding[];
@@ -99,18 +100,33 @@ export const HoldingsTable = memo(({
                 {formatCurrency(cashDisplay, displayCurrency, locale)}
               </TableCell>
               <TableCell>
-                {currencyGainsEur === null ? '-' : (
+                {showEur && currencyGainsEur !== null ? (
                   <div className="flex flex-col">
-                    <span className={`font-semibold ${getValueClass(currencyGainsEur)}`}>
-                      {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`font-semibold ${getValueClass(currencyGainsEur)}`}>
+                        {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
+                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground cursor-help">
+                              {t('status.fx')}
+                              <InfoIcon className="h-3 w-3" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{t('status.cashFxTooltip')}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     {currencyGainsPct !== null && (
                       <span className={`text-xs ${getValueClass(currencyGainsEur)}`}>
                         {formatSignedPercent(currencyGainsPct)}
                       </span>
                     )}
                   </div>
-                )}
+                ) : '-'}
               </TableCell>
             </TableRow>
             {(holdingsWithEur ?? holdings.map((h) => ({ holding: h, eurVals: null }))).map(({ holding, eurVals }) => (

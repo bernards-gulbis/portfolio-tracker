@@ -11,6 +11,7 @@ import { formatCurrency } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import type { ViewBox } from 'recharts/types/util/types';
 import { PricedHolding } from '../api';
+import type { Currency } from '../hooks/useCurrencyPreference';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -22,6 +23,7 @@ interface HoldingsAllocationChartProps {
   holdings: PricedHolding[];
   cash: number;
   eurRate?: number | null;
+  displayCurrency?: Currency;
   isLoading?: boolean;
 }
 
@@ -87,6 +89,7 @@ export const HoldingsAllocationChart = ({
   holdings,
   cash,
   eurRate,
+  displayCurrency,
   isLoading,
 }: HoldingsAllocationChartProps) => {
   const { t } = useTranslation();
@@ -95,7 +98,7 @@ export const HoldingsAllocationChart = ({
   const shapeRenderer = useMemo(() => createShapeRenderer(activeIndex), [activeIndex]);
 
   const { chartData, total, chartConfig, currency } = useMemo(() => {
-    const useEur = eurRate != null && eurRate > 0;
+    const useEur = displayCurrency === 'EUR' && eurRate != null && eurRate > 0;
     const currency = useEur ? 'EUR' : 'USD';
     const data: Array<{ name: string; value: number; fill: string }> = [];
 
@@ -124,7 +127,7 @@ export const HoldingsAllocationChart = ({
     }, {} as ChartConfig);
 
     return { chartData: data, total, chartConfig: config, currency };
-  }, [holdings, cash, eurRate]);
+  }, [holdings, cash, eurRate, displayCurrency]);
 
   const handleMouseEnter = useCallback((_: unknown, index: number) => {
     setActiveIndex(index);
