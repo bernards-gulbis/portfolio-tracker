@@ -283,6 +283,7 @@ const en = {
     netInvested: 'Net Invested',
     netInvestedTooltip: 'Deposits minus withdrawals. EUR conversion rate changes affect gains.',
     fx: 'FX',
+    cashFxTooltip: 'FX impact: gain/loss from EUR/USD rate changes on your deposits',
     dividends: 'Dividends',
     estTax: 'Est. Tax ({{rate}}%)',
     on: 'on',

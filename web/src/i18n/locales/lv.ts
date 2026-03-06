@@ -285,6 +285,7 @@ const lv: Translation = {
     netInvested: 'Neto ieguldīts',
     netInvestedTooltip: 'Iemaksas mīnus izmaksas. EUR konvertācijas kursa izmaiņas ietekmē peļņu.',
     fx: 'Valūta',
+    cashFxTooltip: 'Valūtas ietekme: peļņa/zaudējumi no EUR/USD kursa izmaiņām uz jūsu iemaksām',
     dividends: 'Dividendes',
     estTax: 'Aplēstais nodoklis ({{rate}}%)',
     on: 'no',

@@ -1,67 +1,74 @@
 import uuid
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from datetime import datetime
-from typing import Optional, List
-from app.models import TransactionType
-from fastapi_users import schemas as fu_schemas
 
+from fastapi_users import schemas as fu_schemas
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.models import TransactionType
 
 # ================== User Schemas ==================
 
+
 class UserRead(fu_schemas.BaseUser[uuid.UUID]):
-    name: Optional[str] = None
-    picture: Optional[str] = None
+    name: str | None = None
+    picture: str | None = None
     oauth_providers: list[str] = Field(default_factory=list)
     tax_rate: float = 0.255
 
 
 class UserCreate(fu_schemas.BaseUserCreate):
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class UserUpdate(fu_schemas.BaseUserUpdate):
-    name: Optional[str] = None
-    picture: Optional[str] = None
-    tax_rate: Optional[float] = Field(None, ge=0, le=1)
+    name: str | None = None
+    picture: str | None = None
+    tax_rate: float | None = Field(None, ge=0, le=1)
 
 
 class CloseAccountRequest(BaseModel):
-    password: Optional[str] = None
-    confirmation: Optional[str] = None
+    password: str | None = None
+    confirmation: str | None = None
 
 
 # ================== Portfolio Schemas ==================
 
+
 class PortfolioBase(BaseModel):
     """Base portfolio schema"""
+
     name: str = Field(min_length=1, max_length=255)
-    
-    @field_validator('name')
+
+    @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
         """Validate portfolio name is not empty or whitespace"""
         if not v or not v.strip():
-            raise ValueError('Portfolio name cannot be empty or whitespace')
+            raise ValueError("Portfolio name cannot be empty or whitespace")
         return v.strip()
 
 
 class PortfolioCreate(PortfolioBase):
     """Schema for creating a portfolio"""
+
     pass
 
 
 class PortfolioUpdate(PortfolioBase):
     """Schema for updating a portfolio"""
+
     pass
 
 
 class PortfolioCopy(BaseModel):
     """Schema for copying a portfolio"""
+
     new_name: str
 
 
 class PortfolioResponse(PortfolioBase):
     """Schema for portfolio response"""
+
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -69,141 +76,163 @@ class PortfolioResponse(PortfolioBase):
 
 class PortfolioWithTransactions(PortfolioResponse):
     """Schema for portfolio with transactions"""
-    transactions: List["TransactionResponse"] = []
-    
+
+    transactions: list["TransactionResponse"] = []
+
     model_config = ConfigDict(from_attributes=True)
 
 
 # ================== Transaction Schemas ==================
 
+
 class TransactionBase(BaseModel):
     """Base transaction schema"""
+
     date: datetime
     type: TransactionType
-    ticker: Optional[str] = Field(None, max_length=20)
-    quantity: Optional[float] = None
-    price_per_share: Optional[float] = None
-    fee: Optional[float] = None
+    ticker: str | None = Field(None, max_length=20)
+    quantity: float | None = None
+    price_per_share: float | None = None
+    fee: float | None = None
     total_amount: float
-    eur_amount: Optional[float] = None
-    split_ratio: Optional[float] = None
-    currency: Optional[str] = Field(None, max_length=3)
-    fx_rate: Optional[float] = None
-    
-    @field_validator('ticker')
+    eur_amount: float | None = None
+    split_ratio: float | None = None
+    currency: str | None = Field(None, max_length=3)
+    fx_rate: float | None = None
+
+    @field_validator("ticker")
     @classmethod
-    def validate_ticker(cls, v: Optional[str]) -> Optional[str]:
+    def validate_ticker(cls, v: str | None) -> str | None:
         """Validate and normalize ticker symbol"""
         if v is not None:
             v = v.strip().upper()
             if not v:
                 return None
             # Basic ticker validation: alphanumeric and common symbols
-            if not all(c.isalnum() or c in '.-' for c in v):
-                raise ValueError('Ticker must contain only alphanumeric characters, dots, or hyphens')
+            if not all(c.isalnum() or c in ".-" for c in v):
+                raise ValueError(
+                    "Ticker must contain only alphanumeric characters, dots, or hyphens"
+                )
         return v
-    
-    @field_validator('split_ratio')
+
+    @field_validator("split_ratio")
     @classmethod
-    def validate_split_ratio(cls, v: Optional[float]) -> Optional[float]:
+    def validate_split_ratio(cls, v: float | None) -> float | None:
         """Validate split ratio is positive"""
         if v is not None and v <= 0:
-            raise ValueError('Split ratio must be greater than 0')
+            raise ValueError("Split ratio must be greater than 0")
         return v
-    
-    @field_validator('fee')
+
+    @field_validator("fee")
     @classmethod
-    def validate_fee(cls, v: Optional[float]) -> Optional[float]:
+    def validate_fee(cls, v: float | None) -> float | None:
         """Validate fee is positive"""
         if v is not None and v < 0:
-            raise ValueError('Fee must be positive')
+            raise ValueError("Fee must be positive")
         return v
 
 
 class TransactionCreate(TransactionBase):
     """Schema for creating a transaction"""
-    
-    @model_validator(mode='after')
+
+    @model_validator(mode="after")
     def validate_total_amount_sign(self):
         """Validate total_amount has correct sign based on transaction type"""
         tx_type = self.type
         amount = self.total_amount
-        
+
         # Split must have exactly 0 amount
         if tx_type == TransactionType.SPLIT:
             if amount != 0:
-                raise ValueError('Split transactions must have total_amount of 0')
-        
+                raise ValueError("Split transactions must have total_amount of 0")
+
         # Buy, Withdraw, Fee must be negative (money leaving account)
-        elif tx_type in [TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE]:
+        elif tx_type in [
+            TransactionType.BUY,
+            TransactionType.WITHDRAW,
+            TransactionType.FEE,
+        ]:
             if amount >= 0:
-                raise ValueError(f'{tx_type.value} transactions must have negative total_amount (money leaving account)')
-        
+                raise ValueError(
+                    f"{tx_type.value} transactions must have negative total_amount (money leaving account)"
+                )
+
         # Deposit, Sell, Dividend must be positive (money entering account)
-        elif tx_type in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]:
-            if amount <= 0:
-                raise ValueError(f'{tx_type.value} transactions must have positive total_amount (money entering account)')
-        
+        elif (
+            tx_type
+            in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]
+            and amount <= 0
+        ):
+            raise ValueError(
+                f"{tx_type.value} transactions must have positive total_amount (money entering account)"
+            )
+
         return self
 
 
 class TransactionUpdate(BaseModel):
     """Schema for updating a transaction (all fields optional)"""
-    date: Optional[datetime] = None
-    type: Optional[TransactionType] = None
-    ticker: Optional[str] = None
-    quantity: Optional[float] = None
-    price_per_share: Optional[float] = None
-    fee: Optional[float] = None
-    total_amount: Optional[float] = None
-    eur_amount: Optional[float] = None
-    split_ratio: Optional[float] = None
-    currency: Optional[str] = None
-    fx_rate: Optional[float] = None
 
-    @field_validator('ticker')
+    date: datetime | None = None
+    type: TransactionType | None = None
+    ticker: str | None = None
+    quantity: float | None = None
+    price_per_share: float | None = None
+    fee: float | None = None
+    total_amount: float | None = None
+    eur_amount: float | None = None
+    split_ratio: float | None = None
+    currency: str | None = None
+    fx_rate: float | None = None
+
+    @field_validator("ticker")
     @classmethod
-    def validate_ticker(cls, v: Optional[str]) -> Optional[str]:
+    def validate_ticker(cls, v: str | None) -> str | None:
         if v is not None:
             v = v.strip().upper()
             if not v:
                 return None
-            if not all(c.isalnum() or c in '.-' for c in v):
-                raise ValueError('Ticker must contain only alphanumeric characters, dots, or hyphens')
+            if not all(c.isalnum() or c in ".-" for c in v):
+                raise ValueError(
+                    "Ticker must contain only alphanumeric characters, dots, or hyphens"
+                )
         return v
 
-    @field_validator('split_ratio')
+    @field_validator("split_ratio")
     @classmethod
-    def validate_split_ratio(cls, v: Optional[float]) -> Optional[float]:
+    def validate_split_ratio(cls, v: float | None) -> float | None:
         if v is not None and v <= 0:
-            raise ValueError('Split ratio must be greater than 0')
+            raise ValueError("Split ratio must be greater than 0")
         return v
 
-    @field_validator('fee')
+    @field_validator("fee")
     @classmethod
-    def validate_fee(cls, v: Optional[float]) -> Optional[float]:
+    def validate_fee(cls, v: float | None) -> float | None:
         if v is not None and v < 0:
-            raise ValueError('Fee must be positive')
+            raise ValueError("Fee must be positive")
         return v
 
 
 class TransactionResponse(TransactionBase):
     """Schema for transaction response"""
+
     id: int
     portfolio_id: int
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class BulkImportResponse(BaseModel):
     """Schema for CSV bulk import response"""
+
     imported_count: int
-    transactions: List[TransactionResponse]
+    transactions: list[TransactionResponse]
 
 
 class PaginatedTransactionResponse(BaseModel):
     """Schema for paginated transaction response"""
-    transactions: List[TransactionResponse]
+
+    transactions: list[TransactionResponse]
     total: int
     page: int
     page_size: int
@@ -212,8 +241,10 @@ class PaginatedTransactionResponse(BaseModel):
 
 # ================== Portfolio Status Schemas ==================
 
+
 class HoldingResponse(BaseModel):
     """Schema for a single holding (transaction-derived only)"""
+
     ticker: str
     quantity: float
     average_cost: float
@@ -224,54 +255,65 @@ class HoldingResponse(BaseModel):
 
 class TransactionWarning(BaseModel):
     """Structured warning from transaction processing, for frontend i18n."""
-    code: str                                    # i18n key suffix, e.g. "sellNotInHoldings"
-    date: str                                    # ISO datetime YYYY-MM-DDTHH:MM:SS of the transaction
+
+    code: str  # i18n key suffix, e.g. "sellNotInHoldings"
+    date: str  # ISO datetime YYYY-MM-DDTHH:MM:SS of the transaction
     params: dict[str, str] = Field(default_factory=dict)  # interpolation values
 
 
 class PortfolioStatusResponse(BaseModel):
     """Schema for portfolio status (transaction-derived metrics only)"""
+
     portfolio_id: int
     portfolio_name: str
     principal: float  # Deposits - Withdrawals
     principal_eur: float  # Sum of all eur_amount fields (historical rates)
     dividends: float
-    dividends_eur: Optional[float] = None  # Dividends in EUR (historical rates)
+    dividends_eur: float | None = None  # Dividends in EUR (historical rates)
     cash: float
-    holdings: List[HoldingResponse]
+    holdings: list[HoldingResponse]
     holdings_cost: float  # Sum of all holdings cost basis
     realized_gains: float  # Gains/losses from sells
-    capital_gains_tax_rate: float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
-    warnings: List[TransactionWarning] = Field(default_factory=list)  # Transaction processing warnings
-    usd_to_eur_rate: Optional[float] = None  # Live USD→EUR rate; None when unavailable
+    capital_gains_tax_rate: (
+        float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
+    )
+    warnings: list[TransactionWarning] = Field(
+        default_factory=list
+    )  # Transaction processing warnings
+    usd_to_eur_rate: float | None = None  # Live USD→EUR rate; None when unavailable
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class LivePricesResponse(BaseModel):
     """Schema for live price polling (no transaction replay)"""
-    prices: dict[str, Optional[float]]
-    usd_to_eur_rate: Optional[float] = None
+
+    prices: dict[str, float | None]
+    usd_to_eur_rate: float | None = None
     timestamp: datetime
 
 
 class PerformanceDataPoint(BaseModel):
     """Schema for a single performance data point"""
+
     date: str  # YYYY-MM-DD format
     principal: float = 0.0
-    principal_eur: Optional[float] = None   # Cumulative net deposits in EUR at historical rates
-    current_value: Optional[float] = None
-    fx_rate: Optional[float] = None         # Historical USD→EUR rate at this date
-    return_pct: Optional[float] = None      # Time-weighted return (TWR) %
-    sp500_return_pct: Optional[float] = None  # S&P 500 USD return % from first data point
+    principal_eur: float | None = (
+        None  # Cumulative net deposits in EUR at historical rates
+    )
+    current_value: float | None = None
+    fx_rate: float | None = None  # Historical USD→EUR rate at this date
+    return_pct: float | None = None  # Time-weighted return (TWR) %
+    sp500_return_pct: float | None = None  # S&P 500 USD return % from first data point
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class PortfolioPerformanceResponse(BaseModel):
     """Schema for portfolio performance over time"""
+
     portfolio_id: int
     portfolio_name: str
-    data_points: List[PerformanceDataPoint]
+    data_points: list[PerformanceDataPoint]
 
     model_config = ConfigDict(from_attributes=True)

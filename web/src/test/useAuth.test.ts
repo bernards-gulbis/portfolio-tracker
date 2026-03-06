@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { useLogin, useRegister, useLogout } from '../hooks/useAuth';
+import { useLogin, useRegister, useLogout, useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 import type { UserRead } from '../api';
 
 vi.mock('../api', async () => {
@@ -15,6 +15,8 @@ vi.mock('../api', async () => {
     login: vi.fn(),
     register: vi.fn(),
     getCurrentUser: vi.fn(),
+    updateUser: vi.fn(),
+    closeAccount: vi.fn(),
   };
 });
 
@@ -179,5 +181,157 @@ describe('useLogout', () => {
 
     const { result } = renderHook(() => useLogout(), { wrapper: createWrapper() });
     await expect(result.current.mutateAsync()).rejects.toThrow('Session already expired');
+  });
+});
+
+// ── useUpdateProfile ────────────────────────────────────────────────────────────────────
+
+describe('useUpdateProfile', () => {
+  const mockSetUser = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({
+      setUser: mockSetUser,
+      logout: vi.fn(),
+      user: mockUser,
+      status: 'authenticated',
+    });
+  });
+
+  it('calls updateUser then getCurrentUser and sets user', async () => {
+    vi.mocked(api.updateUser).mockResolvedValueOnce(mockUser);
+    vi.mocked(api.getCurrentUser).mockResolvedValueOnce({ ...mockUser, name: 'New Name' });
+
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ name: 'New Name' });
+
+    expect(api.updateUser).toHaveBeenCalledWith({ name: 'New Name' });
+    expect(api.getCurrentUser).toHaveBeenCalled();
+    await waitFor(() => expect(mockSetUser).toHaveBeenCalledWith({ ...mockUser, name: 'New Name' }));
+  });
+
+  it('shows success toast', async () => {
+    vi.mocked(api.updateUser).mockResolvedValueOnce(mockUser);
+    vi.mocked(api.getCurrentUser).mockResolvedValueOnce(mockUser);
+
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ name: 'Test' });
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Profile updated'));
+  });
+});
+
+// ── useChangePassword ───────────────────────────────────────────────────────────────────
+
+describe('useChangePassword', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({
+      setUser: vi.fn(),
+      logout: vi.fn(),
+      user: mockUser,
+      status: 'authenticated',
+    });
+  });
+
+  it('calls updateUser with password', async () => {
+    vi.mocked(api.updateUser).mockResolvedValueOnce(mockUser);
+
+    const { result } = renderHook(() => useChangePassword(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ password: 'newpass123' });
+
+    expect(api.updateUser).toHaveBeenCalledWith({ password: 'newpass123' });
+  });
+
+  it('shows success toast', async () => {
+    vi.mocked(api.updateUser).mockResolvedValueOnce(mockUser);
+
+    const { result } = renderHook(() => useChangePassword(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ password: 'newpass123' });
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Password changed'));
+  });
+});
+
+// ── useUpdateTaxRate ────────────────────────────────────────────────────────────────────
+
+describe('useUpdateTaxRate', () => {
+  const mockSetUser = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({
+      setUser: mockSetUser,
+      logout: vi.fn(),
+      user: mockUser,
+      status: 'authenticated',
+    });
+  });
+
+  it('calls updateUser with tax_rate and refreshes user', async () => {
+    vi.mocked(api.updateUser).mockResolvedValueOnce(mockUser);
+    vi.mocked(api.getCurrentUser).mockResolvedValueOnce({ ...mockUser, tax_rate: 0.20 });
+
+    const { result } = renderHook(() => useUpdateTaxRate(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ tax_rate: 0.20 });
+
+    expect(api.updateUser).toHaveBeenCalledWith({ tax_rate: 0.20 });
+    await waitFor(() => expect(mockSetUser).toHaveBeenCalled());
+  });
+
+  it('shows success toast', async () => {
+    vi.mocked(api.updateUser).mockResolvedValueOnce(mockUser);
+    vi.mocked(api.getCurrentUser).mockResolvedValueOnce(mockUser);
+
+    const { result } = renderHook(() => useUpdateTaxRate(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ tax_rate: 0.20 });
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Tax rate updated'));
+  });
+});
+
+// ── useCloseAccount ─────────────────────────────────────────────────────────────────────
+
+describe('useCloseAccount', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({
+      setUser: vi.fn(),
+      logout: vi.fn(),
+      user: mockUser,
+      status: 'authenticated',
+    });
+  });
+
+  it('calls closeAccount API', async () => {
+    vi.mocked(api.closeAccount).mockResolvedValueOnce(undefined);
+
+    const { result } = renderHook(() => useCloseAccount(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ password: 'mypass' });
+
+    expect(api.closeAccount).toHaveBeenCalledWith({ password: 'mypass' });
+  });
+
+  it('dispatches auth:logout event on success', async () => {
+    vi.mocked(api.closeAccount).mockResolvedValueOnce(undefined);
+    const dispatchSpy = vi.spyOn(globalThis, 'dispatchEvent');
+
+    const { result } = renderHook(() => useCloseAccount(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ password: 'mypass' });
+
+    await waitFor(() => {
+      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'auth:logout' }));
+    });
+    dispatchSpy.mockRestore();
+  });
+
+  it('shows success toast', async () => {
+    vi.mocked(api.closeAccount).mockResolvedValueOnce(undefined);
+
+    const { result } = renderHook(() => useCloseAccount(), { wrapper: createWrapper() });
+    await result.current.mutateAsync({ password: 'mypass' });
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Account closed'));
   });
 });

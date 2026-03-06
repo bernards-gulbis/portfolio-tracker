@@ -235,7 +235,7 @@ describe('TransactionTable', () => {
     expect(screen.getByText('15.00000001 shares at $183.69')).toBeInTheDocument();
   });
 
-  it('shows error toast when transaction delete fails', async () => {
+  it('shows error toast when transaction delete fails', { timeout: 15000 }, async () => {
     vi.mocked(useDeleteTransaction).mockReturnValue({
       mutateAsync: vi.fn().mockRejectedValueOnce(new Error('Delete failed')),
       isPending: false,

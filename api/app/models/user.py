@@ -1,8 +1,9 @@
 """User database model"""
+
 import uuid
 from decimal import Decimal
-from typing import Optional
-from sqlmodel import SQLModel, Field
+
+from sqlmodel import Field, SQLModel
 
 
 class User(SQLModel, table=True):
@@ -11,6 +12,7 @@ class User(SQLModel, table=True):
     Defined as a pure SQLModel (no SQLAlchemyBaseUserTableUUID mixin) for
     compatibility with Pydantic v2 / SQLModel.
     """
+
     __tablename__ = "user"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -19,6 +21,8 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
     is_verified: bool = Field(default=False)
-    name: Optional[str] = Field(default=None, max_length=255)
-    picture: Optional[str] = Field(default=None, max_length=2048)
-    tax_rate: Decimal = Field(default=Decimal('0.255'), ge=0, le=1, max_digits=5, decimal_places=4)
+    name: str | None = Field(default=None, max_length=255)
+    picture: str | None = Field(default=None, max_length=2048)
+    tax_rate: Decimal = Field(
+        default=Decimal("0.255"), ge=0, le=1, max_digits=5, decimal_places=4
+    )

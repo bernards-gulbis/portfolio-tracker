@@ -11,6 +11,7 @@ import { formatCurrency } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import type { ViewBox } from 'recharts/types/util/types';
 import { PricedHolding } from '../api';
+import type { Currency } from '../hooks/useCurrencyPreference';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -22,6 +23,7 @@ interface HoldingsAllocationChartProps {
   holdings: PricedHolding[];
   cash: number;
   eurRate?: number | null;
+  displayCurrency?: Currency;
   isLoading?: boolean;
 }
 
@@ -70,6 +72,11 @@ const PieCenterLabel = ({ viewBox, locale, currency, activeEntry, total, totalLa
 
 const TRANSITION_STYLE = { transition: 'opacity 150ms ease-in-out' };
 
+const createShapeRenderer = (activeIndex: number | null) =>
+  (props: PieSectorShapeProps) => (
+    <Sector {...props} opacity={activeIndex == null || props.index === activeIndex ? 1 : 0.3} style={TRANSITION_STYLE} />
+  );
+
 const COLORS = [
   'var(--chart-1)',
   'var(--chart-2)',
@@ -82,14 +89,16 @@ export const HoldingsAllocationChart = ({
   holdings,
   cash,
   eurRate,
+  displayCurrency,
   isLoading,
 }: HoldingsAllocationChartProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const shapeRenderer = useMemo(() => createShapeRenderer(activeIndex), [activeIndex]);
 
   const { chartData, total, chartConfig, currency } = useMemo(() => {
-    const useEur = eurRate != null && eurRate > 0;
+    const useEur = displayCurrency === 'EUR' && eurRate != null && eurRate > 0;
     const currency = useEur ? 'EUR' : 'USD';
     const data: Array<{ name: string; value: number; fill: string }> = [];
 
@@ -118,7 +127,7 @@ export const HoldingsAllocationChart = ({
     }, {} as ChartConfig);
 
     return { chartData: data, total, chartConfig: config, currency };
-  }, [holdings, cash, eurRate]);
+  }, [holdings, cash, eurRate, displayCurrency]);
 
   const handleMouseEnter = useCallback((_: unknown, index: number) => {
     setActiveIndex(index);
@@ -179,7 +188,7 @@ export const HoldingsAllocationChart = ({
               outerRadius={108}
               strokeWidth={2}
               stroke="var(--card)"
-              shape={(props: PieSectorShapeProps) => <Sector {...props} opacity={activeIndex == null || props.index === activeIndex ? 1 : 0.3} style={TRANSITION_STYLE} />}
+              shape={shapeRenderer}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
             >

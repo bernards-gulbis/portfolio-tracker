@@ -147,7 +147,7 @@ const PortfolioStatusContent = ({
       )}
 
       {/* Financial Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className={`grid grid-cols-2 ${showEur ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-4 mb-6`}>
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
           <p className="text-lg font-semibold">{formatCurrency(netInvested, currency, locale)}</p>
@@ -160,27 +160,31 @@ const PortfolioStatusContent = ({
           </p>
         </div>
 
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: taxRate })}</p>
-          <p className="text-lg font-semibold">
-            {taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
-          </p>
-          {capitalGainsEur !== null && taxEur !== null && (
-            <p className="text-xs mt-0.5 text-muted-foreground">
-              {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
+        {showEur && (
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: taxRate })}</p>
+            <p className="text-lg font-semibold">
+              {taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
             </p>
-          )}
-        </div>
+            {capitalGainsEur !== null && taxEur !== null && (
+              <p className="text-xs mt-0.5 text-muted-foreground">
+                {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
+              </p>
+            )}
+          </div>
+        )}
 
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
-          <p className="text-lg font-semibold">
-            {afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
-          </p>
-          <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
-            {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
-          </p>
-        </div>
+        {showEur && (
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
+            <p className="text-lg font-semibold">
+              {afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
+            </p>
+            <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
+              {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Charts Section */}
@@ -203,6 +207,7 @@ const PortfolioStatusContent = ({
             holdings={status.holdings}
             cash={status.cash}
             eurRate={eurRate}
+            displayCurrency={currency}
             isLoading={isAllocationLoading}
           />
         </div>

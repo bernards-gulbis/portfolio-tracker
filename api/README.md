@@ -29,7 +29,13 @@ app/
   routers/
     portfolios.py                # Portfolio CRUD, status, performance, copy
     transactions.py              # Two routers: portfolio-scoped + standalone
-tests/test_api.py                # Integration tests with in-memory SQLite
+tests/
+  test_api.py                    # Integration tests with in-memory SQLite
+  test_auth.py                   # Auth unit tests (UserManager, OAuth, transports)
+  test_price_service.py          # Price service unit tests (caching, Yahoo Finance)
+  test_transaction_service.py    # Transaction service unit tests (CRUD, CSV)
+  conftest.py                    # Shared fixtures (test DB, sessions)
+pyproject.toml                   # Ruff linter/formatter configuration
 ```
 
 ## Architecture
@@ -48,6 +54,36 @@ Key patterns:
 - Database sessions injected via `Depends(get_session)`. Services instantiated per-request; they create their own repositories.
 - Domain exceptions inherit from `PortfolioTrackerException` and bubble up to centralized handlers in `main.py`.
 - `PriceService` is the exception to per-request instantiation — it uses class-level caches with thread-safe locks and a 3-layer cache (in-memory TTL + DB historical + per-session).
+
+## Linting & Formatting
+
+[Ruff](https://docs.astral.sh/ruff/) handles both linting and formatting. Configuration is in `pyproject.toml`.
+
+```bash
+# Check for lint errors
+ruff check .
+
+# Auto-fix lint errors
+ruff check --fix .
+
+# Check formatting
+ruff format --check .
+
+# Apply formatting
+ruff format .
+```
+
+**Enabled rule sets:** pycodestyle (E/W), pyflakes (F), isort (I), pep8-naming (N), pyupgrade (UP), flake8-bugbear (B), flake8-simplify (SIM), flake8-print (T20), ruff-specific (RUF).
+
+## Testing
+
+Tests use pytest with an in-memory SQLite database.
+
+```bash
+python -m pytest tests/ -x -q          # Run all tests, stop on first failure
+python -m pytest tests/test_api.py -v  # Integration tests only
+python -m pytest tests/test_auth.py    # Auth tests only
+```
 
 ## API Routes
 

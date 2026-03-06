@@ -1,9 +1,10 @@
-from sqlmodel import SQLModel, create_engine, Session
-from typing import Generator
 import logging
-from sqlalchemy import event, text
+from collections.abc import Generator
 
-from app.core.config import DATABASE_URL, DB_POOL_SIZE, DB_MAX_OVERFLOW, DATABASE_ECHO
+from sqlalchemy import event, text
+from sqlmodel import Session, SQLModel, create_engine
+
+from app.core.config import DATABASE_ECHO, DATABASE_URL, DB_MAX_OVERFLOW, DB_POOL_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,16 @@ try:
             pool_size=DB_POOL_SIZE,
             max_overflow=DB_MAX_OVERFLOW,
         )
-        logger.info("PostgreSQL engine created (pool_size=%d, max_overflow=%d)", DB_POOL_SIZE, DB_MAX_OVERFLOW)
+        logger.info(
+            "PostgreSQL engine created (pool_size=%d, max_overflow=%d)",
+            DB_POOL_SIZE,
+            DB_MAX_OVERFLOW,
+        )
     else:
         # SQLite configuration
         connect_args = {
             "check_same_thread": False,  # Needed for SQLite
-            "timeout": 30  # Set timeout for SQLite
+            "timeout": 30,  # Set timeout for SQLite
         }
         engine = create_engine(
             DATABASE_URL,
@@ -39,7 +44,7 @@ try:
             connect_args=connect_args,
         )
         logger.info("SQLite engine created")
-        
+
         # Enable foreign key support for SQLite only
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_conn, connection_record):

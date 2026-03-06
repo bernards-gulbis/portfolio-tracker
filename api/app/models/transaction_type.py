@@ -1,9 +1,11 @@
 """Transaction type enumeration"""
-from enum import Enum
+
+from enum import StrEnum
 
 
-class TransactionType(str, Enum):
+class TransactionType(StrEnum):
     """Transaction type enumeration"""
+
     DEPOSIT = "Deposit"
     BUY = "Buy"
     FEE = "Fee"

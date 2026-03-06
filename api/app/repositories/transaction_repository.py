@@ -1,11 +1,13 @@
 """
 Transaction repository for data access
 """
+
 import uuid
-from sqlmodel import Session, select, func
-from typing import List, Optional, Tuple
+
 from sqlalchemy.exc import SQLAlchemyError
-from app.models import Transaction, Portfolio
+from sqlmodel import Session, func, select
+
+from app.models import Portfolio, Transaction
 
 
 class TransactionRepository:
@@ -21,7 +23,7 @@ class TransactionRepository:
         self.session.refresh(transaction)
         return transaction
 
-    def bulk_create(self, transactions: List[Transaction]) -> List[Transaction]:
+    def bulk_create(self, transactions: list[Transaction]) -> list[Transaction]:
         """Create multiple transactions atomically"""
         try:
             for transaction in transactions:
@@ -34,11 +36,13 @@ class TransactionRepository:
             self.session.rollback()
             raise
 
-    def get_by_id(self, transaction_id: int) -> Optional[Transaction]:
+    def get_by_id(self, transaction_id: int) -> Transaction | None:
         """Get a transaction by ID"""
         return self.session.get(Transaction, transaction_id)
 
-    def get_by_id_and_user(self, transaction_id: int, user_id: uuid.UUID) -> Optional[Transaction]:
+    def get_by_id_and_user(
+        self, transaction_id: int, user_id: uuid.UUID
+    ) -> Transaction | None:
         """Get a transaction by ID verifying ownership via portfolio"""
         statement = (
             select(Transaction)
@@ -47,7 +51,7 @@ class TransactionRepository:
         )
         return self.session.exec(statement).first()
 
-    def get_by_portfolio_id(self, portfolio_id: int) -> List[Transaction]:
+    def get_by_portfolio_id(self, portfolio_id: int) -> list[Transaction]:
         """Get all transactions for a specific portfolio, ordered chronologically"""
         statement = (
             select(Transaction)
@@ -57,10 +61,14 @@ class TransactionRepository:
         return list(self.session.exec(statement).all())
 
     def get_by_portfolio_id_paginated(
-        self, portfolio_id: int, page: int = 1, page_size: int = 20,
-        ticker: Optional[str] = None, transaction_types: Optional[List[str]] = None,
-        sort_order: str = "desc"
-    ) -> Tuple[List[Transaction], int]:
+        self,
+        portfolio_id: int,
+        page: int = 1,
+        page_size: int = 20,
+        ticker: str | None = None,
+        transaction_types: list[str] | None = None,
+        sort_order: str = "desc",
+    ) -> tuple[list[Transaction], int]:
         """Get paginated transactions for a specific portfolio"""
         conditions = [Transaction.portfolio_id == portfolio_id]
         if ticker:
@@ -68,10 +76,14 @@ class TransactionRepository:
         if transaction_types:
             conditions.append(Transaction.type.in_(transaction_types))
 
-        count_statement = select(func.count()).select_from(Transaction).where(*conditions)
+        count_statement = (
+            select(func.count()).select_from(Transaction).where(*conditions)
+        )
         total = self.session.exec(count_statement).one()
 
-        date_col = Transaction.date.asc() if sort_order == "asc" else Transaction.date.desc()
+        date_col = (
+            Transaction.date.asc() if sort_order == "asc" else Transaction.date.desc()
+        )
         id_col = Transaction.id.asc() if sort_order == "asc" else Transaction.id.desc()
 
         offset = (page - 1) * page_size
@@ -100,4 +112,3 @@ class TransactionRepository:
             self.session.commit()
             return True
         return False
-

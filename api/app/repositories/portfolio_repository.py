@@ -1,9 +1,11 @@
 """
 Portfolio repository for data access
 """
+
 import uuid
+
 from sqlmodel import Session, select
-from typing import List, Optional
+
 from app.models import Portfolio, Transaction
 
 
@@ -21,20 +23,23 @@ class PortfolioRepository:
         self.session.refresh(portfolio)
         return portfolio
 
-    def get_by_id_and_user(self, portfolio_id: int, user_id: uuid.UUID) -> Optional[Portfolio]:
+    def get_by_id_and_user(
+        self, portfolio_id: int, user_id: uuid.UUID
+    ) -> Portfolio | None:
         """Get a portfolio by ID scoped to user"""
         statement = select(Portfolio).where(
-            Portfolio.id == portfolio_id,
-            Portfolio.user_id == user_id
+            Portfolio.id == portfolio_id, Portfolio.user_id == user_id
         )
         return self.session.exec(statement).first()
 
-    def get_all_for_user(self, user_id: uuid.UUID) -> List[Portfolio]:
+    def get_all_for_user(self, user_id: uuid.UUID) -> list[Portfolio]:
         """Get all portfolios for a specific user"""
         statement = select(Portfolio).where(Portfolio.user_id == user_id)
         return list(self.session.exec(statement).all())
 
-    def update(self, portfolio_id: int, name: str, user_id: uuid.UUID) -> Optional[Portfolio]:
+    def update(
+        self, portfolio_id: int, name: str, user_id: uuid.UUID
+    ) -> Portfolio | None:
         """Update a portfolio's name (user-scoped)"""
         portfolio = self.get_by_id_and_user(portfolio_id, user_id)
         if portfolio:
@@ -57,7 +62,9 @@ class PortfolioRepository:
         """Check if a portfolio exists and belongs to user"""
         return self.get_by_id_and_user(portfolio_id, user_id) is not None
 
-    def copy_with_transactions(self, portfolio_id: int, new_name: str, user_id: uuid.UUID) -> Optional[Portfolio]:
+    def copy_with_transactions(
+        self, portfolio_id: int, new_name: str, user_id: uuid.UUID
+    ) -> Portfolio | None:
         """Copy a portfolio with all its transactions (user-scoped)"""
         original = self.get_by_id_and_user(portfolio_id, user_id)
         if not original:

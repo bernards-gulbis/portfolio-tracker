@@ -1,30 +1,30 @@
 """
 Transaction service for business logic
 """
-import uuid
-from typing import List, Optional, Tuple
-from datetime import datetime
+
 import csv
+import uuid
+from datetime import datetime
 from io import StringIO
 
 from sqlmodel import Session
+
+from app.core.exceptions import (
+    InvalidCSVFormatException,
+    InvalidTransactionDataException,
+    PortfolioNotFoundException,
+    TransactionNotFoundException,
+)
 from app.models import Transaction, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.repositories.transaction_repository import TransactionRepository
-from app.core.exceptions import (
-    PortfolioNotFoundException,
-    TransactionNotFoundException,
-    InvalidCSVFormatException,
-    InvalidTransactionDataException,
-)
-
 
 _ERR_EUR_AMOUNT_SIGN_MISMATCH = "eur_amount sign must match total_amount sign"
 
 
 def _csv_field(value):
     """Convert None to empty string for CSV export."""
-    return value if value is not None else ''
+    return value if value is not None else ""
 
 
 def _coalesce(new, existing):
@@ -46,14 +46,14 @@ class TransactionService:
         date: datetime,
         transaction_type: TransactionType,
         total_amount: float,
-        ticker: Optional[str] = None,
-        quantity: Optional[float] = None,
-        price_per_share: Optional[float] = None,
-        fee: Optional[float] = None,
-        eur_amount: Optional[float] = None,
-        split_ratio: Optional[float] = None,
-        currency: Optional[str] = None,
-        fx_rate: Optional[float] = None,
+        ticker: str | None = None,
+        quantity: float | None = None,
+        price_per_share: float | None = None,
+        fee: float | None = None,
+        eur_amount: float | None = None,
+        split_ratio: float | None = None,
+        currency: str | None = None,
+        fx_rate: float | None = None,
     ) -> Transaction:
         """Create a new transaction with validation"""
         # Verify portfolio exists and belongs to user
@@ -65,11 +65,15 @@ class TransactionService:
             raise InvalidTransactionDataException("fx_rate must be positive")
 
         # Validate eur_amount sign matches total_amount sign
-        if eur_amount is not None and transaction_type != TransactionType.SPLIT:
-            if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
-                raise InvalidTransactionDataException(
-                    _ERR_EUR_AMOUNT_SIGN_MISMATCH
-                )
+        if (
+            eur_amount is not None
+            and transaction_type != TransactionType.SPLIT
+            and (
+                (total_amount > 0 and eur_amount < 0)
+                or (total_amount < 0 and eur_amount > 0)
+            )
+        ):
+            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
 
         self._validate_transaction_data(
             transaction_type, ticker, quantity, price_per_share, total_amount, fee
@@ -99,23 +103,34 @@ class TransactionService:
             raise TransactionNotFoundException(transaction_id)
         return transaction
 
-    def get_transactions_by_portfolio(self, portfolio_id: int, user_id: uuid.UUID) -> List[Transaction]:
+    def get_transactions_by_portfolio(
+        self, portfolio_id: int, user_id: uuid.UUID
+    ) -> list[Transaction]:
         """Get all transactions for a portfolio (user-scoped)"""
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
         return self.transaction_repo.get_by_portfolio_id(portfolio_id)
 
     def get_transactions_by_portfolio_paginated(
-        self, portfolio_id: int, user_id: uuid.UUID, page: int = 1, page_size: int = 20,
-        ticker: Optional[str] = None, transaction_types: Optional[List[str]] = None,
-        sort_order: str = "desc"
-    ) -> Tuple[List[Transaction], int]:
+        self,
+        portfolio_id: int,
+        user_id: uuid.UUID,
+        page: int = 1,
+        page_size: int = 20,
+        ticker: str | None = None,
+        transaction_types: list[str] | None = None,
+        sort_order: str = "desc",
+    ) -> tuple[list[Transaction], int]:
         """Get paginated transactions for a portfolio (user-scoped)"""
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
         return self.transaction_repo.get_by_portfolio_id_paginated(
-            portfolio_id, page, page_size, ticker=ticker, transaction_types=transaction_types,
-            sort_order=sort_order
+            portfolio_id,
+            page,
+            page_size,
+            ticker=ticker,
+            transaction_types=transaction_types,
+            sort_order=sort_order,
         )
 
     def export_transactions_to_csv(self, portfolio_id: int, user_id: uuid.UUID) -> str:
@@ -128,34 +143,38 @@ class TransactionService:
         output = StringIO()
         writer = csv.writer(output)
 
-        writer.writerow([
-            'date',
-            'type',
-            'ticker',
-            'quantity',
-            'price_per_share',
-            'fee',
-            'total_amount',
-            'eur',
-            'split_ratio',
-            'currency',
-            'fx_rate'
-        ])
+        writer.writerow(
+            [
+                "date",
+                "type",
+                "ticker",
+                "quantity",
+                "price_per_share",
+                "fee",
+                "total_amount",
+                "eur",
+                "split_ratio",
+                "currency",
+                "fx_rate",
+            ]
+        )
 
         for transaction in transactions:
-            writer.writerow([
-                transaction.date.strftime('%m/%d/%Y %H:%M:%S'),
-                transaction.type.value,
-                transaction.ticker or '',
-                _csv_field(transaction.quantity),
-                _csv_field(transaction.price_per_share),
-                _csv_field(transaction.fee),
-                transaction.total_amount,
-                _csv_field(transaction.eur_amount),
-                _csv_field(transaction.split_ratio),
-                _csv_field(transaction.currency),
-                _csv_field(transaction.fx_rate),
-            ])
+            writer.writerow(
+                [
+                    transaction.date.strftime("%m/%d/%Y %H:%M:%S"),
+                    transaction.type.value,
+                    transaction.ticker or "",
+                    _csv_field(transaction.quantity),
+                    _csv_field(transaction.price_per_share),
+                    _csv_field(transaction.fee),
+                    transaction.total_amount,
+                    _csv_field(transaction.eur_amount),
+                    _csv_field(transaction.split_ratio),
+                    _csv_field(transaction.currency),
+                    _csv_field(transaction.fx_rate),
+                ]
+            )
 
         return output.getvalue()
 
@@ -163,17 +182,17 @@ class TransactionService:
         self,
         transaction_id: int,
         user_id: uuid.UUID,
-        date: Optional[datetime] = None,
-        transaction_type: Optional[TransactionType] = None,
-        ticker: Optional[str] = None,
-        quantity: Optional[float] = None,
-        price_per_share: Optional[float] = None,
-        fee: Optional[float] = None,
-        total_amount: Optional[float] = None,
-        eur_amount: Optional[float] = None,
-        split_ratio: Optional[float] = None,
-        currency: Optional[str] = None,
-        fx_rate: Optional[float] = None,
+        date: datetime | None = None,
+        transaction_type: TransactionType | None = None,
+        ticker: str | None = None,
+        quantity: float | None = None,
+        price_per_share: float | None = None,
+        fee: float | None = None,
+        total_amount: float | None = None,
+        eur_amount: float | None = None,
+        split_ratio: float | None = None,
+        currency: str | None = None,
+        fx_rate: float | None = None,
     ) -> Transaction:
         """Update a transaction (user-scoped via portfolio ownership)"""
         transaction = self.transaction_repo.get_by_id_and_user(transaction_id, user_id)
@@ -192,11 +211,15 @@ class TransactionService:
             raise InvalidTransactionDataException("fx_rate must be positive")
 
         # Validate eur_amount sign matches total_amount sign
-        if val_eur_amount is not None and val_type != TransactionType.SPLIT:
-            if (val_total_amount > 0 and val_eur_amount < 0) or (val_total_amount < 0 and val_eur_amount > 0):
-                raise InvalidTransactionDataException(
-                    _ERR_EUR_AMOUNT_SIGN_MISMATCH
-                )
+        if (
+            val_eur_amount is not None
+            and val_type != TransactionType.SPLIT
+            and (
+                (val_total_amount > 0 and val_eur_amount < 0)
+                or (val_total_amount < 0 and val_eur_amount > 0)
+            )
+        ):
+            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
 
         self._validate_transaction_data(
             val_type,
@@ -204,14 +227,21 @@ class TransactionService:
             val_quantity,
             val_price_per_share,
             val_total_amount,
-            val_fee
+            val_fee,
         )
 
         provided = {
-            'date': date, 'type': transaction_type, 'ticker': ticker,
-            'quantity': quantity, 'price_per_share': price_per_share,
-            'fee': fee, 'total_amount': total_amount, 'eur_amount': eur_amount,
-            'split_ratio': split_ratio, 'currency': currency, 'fx_rate': fx_rate,
+            "date": date,
+            "type": transaction_type,
+            "ticker": ticker,
+            "quantity": quantity,
+            "price_per_share": price_per_share,
+            "fee": fee,
+            "total_amount": total_amount,
+            "eur_amount": eur_amount,
+            "split_ratio": split_ratio,
+            "currency": currency,
+            "fx_rate": fx_rate,
         }
         for field, value in provided.items():
             if value is not None:
@@ -226,7 +256,9 @@ class TransactionService:
             raise TransactionNotFoundException(transaction_id)
         self.transaction_repo.delete(transaction_id)
 
-    def import_from_csv(self, csv_content: str, portfolio_id: int, user_id: uuid.UUID) -> List[Transaction]:
+    def import_from_csv(
+        self, csv_content: str, portfolio_id: int, user_id: uuid.UUID
+    ) -> list[Transaction]:
         """Import transactions from CSV with transaction atomicity (user-scoped)"""
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
@@ -237,11 +269,11 @@ class TransactionService:
     def _validate_transaction_data(
         self,
         transaction_type: TransactionType,
-        ticker: Optional[str],
-        quantity: Optional[float],
-        price_per_share: Optional[float],
+        ticker: str | None,
+        quantity: float | None,
+        price_per_share: float | None,
         total_amount: float,
-        fee: Optional[float],
+        fee: float | None,
     ) -> None:
         """Validate transaction data based on business rules"""
         if quantity is not None and quantity <= 0:
@@ -254,7 +286,9 @@ class TransactionService:
             raise InvalidTransactionDataException("Fee must be positive")
 
         if transaction_type in (TransactionType.BUY, TransactionType.SELL):
-            self._validate_buy_sell(transaction_type, ticker, quantity, price_per_share, total_amount, fee)
+            self._validate_buy_sell(
+                transaction_type, ticker, quantity, price_per_share, total_amount, fee
+            )
 
         elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):
             if ticker or quantity is not None or price_per_share is not None:
@@ -262,20 +296,22 @@ class TransactionService:
                     f"{transaction_type.value} transactions should not have ticker, quantity, or price"
                 )
 
-        elif transaction_type in (TransactionType.SPLIT, TransactionType.DIVIDEND):
-            if not ticker:
-                raise InvalidTransactionDataException(
-                    f"{transaction_type.value} transactions require a ticker symbol"
-                )
+        elif (
+            transaction_type in (TransactionType.SPLIT, TransactionType.DIVIDEND)
+            and not ticker
+        ):
+            raise InvalidTransactionDataException(
+                f"{transaction_type.value} transactions require a ticker symbol"
+            )
 
     @staticmethod
     def _validate_buy_sell(
         transaction_type: TransactionType,
-        ticker: Optional[str],
-        quantity: Optional[float],
-        price_per_share: Optional[float],
+        ticker: str | None,
+        quantity: float | None,
+        price_per_share: float | None,
         total_amount: float,
-        fee: Optional[float],
+        fee: float | None,
     ) -> None:
         """Validate fields specific to BUY/SELL transactions."""
         if not ticker:
@@ -302,7 +338,7 @@ class TransactionService:
                 f"{'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {total_amount}"
             )
 
-    def _parse_csv(self, csv_content: str, portfolio_id: int) -> List[Transaction]:
+    def _parse_csv(self, csv_content: str, portfolio_id: int) -> list[Transaction]:
         """Parse CSV content and create Transaction objects"""
         transactions = []
         csv_file = StringIO(csv_content)
@@ -320,16 +356,23 @@ class TransactionService:
                 try:
                     transaction = self._parse_csv_row(row, portfolio_id)
                     transactions.append(transaction)
-                except (ValueError, InvalidTransactionDataException, KeyError, InvalidCSVFormatException) as e:
-                    raise InvalidCSVFormatException(str(e), line_num)
+                except (
+                    ValueError,
+                    InvalidTransactionDataException,
+                    KeyError,
+                    InvalidCSVFormatException,
+                ) as e:
+                    raise InvalidCSVFormatException(str(e), line_num) from e
 
         except InvalidCSVFormatException:
             raise
         except csv.Error as e:
-            raise InvalidCSVFormatException(f"Invalid CSV format: {str(e)}")
+            raise InvalidCSVFormatException(f"Invalid CSV format: {e!s}") from e
 
         if not transactions:
-            raise InvalidCSVFormatException("CSV file is empty or contains no valid transactions")
+            raise InvalidCSVFormatException(
+                "CSV file is empty or contains no valid transactions"
+            )
 
         return transactions
 
@@ -337,17 +380,23 @@ class TransactionService:
         """Parse a single CSV row into a Transaction object"""
         try:
             date = datetime.strptime(row["date"].strip(), "%m/%d/%Y %H:%M:%S")
-        except ValueError:
-            raise ValueError(f"Invalid date format: {row['date']}. Expected MM/DD/YYYY HH:MM:SS")
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid date format: {row['date']}. Expected MM/DD/YYYY HH:MM:SS"
+            ) from exc
 
         try:
             transaction_type = TransactionType(row["type"].strip())
-        except ValueError:
-            raise ValueError(f"Invalid transaction type: {row['type']}. Must be one of: {', '.join([t.value for t in TransactionType])}")
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid transaction type: {row['type']}. Must be one of: {', '.join([t.value for t in TransactionType])}"
+            ) from exc
 
         ticker = row.get("ticker", "").strip().upper() or None
         quantity = self._clean_csv_number(row.get("quantity", ""), "quantity")
-        price_per_share = self._clean_csv_number(row.get("price_per_share", ""), "price_per_share")
+        price_per_share = self._clean_csv_number(
+            row.get("price_per_share", ""), "price_per_share"
+        )
         fee = self._clean_csv_number(row.get("fee", ""), "fee")
 
         total_amount_str = row.get("total_amount", "").strip()
@@ -393,8 +442,16 @@ class TransactionService:
         transaction_type: TransactionType, total_amount: float
     ) -> None:
         """Raise if total_amount has the wrong sign for the transaction type."""
-        negative_types = {TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE}
-        positive_types = {TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND}
+        negative_types = {
+            TransactionType.BUY,
+            TransactionType.WITHDRAW,
+            TransactionType.FEE,
+        }
+        positive_types = {
+            TransactionType.DEPOSIT,
+            TransactionType.SELL,
+            TransactionType.DIVIDEND,
+        }
 
         if transaction_type in negative_types and total_amount > 0:
             raise ValueError(
@@ -409,23 +466,27 @@ class TransactionService:
 
     @staticmethod
     def _validate_csv_eur_sign(
-        transaction_type: TransactionType, total_amount: float, eur_amount: Optional[float]
+        transaction_type: TransactionType, total_amount: float, eur_amount: float | None
     ) -> None:
         """Raise if eur_amount sign doesn't match total_amount sign."""
         if eur_amount is None:
             return
         if transaction_type == TransactionType.SPLIT:
             return
-        if (total_amount > 0 and eur_amount < 0) or (total_amount < 0 and eur_amount > 0):
+        if (total_amount > 0 and eur_amount < 0) or (
+            total_amount < 0 and eur_amount > 0
+        ):
             raise ValueError(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
 
     @staticmethod
-    def _clean_csv_number(value: str, field_name: str = "field") -> Optional[float]:
+    def _clean_csv_number(value: str, field_name: str = "field") -> float | None:
         """Clean CSV number by removing thousand separators and converting to float"""
         if not value or value.strip() == "":
             return None
         cleaned = value.replace(",", "")
         try:
             return float(cleaned)
-        except ValueError:
-            raise ValueError(f"Invalid number format for {field_name}: {value}")
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid number format for {field_name}: {value}"
+            ) from exc

@@ -25,7 +25,9 @@ _BOOL_FALSE = {"false", "0", "no", ""}
 def _get_bool(name: str, default: bool = False) -> bool:
     raw = os.getenv(name, str(default)).lower()
     if raw not in _BOOL_TRUE | _BOOL_FALSE:
-        _warnings.append(f"{name}={raw!r} is not a recognized boolean (expected true/false)")
+        _warnings.append(
+            f"{name}={raw!r} is not a recognized boolean (expected true/false)"
+        )
     return raw in _BOOL_TRUE
 
 
@@ -50,7 +52,9 @@ DATABASE_ECHO: bool = _get_bool("DATABASE_ECHO")
 COOKIE_SECURE: bool = _get_bool("COOKIE_SECURE")
 COOKIE_SAMESITE: str = os.getenv("COOKIE_SAMESITE", "lax").lower()
 if COOKIE_SAMESITE not in ("lax", "strict", "none"):
-    _errors.append(f"COOKIE_SAMESITE={COOKIE_SAMESITE!r} is invalid (expected lax/strict/none)")
+    _errors.append(
+        f"COOKIE_SAMESITE={COOKIE_SAMESITE!r} is invalid (expected lax/strict/none)"
+    )
 if COOKIE_SAMESITE == "none" and not COOKIE_SECURE:
     _errors.append("COOKIE_SECURE must be true when COOKIE_SAMESITE=none")
 
@@ -61,7 +65,10 @@ GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-for _name, _val in [("SECRET_KEY", SECRET_KEY), ("OAUTH_STATE_SECRET", OAUTH_STATE_SECRET)]:
+for _name, _val in [
+    ("SECRET_KEY", SECRET_KEY),
+    ("OAUTH_STATE_SECRET", OAUTH_STATE_SECRET),
+]:
     if _val == _DEFAULT_SECRET:
         if COOKIE_SECURE:
             _errors.append(
@@ -91,5 +98,5 @@ for _w in _warnings:
 if _errors:
     # Logging may not be configured yet, so also write to stderr
     msg = "Environment validation failed:\n" + "\n".join(f"  - {e}" for e in _errors)
-    print(f"FATAL: {msg}", file=sys.stderr)
+    sys.stderr.write(f"FATAL: {msg}\n")
     raise SystemExit(1)

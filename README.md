@@ -23,8 +23,8 @@ See [api/README.md](api/README.md) and [web/README.md](web/README.md) for archit
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
+- Python 3.12+
+- Node.js 20+
 
 ### Backend
 
@@ -33,6 +33,7 @@ cd api
 python -m venv venv
 # Windows: venv\Scripts\activate | macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
+pip install ruff               # Linter/formatter (dev dependency)
 cp .env.example .env
 ```
 
@@ -68,12 +69,23 @@ npm run dev                  # http://localhost:3000 (proxies /api to :8000)
 
 ```bash
 # Backend
-pytest api/tests/test_api.py -v
-pytest api/tests/test_api.py --cov=api
+cd api && python -m pytest tests/ -x -q
 
-# Frontend (from web/)
-cd web
-npm test
+# Frontend
+cd web && npx vitest run
+```
+
+## Linting
+
+```bash
+# Backend — Ruff (config in api/pyproject.toml)
+cd api && ruff check . && ruff format --check .
+
+# Backend — auto-fix
+cd api && ruff check --fix . && ruff format .
+
+# Frontend — ESLint
+cd web && npm run lint
 ```
 
 ## CSV Import Format

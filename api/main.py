@@ -1,46 +1,59 @@
 """
 Portfolio Tracker API - Main Application
 """
+
+import contextlib
 import logging
 import sys
+from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Annotated
 from urllib.parse import urlencode
 
-from app.core.config import CORS_ORIGINS, LOG_LEVEL, OAUTH_STATE_SECRET, COOKIE_SECURE, COOKIE_SAMESITE, FRONTEND_URL
-
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
-from contextlib import asynccontextmanager
+from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
+from sqlalchemy import text
+from sqlmodel import Session, select
 
 from app.core import (
-    create_db_and_tables,
+    FileUploadException,
+    InvalidCSVFormatException,
+    InvalidPortfolioNameException,
+    InvalidTransactionDataException,
     PortfolioNotFoundException,
     TransactionNotFoundException,
-    InvalidPortfolioNameException,
-    InvalidCSVFormatException,
-    InvalidTransactionDataException,
-    FileUploadException,
+    create_db_and_tables,
 )
-from app.routers import portfolios_router, transactions_router, transaction_router
+from app.core.auth import (
+    UserManager,
+    auth_backend,
+    current_active_user,
+    fastapi_users,
+    get_user_manager,
+    google_oauth_client,
+    oauth_auth_backend,
+)
+from app.core.config import (
+    COOKIE_SAMESITE,
+    COOKIE_SECURE,
+    CORS_ORIGINS,
+    FRONTEND_URL,
+    LOG_LEVEL,
+    OAUTH_STATE_SECRET,
+)
 from app.core.database import engine, get_session
-from app.core.auth import fastapi_users, auth_backend, oauth_auth_backend, google_oauth_client, current_active_user, get_user_manager, UserManager
-from app.schemas import UserRead, UserCreate, UserUpdate, CloseAccountRequest
-from app.models.user import User
 from app.models.oauth_account import OAuthAccount
-from sqlmodel import Session, select
-from sqlalchemy import text
-from typing import Annotated
-from fastapi import Depends
-from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
+from app.models.user import User
+from app.routers import portfolios_router, transaction_router, transactions_router
+from app.schemas import CloseAccountRequest, UserCreate, UserRead, UserUpdate
 
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 
@@ -53,6 +66,7 @@ async def lifespan(app: FastAPI):
 
     # Verify database connection before proceeding
     from app.core.database import verify_connection
+
     if not verify_connection():
         logger.error("Failed to connect to database")
         raise RuntimeError("Database connection failed")
@@ -68,8 +82,9 @@ app = FastAPI(
     title="Portfolio Tracker API",
     description="API for tracking investment portfolios and transactions",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
 
 # Add security headers middleware (added before CORS so CORS is outermost)
 @app.middleware("http")
@@ -81,6 +96,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
+
 
 # Configure CORS (added after security headers so it wraps outermost —
 # ensures CORS headers are present even on unhandled 500 errors)
@@ -94,6 +110,7 @@ app.add_middleware(
 
 
 # ================== Exception Handlers ==================
+
 
 @app.exception_handler(PortfolioNotFoundException)
 async def portfolio_not_found_handler(request, exc: PortfolioNotFoundException):
@@ -116,7 +133,9 @@ async def invalid_csv_format_handler(request, exc: InvalidCSVFormatException):
 
 
 @app.exception_handler(InvalidTransactionDataException)
-async def invalid_transaction_data_handler(request, exc: InvalidTransactionDataException):
+async def invalid_transaction_data_handler(
+    request, exc: InvalidTransactionDataException
+):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
@@ -126,13 +145,13 @@ async def file_upload_handler(request, exc: FileUploadException):
 
 
 @app.exception_handler(OAuth2AuthorizeCallbackError)
-async def oauth_callback_error_handler(request: Request, exc: OAuth2AuthorizeCallbackError):
+async def oauth_callback_error_handler(
+    request: Request, exc: OAuth2AuthorizeCallbackError
+):
     detail = exc.detail or "OAuth authentication failed"
     if exc.response is not None:
-        try:
+        with contextlib.suppress(Exception):
             detail = exc.response.text or detail
-        except Exception:
-            pass
     logger.error("OAuth callback error (status=%s): %s", exc.status_code, detail)
     # Always redirect to the frontend — never show a raw error page to the user
     params = urlencode({"oauth_error": detail})
@@ -171,26 +190,38 @@ app.include_router(
 # so there is exactly one handler for GET /users/me and no ordering ambiguity.
 _users_router = fastapi_users.get_users_router(UserRead, UserUpdate)
 _users_router.routes = [
-    r for r in _users_router.routes
+    r
+    for r in _users_router.routes
     if not (
         getattr(r, "path", None) == "/me"
         and ({"GET", "DELETE"} & getattr(r, "methods", set()))
     )
 ]
 
+
 @_users_router.get("/me", tags=["users"])
 def get_current_user_me(
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    providers = list(session.exec(
-        select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
-    ).all())
+    providers = list(
+        session.exec(
+            select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
+        ).all()
+    )
     user_data = UserRead.model_validate(user).model_dump()
     user_data["oauth_providers"] = providers
     return user_data
 
-@_users_router.delete("/me", tags=["users"], status_code=204, responses={400: {"description": "Incorrect password or missing DELETE confirmation"}})
+
+@_users_router.delete(
+    "/me",
+    tags=["users"],
+    status_code=204,
+    responses={
+        400: {"description": "Incorrect password or missing DELETE confirmation"}
+    },
+)
 async def delete_current_user(
     body: CloseAccountRequest,
     user: Annotated[User, Depends(current_active_user)],
@@ -199,9 +230,11 @@ async def delete_current_user(
 ):
     """Permanently delete the current user and all associated data."""
     # Determine which providers the user has
-    providers = list(session.exec(
-        select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
-    ).all())
+    providers = list(
+        session.exec(
+            select(OAuthAccount.oauth_name).where(OAuthAccount.user_id == user.id)
+        ).all()
+    )
     has_oauth = len(providers) > 0
 
     # Verify identity: password OR "DELETE" confirmation for OAuth-only users
@@ -224,6 +257,7 @@ async def delete_current_user(
     response = Response(status_code=204)
     response.delete_cookie("pt_auth")
     return response
+
 
 # Move /me routes to the front so they are checked before GET /{id}, which would
 # otherwise match the literal string "me" as a path parameter and return 403.
@@ -249,6 +283,7 @@ app.include_router(
 
 # ================== Health Check ==================
 
+
 @app.get("/", tags=["health"])
 def root():
     """Basic health check endpoint"""
@@ -265,7 +300,7 @@ def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": "1.0.0",
-        "database": "unknown"
+        "database": "unknown",
     }
 
     try:

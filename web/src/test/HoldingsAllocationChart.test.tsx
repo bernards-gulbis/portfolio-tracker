@@ -93,6 +93,7 @@ describe('HoldingsAllocationChart', () => {
         holdings={mockHoldingsEur}
         cash={500}
         eurRate={0.92}
+        displayCurrency="EUR"
         isLoading={false}
       />
     );
