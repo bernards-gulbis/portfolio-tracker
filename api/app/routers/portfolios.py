@@ -1,24 +1,25 @@
 """Portfolio API routes"""
+
 import logging
+from datetime import UTC, datetime
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
-from typing import Annotated, List, Optional
-from datetime import datetime, timezone
 
 from app.core import get_session
 from app.core.auth import current_active_user
 from app.models.user import User
 from app.schemas import (
-    PortfolioCreate,
-    PortfolioUpdate,
+    LivePricesResponse,
+    PerformanceDataPoint,
     PortfolioCopy,
+    PortfolioCreate,
+    PortfolioPerformanceResponse,
     PortfolioResponse,
     PortfolioStatusResponse,
-    LivePricesResponse,
-    PortfolioPerformanceResponse,
-    PerformanceDataPoint,
+    PortfolioUpdate,
 )
-
 from app.services import PortfolioService
 from app.services.price_service import PriceService
 
@@ -40,7 +41,7 @@ def create_portfolio(
     return service.create_portfolio(portfolio.name, user.id)
 
 
-@router.get("/", response_model=List[PortfolioResponse])
+@router.get("/", response_model=list[PortfolioResponse])
 def list_portfolios(
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
@@ -57,7 +58,7 @@ def list_portfolios(
 )
 def get_live_prices(
     _user: Annotated[User, Depends(current_active_user)],
-    tickers: Annotated[Optional[List[str]], Query()] = None,
+    tickers: Annotated[list[str] | None, Query()] = None,
 ):
     """Get current prices and FX rate without replaying transactions"""
     tickers = tickers or []
@@ -75,7 +76,7 @@ def get_live_prices(
     return LivePricesResponse(
         prices=prices,
         usd_to_eur_rate=usd_to_eur_rate,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 
@@ -90,7 +91,11 @@ def get_portfolio(
     return service.get_portfolio(portfolio_id, user.id)
 
 
-@router.get("/{portfolio_id}/status", response_model=PortfolioStatusResponse, responses={400: {"description": "Invalid portfolio data"}})
+@router.get(
+    "/{portfolio_id}/status",
+    response_model=PortfolioStatusResponse,
+    responses={400: {"description": "Invalid portfolio data"}},
+)
 def get_portfolio_status(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
@@ -99,9 +104,11 @@ def get_portfolio_status(
     """Get portfolio status with holdings, cash balance, and performance metrics"""
     service = PortfolioService(session)
     try:
-        return service.calculate_portfolio_status(portfolio_id, user.id, tax_rate=user.tax_rate)
+        return service.calculate_portfolio_status(
+            portfolio_id, user.id, tax_rate=user.tax_rate
+        )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
 
 @router.put("/{portfolio_id}", response_model=PortfolioResponse)
@@ -140,14 +147,24 @@ def delete_portfolio(
     return None
 
 
-@router.get("/{portfolio_id}/performance", response_model=PortfolioPerformanceResponse, responses={400: {"description": "Invalid date format or date range"}})
+@router.get(
+    "/{portfolio_id}/performance",
+    response_model=PortfolioPerformanceResponse,
+    responses={400: {"description": "Invalid date format or date range"}},
+)
 def get_portfolio_performance(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
-    start_date: Annotated[Optional[str], Query(description="Start date in YYYY-MM-DD format")] = None,
-    end_date: Annotated[Optional[str], Query(description="End date in YYYY-MM-DD format")] = None,
-    num_points: Annotated[int, Query(ge=2, le=365, description="Number of data points to return")] = 60,
+    start_date: Annotated[
+        str | None, Query(description="Start date in YYYY-MM-DD format")
+    ] = None,
+    end_date: Annotated[
+        str | None, Query(description="End date in YYYY-MM-DD format")
+    ] = None,
+    num_points: Annotated[
+        int, Query(ge=2, le=365, description="Number of data points to return")
+    ] = 60,
 ):
     """Get portfolio performance over time as a time series of portfolio values."""
     service = PortfolioService(session)
@@ -157,17 +174,18 @@ def get_portfolio_performance(
 
     try:
         if start_date:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         if end_date:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
         if start_dt and end_dt and start_dt >= end_dt:
             raise HTTPException(
-                status_code=400,
-                detail="start_date must be before end_date"
+                status_code=400, detail="start_date must be before end_date"
             )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid date format: {e!s}"
+        ) from None
 
     try:
         PriceService.clear_session_cache()
@@ -177,18 +195,18 @@ def get_portfolio_performance(
             user_id=user.id,
             start_date=start_dt,
             end_date=end_dt,
-            num_points=num_points
+            num_points=num_points,
         )
 
         data_points = [
             PerformanceDataPoint(
-                date=dp['date'],
-                principal=dp.get('principal', 0.0),
-                principal_eur=dp.get('principal_eur'),
-                current_value=dp.get('current_value'),
-                fx_rate=dp.get('fx_rate'),
-                return_pct=dp.get('return_pct'),
-                sp500_return_pct=dp.get('sp500_return_pct'),
+                date=dp["date"],
+                principal=dp.get("principal", 0.0),
+                principal_eur=dp.get("principal_eur"),
+                current_value=dp.get("current_value"),
+                fx_rate=dp.get("fx_rate"),
+                return_pct=dp.get("return_pct"),
+                sp500_return_pct=dp.get("sp500_return_pct"),
             )
             for dp in performance_data
         ]
@@ -196,9 +214,7 @@ def get_portfolio_performance(
         return PortfolioPerformanceResponse(
             portfolio_id=portfolio_id,
             portfolio_name=portfolio_name,
-            data_points=data_points
+            data_points=data_points,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
+        raise HTTPException(status_code=400, detail=str(e)) from None

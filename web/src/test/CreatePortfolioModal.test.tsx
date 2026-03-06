@@ -95,12 +95,14 @@ describe('CreatePortfolioModal', () => {
   });
 
   it('shows validation error for name exceeding 255 characters', async () => {
+    const user = userEvent.setup();
     renderModal({ isOpen: true, onClose: mockOnClose });
 
     const input = screen.getByLabelText('Portfolio Name');
-    await userEvent.type(input, 'a'.repeat(256));
+    await user.click(input);
+    await user.paste('a'.repeat(256));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Create Portfolio' }));
+    await user.click(screen.getByRole('button', { name: 'Create Portfolio' }));
 
     await waitFor(() => {
       expect(screen.getByText('Name must be at most 255 characters')).toBeInTheDocument();

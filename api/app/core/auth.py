@@ -1,26 +1,34 @@
 """FastAPI Users authentication configuration"""
-import uuid
-import logging
-from typing import Annotated, Optional
 
+import logging
+import uuid
+from typing import Annotated
+
+import httpx
 from fastapi import Depends
 from fastapi.responses import RedirectResponse
-from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
-from fastapi_users import exceptions
-from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
+from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin, exceptions
+from fastapi_users.authentication import (
+    AuthenticationBackend,
+    CookieTransport,
+    JWTStrategy,
+)
 from fastapi_users.db import BaseUserDatabase
 from httpx_oauth.clients.google import GoogleOAuth2
-import httpx
-from sqlmodel import Session, select
 from sqlalchemy import func as sa_func
+from sqlmodel import Session, select
 
 from app.core.config import (
-    SECRET_KEY, OAUTH_STATE_SECRET, GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET, COOKIE_SECURE, COOKIE_SAMESITE, FRONTEND_URL,
+    COOKIE_SAMESITE,
+    COOKIE_SECURE,
+    FRONTEND_URL,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    SECRET_KEY,
 )
 from app.core.database import get_session
-from app.models.user import User
 from app.models.oauth_account import OAuthAccount
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +81,7 @@ oauth_cookie_transport = OAuthRedirectCookieTransport(
 
 # ================== JWT Strategy ==================
 
+
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=604800)
 
@@ -96,6 +105,7 @@ oauth_auth_backend = AuthenticationBackend(
 
 # ================== Custom Sync User Database Adapter ==================
 
+
 class SyncSQLAlchemyUserDatabase(BaseUserDatabase[User, uuid.UUID]):
     """
     Custom sync adapter bridging SQLModel sync sessions to FastAPI Users.
@@ -109,18 +119,20 @@ class SyncSQLAlchemyUserDatabase(BaseUserDatabase[User, uuid.UUID]):
     def __init__(self, session: Session):
         self.session = session
 
-    async def get(self, id: uuid.UUID) -> Optional[User]:
+    async def get(self, id: uuid.UUID) -> User | None:
         return self.session.get(User, id)
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         statement = select(User).where(sa_func.lower(User.email) == email.lower())
         return self.session.exec(statement).first()
 
-    async def get_by_oauth_account(self, oauth: str, account_id: str) -> Optional[User]:
+    async def get_by_oauth_account(self, oauth: str, account_id: str) -> User | None:
         statement = (
             select(User)
             .join(OAuthAccount, OAuthAccount.user_id == User.id)
-            .where(OAuthAccount.oauth_name == oauth, OAuthAccount.account_id == account_id)
+            .where(
+                OAuthAccount.oauth_name == oauth, OAuthAccount.account_id == account_id
+            )
         )
         return self.session.exec(statement).first()
 
@@ -150,7 +162,9 @@ class SyncSQLAlchemyUserDatabase(BaseUserDatabase[User, uuid.UUID]):
         self.session.refresh(user)
         return user
 
-    async def update_oauth_account(self, user: User, oauth_account: OAuthAccount, update_dict: dict) -> User:
+    async def update_oauth_account(
+        self, user: User, oauth_account: OAuthAccount, update_dict: dict
+    ) -> User:
         for key, value in update_dict.items():
             setattr(oauth_account, key, value)
         self.session.add(oauth_account)
@@ -175,11 +189,13 @@ class SyncSQLAlchemyUserDatabase(BaseUserDatabase[User, uuid.UUID]):
 
 # ================== User Database Dependency ==================
 
+
 def get_user_db(session: Annotated[Session, Depends(get_session)]):
     yield SyncSQLAlchemyUserDatabase(session)
 
 
 # ================== User Manager ==================
+
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = SECRET_KEY
@@ -189,7 +205,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         logger.info("User %s registered", user.id)
 
     async def _create_oauth_user(
-        self, oauth_account_dict: dict, profile: dict, is_verified_by_default: bool, request
+        self,
+        oauth_account_dict: dict,
+        profile: dict,
+        is_verified_by_default: bool,
+        request,
     ) -> User:
         """Create a brand-new user from OAuth profile data."""
         password = self.password_helper.generate()
@@ -228,8 +248,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         access_token: str,
         account_id: str,
         account_email: str,
-        expires_at: Optional[int] = None,
-        refresh_token: Optional[str] = None,
+        expires_at: int | None = None,
+        refresh_token: str | None = None,
         request=None,
         *,
         associate_by_email: bool = False,
@@ -252,7 +272,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         }
 
         # Fetch profile data using this request's own access token
-        profile = await fetch_google_profile(access_token) if oauth_name == "google" else {}
+        profile = (
+            await fetch_google_profile(access_token) if oauth_name == "google" else {}
+        )
 
         try:
             user = await self.get_by_oauth_account(oauth_name, account_id)
@@ -277,7 +299,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         return user
 
 
-async def get_user_manager(user_db: Annotated[SyncSQLAlchemyUserDatabase, Depends(get_user_db)]):
+async def get_user_manager(
+    user_db: Annotated[SyncSQLAlchemyUserDatabase, Depends(get_user_db)],
+):
     yield UserManager(user_db)
 
 
@@ -303,7 +327,7 @@ class CustomGoogleOAuth2(GoogleOAuth2):
     Console; the OIDC endpoint works with just the basic userinfo scopes.
     """
 
-    async def get_id_email(self, token: str) -> tuple[str, Optional[str]]:
+    async def get_id_email(self, token: str) -> tuple[str, str | None]:
         async with self.get_httpx_client() as client:
             response = await client.get(
                 USERINFO_ENDPOINT,
@@ -311,6 +335,7 @@ class CustomGoogleOAuth2(GoogleOAuth2):
             )
             if response.status_code >= 400:
                 from httpx_oauth.exceptions import GetIdEmailError
+
                 raise GetIdEmailError(response=response)
 
             data = response.json()

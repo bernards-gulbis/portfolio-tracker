@@ -1,21 +1,23 @@
 """Transaction API routes"""
+
+import math
+from io import BytesIO
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
-from typing import Annotated, List, Optional
-from io import BytesIO
-import math
 
 from app.core import get_session
 from app.core.auth import current_active_user
 from app.core.exceptions import FileUploadException
 from app.models.user import User
 from app.schemas import (
-    TransactionCreate,
-    TransactionUpdate,
-    TransactionResponse,
     BulkImportResponse,
     PaginatedTransactionResponse,
+    TransactionCreate,
+    TransactionResponse,
+    TransactionUpdate,
 )
 from app.services import TransactionService
 
@@ -55,15 +57,26 @@ def list_transactions(
     user: Annotated[User, Depends(current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     page_size: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
-    ticker: Annotated[Optional[str], Query(description="Filter by ticker (partial, case-insensitive)")] = None,
-    type: Annotated[Optional[List[str]], Query(description="Filter by transaction type(s)")] = None,
-    sort_order: Annotated[str, Query(pattern="^(asc|desc)$", description="Sort by date: asc or desc")] = "desc",
+    ticker: Annotated[
+        str | None, Query(description="Filter by ticker (partial, case-insensitive)")
+    ] = None,
+    type: Annotated[
+        list[str] | None, Query(description="Filter by transaction type(s)")
+    ] = None,
+    sort_order: Annotated[
+        str, Query(pattern="^(asc|desc)$", description="Sort by date: asc or desc")
+    ] = "desc",
 ):
     """Get paginated transactions for a specific portfolio"""
     service = TransactionService(session)
     transactions, total = service.get_transactions_by_portfolio_paginated(
-        portfolio_id, user.id, page, page_size, ticker=ticker, transaction_types=type,
-        sort_order=sort_order
+        portfolio_id,
+        user.id,
+        page,
+        page_size,
+        ticker=ticker,
+        transaction_types=type,
+        sort_order=sort_order,
     )
     total_pages = math.ceil(total / page_size) if total > 0 else 1
 
@@ -72,7 +85,7 @@ def list_transactions(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages
+        total_pages=total_pages,
     )
 
 
@@ -86,14 +99,14 @@ def export_transactions(
     service = TransactionService(session)
     csv_content = service.export_transactions_to_csv(portfolio_id, user.id)
 
-    csv_bytes = BytesIO(csv_content.encode('utf-8'))
+    csv_bytes = BytesIO(csv_content.encode("utf-8"))
 
     return StreamingResponse(
         csv_bytes,
         media_type="text/csv",
         headers={
             "Content-Disposition": f"attachment; filename=portfolio_{portfolio_id}_transactions.csv"
-        }
+        },
     )
 
 
@@ -112,26 +125,31 @@ async def import_transactions_csv(
     2/12/2020 20:14:39,Deposit,,,,,3000,2760.27,,USD,1.0871
     2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,,,
     """
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith(".csv"):
         raise FileUploadException("File must be a CSV file")
 
-    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    max_file_size = 5 * 1024 * 1024  # 5MB
     try:
-        content = await file.read(MAX_FILE_SIZE + 1)
-        if len(content) > MAX_FILE_SIZE:
-            raise FileUploadException(f"File size exceeds maximum allowed size of {MAX_FILE_SIZE // (1024*1024)}MB")
-        csv_content = content.decode('utf-8')
-    except UnicodeDecodeError:
-        raise FileUploadException("File must be a valid UTF-8 encoded CSV file")
+        content = await file.read(max_file_size + 1)
+        if len(content) > max_file_size:
+            raise FileUploadException(
+                f"File size exceeds maximum allowed size of {max_file_size // (1024 * 1024)}MB"
+            )
+        csv_content = content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise FileUploadException(
+            "File must be a valid UTF-8 encoded CSV file"
+        ) from exc
+    except FileUploadException:
+        raise
     except Exception as e:
-        raise FileUploadException(f"Error reading file: {str(e)}")
+        raise FileUploadException(f"Error reading file: {e!s}") from e
 
     service = TransactionService(session)
     transactions = service.import_from_csv(csv_content, portfolio_id, user.id)
 
     return BulkImportResponse(
-        imported_count=len(transactions),
-        transactions=transactions
+        imported_count=len(transactions), transactions=transactions
     )
 
 

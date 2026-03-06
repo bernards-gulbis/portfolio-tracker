@@ -85,3 +85,24 @@ English (`en`) and Latvian (`lv`) via i18next. `lv.ts` is typed as `Translation`
 - Use `useLocale()` hook and pass locale to `formatCurrency`/`formatDate`
 
 **Adding a new language:** create locale file in `src/i18n/locales/`, import in `index.ts`, add BCP 47 mapping in `useLocale.ts`, add display name to both existing locale files.
+
+## Linting
+
+ESLint with TypeScript and React plugins. Configuration is in `eslint.config.js`.
+
+```bash
+npm run lint
+```
+
+## Testing
+
+Vitest with React Testing Library and jsdom.
+
+```bash
+npx vitest run                # Run all tests once
+npx vitest                    # Watch mode
+npx vitest --ui               # Browser UI
+npx vitest --coverage         # Coverage report
+```
+
+Tests are in `src/test/`.

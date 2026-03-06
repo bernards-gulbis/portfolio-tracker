@@ -1,40 +1,44 @@
 """
 Portfolio service for business logic
 """
+
 import logging
 import uuid
 from bisect import bisect_right
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta, timezone
+
 from sqlmodel import Session
+
+from app.core.exceptions import (
+    InvalidPortfolioNameException,
+    PortfolioNotFoundException,
+)
 from app.models import Portfolio, Transaction, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.repositories.transaction_repository import TransactionRepository
-from app.core.exceptions import (
-    PortfolioNotFoundException,
-    InvalidPortfolioNameException,
-)
 from app.schemas import HoldingResponse, PortfolioStatusResponse
 from app.schemas.schemas import TransactionWarning
 from app.services.price_service import PriceService
 
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
-HOLDINGS_EPSILON = Decimal('1e-6')
+HOLDINGS_EPSILON = Decimal("1e-6")
 
-_DEFAULT_TAX_RATE = Decimal('0.255')
+_DEFAULT_TAX_RATE = Decimal("0.255")
 
-_ISO_DATETIME_FMT = '%Y-%m-%dT%H:%M:%S'
+_ISO_DATETIME_FMT = "%Y-%m-%dT%H:%M:%S"
 
 # Shorthand for Decimal constants
-_ZERO = Decimal('0')
-_ONE = Decimal('1')
+_ZERO = Decimal("0")
+_ONE = Decimal("1")
 
 logger = logging.getLogger(__name__)
 
 
 # ================== Transaction state helpers ==================
+
 
 def _to_decimal(value: object) -> Decimal:
     """Convert a value to Decimal, handling None and float inputs."""
@@ -51,20 +55,20 @@ def _normalize_zero(value: Decimal) -> float:
     return 0.0 if abs(value) < HOLDINGS_EPSILON else float(value)
 
 
-def _opt_float(value: Optional[Decimal]) -> Optional[float]:
+def _opt_float(value: Decimal | None) -> float | None:
     """Convert Optional[Decimal] to Optional[float]."""
     return float(value) if value is not None else None
 
 
-def _opt_normalize(value: Optional[Decimal]) -> Optional[float]:
+def _opt_normalize(value: Decimal | None) -> float | None:
     """Normalize Optional[Decimal] to Optional[float], converting near-zero to 0.0."""
     return _normalize_zero(value) if value is not None else None
 
 
 def _compute_forward_split_factors(
-    transactions: List[Transaction],
-    cutoff_date: Optional[datetime] = None,
-) -> Dict[str, Decimal]:
+    transactions: list[Transaction],
+    cutoff_date: datetime | None = None,
+) -> dict[str, Decimal]:
     """Compute the product of all future split ratios per ticker.
 
     Yahoo Finance close prices are split-adjusted: for dates before a split,
@@ -81,7 +85,7 @@ def _compute_forward_split_factors(
                       If None, include all splits (caller will decrement as
                       splits are replayed).
     """
-    factors: Dict[str, Decimal] = {}
+    factors: dict[str, Decimal] = {}
     for tx in transactions:
         if tx.type != TransactionType.SPLIT or not tx.ticker or not tx.split_ratio:
             continue
@@ -95,18 +99,23 @@ def _compute_forward_split_factors(
 @dataclass
 class _TxState:
     """Mutable portfolio state built by replaying transactions in chronological order."""
+
     cash: Decimal = _ZERO
-    principal: Decimal = _ZERO        # Net deposits - withdrawals in native currency
-    principal_eur: Decimal = _ZERO    # Net deposits - withdrawals in EUR (historical rates)
+    principal: Decimal = _ZERO  # Net deposits - withdrawals in native currency
+    principal_eur: Decimal = (
+        _ZERO  # Net deposits - withdrawals in EUR (historical rates)
+    )
     dividends: Decimal = _ZERO
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
-    holdings: Dict[str, Dict[str, Decimal]] = dc_field(default_factory=dict)
-    warnings: List[Dict[str, object]] = dc_field(default_factory=list)
-    usd_to_eur_fallback: Optional[float] = None
+    holdings: dict[str, dict[str, Decimal]] = dc_field(default_factory=dict)
+    warnings: list[dict[str, object]] = dc_field(default_factory=list)
+    usd_to_eur_fallback: float | None = None
 
 
-def _eur_from_tx(tx: Transaction, total_amount: Decimal, usd_to_eur_fallback: Optional[float] = None) -> Decimal:
+def _eur_from_tx(
+    tx: Transaction, total_amount: Decimal, usd_to_eur_fallback: float | None = None
+) -> Decimal:
     """Return the EUR equivalent of a transaction, or 0 if no rate is available."""
     if tx.eur_amount is not None:
         return _to_decimal(tx.eur_amount)
@@ -132,11 +141,13 @@ def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.principal += total
     state.principal_eur += _eur_from_tx(tx, total, state.usd_to_eur_fallback)
     if strict and state.cash < 0:
-        state.warnings.append({
-            'code': 'withdrawNegativeCash',
-            'date': tx.date.strftime(_ISO_DATETIME_FMT),
-            'params': {'amount': str(-total), 'balance': str(state.cash)},
-        })
+        state.warnings.append(
+            {
+                "code": "withdrawNegativeCash",
+                "date": tx.date.strftime(_ISO_DATETIME_FMT),
+                "params": {"amount": str(-total), "balance": str(state.cash)},
+            }
+        )
 
 
 def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -144,9 +155,11 @@ def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.cash += total
     if tx.ticker:
         quantity = _to_decimal(tx.quantity or 0)
-        h = state.holdings.setdefault(tx.ticker, {'quantity': _ZERO, 'total_cost': _ZERO})
-        h['quantity'] += quantity
-        h['total_cost'] += -total
+        h = state.holdings.setdefault(
+            tx.ticker, {"quantity": _ZERO, "total_cost": _ZERO}
+        )
+        h["quantity"] += quantity
+        h["total_cost"] += -total
 
 
 def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -158,35 +171,45 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         return
     if ticker not in state.holdings:
         if strict:
-            state.warnings.append({
-                'code': 'sellNotInHoldings',
-                'date': tx.date.strftime(_ISO_DATETIME_FMT),
-                'params': {'ticker': ticker},
-            })
+            state.warnings.append(
+                {
+                    "code": "sellNotInHoldings",
+                    "date": tx.date.strftime(_ISO_DATETIME_FMT),
+                    "params": {"ticker": ticker},
+                }
+            )
         return
     h = state.holdings[ticker]
-    if quantity > h['quantity'] + HOLDINGS_EPSILON:
+    if quantity > h["quantity"] + HOLDINGS_EPSILON:
         if strict:
-            held = h['quantity']
-            state.warnings.append({
-                'code': 'sellOversell',
-                'date': tx.date.strftime(_ISO_DATETIME_FMT),
-                'params': {'ticker': ticker, 'quantity': str(quantity), 'available': str(held)},
-            })
+            held = h["quantity"]
+            state.warnings.append(
+                {
+                    "code": "sellOversell",
+                    "date": tx.date.strftime(_ISO_DATETIME_FMT),
+                    "params": {
+                        "ticker": ticker,
+                        "quantity": str(quantity),
+                        "available": str(held),
+                    },
+                }
+            )
             # Partial sell: sell only what is held, with proportional total
             partial_total = total * (held / quantity) if quantity > 0 else _ZERO
-            cost_basis = h['total_cost']
+            cost_basis = h["total_cost"]
             state.cash += partial_total
             state.realized_gains += partial_total - cost_basis
             del state.holdings[ticker]
         return
     state.cash += total
     # Proportional cost removal: avoids intermediate avg_cost rounding
-    cost_basis = h['total_cost'] * (quantity / h['quantity']) if h['quantity'] > 0 else _ZERO
+    cost_basis = (
+        h["total_cost"] * (quantity / h["quantity"]) if h["quantity"] > 0 else _ZERO
+    )
     state.realized_gains += total - cost_basis
-    h['quantity'] -= quantity
-    h['total_cost'] -= cost_basis
-    if h['quantity'] < HOLDINGS_EPSILON:
+    h["quantity"] -= quantity
+    h["total_cost"] -= cost_basis
+    if h["quantity"] < HOLDINGS_EPSILON:
         del state.holdings[ticker]
 
 
@@ -205,14 +228,16 @@ def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
     split_ratio = _to_decimal(tx.split_ratio or 1)
     if split_ratio <= 0:
         if strict:
-            state.warnings.append({
-                'code': 'invalidSplitRatio',
-                'date': tx.date.strftime(_ISO_DATETIME_FMT),
-                'params': {'ticker': tx.ticker or '', 'ratio': str(split_ratio)},
-            })
+            state.warnings.append(
+                {
+                    "code": "invalidSplitRatio",
+                    "date": tx.date.strftime(_ISO_DATETIME_FMT),
+                    "params": {"ticker": tx.ticker or "", "ratio": str(split_ratio)},
+                }
+            )
         return
     if tx.ticker and tx.ticker in state.holdings:
-        state.holdings[tx.ticker]['quantity'] *= split_ratio
+        state.holdings[tx.ticker]["quantity"] *= split_ratio
 
 
 _TX_HANDLERS = {
@@ -241,11 +266,13 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
     handler = _TX_HANDLERS.get(tx.type)
     if handler is None:
         if strict:
-            state.warnings.append({
-                'code': 'unknownType',
-                'date': tx.date.strftime(_ISO_DATETIME_FMT),
-                'params': {'type': str(tx.type)},
-            })
+            state.warnings.append(
+                {
+                    "code": "unknownType",
+                    "date": tx.date.strftime(_ISO_DATETIME_FMT),
+                    "params": {"type": str(tx.type)},
+                }
+            )
         return
     handler(state, tx, strict)
 
@@ -254,24 +281,22 @@ def _apply_transaction(state: _TxState, tx: Transaction, strict: bool = False) -
 
 
 def _resolve_nearest_date_value(
-    date_prices: Dict[str, float], target_date_str: str
-) -> Optional[float]:
+    date_prices: dict[str, float], target_date_str: str
+) -> float | None:
     """Return the value for *target_date_str* or the nearest earlier date, else None."""
     if not date_prices:
         return None
     if target_date_str in date_prices:
         return date_prices[target_date_str]
-    available = sorted(
-        (d for d in date_prices if d <= target_date_str), reverse=True
-    )
+    available = sorted((d for d in date_prices if d <= target_date_str), reverse=True)
     if available:
         return date_prices[available[0]]
     return None
 
 
 def _fetch_historical_prices(
-    tickers: List[str], target_date: datetime
-) -> Dict[str, float]:
+    tickers: list[str], target_date: datetime
+) -> dict[str, float]:
     """Fetch historical prices for *tickers* at (or near) *target_date*."""
     if not tickers:
         return {}
@@ -280,8 +305,8 @@ def _fetch_historical_prices(
     all_prices = PriceService.get_historical_prices_for_multiple_tickers(
         tickers, start_date, end_date
     )
-    target_date_str = target_date.strftime('%Y-%m-%d')
-    result: Dict[str, float] = {}
+    target_date_str = target_date.strftime("%Y-%m-%d")
+    result: dict[str, float] = {}
     for ticker, date_prices in all_prices.items():
         if not date_prices:
             continue
@@ -296,8 +321,8 @@ def _fetch_historical_prices(
 
 def _value_holdings_at_date(
     state: _TxState,
-    historical_prices: Optional[Dict[str, float]],
-    forward_split_factors: Dict[str, Decimal],
+    historical_prices: dict[str, float] | None,
+    forward_split_factors: dict[str, Decimal],
     target_date_str: str,
 ) -> Decimal:
     """Compute total holdings value at a historical date using price → DB cache → cost basis fallback."""
@@ -306,32 +331,39 @@ def _value_holdings_at_date(
         price = historical_prices.get(ticker) if historical_prices else None
         if price is not None and price > 0:
             split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
+            holdings_value += (
+                holding_data["quantity"] * _to_decimal(price) * split_factor
+            )
             continue
         # Try last known price from DB cache before falling back to cost basis
         db_price = PriceService.get_last_known_price(ticker)
         if db_price is not None and db_price > 0:
             split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += holding_data['quantity'] * _to_decimal(db_price) * split_factor
+            holdings_value += (
+                holding_data["quantity"] * _to_decimal(db_price) * split_factor
+            )
             logger.debug(
                 "Status at %s: using last known price %.4f for %s",
-                target_date_str, db_price, ticker,
+                target_date_str,
+                db_price,
+                ticker,
             )
         else:
-            holdings_value += holding_data['total_cost']
+            holdings_value += holding_data["total_cost"]
             logger.warning(
                 "Status at %s: no price data for %s (using cost basis)",
-                target_date_str, ticker,
+                target_date_str,
+                ticker,
             )
     return holdings_value
 
 
-def _resolve_usd_to_eur_rate(target_date: datetime) -> Optional[float]:
+def _resolve_usd_to_eur_rate(target_date: datetime) -> float | None:
     """Resolve USD→EUR rate at *target_date*, falling back to nearest earlier date or current rate."""
     start_date = target_date - timedelta(days=5)
     end_date = target_date + timedelta(days=1)
     fx_rates = PriceService.get_historical_usd_to_eur_rates(start_date, end_date)
-    target_date_str = target_date.strftime('%Y-%m-%d')
+    target_date_str = target_date.strftime("%Y-%m-%d")
     rate = _resolve_nearest_date_value(fx_rates, target_date_str)
     if rate is not None:
         return rate
@@ -343,26 +375,28 @@ def _resolve_usd_to_eur_rate(target_date: datetime) -> Optional[float]:
 
 def _build_holdings_list(
     state: _TxState,
-) -> Tuple[List[HoldingResponse], Decimal]:
+) -> tuple[list[HoldingResponse], Decimal]:
     """Build the sorted holdings list and total cost basis (transaction-derived only).
 
     Returns:
         (holdings_list, holdings_cost)
     """
-    holdings_list: List[HoldingResponse] = []
+    holdings_list: list[HoldingResponse] = []
     holdings_cost = _ZERO
 
     for ticker, holding_data in state.holdings.items():
-        quantity = holding_data['quantity']
-        total_cost = holding_data['total_cost']
+        quantity = holding_data["quantity"]
+        total_cost = holding_data["total_cost"]
         avg_cost = total_cost / quantity if quantity > 0 else _ZERO
 
-        holdings_list.append(HoldingResponse(
-            ticker=ticker,
-            quantity=float(quantity),
-            average_cost=float(avg_cost),
-            total_cost=float(total_cost),
-        ))
+        holdings_list.append(
+            HoldingResponse(
+                ticker=ticker,
+                quantity=float(quantity),
+                average_cost=float(avg_cost),
+                total_cost=float(total_cost),
+            )
+        )
         holdings_cost += total_cost
 
     holdings_list.sort(key=lambda h: h.ticker)
@@ -373,8 +407,8 @@ def _build_holdings_list(
 
 
 def _bisect_lookup(
-    sorted_dates: List[str], data: Dict[str, float], date_str: str
-) -> Optional[float]:
+    sorted_dates: list[str], data: dict[str, float], date_str: str
+) -> float | None:
     """Look up value for a date using bisect, falling back to the most recent earlier date."""
     if not sorted_dates:
         return None
@@ -384,7 +418,7 @@ def _bisect_lookup(
 
 def _generate_date_points(
     start_date: datetime, end_date: datetime, num_points: int
-) -> List[datetime]:
+) -> list[datetime]:
     """Generate evenly-spaced date points between start and end."""
     total_days = (end_date - start_date).days
     if total_days == 0:
@@ -393,7 +427,9 @@ def _generate_date_points(
         date_points = [start_date + timedelta(days=i) for i in range(total_days + 1)]
     else:
         interval = total_days / (num_points - 1)
-        date_points = [start_date + timedelta(days=int(i * interval)) for i in range(num_points)]
+        date_points = [
+            start_date + timedelta(days=int(i * interval)) for i in range(num_points)
+        ]
 
     if total_days > 0 and date_points[-1].date() != end_date.date():
         date_points[-1] = end_date
@@ -401,28 +437,28 @@ def _generate_date_points(
 
 
 def _prepare_perf_data(
-    transactions: List[Transaction],
+    transactions: list[Transaction],
     start_date: datetime,
     end_date: datetime,
-) -> Tuple[
-    Dict[str, Dict[str, float]],   # historical_data
-    Dict[str, List[str]],          # sorted_dates_map
-    Dict[str, float],              # fx_rates
-    List[str],                     # sorted_fx_dates
-    Dict[str, float],              # sp500_prices
-    List[str],                     # sorted_sp500_dates
-    Dict[str, float],              # ticker_last_price
+) -> tuple[
+    dict[str, dict[str, float]],  # historical_data
+    dict[str, list[str]],  # sorted_dates_map
+    dict[str, float],  # fx_rates
+    list[str],  # sorted_fx_dates
+    dict[str, float],  # sp500_prices
+    list[str],  # sorted_sp500_dates
+    dict[str, float],  # ticker_last_price
 ]:
     """Fetch all historical price data, FX rates, and S&P 500 in a single batch."""
     all_tickers = {tx.ticker for tx in transactions if tx.ticker}
 
     # Per-ticker earliest transaction date (avoid pre-IPO lookups)
-    ticker_first_date: Dict[str, datetime] = {}
+    ticker_first_date: dict[str, datetime] = {}
     for tx in transactions:
         if tx.ticker and tx.ticker not in ticker_first_date:
             ticker_first_date[tx.ticker] = tx.date - timedelta(days=5)
 
-    fetch_tickers = list(all_tickers | {'EURUSD=X', '^GSPC'})
+    fetch_tickers = list(all_tickers | {"EURUSD=X", "^GSPC"})
     historical_data = PriceService.get_historical_prices_for_multiple_tickers(
         fetch_tickers,
         start_date - timedelta(days=5),
@@ -431,24 +467,24 @@ def _prepare_perf_data(
     )
 
     # Extract and invert FX rates
-    eur_usd_prices = historical_data.pop('EURUSD=X', {})
+    eur_usd_prices = historical_data.pop("EURUSD=X", {})
     fx_rates = {
         date_str: 1.0 / rate
         for date_str, rate in eur_usd_prices.items()
         if rate and rate > 0
     }
 
-    sp500_prices = historical_data.pop('^GSPC', {})
+    sp500_prices = historical_data.pop("^GSPC", {})
 
     # Pre-sort date keys for O(log n) bisect lookups
-    sorted_dates_map: Dict[str, List[str]] = {}
+    sorted_dates_map: dict[str, list[str]] = {}
     for ticker, data in historical_data.items():
         sorted_dates_map[ticker] = sorted(data.keys())
     sorted_fx_dates = sorted(fx_rates.keys())
     sorted_sp500_dates = sorted(sp500_prices.keys())
 
     # Seed last known prices from DB for tickers with no Yahoo data
-    ticker_last_price: Dict[str, float] = {}
+    ticker_last_price: dict[str, float] = {}
     for ticker in all_tickers:
         if not historical_data.get(ticker):
             db_price = PriceService.get_last_known_price(ticker)
@@ -456,22 +492,33 @@ def _prepare_perf_data(
                 ticker_last_price[ticker] = db_price
                 logger.info(
                     "Seeded last known price for %s: %.4f (from DB cache)",
-                    ticker, db_price,
+                    ticker,
+                    db_price,
                 )
 
-    return (historical_data, sorted_dates_map, fx_rates, sorted_fx_dates,
-            sp500_prices, sorted_sp500_dates, ticker_last_price)
+    return (
+        historical_data,
+        sorted_dates_map,
+        fx_rates,
+        sorted_fx_dates,
+        sp500_prices,
+        sorted_sp500_dates,
+        ticker_last_price,
+    )
 
 
 def _replay_transactions_up_to(
-    transactions: List[Transaction],
+    transactions: list[Transaction],
     tx_index: int,
     state: _TxState,
     date_point: datetime,
-    forward_split_factors: Dict[str, Decimal],
+    forward_split_factors: dict[str, Decimal],
 ) -> int:
     """Replay transactions up to *date_point*, updating state and split factors. Returns new tx_index."""
-    while tx_index < len(transactions) and transactions[tx_index].date.date() <= date_point.date():
+    while (
+        tx_index < len(transactions)
+        and transactions[tx_index].date.date() <= date_point.date()
+    ):
         tx = transactions[tx_index]
         _apply_transaction(state, tx, strict=False)
         if tx.type == TransactionType.SPLIT and tx.ticker and tx.split_ratio:
@@ -484,31 +531,37 @@ def _replay_transactions_up_to(
 
 def _compute_perf_holdings(
     state: _TxState,
-    sorted_dates_map: Dict[str, List[str]],
-    historical_data: Dict[str, Dict[str, float]],
-    ticker_last_price: Dict[str, float],
-    forward_split_factors: Dict[str, Decimal],
+    sorted_dates_map: dict[str, list[str]],
+    historical_data: dict[str, dict[str, float]],
+    ticker_last_price: dict[str, float],
+    forward_split_factors: dict[str, Decimal],
     date_str: str,
-) -> Tuple[Decimal, List[str], List[str]]:
+) -> tuple[Decimal, list[str], list[str]]:
     """Compute total holdings value for a performance date point using price → last-known → cost basis."""
     holdings_value = _ZERO
-    last_known_tickers: List[str] = []
-    cost_basis_tickers: List[str] = []
+    last_known_tickers: list[str] = []
+    cost_basis_tickers: list[str] = []
     for ticker, holding_data in state.holdings.items():
         ticker_dates = sorted_dates_map.get(ticker, [])
         price = _bisect_lookup(ticker_dates, historical_data.get(ticker, {}), date_str)
         if price is not None and price > 0:
             split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += holding_data['quantity'] * _to_decimal(price) * split_factor
+            holdings_value += (
+                holding_data["quantity"] * _to_decimal(price) * split_factor
+            )
             ticker_last_price[ticker] = price  # store raw Yahoo price
         elif ticker in ticker_last_price:
             # Use last known raw price × current split factor
             split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += holding_data['quantity'] * _to_decimal(ticker_last_price[ticker]) * split_factor
+            holdings_value += (
+                holding_data["quantity"]
+                * _to_decimal(ticker_last_price[ticker])
+                * split_factor
+            )
             last_known_tickers.append(ticker)
         else:
             # No price ever seen — fall back to cost basis (last resort)
-            holdings_value += holding_data['total_cost']
+            holdings_value += holding_data["total_cost"]
             cost_basis_tickers.append(ticker)
     return holdings_value, last_known_tickers, cost_basis_tickers
 
@@ -516,6 +569,7 @@ def _compute_perf_holdings(
 @dataclass
 class _TwrState:
     """Running state for Time-Weighted Return calculation."""
+
     prev_value: Decimal = _ZERO
     prev_principal: Decimal = _ZERO
     twr_factor: Decimal = _ONE  # cumulative (1+r1)(1+r2)…
@@ -527,24 +581,26 @@ def _compute_perf_data_point(
     twr: _TwrState,
     date_str: str,
     holdings_value: Decimal,
-    last_known_tickers: List[str],
-    cost_basis_tickers: List[str],
-    fx_rates: Dict[str, float],
-    sorted_fx_dates: List[str],
-    sp500_prices: Dict[str, float],
-    sorted_sp500_dates: List[str],
-    sp500_base_price: Optional[float],
-) -> Tuple[Dict, Optional[float]]:
+    last_known_tickers: list[str],
+    cost_basis_tickers: list[str],
+    fx_rates: dict[str, float],
+    sorted_fx_dates: list[str],
+    sp500_prices: dict[str, float],
+    sorted_sp500_dates: list[str],
+    sp500_base_price: float | None,
+) -> tuple[dict, float | None]:
     """Build a single performance data-point dict. Returns (data_point, updated sp500_base_price)."""
     if last_known_tickers:
         logger.debug(
             "Performance %s: using last known price for %s",
-            date_str, last_known_tickers,
+            date_str,
+            last_known_tickers,
         )
     if cost_basis_tickers:
         logger.warning(
             "Performance %s: no price data for %s (using cost basis as fallback)",
-            date_str, cost_basis_tickers,
+            date_str,
+            cost_basis_tickers,
         )
 
     current_value = state.cash + holdings_value
@@ -566,7 +622,7 @@ def _compute_perf_data_point(
             sub_return = current_value / base
             twr.twr_factor *= sub_return
         # If base <= 0 (e.g. everything withdrawn), skip sub-period
-        return_pct = float((twr.twr_factor - _ONE) * Decimal('100'))
+        return_pct = float((twr.twr_factor - _ONE) * Decimal("100"))
 
     twr.prev_value = current_value
     twr.prev_principal = state.principal
@@ -580,18 +636,19 @@ def _compute_perf_data_point(
         sp500_return_pct = (sp500_price / sp500_base_price - 1.0) * 100.0
 
     data_point = {
-        'date': date_str,
-        'principal': float(state.principal),
-        'principal_eur': float(state.principal_eur),
-        'current_value': float(current_value),
-        'fx_rate': fx_rate,
-        'return_pct': return_pct,
-        'sp500_return_pct': sp500_return_pct,
+        "date": date_str,
+        "principal": float(state.principal),
+        "principal_eur": float(state.principal_eur),
+        "current_value": float(current_value),
+        "fx_rate": fx_rate,
+        "return_pct": return_pct,
+        "sp500_return_pct": sp500_return_pct,
     }
     return data_point, sp500_base_price
 
 
 # ================== Service ==================
+
 
 class PortfolioService:
     """Service for portfolio business logic"""
@@ -607,7 +664,9 @@ class PortfolioService:
         if not stripped:
             raise InvalidPortfolioNameException("Portfolio name cannot be empty")
         if len(stripped) > 255:
-            raise InvalidPortfolioNameException("Portfolio name cannot exceed 255 characters")
+            raise InvalidPortfolioNameException(
+                "Portfolio name cannot exceed 255 characters"
+            )
         return stripped
 
     def create_portfolio(self, name: str, user_id: uuid.UUID) -> Portfolio:
@@ -621,13 +680,17 @@ class PortfolioService:
             raise PortfolioNotFoundException(portfolio_id)
         return portfolio
 
-    def get_all_portfolios(self, user_id: uuid.UUID) -> List[Portfolio]:
+    def get_all_portfolios(self, user_id: uuid.UUID) -> list[Portfolio]:
         """Get all portfolios for user"""
         return self.portfolio_repo.get_all_for_user(user_id)
 
-    def update_portfolio(self, portfolio_id: int, name: str, user_id: uuid.UUID) -> Portfolio:
+    def update_portfolio(
+        self, portfolio_id: int, name: str, user_id: uuid.UUID
+    ) -> Portfolio:
         """Update a portfolio (user-scoped)"""
-        portfolio = self.portfolio_repo.update(portfolio_id, self._validate_name(name), user_id)
+        portfolio = self.portfolio_repo.update(
+            portfolio_id, self._validate_name(name), user_id
+        )
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
         return portfolio
@@ -637,7 +700,9 @@ class PortfolioService:
         if not self.portfolio_repo.delete(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
 
-    def copy_portfolio(self, portfolio_id: int, new_name: str, user_id: uuid.UUID) -> Portfolio:
+    def copy_portfolio(
+        self, portfolio_id: int, new_name: str, user_id: uuid.UUID
+    ) -> Portfolio:
         """Copy a portfolio with all its transactions (user-scoped)"""
         copied_portfolio = self.portfolio_repo.copy_with_transactions(
             portfolio_id, self._validate_name(new_name), user_id
@@ -648,7 +713,12 @@ class PortfolioService:
 
         return copied_portfolio
 
-    def calculate_portfolio_status(self, portfolio_id: int, user_id: uuid.UUID, tax_rate: Decimal = _DEFAULT_TAX_RATE) -> PortfolioStatusResponse:
+    def calculate_portfolio_status(
+        self,
+        portfolio_id: int,
+        user_id: uuid.UUID,
+        tax_rate: Decimal = _DEFAULT_TAX_RATE,
+    ) -> PortfolioStatusResponse:
         """
         Calculate comprehensive portfolio status including holdings, cash, and performance metrics.
 
@@ -682,7 +752,7 @@ class PortfolioService:
         # Note: both cases produce None on the frontend, which is intentional — the
         # distinction (no dividends vs. dividends with missing EUR rate) is not surfaced in UI.
         has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
-        dividends_eur: Optional[Decimal] = state.dividends_eur if has_valid_eur else None
+        dividends_eur: Decimal | None = state.dividends_eur if has_valid_eur else None
 
         return PortfolioStatusResponse(
             portfolio_id=portfolio.id,
@@ -704,10 +774,10 @@ class PortfolioService:
         self,
         portfolio_id: int,
         user_id: uuid.UUID,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        num_points: int = 60
-    ) -> Tuple[str, List[Dict]]:
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        num_points: int = 60,
+    ) -> tuple[str, list[dict]]:
         """
         Get portfolio performance over time as a time series.
 
@@ -731,18 +801,26 @@ class PortfolioService:
         if start_date is None:
             start_date = min(t.date for t in transactions)
         if end_date is None:
-            end_date = datetime.now(timezone.utc).replace(tzinfo=None)
+            end_date = datetime.now(UTC).replace(tzinfo=None)
 
         if start_date >= end_date:
-            raise ValueError(f"start_date ({start_date}) must be before end_date ({end_date})")
+            raise ValueError(
+                f"start_date ({start_date}) must be before end_date ({end_date})"
+            )
         if num_points < 2:
             raise ValueError(f"num_points must be at least 2, got {num_points}")
 
         date_points = _generate_date_points(start_date, end_date, num_points)
 
-        (historical_data, sorted_dates_map, fx_rates, sorted_fx_dates,
-         sp500_prices, sorted_sp500_dates, ticker_last_price) = \
-            _prepare_perf_data(transactions, start_date, end_date)
+        (
+            historical_data,
+            sorted_dates_map,
+            fx_rates,
+            sorted_fx_dates,
+            sp500_prices,
+            sorted_sp500_dates,
+            ticker_last_price,
+        ) = _prepare_perf_data(transactions, start_date, end_date)
 
         forward_split_factors = _compute_forward_split_factors(transactions)
 
@@ -751,20 +829,36 @@ class PortfolioService:
         state.usd_to_eur_fallback = _resolve_usd_to_eur_rate(end_date)
         twr = _TwrState()
         tx_index = 0
-        sp500_base_price: Optional[float] = None
+        sp500_base_price: float | None = None
 
         for date_point in date_points:
-            date_str = date_point.strftime('%Y-%m-%d')
+            date_str = date_point.strftime("%Y-%m-%d")
             tx_index = _replay_transactions_up_to(
-                transactions, tx_index, state, date_point, forward_split_factors,
+                transactions,
+                tx_index,
+                state,
+                date_point,
+                forward_split_factors,
             )
             holdings_value, last_known, cost_basis = _compute_perf_holdings(
-                state, sorted_dates_map, historical_data,
-                ticker_last_price, forward_split_factors, date_str,
+                state,
+                sorted_dates_map,
+                historical_data,
+                ticker_last_price,
+                forward_split_factors,
+                date_str,
             )
             data_point_dict, sp500_base_price = _compute_perf_data_point(
-                state, twr, date_str, holdings_value, last_known, cost_basis,
-                fx_rates, sorted_fx_dates, sp500_prices, sorted_sp500_dates,
+                state,
+                twr,
+                date_str,
+                holdings_value,
+                last_known,
+                cost_basis,
+                fx_rates,
+                sorted_fx_dates,
+                sp500_prices,
+                sorted_sp500_dates,
                 sp500_base_price,
             )
             performance_data.append(data_point_dict)

@@ -1,10 +1,18 @@
 """Database models"""
 
-from .user import User
+from .historical_price import FxRate, HistoricalPrice
 from .oauth_account import OAuthAccount
-from .transaction_type import TransactionType
 from .portfolio import Portfolio
 from .transaction import Transaction
-from .historical_price import HistoricalPrice, FxRate
+from .transaction_type import TransactionType
+from .user import User
 
-__all__ = ["User", "OAuthAccount", "Portfolio", "Transaction", "TransactionType", "HistoricalPrice", "FxRate"]
+__all__ = [
+    "FxRate",
+    "HistoricalPrice",
+    "OAuthAccount",
+    "Portfolio",
+    "Transaction",
+    "TransactionType",
+    "User",
+]

@@ -2,6 +2,12 @@
 
 Green-field project — structure can be changed freely. Use shadcn components for UI. Run and add unit tests. Run build and lint, fix any errors.
 
+## Lint & format commands
+
+- **Backend**: `cd api && ruff check . && ruff format --check .` (auto-fix: `ruff check --fix . && ruff format .`)
+- **Frontend**: `cd web && npm run lint`
+- **Tests**: `cd api && python -m pytest tests/ -x -q` | `cd web && npx vitest run`
+
 ## Code style
 
 - **`globalThis.window`** over bare `window`: use `globalThis.window === undefined` not `typeof window === 'undefined'`
