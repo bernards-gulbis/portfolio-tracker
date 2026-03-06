@@ -70,6 +70,11 @@ const PieCenterLabel = ({ viewBox, locale, currency, activeEntry, total, totalLa
 
 const TRANSITION_STYLE = { transition: 'opacity 150ms ease-in-out' };
 
+const createShapeRenderer = (activeIndex: number | null) =>
+  (props: PieSectorShapeProps) => (
+    <Sector {...props} opacity={activeIndex == null || props.index === activeIndex ? 1 : 0.3} style={TRANSITION_STYLE} />
+  );
+
 const COLORS = [
   'var(--chart-1)',
   'var(--chart-2)',
@@ -87,6 +92,7 @@ export const HoldingsAllocationChart = ({
   const { t } = useTranslation();
   const locale = useLocale();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const shapeRenderer = useMemo(() => createShapeRenderer(activeIndex), [activeIndex]);
 
   const { chartData, total, chartConfig, currency } = useMemo(() => {
     const useEur = eurRate != null && eurRate > 0;
@@ -179,7 +185,7 @@ export const HoldingsAllocationChart = ({
               outerRadius={108}
               strokeWidth={2}
               stroke="var(--card)"
-              shape={(props: PieSectorShapeProps) => <Sector {...props} opacity={activeIndex == null || props.index === activeIndex ? 1 : 0.3} style={TRANSITION_STYLE} />}
+              shape={shapeRenderer}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
             >
