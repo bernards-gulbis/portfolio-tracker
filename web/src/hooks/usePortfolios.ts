@@ -39,8 +39,9 @@ export const useUpdatePortfolio = () => {
   return useMutation({
     mutationFn: ({ portfolioId, data }: { portfolioId: number; data: PortfolioUpdate }) =>
       updatePortfolio(portfolioId, data),
-    onSuccess: (portfolio) => {
+    onSuccess: (portfolio, { portfolioId }) => {
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] });
       toast.success(t('portfolio.toasts.renamed', { name: portfolio.name }));
     },
   });
@@ -59,7 +60,6 @@ export const useDeletePortfolio = () => {
       queryClient.removeQueries({ queryKey: ['portfolioStatus', portfolioId] });
       queryClient.removeQueries({ queryKey: ['transactions', portfolioId] });
       queryClient.removeQueries({ queryKey: ['portfolioPerformance', portfolioId] });
-      queryClient.removeQueries({ queryKey: ['realizedSales', portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolios'] });
       toast.success(t('portfolio.toasts.deleted'));
     },
