@@ -4,18 +4,17 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '../context/NavigationContext';
 import { getErrorMessage } from '../api';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
-import { User, KeyRound, ShieldAlert, Receipt, Info, ArrowLeft } from 'lucide-react';
+import { Info, ArrowLeft } from 'lucide-react';
 
 // ================== Schemas ==================
 
@@ -83,55 +82,40 @@ const useWarnUnsavedChanges = (isDirty: boolean) => {
   }, [isDirty]);
 };
 
-// ================== Nav item helper ==================
+// ================== Page ==================
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-    isActive
-      ? 'bg-muted text-foreground'
-      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-  );
-
-// ================== Layout ==================
-
-export const SettingsLayout = () => {
+export const SettingsPage = () => {
   const { t } = useTranslation();
+  const { goToPortfolio, activePortfolioId, goToFirstPortfolio } = useNavigation();
 
-  const navItems = [
-    { to: '/settings/profile', label: t('settings.profile.tab'), icon: User },
-    { to: '/settings/password', label: t('settings.password.tab'), icon: KeyRound },
-    { to: '/settings/tax', label: t('settings.tax.tab'), icon: Receipt },
-    { to: '/settings/account', label: t('settings.account.tab'), icon: ShieldAlert },
-  ];
+  const handleBack = () => {
+    if (activePortfolioId !== null) {
+      goToPortfolio(activePortfolioId);
+    } else {
+      goToFirstPortfolio();
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-4">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+        >
           <ArrowLeft className="h-4 w-4" />
           {t('settings.backToPortfolio')}
-        </Link>
+        </button>
         <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
         <p className="text-muted-foreground text-sm">{t('settings.description')}</p>
       </div>
       <Separator className="mb-4" />
-      <div className="flex flex-col md:flex-row gap-4">
-        <nav className="md:w-52 shrink-0">
-          <ul className="space-y-1">
-            {navItems.map(({ to, label, icon: Icon }) => (
-              <li key={to}>
-                <NavLink to={to} className={navLinkClass} end>
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="flex-1 min-w-0">
-          <Outlet />
-        </div>
+      <div className="space-y-10">
+        <ProfileSection />
+        <PasswordSection />
+        <TaxSection />
+        <AccountSection />
       </div>
     </div>
   );

@@ -1,11 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
 import { TransactionView } from '../components/TransactionView';
 import { useTransactions } from '../hooks/useTransactions';
-import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
 import { TransactionType } from '../api';
+
+const mockNavigation = {
+  page: 'portfolio' as const,
+  activePortfolioId: null as number | null,
+  goToPortfolio: vi.fn(),
+  goToFirstPortfolio: vi.fn(),
+  goToSettings: vi.fn(),
+};
+
+vi.mock('../context/NavigationContext', () => ({
+  useNavigation: () => mockNavigation,
+}));
 
 vi.mock('../hooks/useTransactions', () => ({
   useTransactions: vi.fn(),
@@ -13,10 +23,6 @@ vi.mock('../hooks/useTransactions', () => ({
   useUpdateTransaction: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteTransaction: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
   useImportTransactionsCSV: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false, data: null }),
-}));
-
-vi.mock('../hooks/useActivePortfolioId', () => ({
-  useActivePortfolioId: vi.fn(),
 }));
 
 vi.mock('../hooks/usePortfolioStatus', () => ({
@@ -43,9 +49,7 @@ const renderView = () => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <TransactionView />
-      </MemoryRouter>
+      <TransactionView />
     </QueryClientProvider>
   );
 };
@@ -56,7 +60,7 @@ describe('TransactionView', () => {
   });
 
   it('shows no portfolio message when activePortfolioId is null', () => {
-    vi.mocked(useActivePortfolioId).mockReturnValue(null);
+    mockNavigation.activePortfolioId = null;
     vi.mocked(useTransactions).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -69,7 +73,7 @@ describe('TransactionView', () => {
   });
 
   it('shows loading skeleton while fetching', () => {
-    vi.mocked(useActivePortfolioId).mockReturnValue(1);
+    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -82,7 +86,7 @@ describe('TransactionView', () => {
   });
 
   it('shows error message when query fails', () => {
-    vi.mocked(useActivePortfolioId).mockReturnValue(1);
+    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -95,7 +99,7 @@ describe('TransactionView', () => {
   });
 
   it('renders transaction table when data is loaded', () => {
-    vi.mocked(useActivePortfolioId).mockReturnValue(1);
+    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: {
         transactions: [
@@ -130,7 +134,7 @@ describe('TransactionView', () => {
   });
 
   it('shows empty state when no transactions', () => {
-    vi.mocked(useActivePortfolioId).mockReturnValue(1);
+    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: {
         transactions: [],

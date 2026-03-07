@@ -1,10 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { PortfolioStatusView } from '../components/PortfolioStatusView';
 import { CurrencyProvider } from '../hooks/useCurrencyPreference';
 import type { PortfolioStatus } from '../api';
+
+const mockNavigation = {
+  page: 'portfolio' as const,
+  activePortfolioId: null as number | null,
+  goToPortfolio: vi.fn(),
+  goToFirstPortfolio: vi.fn(),
+  goToSettings: vi.fn(),
+};
+
+vi.mock('../context/NavigationContext', () => ({
+  useNavigation: () => mockNavigation,
+}));
 
 vi.mock('../hooks/usePortfolioStatus', () => ({
   usePortfolioStatus: vi.fn(),
@@ -37,17 +48,13 @@ const createTestQueryClient = () =>
     },
   });
 
-const renderComponent = (initialEntry: string = '/') => {
+const renderComponent = (portfolioId: number | null = null) => {
+  mockNavigation.activePortfolioId = portfolioId;
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
       <CurrencyProvider>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <Routes>
-            <Route path="/" element={<PortfolioStatusView />} />
-            <Route path="/portfolios/:id" element={<PortfolioStatusView />} />
-          </Routes>
-        </MemoryRouter>
+        <PortfolioStatusView />
       </CurrencyProvider>
     </QueryClientProvider>
   );
@@ -99,14 +106,14 @@ describe('PortfolioStatusView', () => {
     );
   });
 
-  it('shows "Select a portfolio" message when no portfolio in URL', () => {
+  it('shows "Select a portfolio" message when no portfolio selected', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: undefined,
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/');
+    renderComponent(null);
 
     expect(screen.getByText('Select a portfolio to view its status')).toBeInTheDocument();
   });
@@ -118,7 +125,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
     expect(skeletons.length).toBeGreaterThan(0);
@@ -131,7 +138,7 @@ describe('PortfolioStatusView', () => {
       error: new Error('Failed to load status'),
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.getByText(/Error loading portfolio status/)).toBeInTheDocument();
   });
@@ -143,7 +150,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
@@ -159,7 +166,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.getAllByText('CASH').length).toBeGreaterThan(0);
   });
@@ -171,7 +178,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0);
   });
@@ -194,7 +201,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.getByText(/once you add transactions below/i)).toBeInTheDocument();
   });
@@ -206,7 +213,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.queryByText(/once you add transactions below/i)).not.toBeInTheDocument();
   });
@@ -226,7 +233,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.getByText('Transaction warnings')).toBeInTheDocument();
     expect(screen.getByText(/Cannot sell UNKNOWN/)).toBeInTheDocument();
@@ -240,7 +247,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     expect(screen.queryByText('Transaction warnings')).not.toBeInTheDocument();
   });
@@ -266,7 +273,7 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    renderComponent('/portfolios/1');
+    renderComponent(1);
 
     // Null monetary values (market value, dividends, tax, after-tax) render as '-'
     const dashes = screen.getAllByText('-');

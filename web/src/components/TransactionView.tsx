@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
 import { useDebounce } from '../hooks/useDebounce';
-import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
+import { useNavigation } from '../context/NavigationContext';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
 import { TransactionTable } from './TransactionTable';
 import { ImportCSVModal } from './ImportCSVModal';
@@ -24,7 +24,7 @@ import { Plus, MoreVertical, UploadIcon, DownloadIcon } from 'lucide-react';
 
 export const TransactionView = () => {
   const { t } = useTranslation();
-  const activePortfolioId = useActivePortfolioId();
+  const { activePortfolioId } = useNavigation();
   const [currentPage, setCurrentPage] = useState(1);
   const [tickerSearch, setTickerSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);

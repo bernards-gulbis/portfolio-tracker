@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { getCurrentUser, logoutApi, UserRead } from '../api';
@@ -18,7 +17,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [user, setUser] = useState<UserRead | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
@@ -63,12 +61,11 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     const handleAuthLogout = () => {
       updateUser(null);
       queryClient.clear();
-      navigate('/', { replace: true });
     };
 
     globalThis.addEventListener('auth:logout', handleAuthLogout);
     return () => globalThis.removeEventListener('auth:logout', handleAuthLogout);
-  }, [queryClient, navigate, updateUser]);
+  }, [queryClient, updateUser]);
 
   const value = useMemo(() => ({ user, status, setUser: updateUser, logout }), [user, status, updateUser, logout]);
 

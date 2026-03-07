@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useLivePrices } from '../hooks/useLivePrices';
-import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
+import { useNavigation } from '../context/NavigationContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
@@ -282,7 +282,7 @@ const PortfolioStatusSkeleton = () => (
 // ================== Main view with data fetching ==================
 
 export const PortfolioStatusView = () => {
-  const portfolioId = useActivePortfolioId();
+  const { activePortfolioId: portfolioId } = useNavigation();
   const { t } = useTranslation();
   const locale = useLocale();
 

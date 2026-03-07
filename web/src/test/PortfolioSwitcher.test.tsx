@@ -2,9 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
 import { PortfolioSwitcher } from '../components/PortfolioSwitcher';
 import type { Portfolio } from '../api';
+
+const mockNavigation = {
+  page: 'portfolio' as const,
+  activePortfolioId: null as number | null,
+  goToPortfolio: vi.fn(),
+  goToFirstPortfolio: vi.fn(),
+  goToSettings: vi.fn(),
+};
+
+vi.mock('../context/NavigationContext', () => ({
+  useNavigation: () => mockNavigation,
+}));
 
 vi.mock('../hooks/usePortfolios', () => ({
   usePortfolios: vi.fn(),
@@ -29,9 +40,7 @@ const renderComponent = (activePortfolioId: number | null = null) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
-      </MemoryRouter>
+      <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
     </QueryClientProvider>
   );
 };
@@ -162,7 +171,7 @@ describe('PortfolioSwitcher', () => {
     expect(mockOnCreateClick).toHaveBeenCalledOnce();
   });
 
-  it('portfolio items are links to /portfolios/:id', async () => {
+  it('calls goToPortfolio when portfolio item is clicked', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -174,10 +183,8 @@ describe('PortfolioSwitcher', () => {
     const trigger = screen.getByRole('button');
     await userEvent.click(trigger);
 
-    const growthLink = screen.getByText('Growth Fund').closest('a');
-    expect(growthLink).toHaveAttribute('href', '/portfolios/1');
+    await userEvent.click(screen.getByText('Growth Fund'));
 
-    const dividendLink = screen.getByText('Dividend Portfolio').closest('a');
-    expect(dividendLink).toHaveAttribute('href', '/portfolios/2');
+    expect(mockNavigation.goToPortfolio).toHaveBeenCalledWith(1);
   });
 });
