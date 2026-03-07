@@ -14,7 +14,7 @@ export const usePortfolioStatus = (portfolioId: number | null) => {
       return getPortfolioStatus(portfolioId);
     },
     enabled: !!portfolioId,
-    staleTime: 30000, // Consider data stale after 30 seconds
+    staleTime: Infinity, // Only refetch when transactions change (via invalidateQueries)
     refetchOnWindowFocus: false, // Don't refetch on window focus (mutations will invalidate)
   });
 };

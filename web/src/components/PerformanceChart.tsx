@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, toLocalDateStr } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChartContainer,
@@ -336,14 +336,8 @@ export const PerformanceChart = ({
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <Skeleton className="h-4 w-24" />
-          <CardAction>
-            <Skeleton className="h-8 w-20 rounded-md" />
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[300px] w-full" />
+        <CardContent className="flex items-center justify-center h-[380px]">
+          <Spinner className="size-8" />
         </CardContent>
       </Card>
     );

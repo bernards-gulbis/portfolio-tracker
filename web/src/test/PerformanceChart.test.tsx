@@ -22,11 +22,11 @@ const oldMockData: PerformanceDataPoint[] = [
 ];
 
 describe('PerformanceChart', () => {
-  it('shows skeleton while loading', () => {
+  it('shows spinner while loading', () => {
     render(<PerformanceChart data={[]} isLoading={true} />);
 
-    const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
-    expect(skeletons.length).toBeGreaterThan(0);
+    const spinner = document.querySelector('[class*="animate-spin"]');
+    expect(spinner).toBeInTheDocument();
   });
 
   it('shows "No performance data available" when data is empty', () => {

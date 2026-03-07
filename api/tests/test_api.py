@@ -1036,12 +1036,14 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     assert aapl_holding["quantity"] == pytest.approx(10.0)
     assert aapl_holding["average_cost"] == pytest.approx(150.0)
     assert aapl_holding["total_cost"] == pytest.approx(1500.0)
+    assert aapl_holding["first_buy_date"] == "2024-01-02"
 
     # Check MSFT holding
     msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
     assert msft_holding["quantity"] == pytest.approx(5.0)
     assert msft_holding["average_cost"] == pytest.approx(300.0)
     assert msft_holding["total_cost"] == pytest.approx(1500.0)
+    assert msft_holding["first_buy_date"] == "2024-01-03"
 
     assert data["holdings_cost"] == pytest.approx(3000.0)
 
@@ -1111,6 +1113,18 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
     # Realized gains: sold 10 shares at 1500 (includes -1 fee) - cost basis 10*100 (1000) = 500
     assert data["realized_gains"] == pytest.approx(500.0)
 
+    # Realized sales breakdown
+    assert len(data["realized_sales"]) == 1
+    sale = data["realized_sales"][0]
+    assert sale["ticker"] == "AAPL"
+    assert sale["quantity"] == pytest.approx(10.0)
+    assert sale["quantity_before"] == pytest.approx(20.0)
+    assert sale["proceeds"] == pytest.approx(1500.0)
+    assert sale["cost_basis"] == pytest.approx(1000.0)
+    assert sale["realized_gain"] == pytest.approx(500.0)
+    assert sale["days_held"] == 8  # 2024-01-02 -> 2024-01-10
+    assert "date" in sale
+
 
 def test_portfolio_status_with_dividends(client: TestClient):
     """Test portfolio status with dividend income"""
@@ -1177,6 +1191,15 @@ def test_portfolio_status_with_dividends(client: TestClient):
     )  # 5000 - 1500 + 50 + 50 (fees included in values)
     assert data["dividends"] == pytest.approx(100.0)
     assert len(data["holdings"]) == 1
+
+    # Verify dividends_received breakdown
+    dr = data["dividends_received"]
+    assert len(dr) == 2
+    assert dr[0]["ticker"] == "AAPL"
+    assert dr[0]["amount"] == pytest.approx(50.0)
+    assert dr[1]["ticker"] == "AAPL"
+    assert dr[1]["amount"] == pytest.approx(50.0)
+    assert sum(d["amount"] for d in dr) == pytest.approx(data["dividends"])
 
 
 def test_portfolio_status_with_stock_split(client: TestClient):
@@ -2484,7 +2507,11 @@ def test_sell_non_strict_oversell():
     """Oversell in non-strict mode should NOT inflate cash."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {"quantity": Decimal("5"), "total_cost": Decimal("500")}
+    state.holdings["AAPL"] = {
+        "quantity": Decimal("5"),
+        "total_cost": Decimal("500"),
+        "first_buy_date": datetime(2024, 1, 1),
+    }
 
     tx = Transaction(
         id=1,
@@ -3239,7 +3266,11 @@ def test_warning_oversell_partial_strict():
     """Strict oversell appends a warning and executes a partial sell."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {"quantity": Decimal("5"), "total_cost": Decimal("500")}
+    state.holdings["AAPL"] = {
+        "quantity": Decimal("5"),
+        "total_cost": Decimal("500"),
+        "first_buy_date": datetime(2024, 1, 1),
+    }
 
     tx = Transaction(
         id=1,
@@ -3289,7 +3320,11 @@ def test_no_warnings_in_non_strict_mode():
     """Non-strict mode should never append warnings, only skip silently."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {"quantity": Decimal("5"), "total_cost": Decimal("500")}
+    state.holdings["AAPL"] = {
+        "quantity": Decimal("5"),
+        "total_cost": Decimal("500"),
+        "first_buy_date": datetime(2024, 1, 1),
+    }
 
     # Oversell in non-strict mode
     tx = Transaction(

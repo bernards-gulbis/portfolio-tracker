@@ -20,7 +20,11 @@ from app.models import Portfolio, Transaction, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.repositories.transaction_repository import TransactionRepository
 from app.schemas import HoldingResponse, PortfolioStatusResponse
-from app.schemas.schemas import TransactionWarning
+from app.schemas.schemas import (
+    DividendReceivedResponse,
+    RealizedSaleResponse,
+    TransactionWarning,
+)
 from app.services.price_service import PriceService
 
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
@@ -109,6 +113,8 @@ class _TxState:
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
     holdings: dict[str, dict[str, Decimal]] = dc_field(default_factory=dict)
+    realized_sales: list[dict[str, object]] = dc_field(default_factory=list)
+    dividends_received: list[dict[str, object]] = dc_field(default_factory=list)
     warnings: list[dict[str, object]] = dc_field(default_factory=list)
     usd_to_eur_fallback: float | None = None
 
@@ -156,7 +162,8 @@ def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
     if tx.ticker:
         quantity = _to_decimal(tx.quantity or 0)
         h = state.holdings.setdefault(
-            tx.ticker, {"quantity": _ZERO, "total_cost": _ZERO}
+            tx.ticker,
+            {"quantity": _ZERO, "total_cost": _ZERO, "first_buy_date": tx.date},
         )
         h["quantity"] += quantity
         h["total_cost"] += -total
@@ -199,6 +206,18 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
             cost_basis = h["total_cost"]
             state.cash += partial_total
             state.realized_gains += partial_total - cost_basis
+            state.realized_sales.append(
+                {
+                    "ticker": ticker,
+                    "date": tx.date.strftime(_ISO_DATETIME_FMT),
+                    "quantity": float(held),
+                    "quantity_before": float(held),
+                    "proceeds": float(partial_total),
+                    "cost_basis": float(cost_basis),
+                    "realized_gain": float(partial_total - cost_basis),
+                    "days_held": (tx.date - h["first_buy_date"]).days,
+                }
+            )
             del state.holdings[ticker]
         return
     state.cash += total
@@ -207,6 +226,18 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         h["total_cost"] * (quantity / h["quantity"]) if h["quantity"] > 0 else _ZERO
     )
     state.realized_gains += total - cost_basis
+    state.realized_sales.append(
+        {
+            "ticker": ticker,
+            "date": tx.date.strftime(_ISO_DATETIME_FMT),
+            "quantity": float(quantity),
+            "quantity_before": float(h["quantity"]),
+            "proceeds": float(total),
+            "cost_basis": float(cost_basis),
+            "realized_gain": float(total - cost_basis),
+            "days_held": (tx.date - h["first_buy_date"]).days,
+        }
+    )
     h["quantity"] -= quantity
     h["total_cost"] -= cost_basis
     if h["quantity"] < HOLDINGS_EPSILON:
@@ -217,7 +248,16 @@ def _apply_dividend(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.dividends += total
-    state.dividends_eur += _eur_from_tx(tx, total, state.usd_to_eur_fallback)
+    eur = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
+    state.dividends_eur += eur
+    state.dividends_received.append(
+        {
+            "ticker": tx.ticker or "",
+            "date": tx.date.strftime(_ISO_DATETIME_FMT),
+            "amount": float(total),
+            "amount_eur": float(eur) if eur != _ZERO else None,
+        }
+    )
 
 
 def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -389,12 +429,16 @@ def _build_holdings_list(
         total_cost = holding_data["total_cost"]
         avg_cost = total_cost / quantity if quantity > 0 else _ZERO
 
+        first_buy = holding_data["first_buy_date"]
         holdings_list.append(
             HoldingResponse(
                 ticker=ticker,
                 quantity=float(quantity),
                 average_cost=float(avg_cost),
                 total_cost=float(total_cost),
+                first_buy_date=first_buy.date()
+                if hasattr(first_buy, "date")
+                else first_buy,
             )
         )
         holdings_cost += total_cost
@@ -766,6 +810,10 @@ class PortfolioService:
             holdings_cost=_normalize_zero(holdings_cost),
             realized_gains=_normalize_zero(state.realized_gains),
             capital_gains_tax_rate=float(tax_rate),
+            realized_sales=[RealizedSaleResponse(**s) for s in state.realized_sales],
+            dividends_received=[
+                DividendReceivedResponse(**d) for d in state.dividends_received
+            ],
             warnings=[TransactionWarning(**w) for w in state.warnings],
             usd_to_eur_rate=usd_to_eur_rate,
         )

@@ -39,6 +39,8 @@ const mockStatus: PortfolioStatus = {
   holdings: [],
   holdings_cost: 7500,
   realized_gains: 0,
+  realized_sales: [],
+  dividends_received: [],
   capital_gains_tax_rate: 0.255,
   warnings: [],
   usd_to_eur_rate: 0.92,

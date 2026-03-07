@@ -62,10 +62,12 @@ const mockStatus: PortfolioStatus = {
   dividends_eur: 184,
   cash: 500,
   holdings: [
-    { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1500 },
+    { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1500, first_buy_date: '2024-01-01' },
   ],
   holdings_cost: 7500,
   realized_gains: 0,
+  realized_sales: [],
+  dividends_received: [],
   capital_gains_tax_rate: 0.255,
   warnings: [],
   usd_to_eur_rate: 0.92,

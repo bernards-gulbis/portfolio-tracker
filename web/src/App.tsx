@@ -74,7 +74,7 @@ function AuthGuard() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Skeleton className="h-12 w-48" />
+        <Spinner className="size-8" />
       </div>
     );
   }

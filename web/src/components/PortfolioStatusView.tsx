@@ -12,6 +12,7 @@ import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPrefer
 import { computeEurMetrics } from '../utils/eurMetrics';
 import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
+import { RealizedGainsTable } from './RealizedGainsTable';
 
 const PerformanceChart = lazy(() =>
   import('./PerformanceChart').then((m) => ({ default: m.PerformanceChart }))
@@ -223,6 +224,15 @@ const PortfolioStatusContent = ({
         eurMetrics={eur}
         locale={locale}
       />
+
+      {/* Realized Gains / Dividends Table */}
+      {(status.realized_sales.length > 0 || status.dividends_received.length > 0) && (
+        <RealizedGainsTable
+          realizedSales={status.realized_sales}
+          dividendsReceived={status.dividends_received}
+          locale={locale}
+        />
+      )}
     </CardContent>
   );
 };
@@ -302,11 +312,7 @@ export const PortfolioStatusView = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] }),
-        queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', portfolioId] }),
-        queryClient.invalidateQueries({ queryKey: ['livePrices'] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ['livePrices'] });
     } finally {
       setIsRefreshing(false);
     }

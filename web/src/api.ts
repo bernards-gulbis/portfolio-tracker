@@ -126,6 +126,7 @@ export interface Holding {
   quantity: number;
   average_cost: number;
   total_cost: number;
+  first_buy_date: string;
 }
 
 export interface PricedHolding extends Holding {
@@ -133,6 +134,24 @@ export interface PricedHolding extends Holding {
   current_value: number | null;
   unrealized_gain_loss: number | null;
   unrealized_gain_loss_pct: number | null;
+}
+
+export interface RealizedSale {
+  ticker: string;
+  date: string;
+  quantity: number;
+  quantity_before: number;
+  proceeds: number;
+  cost_basis: number;
+  realized_gain: number;
+  days_held: number;
+}
+
+export interface DividendReceived {
+  ticker: string;
+  date: string;
+  amount: number;
+  amount_eur: number | null;
 }
 
 export interface TransactionWarning {
@@ -152,6 +171,8 @@ export interface PortfolioStatus {
   holdings: Holding[];
   holdings_cost: number;
   realized_gains: number;
+  realized_sales: RealizedSale[];
+  dividends_received: DividendReceived[];
   capital_gains_tax_rate: number;
   warnings: TransactionWarning[];
   usd_to_eur_rate: number | null;

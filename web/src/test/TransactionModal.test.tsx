@@ -38,12 +38,14 @@ const mockHoldings: Holding[] = [
     quantity: 10,
     average_cost: 150,
     total_cost: 1500,
+    first_buy_date: '2024-01-01',
   },
   {
     ticker: 'MSFT',
     quantity: 5,
     average_cost: 300,
     total_cost: 1500,
+    first_buy_date: '2024-01-01',
   },
 ];
 
