@@ -4,11 +4,11 @@ import { formatSignedCurrency, formatDateCompact, formatCurrency, getValueClass 
 import type { WithdrawalFx } from '../api';
 import { computeWithdrawalTaxMap } from '../utils/eurMetrics';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ChevronRightIcon, ChevronLeftIcon, InfoIcon } from 'lucide-react';
+import { InfoIcon } from 'lucide-react';
+import { PaginationControls } from './PaginationControls';
 
 const PAGE_SIZE = 10;
 
@@ -32,18 +32,23 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
     return Array.from(years).sort().reverse();
   }, [realizedWithdrawals]);
 
+  const indexedWithdrawals = useMemo(
+    () => realizedWithdrawals.map((w, origIdx) => ({ w, origIdx })),
+    [realizedWithdrawals],
+  );
+
   const filteredWithdrawals = useMemo(() => {
-    if (yearFilter === 'all') return realizedWithdrawals;
-    return realizedWithdrawals.filter((w) => w.date.startsWith(yearFilter));
-  }, [realizedWithdrawals, yearFilter]);
+    if (yearFilter === 'all') return indexedWithdrawals;
+    return indexedWithdrawals.filter(({ w }) => w.date.startsWith(yearFilter));
+  }, [indexedWithdrawals, yearFilter]);
 
   const sortedWithdrawals = useMemo(() => {
     const list = [...filteredWithdrawals];
     return list.sort((a, b) => {
       let diff: number;
-      if (sortKey === 'amount') diff = a.amount - b.amount;
-      else if (sortKey === 'fx_gain') diff = a.realized_fx_gain - b.realized_fx_gain;
-      else diff = a.date.localeCompare(b.date);
+      if (sortKey === 'amount') diff = a.w.amount - b.w.amount;
+      else if (sortKey === 'fx_gain') diff = a.w.realized_fx_gain - b.w.realized_fx_gain;
+      else diff = a.w.date.localeCompare(b.w.date);
       return sortAsc ? diff : -diff;
     });
   }, [filteredWithdrawals, sortKey, sortAsc]);
@@ -59,18 +64,17 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
 
   const withdrawalTotals = useMemo(() => {
     let totalTaxable = 0;
-    for (const w of filteredWithdrawals) {
-      const origIdx = realizedWithdrawals.indexOf(w);
+    for (const { origIdx } of filteredWithdrawals) {
       totalTaxable += withdrawalTaxMap.get(origIdx) ?? 0;
     }
     return {
-      amount: sortedWithdrawals.reduce((sum, w) => sum + w.amount, 0),
-      eurAvg: sortedWithdrawals.reduce((sum, w) => sum + w.amount_eur_avg, 0),
-      eurReceived: sortedWithdrawals.reduce((sum, w) => sum + w.amount_eur, 0),
-      fxGain: sortedWithdrawals.reduce((sum, w) => sum + w.realized_fx_gain, 0),
+      amount: sortedWithdrawals.reduce((sum, { w }) => sum + w.amount, 0),
+      eurAvg: sortedWithdrawals.reduce((sum, { w }) => sum + w.amount_eur_avg, 0),
+      eurReceived: sortedWithdrawals.reduce((sum, { w }) => sum + w.amount_eur, 0),
+      fxGain: sortedWithdrawals.reduce((sum, { w }) => sum + w.realized_fx_gain, 0),
       taxable: totalTaxable,
     };
-  }, [sortedWithdrawals, filteredWithdrawals, realizedWithdrawals, withdrawalTaxMap]);
+  }, [sortedWithdrawals, filteredWithdrawals, withdrawalTaxMap]);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -148,8 +152,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pagedWithdrawals.map((w, idx) => {
-              const origIdx = realizedWithdrawals.indexOf(w);
+            {pagedWithdrawals.map(({ w, origIdx }, idx) => {
               const taxable = withdrawalTaxMap.get(origIdx) ?? 0;
               return (
                 <TableRow key={`${w.date}-${idx}`}>
@@ -203,38 +206,3 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
 });
 
 WithdrawalsTable.displayName = 'WithdrawalsTable';
-
-// ================== Pagination ==================
-
-interface PaginationControlsProps {
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-}
-
-const PaginationControls = ({ page, totalPages, onPageChange }: PaginationControlsProps) => {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-center justify-center gap-2 px-4 py-3 border-t">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onPageChange(Math.max(1, page - 1))}
-        disabled={page <= 1}
-      >
-        <ChevronLeftIcon className="h-4 w-4" />
-      </Button>
-      <span className="text-xs text-muted-foreground">
-        {t('status.pageOf', { page, total: totalPages })}
-      </span>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-        disabled={page >= totalPages}
-      >
-        <ChevronRightIcon className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-};

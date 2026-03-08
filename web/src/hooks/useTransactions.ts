@@ -46,6 +46,8 @@ export const useCreateTransaction = () => {
       createTransaction(portfolioId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.added'));
     },
   });
@@ -69,6 +71,8 @@ export const useUpdateTransaction = () => {
         queryKey: ['transactions', variables.portfolioId],
         exact: false
       });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.updated'));
     },
   });
@@ -89,6 +93,8 @@ export const useDeleteTransaction = () => {
         queryKey: ['transactions', variables.portfolioId],
         exact: false
       });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.deleted'));
     },
   });
@@ -109,6 +115,8 @@ export const useImportTransactionsCSV = () => {
         queryKey: ['transactions', variables.portfolioId],
         exact: false
       });
+      queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
     },
   });

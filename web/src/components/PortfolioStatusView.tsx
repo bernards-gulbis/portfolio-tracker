@@ -439,7 +439,11 @@ export const PortfolioStatusView = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ['livePrices'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] }),
+        queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', portfolioId] }),
+        queryClient.invalidateQueries({ queryKey: ['livePrices'] }),
+      ]);
     } finally {
       setIsRefreshing(false);
     }

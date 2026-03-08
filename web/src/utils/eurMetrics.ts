@@ -72,9 +72,6 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
 };
 
 /**
- * Compute EUR values for a single holding by applying the live rate to USD fields.
- */
-/**
  * Compute per-withdrawal taxable amounts.
  * In the Latvian model, withdrawals are tax-free up to (total deposited EUR + dividends EUR).
  * Returns a Map from original array index → taxable EUR amount for that withdrawal.
@@ -88,21 +85,22 @@ export const computeWithdrawalTaxMap = (
   const totalDepositedEur = principalEur + totalWithdrawnEur;
   const threshold = totalDepositedEur + (dividendsEur ?? 0);
 
-  const chronological = [...withdrawals].sort((a, b) => a.date.localeCompare(b.date));
+  const indexed = withdrawals.map((w, i) => ({ w, i }));
+  indexed.sort((a, b) => a.w.date.localeCompare(b.w.date));
   const map = new Map<number, number>();
   let running = 0;
   let prevTaxable = 0;
-  for (const w of chronological) {
+  for (const { w, i } of indexed) {
     running += w.amount_eur;
     const cumTaxable = Math.max(0, running - threshold);
     const taxableThisRow = cumTaxable - prevTaxable;
     prevTaxable = cumTaxable;
-    const origIdx = withdrawals.indexOf(w);
-    map.set(origIdx, taxableThisRow);
+    map.set(i, taxableThisRow);
   }
   return map;
 };
 
+/** Compute EUR values for a single holding by applying the live rate to USD fields. */
 export const applyRateToHolding = (holding: PricedHolding, rate: number): HoldingEurValues => ({
   averageCostEur: holding.average_cost * rate,
   totalCostEur: holding.total_cost * rate,

@@ -6,12 +6,12 @@ import type { RealizedSale, DividendReceived } from '../api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ChevronRightIcon, ChevronLeftIcon } from 'lucide-react';
+import { ChevronRightIcon } from 'lucide-react';
+import { PaginationControls } from './PaginationControls';
 
 const PAGE_SIZE = 10;
 
@@ -365,41 +365,6 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
 });
 
 RealizedGainsTable.displayName = 'RealizedGainsTable';
-
-// ================== Pagination ==================
-
-interface PaginationControlsProps {
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-}
-
-const PaginationControls = ({ page, totalPages, onPageChange }: PaginationControlsProps) => {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-center justify-center gap-2 px-4 py-3 border-t">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onPageChange(Math.max(1, page - 1))}
-        disabled={page <= 1}
-      >
-        <ChevronLeftIcon className="h-4 w-4" />
-      </Button>
-      <span className="text-xs text-muted-foreground">
-        {t('status.pageOf', { page, total: totalPages })}
-      </span>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-        disabled={page >= totalPages}
-      >
-        <ChevronRightIcon className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-};
 
 // ================== Gains Row ==================
 
