@@ -13,6 +13,7 @@ import { computeEurMetrics } from '../utils/eurMetrics';
 import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
 import { RealizedGainsTable } from './RealizedGainsTable';
+import { WithdrawalsTable } from './WithdrawalsTable';
 
 const PerformanceChart = lazy(() =>
   import('./PerformanceChart').then((m) => ({ default: m.PerformanceChart }))
@@ -156,6 +157,36 @@ const CollapsibleRealizedSection = ({ status, displayCurrency, locale }: Collaps
           dividendsReceived={status.dividends_received}
           displayCurrency={displayCurrency}
           locale={locale}
+        />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+// ================== Collapsible Withdrawals Section ==================
+
+interface CollapsibleWithdrawalsSectionProps {
+  status: PricedPortfolioStatus;
+  locale: string;
+}
+
+const CollapsibleWithdrawalsSection = ({ status, locale }: CollapsibleWithdrawalsSectionProps) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('status.withdrawals')}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <WithdrawalsTable
+          realizedWithdrawals={status.realized_withdrawals}
+          locale={locale}
+          principalEur={status.principal_eur}
+          dividendsEur={status.dividends_eur}
+          taxRate={status.capital_gains_tax_rate}
         />
       </CollapsibleContent>
     </Collapsible>
@@ -328,6 +359,14 @@ const PortfolioStatusContent = ({
         <CollapsibleRealizedSection
           status={status}
           displayCurrency={currency}
+          locale={locale}
+        />
+      )}
+
+      {/* Withdrawals Table */}
+      {status.realized_withdrawals.length > 0 && (
+        <CollapsibleWithdrawalsSection
+          status={status}
           locale={locale}
         />
       )}

@@ -24,6 +24,7 @@ from app.schemas.schemas import (
     DividendReceivedResponse,
     RealizedSaleResponse,
     TransactionWarning,
+    WithdrawalFxResponse,
 )
 from app.services.price_service import PriceService
 
@@ -109,12 +110,16 @@ class _TxState:
     principal_eur: Decimal = (
         _ZERO  # Net deposits - withdrawals in EUR (historical rates)
     )
+    principal_eur_avg: Decimal = (
+        _ZERO  # EUR principal using average cost for withdrawals
+    )
     dividends: Decimal = _ZERO
     dividends_eur: Decimal = _ZERO
     realized_gains: Decimal = _ZERO
     holdings: dict[str, dict[str, Decimal]] = dc_field(default_factory=dict)
     realized_sales: list[dict[str, object]] = dc_field(default_factory=list)
     dividends_received: list[dict[str, object]] = dc_field(default_factory=list)
+    realized_withdrawals: list[dict[str, object]] = dc_field(default_factory=list)
     warnings: list[dict[str, object]] = dc_field(default_factory=list)
     usd_to_eur_fallback: float | None = None
 
@@ -139,13 +144,32 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.principal += total
     eur = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
     state.principal_eur += eur
+    state.principal_eur_avg += eur
 
 
 def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)  # total is negative
     state.cash += total
+    eur_historical = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
+    # Average cost: withdraw at weighted-average rate (before updating principal)
+    if state.principal > 0:
+        avg_rate = state.principal_eur_avg / state.principal
+        eur_avg_cost = -total * avg_rate  # positive
+        state.principal_eur_avg += total * avg_rate  # total is negative
+    else:
+        eur_avg_cost = -eur_historical  # positive
+        state.principal_eur_avg += eur_historical
+    state.realized_withdrawals.append(
+        {
+            "date": tx.date.strftime(_ISO_DATETIME_FMT),
+            "amount": float(-total),
+            "amount_eur_avg": float(eur_avg_cost),
+            "amount_eur": float(-eur_historical),
+            "realized_fx_gain": float(-eur_historical - eur_avg_cost),
+        }
+    )
     state.principal += total
-    state.principal_eur += _eur_from_tx(tx, total, state.usd_to_eur_fallback)
+    state.principal_eur += eur_historical
     if strict and state.cash < 0:
         state.warnings.append(
             {
@@ -803,6 +827,7 @@ class PortfolioService:
             portfolio_name=portfolio.name,
             principal=_normalize_zero(state.principal),
             principal_eur=_normalize_zero(state.principal_eur),
+            principal_eur_avg=_normalize_zero(state.principal_eur_avg),
             dividends=_normalize_zero(state.dividends),
             dividends_eur=_opt_normalize(dividends_eur),
             cash=_normalize_zero(state.cash),
@@ -813,6 +838,9 @@ class PortfolioService:
             realized_sales=[RealizedSaleResponse(**s) for s in state.realized_sales],
             dividends_received=[
                 DividendReceivedResponse(**d) for d in state.dividends_received
+            ],
+            realized_withdrawals=[
+                WithdrawalFxResponse(**w) for w in state.realized_withdrawals
             ],
             warnings=[TransactionWarning(**w) for w in state.warnings],
             usd_to_eur_rate=usd_to_eur_rate,

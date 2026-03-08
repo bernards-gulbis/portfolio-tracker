@@ -284,6 +284,16 @@ class DividendReceivedResponse(BaseModel):
     amount_eur: float | None = None
 
 
+class WithdrawalFxResponse(BaseModel):
+    """Schema for a single withdrawal with realized FX gain/loss."""
+
+    date: str
+    amount: float  # USD withdrawal amount (positive)
+    amount_eur_avg: float  # EUR cost basis at average rate
+    amount_eur: float  # EUR at historical withdrawal rate
+    realized_fx_gain: float  # amount_eur - amount_eur_avg
+
+
 class PortfolioStatusResponse(BaseModel):
     """Schema for portfolio status (transaction-derived metrics only)"""
 
@@ -291,6 +301,7 @@ class PortfolioStatusResponse(BaseModel):
     portfolio_name: str
     principal: float  # Deposits - Withdrawals
     principal_eur: float  # Sum of all eur_amount fields (historical rates)
+    principal_eur_avg: float  # EUR principal (average cost method for withdrawals)
     dividends: float
     dividends_eur: float | None = None  # Dividends in EUR (historical rates)
     cash: float
@@ -299,6 +310,7 @@ class PortfolioStatusResponse(BaseModel):
     realized_gains: float  # Gains/losses from sells
     realized_sales: list[RealizedSaleResponse] = Field(default_factory=list)
     dividends_received: list[DividendReceivedResponse] = Field(default_factory=list)
+    realized_withdrawals: list[WithdrawalFxResponse] = Field(default_factory=list)
     capital_gains_tax_rate: (
         float  # Tax rate applied to capital gains (e.g., 0.25 for 25%)
     )

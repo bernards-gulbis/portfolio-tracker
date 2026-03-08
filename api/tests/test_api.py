@@ -940,6 +940,7 @@ def test_portfolio_status_empty_portfolio(client: TestClient):
     assert data["portfolio_name"] == "Empty Portfolio"
     assert data["principal"] == pytest.approx(0.0)
     assert data["principal_eur"] == pytest.approx(0.0)
+    assert data["principal_eur_avg"] == pytest.approx(0.0)
     assert data["dividends"] == pytest.approx(0.0)
     assert data["cash"] == pytest.approx(0.0)
     assert data["holdings"] == []
@@ -1922,6 +1923,347 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
 
     # principal_eur = sum of all deposit EUR amounts at historical rates (no withdrawals)
     assert abs(data["principal_eur"] - expected_principal_eur) < 0.01
+
+
+def test_principal_eur_avg_after_withdrawal(client: TestClient):
+    """Test that principal_eur_avg uses average cost method for withdrawals."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Avg Cost Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx_rate 1.1111 → EUR = 10000/1.1111 ≈ 9000.09
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.1111,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $9,800 at fx_rate 1.1765 → historical EUR = 9800/1.1765 ≈ 8326.39
+    # Average cost EUR = 9800 × (9000.09/10000) = 8820.09
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -9800.0,
+            "fx_rate": 1.1765,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=0.92
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["principal"] == pytest.approx(200.0)
+
+    # principal_eur uses historical rates: 10000/1.1111 - 9800/1.1765
+    deposit_eur = 10000.0 / 1.1111
+    withdraw_eur = 9800.0 / 1.1765
+    assert data["principal_eur"] == pytest.approx(deposit_eur - withdraw_eur, abs=0.1)
+
+    # principal_eur_avg uses average cost: remaining = deposit_eur × (200/10000)
+    expected_avg = deposit_eur * (200.0 / 10000.0)
+    assert data["principal_eur_avg"] == pytest.approx(expected_avg, abs=0.1)
+
+    # realized_withdrawals should contain one entry
+    assert len(data["realized_withdrawals"]) == 1
+    w = data["realized_withdrawals"][0]
+    assert w["date"] == "2024-06-01T10:00:00"
+    assert w["amount"] == pytest.approx(9800.0)
+    # EUR cost at average rate: 9800 × (deposit_eur / 10000)
+    expected_eur_avg = 9800.0 * (deposit_eur / 10000.0)
+    assert w["amount_eur_avg"] == pytest.approx(expected_eur_avg, abs=0.1)
+    # EUR received at historical rate
+    assert w["amount_eur"] == pytest.approx(withdraw_eur, abs=0.1)
+    # Realized FX G/L
+    assert w["realized_fx_gain"] == pytest.approx(
+        withdraw_eur - expected_eur_avg, abs=0.1
+    )
+
+
+def test_withdrawal_fx_gain_multiple_deposits_and_withdrawals(client: TestClient):
+    """Test FX G/L with two deposits at different rates, then two withdrawals."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Multi FX Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx_rate=1.10 → EUR = 10000/1.10 = 9090.909...
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    # Deposit $5,000 at fx_rate=1.25 → EUR = 5000/1.25 = 4000.00
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-02-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fx_rate": 1.25,
+            "fee": 0.0,
+        },
+    )
+
+    # Weighted avg: principal_eur_avg = 9090.909 + 4000 = 13090.909
+    # avg_rate = 13090.909 / 15000 = 0.872727... EUR per USD
+
+    # Withdraw $6,000 at fx_rate=1.15
+    # EUR received (historical) = 6000/1.15 = 5217.391...
+    # EUR avg cost = 6000 × 0.872727 = 5236.364...
+    # FX G/L = 5217.391 - 5236.364 = -18.973...
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -6000.0,
+            "fx_rate": 1.15,
+            "fee": 0.0,
+        },
+    )
+
+    # After W1: principal=9000, principal_eur_avg = 13090.909 - 5236.364 = 7854.545
+    # avg_rate still = 7854.545 / 9000 = 0.872727 (unchanged, as expected)
+
+    # Withdraw $4,000 at fx_rate=1.05
+    # EUR received = 4000/1.05 = 3809.524...
+    # EUR avg cost = 4000 × 0.872727 = 3490.909...
+    # FX G/L = 3809.524 - 3490.909 = +318.615...
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-09-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -4000.0,
+            "fx_rate": 1.05,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        return_value=0.92,
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    dep1_eur = 10000.0 / 1.10  # 9090.909...
+    dep2_eur = 5000.0 / 1.25  # 4000.0
+    total_eur_avg = dep1_eur + dep2_eur  # 13090.909...
+    avg_rate = total_eur_avg / 15000.0  # 0.872727...
+
+    # Remaining principal = 15000 - 6000 - 4000 = 5000
+    assert data["principal"] == pytest.approx(5000.0)
+
+    # Verify withdrawal 1
+    assert len(data["realized_withdrawals"]) == 2
+    w1 = data["realized_withdrawals"][0]
+    assert w1["amount"] == pytest.approx(6000.0)
+    w1_eur_hist = 6000.0 / 1.15
+    w1_eur_avg = 6000.0 * avg_rate
+    assert w1["amount_eur"] == pytest.approx(w1_eur_hist, abs=0.01)
+    assert w1["amount_eur_avg"] == pytest.approx(w1_eur_avg, abs=0.01)
+    assert w1["realized_fx_gain"] == pytest.approx(w1_eur_hist - w1_eur_avg, abs=0.01)
+
+    # Verify withdrawal 2 — avg_rate should be unchanged
+    w2 = data["realized_withdrawals"][1]
+    assert w2["amount"] == pytest.approx(4000.0)
+    w2_eur_hist = 4000.0 / 1.05
+    w2_eur_avg = 4000.0 * avg_rate
+    assert w2["amount_eur"] == pytest.approx(w2_eur_hist, abs=0.01)
+    assert w2["amount_eur_avg"] == pytest.approx(w2_eur_avg, abs=0.01)
+    assert w2["realized_fx_gain"] == pytest.approx(w2_eur_hist - w2_eur_avg, abs=0.01)
+
+    # principal_eur_avg after both withdrawals
+    remaining_eur_avg = total_eur_avg - w1_eur_avg - w2_eur_avg
+    assert data["principal_eur_avg"] == pytest.approx(remaining_eur_avg, abs=0.1)
+
+
+def test_withdrawal_fx_gain_interleaved_deposits(client: TestClient):
+    """Test that a deposit between withdrawals changes the avg rate for later withdrawals."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Interleaved FX Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx=1.10 → EUR = 9090.909
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $5,000 at fx=1.15 → EUR received = 4347.826
+    # avg_rate = 9090.909/10000 = 0.909091
+    # EUR avg cost = 5000 × 0.909091 = 4545.455
+    # FX G/L = 4347.826 - 4545.455 = -197.629
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-03-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -5000.0,
+            "fx_rate": 1.15,
+            "fee": 0.0,
+        },
+    )
+
+    # After W1: principal=5000, principal_eur_avg = 9090.909 - 4545.455 = 4545.455
+
+    # Deposit $5,000 at fx=1.20 → EUR = 4166.667
+    # principal_eur_avg = 4545.455 + 4166.667 = 8712.121
+    # principal = 10000
+    # new avg_rate = 8712.121 / 10000 = 0.871212
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fx_rate": 1.20,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $5,000 at fx=1.10 → EUR received = 4545.455
+    # avg_rate = 8712.121 / 10000 = 0.871212
+    # EUR avg cost = 5000 × 0.871212 = 4356.061
+    # FX G/L = 4545.455 - 4356.061 = +189.394
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-09-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -5000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        return_value=0.92,
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    dep1_eur = 10000.0 / 1.10  # 9090.909
+    dep2_eur = 5000.0 / 1.20  # 4166.667
+
+    # Withdrawal 1: avg_rate based on dep1 only
+    avg_rate_1 = dep1_eur / 10000.0  # 0.909091
+    w1_eur_hist = 5000.0 / 1.15
+    w1_eur_avg = 5000.0 * avg_rate_1
+
+    assert len(data["realized_withdrawals"]) == 2
+    w1 = data["realized_withdrawals"][0]
+    assert w1["amount_eur"] == pytest.approx(w1_eur_hist, abs=0.01)
+    assert w1["amount_eur_avg"] == pytest.approx(w1_eur_avg, abs=0.01)
+    assert w1["realized_fx_gain"] == pytest.approx(w1_eur_hist - w1_eur_avg, abs=0.01)
+
+    # Withdrawal 2: avg_rate after dep2 added
+    remaining_avg_after_w1 = dep1_eur - w1_eur_avg  # 4545.455
+    new_avg_pool = remaining_avg_after_w1 + dep2_eur  # 8712.121
+    avg_rate_2 = new_avg_pool / 10000.0  # 0.871212
+    w2_eur_hist = 5000.0 / 1.10
+    w2_eur_avg = 5000.0 * avg_rate_2
+
+    w2 = data["realized_withdrawals"][1]
+    assert w2["amount_eur"] == pytest.approx(w2_eur_hist, abs=0.01)
+    assert w2["amount_eur_avg"] == pytest.approx(w2_eur_avg, abs=0.01)
+    assert w2["realized_fx_gain"] == pytest.approx(w2_eur_hist - w2_eur_avg, abs=0.01)
+
+    # Remaining principal = 5000
+    assert data["principal"] == pytest.approx(5000.0)
+    remaining_eur_avg = new_avg_pool - w2_eur_avg
+    assert data["principal_eur_avg"] == pytest.approx(remaining_eur_avg, abs=0.1)
+
+
+def test_withdrawal_fx_gain_full_withdrawal(client: TestClient):
+    """Test full withdrawal leaves principal_eur_avg ≈ 0."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Full Withdraw Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx=1.10 → EUR = 9090.909
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $10,000 at fx=1.20 → EUR received = 8333.333
+    # EUR avg cost = 10000 × (9090.909/10000) = 9090.909
+    # FX G/L = 8333.333 - 9090.909 = -757.576
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -10000.0,
+            "fx_rate": 1.20,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        return_value=0.92,
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    dep_eur = 10000.0 / 1.10  # 9090.909
+    w_eur_hist = 10000.0 / 1.20  # 8333.333
+    w_eur_avg = dep_eur  # full withdrawal at avg = full deposit EUR
+
+    assert data["principal"] == pytest.approx(0.0)
+
+    assert len(data["realized_withdrawals"]) == 1
+    w = data["realized_withdrawals"][0]
+    assert w["amount"] == pytest.approx(10000.0)
+    assert w["amount_eur"] == pytest.approx(w_eur_hist, abs=0.01)
+    assert w["amount_eur_avg"] == pytest.approx(w_eur_avg, abs=0.01)
+    assert w["realized_fx_gain"] == pytest.approx(w_eur_hist - w_eur_avg, abs=0.01)
+
+    # principal_eur_avg should be ~0 after full withdrawal
+    assert data["principal_eur_avg"] == pytest.approx(0.0, abs=0.01)
 
 
 # ================== Health Check Test ==================

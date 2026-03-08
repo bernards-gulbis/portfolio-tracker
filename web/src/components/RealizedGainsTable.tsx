@@ -140,8 +140,10 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
     });
   }, [dividendGroups, filter, sortKey, sortAsc]);
 
-  const activeList = tab === 'gains' ? filteredGains : filteredDividends;
-  const totalPages = Math.max(1, Math.ceil(activeList.length / PAGE_SIZE));
+  // ================== Withdrawals sorting ==================
+
+  const activeListLength = tab === 'gains' ? filteredGains.length : filteredDividends.length;
+  const totalPages = Math.max(1, Math.ceil(activeListLength / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
 
   const pagedGains = tab === 'gains'
@@ -150,7 +152,6 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
   const pagedDividends = tab === 'dividends'
     ? filteredDividends.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     : [];
-
   const gainsTotals = useMemo(() => ({
     gain: filteredGains.reduce((sum, g) => sum + g.totalGain, 0),
     count: filteredGains.reduce((sum, g) => sum + g.sales.length, 0),
@@ -217,12 +218,12 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
             )}
           </TabsList>
           <Input
-            name="ticker-filter"
-            placeholder={t('status.columns.ticker')}
-            value={filter}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            className="w-40 h-8 text-sm"
-          />
+              name="ticker-filter"
+              placeholder={t('status.columns.ticker')}
+              value={filter}
+              onChange={(e) => handleFilterChange(e.target.value)}
+              className="w-40 h-8 text-sm"
+            />
         </div>
 
         {/* Realized Gains Tab */}
@@ -355,6 +356,7 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
             {totalPages > 1 && <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />}
           </Card>
         </TabsContent>
+
       </Tabs>
     </div>
   );

@@ -154,6 +154,14 @@ export interface DividendReceived {
   amount_eur: number | null;
 }
 
+export interface WithdrawalFx {
+  date: string;
+  amount: number;
+  amount_eur_avg: number;
+  amount_eur: number;
+  realized_fx_gain: number;
+}
+
 export interface TransactionWarning {
   code: string;
   date: string;
@@ -165,6 +173,7 @@ export interface PortfolioStatus {
   portfolio_name: string;
   principal: number;
   principal_eur: number;
+  principal_eur_avg: number;
   dividends: number;
   dividends_eur: number | null;
   cash: number;
@@ -173,6 +182,7 @@ export interface PortfolioStatus {
   realized_gains: number;
   realized_sales: RealizedSale[];
   dividends_received: DividendReceived[];
+  realized_withdrawals: WithdrawalFx[];
   capital_gains_tax_rate: number;
   warnings: TransactionWarning[];
   usd_to_eur_rate: number | null;

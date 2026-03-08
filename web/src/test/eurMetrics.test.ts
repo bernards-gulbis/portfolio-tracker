@@ -8,6 +8,7 @@ const baseStatus: PricedPortfolioStatus = {
   current_value: 10500,
   principal: 10000,
   principal_eur: 9000,  // deposited at fx_rate 1.1111
+  principal_eur_avg: 9000,
   dividends: 0,
   dividends_eur: null,
   cash: 9000,
@@ -19,6 +20,7 @@ const baseStatus: PricedPortfolioStatus = {
   realized_gains: 0,
   realized_sales: [],
   dividends_received: [],
+  realized_withdrawals: [],
   capital_gains_tax_rate: 0.255,
   missing_prices: [],
   warnings: [],
@@ -145,8 +147,8 @@ describe('computeEurMetrics', () => {
     expect(result.currentValueEur).toBeCloseTo(10500 * 0.85);
   });
 
-  it('returns currencyGainsPct as null when principal_eur is 0', () => {
-    const status = { ...baseStatus, principal_eur: 0 };
+  it('returns currencyGainsPct as null when principal_eur_avg is 0', () => {
+    const status = { ...baseStatus, principal_eur: 0, principal_eur_avg: 0 };
     const result = computeEurMetrics(status)!;
     expect(result.currencyGainsPct).toBeNull();
   });
