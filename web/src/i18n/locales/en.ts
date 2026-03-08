@@ -24,6 +24,13 @@ const en = {
       signOut: 'Sign out',
     },
     version: 'v{{version}}',
+    footer: {
+      copyright: '\u00a9 {{year}} Bernards Gulbis. Licensed under the',
+      license: 'MIT License',
+      dataAttribution: 'Data provided by',
+      dataSource: 'Yahoo Finance',
+      disclaimer: 'Quotes delayed at least 15 minutes. All exchange times are in ET. This application is for informational purposes only and does not constitute financial advice.',
+    },
   },
   auth: {
     validation: {

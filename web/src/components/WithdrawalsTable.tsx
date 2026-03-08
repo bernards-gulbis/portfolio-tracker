@@ -136,7 +136,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
               </TableHead>
               <TableHead className="text-right">
                 <span className="inline-flex items-center gap-1">
-                  {t('status.columns.tax')} ({(taxRate * 100).toFixed(0)}%)
+                  {t('status.columns.tax')} ({new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(taxRate * 100)}%)
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>

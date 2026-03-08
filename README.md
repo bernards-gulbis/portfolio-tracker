@@ -1,4 +1,4 @@
-# Portfolio Tracker v4
+# Portfolio Tracker
 
 A self-hosted investment portfolio tracker for European retail investors who trade in multiple currencies but report in EUR. Record all transaction types, get real-time valuations, gain/loss calculations, performance charts, and tax estimates — all with automatic EUR conversion.
 

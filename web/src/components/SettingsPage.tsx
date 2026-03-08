@@ -15,7 +15,6 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { Info, ArrowLeft } from 'lucide-react';
-import { APP_VERSION } from '../constants/app';
 import { cn } from '@/lib/utils';
 
 type SettingsSection = 'profile' | 'password' | 'tax' | 'account';
@@ -505,7 +504,6 @@ export const SettingsPage = () => {
         <SettingsNav active={activeSection} onChange={setActiveSection} />
         <SectionContent section={activeSection} />
       </div>
-      <p className="text-xs text-muted-foreground text-center mt-8">{t('app.version', { version: APP_VERSION })}</p>
     </div>
   );
 };

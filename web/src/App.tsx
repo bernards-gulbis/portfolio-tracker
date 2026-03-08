@@ -35,6 +35,7 @@ import { PortfolioActions } from './components/PortfolioActions';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsPage } from './components/SettingsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { APP_VERSION } from './constants/app';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 const queryClient = new QueryClient({
@@ -295,6 +296,27 @@ function AppLayout() {
         <main className="flex-1 p-6">
           {renderMainContent()}
         </main>
+
+        <footer className="border-t px-6 py-4 text-xs text-muted-foreground">
+          <div className="flex items-baseline justify-between">
+            <span>
+              {t('app.footer.copyright', { year: new Date().getFullYear() })}{' '}
+              <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+                {t('app.footer.license')}
+              </a>
+              .
+            </span>
+            <span>{t('app.version', { version: APP_VERSION })}</span>
+          </div>
+          <p className="mt-1.5 text-center text-muted-foreground/70">
+            {t('app.footer.dataAttribution')}{' '}
+            <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+              {t('app.footer.dataSource')}
+            </a>
+            {'. '}
+            {t('app.footer.disclaimer')}
+          </p>
+        </footer>
       </div>
 
       <CreatePortfolioModal
