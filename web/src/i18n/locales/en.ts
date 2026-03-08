@@ -155,6 +155,8 @@ const en = {
       deleted: 'Transaction deleted',
       imported_one: 'Imported {{count}} transaction',
       imported_other: 'Imported {{count}} transactions',
+      importedWithSkipped_one: 'Imported {{count}} transaction, skipped {{skipped}} duplicate(s)',
+      importedWithSkipped_other: 'Imported {{count}} transactions, skipped {{skipped}} duplicate(s)',
     },
     validation: {
       dateRequired: 'Date is required',

@@ -117,7 +117,11 @@ export const useImportTransactionsCSV = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
-      toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
+      if (result.skipped_count > 0) {
+        toast.success(t('transaction.toasts.importedWithSkipped', { count: result.imported_count, skipped: result.skipped_count }));
+      } else {
+        toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
+      }
     },
   });
 };

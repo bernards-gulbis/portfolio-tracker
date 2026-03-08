@@ -19,6 +19,21 @@ from app.models import Transaction, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.repositories.transaction_repository import TransactionRepository
 
+
+def _dedup_key(t: Transaction) -> tuple:
+    """Build a fingerprint tuple for deduplication."""
+    return (
+        t.date,
+        t.type,
+        t.ticker,
+        t.total_amount,
+        t.quantity,
+        t.price_per_share,
+        t.fee,
+        t.eur_amount,
+    )
+
+
 _ERR_EUR_AMOUNT_SIGN_MISMATCH = "eur_amount sign must match total_amount sign"
 
 
@@ -258,13 +273,28 @@ class TransactionService:
 
     def import_from_csv(
         self, csv_content: str, portfolio_id: int, user_id: uuid.UUID
-    ) -> list[Transaction]:
-        """Import transactions from CSV with transaction atomicity (user-scoped)"""
+    ) -> tuple[list[Transaction], int]:
+        """Import transactions from CSV with deduplication (user-scoped).
+
+        Returns (created_transactions, skipped_count).
+        """
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
 
-        transactions = self._parse_csv(csv_content, portfolio_id)
-        return self.transaction_repo.bulk_create(transactions)
+        parsed = self._parse_csv(csv_content, portfolio_id)
+
+        existing = self.transaction_repo.get_by_portfolio_id(portfolio_id)
+        existing_keys = {_dedup_key(t) for t in existing}
+
+        new_transactions = [t for t in parsed if _dedup_key(t) not in existing_keys]
+        skipped_count = len(parsed) - len(new_transactions)
+
+        if new_transactions:
+            created = self.transaction_repo.bulk_create(new_transactions)
+        else:
+            created = []
+
+        return created, skipped_count
 
     def _validate_transaction_data(
         self,

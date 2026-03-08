@@ -110,6 +110,7 @@ export interface TransactionUpdate {
 
 export interface BulkImportResponse {
   imported_count: number;
+  skipped_count: number;
   transactions: Transaction[];
 }
 

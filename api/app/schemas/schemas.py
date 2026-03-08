@@ -226,6 +226,7 @@ class BulkImportResponse(BaseModel):
     """Schema for CSV bulk import response"""
 
     imported_count: int
+    skipped_count: int
     transactions: list[TransactionResponse]
 
 
