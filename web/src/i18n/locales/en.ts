@@ -23,6 +23,7 @@ const en = {
       userMenu: 'User menu',
       signOut: 'Sign out',
     },
+    version: 'v{{version}}',
   },
   auth: {
     validation: {

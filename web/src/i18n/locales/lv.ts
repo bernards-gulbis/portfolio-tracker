@@ -25,6 +25,7 @@ const lv: Translation = {
       userMenu: 'Lietotāja izvēlne',
       signOut: 'Izrakstīties',
     },
+    version: 'v{{version}}',
   },
   auth: {
     validation: {

@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
+import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
 import type { RealizedSale, DividendReceived } from '../api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -411,6 +412,7 @@ interface GainsTickerGroupRowProps {
 
 const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTickerGroupRowProps) => {
   const { t } = useTranslation();
+  const daysLabels = useDaysHeldLabels();
 
   return (
     <>
@@ -435,6 +437,7 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
         <TableRow>
           <TableCell colSpan={4} className="p-0">
             <div className="bg-muted/30 pl-11 pr-4 py-2 max-h-80 overflow-y-auto">
+              <TooltipProvider>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -465,18 +468,16 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                       <TableRow key={`${sale.date}-${idx}`}>
                         <TableCell className="text-muted-foreground">{formatDateCompact(sale.date, locale)}</TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help border-b border-dotted border-muted-foreground">
-                                  {formatDaysHeld(sale.days_held, { d: t('common.daysShort'), m: t('common.monthsShort'), y: t('common.yearsShort') })}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{sale.days_held} {t('status.columns.daysHeld').toLowerCase()}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help border-b border-dotted border-muted-foreground">
+                                {formatDaysHeld(sale.days_held, daysLabels)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{sale.days_held} {t('status.columns.daysHeld').toLocaleLowerCase()}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           <span>{formatQuantity(sale.quantity)}</span>
@@ -510,6 +511,7 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                   })}
                 </TableBody>
               </Table>
+              </TooltipProvider>
             </div>
           </TableCell>
         </TableRow>

@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
+import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
 import { applyRateToHolding, type EurMetrics } from '../utils/eurMetrics';
 import type { PricedHolding } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
@@ -46,6 +47,7 @@ export const HoldingsTable = memo(({
   locale,
 }: HoldingsTableProps) => {
   const { t } = useTranslation();
+  const daysLabels = useDaysHeldLabels();
   const eurAvailable = eurMetrics !== null;
   const cashDisplay = showEur && eurAvailable ? eurMetrics.cashEur : cash;
   const currencyGainsEur = eurMetrics?.currencyGainsEur ?? null;
@@ -73,6 +75,7 @@ export const HoldingsTable = memo(({
           </AlertDescription>
         </Alert>
       )}
+      <TooltipProvider>
       <Card className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -114,19 +117,17 @@ export const HoldingsTable = memo(({
                       <span className={`font-semibold ${getValueClass(currencyGainsEur)}`}>
                         {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
                       </span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground cursor-help">
-                              {t('status.fx')}
-                              <InfoIcon className="h-3 w-3" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{t('status.cashFxTooltip')}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground cursor-help">
+                            {t('status.fx')}
+                            <InfoIcon className="h-3 w-3" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{t('status.cashFxTooltip')}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     {currencyGainsPct !== null && (
                       <span className={`text-xs ${getValueClass(currencyGainsEur)}`}>
@@ -142,18 +143,16 @@ export const HoldingsTable = memo(({
                   <TableCell className="font-semibold">{holding.ticker}</TableCell>
                   <TableCell className="tabular-nums">
                     {daysHeldMap[holding.ticker] == null ? '-' : (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help border-b border-dotted border-muted-foreground">
-                              {formatDaysHeld(daysHeldMap[holding.ticker], { d: t('common.daysShort'), m: t('common.monthsShort'), y: t('common.yearsShort') })}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{daysHeldMap[holding.ticker]} {t('status.columns.daysHeld').toLowerCase()}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help border-b border-dotted border-muted-foreground">
+                            {formatDaysHeld(daysHeldMap[holding.ticker], daysLabels)}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{daysHeldMap[holding.ticker]} {t('status.columns.daysHeld').toLocaleLowerCase()}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </TableCell>
                   <TableCell className="tabular-nums">{formatQuantity(holding.quantity)}</TableCell>
@@ -214,6 +213,7 @@ export const HoldingsTable = memo(({
           </TableBody>
         </Table>
       </Card>
+      </TooltipProvider>
     </div>
   );
 });
