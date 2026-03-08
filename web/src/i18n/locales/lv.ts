@@ -371,6 +371,7 @@ const lv: Translation = {
     backToPortfolio: 'Atpakaļ uz portfeli',
     profile: {
       tab: 'Profils',
+      description: 'Pārvaldiet savu vārdu un e-pasta adresi.',
       nameLabel: 'Vārds',
       namePlaceholder: 'Jūsu vārds',
       emailLabel: 'E-pasts',
@@ -379,6 +380,7 @@ const lv: Translation = {
     },
     password: {
       tab: 'Parole',
+      description: 'Atjauniniet savu paroli, lai nodrošinātu konta drošību.',
       newPasswordLabel: 'Jaunā parole',
       confirmPasswordLabel: 'Apstiprināt jauno paroli',
       submit: 'Mainīt paroli',
@@ -388,6 +390,7 @@ const lv: Translation = {
     },
     account: {
       tab: 'Konts',
+      description: 'Pārvaldiet sava konta statusu.',
       dangerZone: 'Bīstamā zona',
       closeTitle: 'Slēgt kontu',
       closeDescription: 'Neatgriezeniski dzēst jūsu kontu un visus saistītos datus (portfeļi, darījumi). Šo darbību nevar atsaukt.',

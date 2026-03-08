@@ -78,13 +78,47 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Manage your account settings and preferences.')).toBeInTheDocument();
   });
 
-  it('renders all four sections', () => {
+  it('renders nav buttons for all four sections', () => {
     renderPage();
 
-    expect(screen.getByText('Profile')).toBeInTheDocument();
-    expect(screen.getByText('Password')).toBeInTheDocument();
-    expect(screen.getByText('Tax')).toBeInTheDocument();
-    expect(screen.getByText('Account')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Password' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tax' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
+  });
+
+  it('shows Profile section by default', () => {
+    renderPage();
+
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+  });
+
+  it('switches to Password section when Password nav is clicked', async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Password' }));
+
+    expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('switches to Tax section when Tax nav is clicked', async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tax' }));
+
+    expect(screen.getByLabelText('Tax rate (%)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('switches to Account section when Account nav is clicked', async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }));
+
+    expect(screen.getByText('Danger Zone')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });
 
   it('calls goToPortfolio when back button is clicked', async () => {
@@ -325,12 +359,6 @@ describe('TaxSection', () => {
     renderWithProviders(<TaxSection />);
 
     expect(screen.getByLabelText('Tax rate (%)')).toHaveValue(25.5);
-  });
-
-  it('renders description text', () => {
-    renderWithProviders(<TaxSection />);
-
-    expect(screen.getByText('Configure the tax rate applied to capital gains calculations.')).toBeInTheDocument();
   });
 
   it('calls updateTaxRate.mutateAsync with decimal value on submit', async () => {

@@ -369,6 +369,7 @@ const en = {
     backToPortfolio: 'Back to portfolio',
     profile: {
       tab: 'Profile',
+      description: 'Manage your display name and email address.',
       nameLabel: 'Name',
       namePlaceholder: 'Your name',
       emailLabel: 'Email',
@@ -377,6 +378,7 @@ const en = {
     },
     password: {
       tab: 'Password',
+      description: 'Update your password to keep your account secure.',
       newPasswordLabel: 'New password',
       confirmPasswordLabel: 'Confirm new password',
       submit: 'Change password',
@@ -386,6 +388,7 @@ const en = {
     },
     account: {
       tab: 'Account',
+      description: 'Manage your account status.',
       dangerZone: 'Danger Zone',
       closeTitle: 'Close Account',
       closeDescription: 'Permanently delete your account and all associated data (portfolios, transactions). This action cannot be undone.',
