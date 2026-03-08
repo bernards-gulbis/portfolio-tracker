@@ -14,7 +14,8 @@ export const usePortfolioStatus = (portfolioId: number | null) => {
       return getPortfolioStatus(portfolioId);
     },
     enabled: !!portfolioId,
-    staleTime: 0, // Refetch on mount when navigating back to Summary tab
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };

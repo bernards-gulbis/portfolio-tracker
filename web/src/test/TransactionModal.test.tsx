@@ -304,3 +304,122 @@ describe('TransactionModal — sell suggestions', () => {
     });
   });
 });
+
+describe('TransactionModal — edit mode', () => {
+  const mockCreateMutateAsync = vi.fn();
+  const mockUpdateMutateAsync = vi.fn();
+
+  const editTransaction: Transaction = {
+    id: 42,
+    portfolio_id: 1,
+    date: '2024-06-15T14:30:00',
+    type: TransactionType.BUY,
+    ticker: 'AAPL',
+    quantity: 10,
+    price_per_share: 150.00,
+    fee: 5.00,
+    total_amount: -1505.00,
+    eur_amount: null,
+    split_ratio: null,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    vi.mocked(useCreateTransaction).mockReturnValue({
+      mutateAsync: mockCreateMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreateTransaction>);
+
+    vi.mocked(useUpdateTransaction).mockReturnValue({
+      mutateAsync: mockUpdateMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTransaction>);
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: { holdings: mockHoldings, usd_to_eur_rate: 0.92 },
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
+    } as unknown as ReturnType<typeof useLivePrices>);
+  });
+
+  it('shows edit title when transaction is provided', () => {
+    renderModal({ ...defaultProps, transaction: editTransaction });
+    expect(screen.getByText('Edit Transaction')).toBeInTheDocument();
+  });
+
+  it('shows add title when no transaction', () => {
+    renderModal();
+    expect(screen.getByRole('heading', { name: 'Add Transaction' })).toBeInTheDocument();
+  });
+
+  it('pre-fills form fields in edit mode', () => {
+    renderModal({ ...defaultProps, transaction: editTransaction });
+
+    const tickerInput = screen.getByLabelText('Asset') as HTMLInputElement;
+    expect(tickerInput.value).toBe('AAPL');
+
+    const quantityInput = screen.getByLabelText('Quantity') as HTMLInputElement;
+    expect(quantityInput.value).toBe('10');
+
+    const priceInput = screen.getByLabelText('Price per Share') as HTMLInputElement;
+    expect(priceInput.value).toBe('150.00');
+  });
+
+  it('calls updateTransaction on submit in edit mode', async () => {
+    mockUpdateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal({ ...defaultProps, transaction: editTransaction });
+
+    const submitBtn = screen.getByRole('button', { name: 'Update' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockUpdateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: 42,
+          portfolioId: 1,
+        })
+      );
+    });
+  });
+
+  it('shows Split Ratio field for Split type', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Split');
+
+    expect(screen.getByLabelText('Split Ratio')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Total Amount')).not.toBeInTheDocument();
+  });
+
+  it('shows EUR amount field for Withdraw type', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Withdraw');
+
+    expect(screen.getByLabelText('Amount in EUR')).toBeInTheDocument();
+  });
+
+  it('shows EUR amount field for Deposit type (default)', () => {
+    renderModal();
+    expect(screen.getByLabelText('Amount in EUR')).toBeInTheDocument();
+  });
+
+  it('shows validation error when total amount is empty', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    // Submit without filling total amount (required for Deposit)
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Total amount must be greater than 0')).toBeInTheDocument();
+    });
+  });
+});

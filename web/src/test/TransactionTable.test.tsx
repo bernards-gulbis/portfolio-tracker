@@ -235,6 +235,144 @@ describe('TransactionTable', () => {
     expect(screen.getByText('15.00000001 shares at $183.69')).toBeInTheDocument();
   });
 
+  it('renders pagination when totalPages > 1', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          totalPages={3}
+          total={50}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('Previous')).toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
+  });
+
+  it('does not render pagination when totalPages is 1', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          totalPages={1}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.queryByText('Previous')).not.toBeInTheDocument();
+    expect(screen.queryByText('Next')).not.toBeInTheDocument();
+  });
+
+  it('displays split ratio for split transactions', () => {
+    const splitTx: Transaction[] = [
+      {
+        id: 10,
+        portfolio_id: 1,
+        date: '2021-06-01T10:00:00',
+        type: TransactionType.SPLIT,
+        ticker: 'AAPL',
+        quantity: null,
+        price_per_share: null,
+        fee: null,
+        total_amount: 0,
+        eur_amount: null,
+        split_ratio: 4,
+      },
+    ];
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={splitTx}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          total={1}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('Split')).toBeInTheDocument();
+    expect(screen.getByText('Split 1:4')).toBeInTheDocument();
+  });
+
+  it('toggles sort order when date header is clicked', async () => {
+    const onSortOrderChange = vi.fn();
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          onSortOrderChange={onSortOrderChange}
+        />
+      </QueryClientProvider>
+    );
+
+    const dateButton = screen.getByRole('button', { name: /Date/ });
+    await userEvent.click(dateButton);
+
+    expect(onSortOrderChange).toHaveBeenCalledWith('asc');
+  });
+
+  it('calls onEdit when edit action is clicked', async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
+      </QueryClientProvider>
+    );
+
+    // Open the action menu for the first row
+    await userEvent.click(screen.getAllByLabelText(/Actions for/)[0]);
+
+    // Click "Edit"
+    await userEvent.click(await screen.findByText('Edit'));
+
+    expect(mockOnEdit).toHaveBeenCalledWith(mockTransactions[0]);
+  });
+
+  it('shows "showing X to Y of Z" text', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          total={50}
+          responsePage={2}
+          responsePageSize={20}
+        />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('Showing 21-23 of 50')).toBeInTheDocument();
+  });
+
   it('shows error toast when transaction delete fails', { timeout: 15000 }, async () => {
     vi.mocked(useDeleteTransaction).mockReturnValue({
       mutateAsync: vi.fn().mockRejectedValueOnce(new Error('Delete failed')),
