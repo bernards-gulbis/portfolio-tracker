@@ -29,6 +29,8 @@ export const useTransactions = (
     queryFn: () => getTransactions(portfolioId!, page, pageSize, ticker, normalizedTypes, sortOrder),
     enabled: portfolioId !== null,
     placeholderData: keepPreviousData,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 };
 

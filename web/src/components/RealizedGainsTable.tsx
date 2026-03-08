@@ -35,10 +35,11 @@ interface DividendTickerGroup {
 interface RealizedGainsTableProps {
   realizedSales: RealizedSale[];
   dividendsReceived: DividendReceived[];
+  displayCurrency: 'EUR' | 'USD';
   locale: string;
 }
 
-export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, locale }: RealizedGainsTableProps) => {
+export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, displayCurrency, locale }: RealizedGainsTableProps) => {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'gains' | 'dividends'>('gains');
   const [expandState, setExpandState] = useState<Set<string>>(new Set());
@@ -192,7 +193,6 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, loca
     });
   };
 
-
   const hasGains = realizedSales.length > 0;
   const hasDividends = dividendsReceived.length > 0;
 
@@ -330,6 +330,7 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, loca
                     group={group}
                     isExpanded={expandState.has(group.ticker)}
                     onToggle={toggleExpand}
+                    displayCurrency={displayCurrency}
                     locale={locale}
                   />
                 ))}
@@ -343,12 +344,9 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, loca
                       </Badge>
                     </TableCell>
                     <TableCell className="min-w-[7rem] text-right text-sm tabular-nums">
-                      {dividendTotals.totalEur != null
+                      {displayCurrency === 'EUR' && dividendTotals.totalEur != null
                         ? formatCurrency(dividendTotals.totalEur, 'EUR', locale)
                         : formatCurrency(dividendTotals.totalUsd, 'USD', locale)}
-                      {dividendTotals.totalEur != null && (
-                        <span className="text-muted-foreground/60 text-xs ml-1">({formatCurrency(dividendTotals.totalUsd, 'USD', locale)})</span>
-                      )}
                     </TableCell>
                   </TableRow>
                 )}
@@ -440,8 +438,18 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                     <TableHead>{t('status.columns.date')}</TableHead>
                     <TableHead className="text-right">{t('status.columns.daysHeld')}</TableHead>
                     <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
-                    <TableHead className="text-right">{t('status.columns.buyTotal')}</TableHead>
-                    <TableHead className="text-right">{t('status.columns.sellTotal')}</TableHead>
+                    <TableHead className="text-right">
+                      <div className="flex flex-col">
+                        <span>{t('status.columns.buyTotal')}</span>
+                        <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <div className="flex flex-col">
+                        <span>{t('status.columns.sellTotal')}</span>
+                        <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">{t('status.columns.realizedGL')}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -453,7 +461,7 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                     return (
                       <TableRow key={`${sale.date}-${idx}`}>
                         <TableCell className="text-muted-foreground">{formatDateCompact(sale.date, locale)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{sale.days_held}d</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{sale.days_held}</TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           <span>{formatQuantity(sale.quantity)}</span>
                           {isPartialSell ? (
@@ -468,16 +476,16 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                           )}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
-                          <span>{formatCurrency(buyPrice, 'USD', locale)}</span>
-                          <span className="block text-[10px] text-muted-foreground/70">{formatCurrency(sale.cost_basis, 'USD', locale)}</span>
+                          <span>{formatCurrency(sale.cost_basis, 'USD', locale)}</span>
+                          <span className="block text-[10px] text-muted-foreground/70">{formatCurrency(buyPrice, 'USD', locale)}</span>
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
-                          <span>{formatCurrency(sellPrice, 'USD', locale)}</span>
-                          <span className="block text-[10px] text-muted-foreground/70">{formatCurrency(sale.proceeds, 'USD', locale)}</span>
+                          <span>{formatCurrency(sale.proceeds, 'USD', locale)}</span>
+                          <span className="block text-[10px] text-muted-foreground/70">{formatCurrency(sellPrice, 'USD', locale)}</span>
                         </TableCell>
                         <TableCell className={`text-right tabular-nums ${getValueClass(sale.realized_gain)}`}>
                           <span>{formatSignedCurrency(sale.realized_gain, 'USD', locale)}</span>
-                          <span className={`block text-[10px] font-bold ${sale.realized_gain >= 0 ? 'text-positive' : 'text-negative'}`}>
+                          <span className={`block text-[10px] font-bold ${getValueClass(sale.realized_gain)}`}>
                             {formatSignedPercent(sale.cost_basis > 0 ? (sale.realized_gain / sale.cost_basis) * 100 : null)}
                           </span>
                         </TableCell>
@@ -500,10 +508,11 @@ interface DividendTickerGroupRowProps {
   group: DividendTickerGroup;
   isExpanded: boolean;
   onToggle: (ticker: string) => void;
+  displayCurrency: 'EUR' | 'USD';
   locale: string;
 }
 
-const DividendTickerGroupRow = ({ group, isExpanded, onToggle, locale }: DividendTickerGroupRowProps) => {
+const DividendTickerGroupRow = ({ group, isExpanded, onToggle, displayCurrency, locale }: DividendTickerGroupRowProps) => {
   const { t } = useTranslation();
 
   return (
@@ -522,12 +531,9 @@ const DividendTickerGroupRow = ({ group, isExpanded, onToggle, locale }: Dividen
           </Badge>
         </TableCell>
         <TableCell className="min-w-[7rem] text-right text-sm font-medium tabular-nums">
-          {group.totalAmountEur != null
+          {displayCurrency === 'EUR' && group.totalAmountEur != null
             ? formatCurrency(group.totalAmountEur, 'EUR', locale)
             : formatCurrency(group.totalAmount, 'USD', locale)}
-          {group.totalAmountEur != null && (
-            <span className="text-muted-foreground/60 text-xs ml-1">({formatCurrency(group.totalAmount, 'USD', locale)})</span>
-          )}
         </TableCell>
       </TableRow>
       {isExpanded && (
@@ -538,8 +544,7 @@ const DividendTickerGroupRow = ({ group, isExpanded, onToggle, locale }: Dividen
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('status.columns.date')}</TableHead>
-                    <TableHead className="text-right">{t('status.columns.amountEur')}</TableHead>
-                    <TableHead className="text-right">{t('status.columns.amountUsd')}</TableHead>
+                    <TableHead className="text-right">{t('status.columns.amount')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -547,9 +552,10 @@ const DividendTickerGroupRow = ({ group, isExpanded, onToggle, locale }: Dividen
                     <TableRow key={`${payment.date}-${idx}`}>
                       <TableCell className="text-muted-foreground">{formatDateCompact(payment.date, locale)}</TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {payment.amount_eur == null ? '-' : formatCurrency(payment.amount_eur, 'EUR', locale)}
+                        {displayCurrency === 'EUR' && payment.amount_eur != null
+                          ? formatCurrency(payment.amount_eur, 'EUR', locale)
+                          : formatCurrency(payment.amount, 'USD', locale)}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">{formatCurrency(payment.amount, 'USD', locale)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PortfolioStatusView } from '../components/PortfolioStatusView';
 import { CurrencyProvider } from '../hooks/useCurrencyPreference';
@@ -153,6 +153,10 @@ describe('PortfolioStatusView', () => {
     renderComponent(1);
 
     expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0);
+
+    // Financial summary is collapsed by default — expand it
+    fireEvent.click(screen.getByText('Financial Summary'));
+
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Dividends').length).toBeGreaterThan(0);
     expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();

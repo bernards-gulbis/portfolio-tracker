@@ -10,29 +10,15 @@ interface NavigationContextValue {
   goToSettings: () => void;
 }
 
-const STORAGE_KEY = 'pt_last_portfolio';
-
 const NavigationContext = createContext<NavigationContextValue | null>(null);
-
-function readStoredPortfolioId(): number | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return null;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
 
 export function NavigationProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [page, setPage] = useState<Page>('portfolio');
-  const [activePortfolioId, setActivePortfolioId] = useState<number | null>(readStoredPortfolioId);
+  const [activePortfolioId, setActivePortfolioId] = useState<number | null>(null);
 
   const goToPortfolio = useCallback((id: number) => {
     setActivePortfolioId(id);
     setPage('portfolio');
-    try { localStorage.setItem(STORAGE_KEY, String(id)); } catch { /* ignore */ }
   }, []);
 
   const goToFirstPortfolio = useCallback(() => {
@@ -49,7 +35,6 @@ export function NavigationProvider({ children }: Readonly<{ children: ReactNode 
     const handleLogout = () => {
       setPage('portfolio');
       setActivePortfolioId(null);
-      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     };
     globalThis.addEventListener('auth:logout', handleLogout);
     return () => globalThis.removeEventListener('auth:logout', handleLogout);

@@ -54,7 +54,9 @@ export const HoldingsTable = memo(({
   const daysHeldMap = useMemo(() => computeDaysHeld(holdings), [holdings]);
 
   const holdingsWithEur = useMemo(() => {
-    if (!showEur || !eurAvailable) return null;
+    if (!showEur || !eurAvailable) {
+      return holdings.map((h) => ({ holding: h, eurVals: null }));
+    }
     return holdings.map((h) => ({
       holding: h,
       eurVals: applyRateToHolding(h, eurMetrics.rate),
@@ -63,7 +65,6 @@ export const HoldingsTable = memo(({
 
   return (
     <div>
-      <h3 className="text-sm font-medium text-muted-foreground mb-4">{t('status.positions')}</h3>
       {missingPrices.length > 0 && (
         <Alert variant="destructive" className="mb-4">
           <AlertTriangleIcon className="h-4 w-4" />
@@ -77,31 +78,36 @@ export const HoldingsTable = memo(({
           <TableHeader>
             <TableRow>
               <TableHead>{t('status.columns.ticker')}</TableHead>
+              <TableHead>{t('status.columns.daysHeld')}</TableHead>
               <TableHead>{t('status.columns.quantity')}</TableHead>
               <TableHead>
-                {t('status.columns.cost')}
-                {showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}
+                <div className="flex flex-col">
+                  <span>{t('status.columns.cost')}{showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                </div>
               </TableHead>
               <TableHead>
-                {t('status.columns.priceValue')}
-                {showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}
+                <div className="flex flex-col">
+                  <span>{t('status.columns.marketValue')}{showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                </div>
               </TableHead>
               <TableHead>
                 {t('status.columns.unrealizedGL')}
                 {showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}
               </TableHead>
-              <TableHead>{t('status.columns.daysHeld')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow key="CASH">
               <TableCell className="font-semibold">CASH</TableCell>
-              <TableCell>-</TableCell>
-              <TableCell>-</TableCell>
-              <TableCell className="font-medium">
+              <TableCell className="tabular-nums">-</TableCell>
+              <TableCell className="tabular-nums">-</TableCell>
+              <TableCell className="tabular-nums">-</TableCell>
+              <TableCell className="font-medium tabular-nums">
                 {formatCurrency(cashDisplay, displayCurrency, locale)}
               </TableCell>
-              <TableCell>
+              <TableCell className="tabular-nums">
                 {showEur && currencyGainsEur !== null ? (
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1">
@@ -130,21 +136,21 @@ export const HoldingsTable = memo(({
                   </div>
                 ) : '-'}
               </TableCell>
-              <TableCell>-</TableCell>
             </TableRow>
-            {(holdingsWithEur ?? holdings.map((h) => ({ holding: h, eurVals: null }))).map(({ holding, eurVals }) => (
+            {holdingsWithEur.map(({ holding, eurVals }) => (
                 <TableRow key={holding.ticker}>
                   <TableCell className="font-semibold">{holding.ticker}</TableCell>
-                  <TableCell>{formatQuantity(holding.quantity)}</TableCell>
-                  <TableCell>
+                  <TableCell className="tabular-nums">{daysHeldMap[holding.ticker] ?? '-'}</TableCell>
+                  <TableCell className="tabular-nums">{formatQuantity(holding.quantity)}</TableCell>
+                  <TableCell className="tabular-nums">
                     <div className="flex flex-col">
-                      <span>{formatCurrency(holding.average_cost, 'USD', locale)}</span>
+                      <span>{formatCurrency(holding.total_cost, 'USD', locale)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {formatCurrency(holding.total_cost, 'USD', locale)}
+                        {formatCurrency(holding.average_cost, 'USD', locale)}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium tabular-nums">
                     <div className="flex flex-col">
                       <span>
                         {(() => {
@@ -159,7 +165,7 @@ export const HoldingsTable = memo(({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="tabular-nums">
                     {(() => {
                       if (eurVals?.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null) {
                         return (
@@ -188,7 +194,6 @@ export const HoldingsTable = memo(({
                       return '-';
                     })()}
                   </TableCell>
-                  <TableCell>{daysHeldMap[holding.ticker] ?? '-'}</TableCell>
                 </TableRow>
             ))}
           </TableBody>
