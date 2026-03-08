@@ -21,7 +21,8 @@ from app.models.historical_price import (  # noqa: F401 — ensures tables exist
     HistoricalPrice,
 )
 from app.models.user import User
-from app.services.portfolio_service import _apply_transaction, _TxState
+from app.services.portfolio_calc import _apply_transaction
+from app.services.portfolio_types import _Holding, _TxState
 from main import app
 
 
@@ -2849,11 +2850,11 @@ def test_sell_non_strict_oversell():
     """Oversell in non-strict mode should NOT inflate cash."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {
-        "quantity": Decimal("5"),
-        "total_cost": Decimal("500"),
-        "first_buy_date": datetime(2024, 1, 1),
-    }
+    state.holdings["AAPL"] = _Holding(
+        quantity=Decimal("5"),
+        total_cost=Decimal("500"),
+        first_buy_date=datetime(2024, 1, 1),
+    )
 
     tx = Transaction(
         id=1,
@@ -2869,7 +2870,7 @@ def test_sell_non_strict_oversell():
     # Cash should remain unchanged — the oversell was skipped entirely
     assert state.cash == Decimal("5000")
     # Holdings should remain untouched
-    assert state.holdings["AAPL"]["quantity"] == Decimal("5")
+    assert state.holdings["AAPL"].quantity == Decimal("5")
 
 
 def test_sell_without_ticker():
@@ -3599,20 +3600,20 @@ def test_warning_sell_unknown_ticker_strict():
 
     assert state.cash == Decimal("5000")  # sell skipped
     assert len(state.warnings) == 1
-    assert state.warnings[0]["code"] == "sellNotInHoldings"
-    assert state.warnings[0]["date"] == "2024-01-02T00:00:00"
-    assert state.warnings[0]["params"]["ticker"] == "UNKNOWN"
+    assert state.warnings[0].code == "sellNotInHoldings"
+    assert state.warnings[0].date == "2024-01-02T00:00:00"
+    assert state.warnings[0].params["ticker"] == "UNKNOWN"
 
 
 def test_warning_oversell_partial_strict():
     """Strict oversell appends a warning and executes a partial sell."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {
-        "quantity": Decimal("5"),
-        "total_cost": Decimal("500"),
-        "first_buy_date": datetime(2024, 1, 1),
-    }
+    state.holdings["AAPL"] = _Holding(
+        quantity=Decimal("5"),
+        total_cost=Decimal("500"),
+        first_buy_date=datetime(2024, 1, 1),
+    )
 
     tx = Transaction(
         id=1,
@@ -3626,9 +3627,9 @@ def test_warning_oversell_partial_strict():
     _apply_transaction(state, tx, strict=True)
 
     assert len(state.warnings) == 1
-    assert state.warnings[0]["code"] == "sellOversell"
-    assert state.warnings[0]["date"] == "2024-01-02T00:00:00"
-    assert state.warnings[0]["params"]["ticker"] == "AAPL"
+    assert state.warnings[0].code == "sellOversell"
+    assert state.warnings[0].date == "2024-01-02T00:00:00"
+    assert state.warnings[0].params["ticker"] == "AAPL"
     # Holdings should be cleared (partial sell of all 5 shares)
     assert "AAPL" not in state.holdings
     # Cash should increase by proportional total: 3000 * (5/20) = 750
@@ -3654,19 +3655,19 @@ def test_warning_withdraw_negative_cash():
     assert state.cash == Decimal("-400")
     assert state.principal == Decimal("-500")
     assert len(state.warnings) == 1
-    assert state.warnings[0]["code"] == "withdrawNegativeCash"
-    assert state.warnings[0]["date"] == "2024-01-02T00:00:00"
+    assert state.warnings[0].code == "withdrawNegativeCash"
+    assert state.warnings[0].date == "2024-01-02T00:00:00"
 
 
 def test_no_warnings_in_non_strict_mode():
     """Non-strict mode should never append warnings, only skip silently."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {
-        "quantity": Decimal("5"),
-        "total_cost": Decimal("500"),
-        "first_buy_date": datetime(2024, 1, 1),
-    }
+    state.holdings["AAPL"] = _Holding(
+        quantity=Decimal("5"),
+        total_cost=Decimal("500"),
+        first_buy_date=datetime(2024, 1, 1),
+    )
 
     # Oversell in non-strict mode
     tx = Transaction(
@@ -3682,7 +3683,7 @@ def test_no_warnings_in_non_strict_mode():
 
     assert len(state.warnings) == 0
     assert state.cash == Decimal("5000")
-    assert state.holdings["AAPL"]["quantity"] == Decimal("5")
+    assert state.holdings["AAPL"].quantity == Decimal("5")
 
 
 # ================== Live Prices Tests ==================
