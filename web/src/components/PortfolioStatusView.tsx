@@ -214,6 +214,7 @@ const PortfolioStatusContent = ({
 }: PortfolioStatusContentProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
+  const { goToTransactions } = useNavigation();
   const { currency } = useCurrencyPreference();
   const showEur = currency === 'EUR';
   const eur = useMemo(() => computeEurMetrics(status), [status]);
@@ -234,7 +235,10 @@ const PortfolioStatusContent = ({
         {toolbar && <div className="flex justify-end mb-4">{toolbar}</div>}
         <Alert>
           <InfoIcon className="h-4 w-4" />
-          <AlertDescription>{t('status.emptyPortfolio')}</AlertDescription>
+          <AlertDescription>
+            <span>{t('status.emptyPortfolio')}{' '}
+            <button type="button" className="underline font-medium cursor-pointer" onClick={goToTransactions}>{t('status.emptyPortfolioLink')}</button>.</span>
+          </AlertDescription>
         </Alert>
       </CardContent>
     );

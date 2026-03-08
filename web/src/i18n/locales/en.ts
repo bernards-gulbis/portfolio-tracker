@@ -281,7 +281,8 @@ const en = {
   status: {
     noPortfolio: 'Select a portfolio to view its status',
     noData: 'No status data available',
-    emptyPortfolio: 'Portfolio summary will appear here once you add transactions below.',
+    emptyPortfolio: 'Portfolio summary will appear here once you add transactions in the',
+    emptyPortfolioLink: 'Transactions tab',
     error: 'Error loading portfolio status: {{message}}',
     refreshPortfolio: 'Refresh portfolio',
     fetchedAt: 'Updated {{time}}',

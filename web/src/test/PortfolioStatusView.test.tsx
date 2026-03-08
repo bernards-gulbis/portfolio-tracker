@@ -211,7 +211,8 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getByText(/once you add transactions below/i)).toBeInTheDocument();
+    expect(screen.getByText(/once you add transactions in the/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /transactions tab/i })).toBeInTheDocument();
   });
 
   it('does not show empty portfolio alert when transactions exist', () => {

@@ -148,18 +148,22 @@ function AppLayout() {
   const currentLang = getCurrentLanguage();
   const { currency, setCurrency } = useCurrencyPreference();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { data: portfolios, isLoading: isPortfoliosLoading } = usePortfolios();
-  const { page, activePortfolioId, goToPortfolio, goToSettings } = useNavigation();
+  const { data: portfolios, isLoading: isPortfoliosLoading, isFetching: isPortfoliosFetching } = usePortfolios();
+  const { page, activePortfolioId, goToPortfolio, goToFirstPortfolio, goToSettings } = useNavigation();
   const portfolioTab = page === 'transactions' ? 'transactions' : 'portfolio';
   const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
 
   // Auto-select first portfolio when none is selected, or when the stored ID no longer exists
   useEffect(() => {
-    if (!portfolios || portfolios.length === 0) return;
+    if (!portfolios || isPortfoliosFetching) return;
+    if (portfolios.length === 0) {
+      if (activePortfolioId !== null) goToFirstPortfolio();
+      return;
+    }
     if (activePortfolioId === null || !portfolios.some((p) => p.id === activePortfolioId)) {
       goToPortfolio(portfolios[0].id);
     }
-  }, [activePortfolioId, portfolios, goToPortfolio]);
+  }, [activePortfolioId, portfolios, isPortfoliosFetching, goToPortfolio, goToFirstPortfolio]);
 
   const renderMainContent = () => {
     if (page === 'settings') {

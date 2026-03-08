@@ -283,7 +283,8 @@ const lv: Translation = {
   status: {
     noPortfolio: 'Izvēlieties portfeli, lai skatītu tā statusu',
     noData: 'Nav pieejami statusa dati',
-    emptyPortfolio: 'Portfeļa kopsavilkums parādīsies, kad pievienosiet darījumus zemāk.',
+    emptyPortfolio: 'Portfeļa kopsavilkums parādīsies, kad pievienosiet darījumus cilnē',
+    emptyPortfolioLink: 'Darījumi',
     error: 'Kļūda ielādējot portfeļa statusu: {{message}}',
     refreshPortfolio: 'Atjaunināt portfeli',
     fetchedAt: 'Atjaunināts {{time}}',
