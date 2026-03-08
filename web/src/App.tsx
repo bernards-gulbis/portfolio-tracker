@@ -26,7 +26,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign, ChevronsUpDown, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
-import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
@@ -57,8 +57,6 @@ const CURRENCY_OPTIONS = [
   { value: 'EUR', key: 'status.currency.eurLabel' },
 ] as const;
 
-const CreatePortfolioContext = createContext<(() => void) | null>(null);
-
 function CheckedItem({ checked, onClick, children }: Readonly<{ checked: boolean; onClick: () => void; children: ReactNode }>) {
   return (
     <DropdownMenuItem onClick={onClick}>
@@ -66,6 +64,16 @@ function CheckedItem({ checked, onClick, children }: Readonly<{ checked: boolean
       {children}
     </DropdownMenuItem>
   );
+}
+
+function getAvatarInitials(name?: string | null, email?: string | null): string | null {
+  if (name) {
+    return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  }
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+  return null;
 }
 
 function AuthGuard() {
@@ -142,6 +150,7 @@ function AppLayout() {
   const { data: portfolios, isLoading: isPortfoliosLoading } = usePortfolios();
   const { page, activePortfolioId, goToPortfolio, goToSettings } = useNavigation();
   const portfolioTab = page === 'transactions' ? 'transactions' : 'portfolio';
+  const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
 
   // Auto-select first portfolio when none is selected, or when the stored ID no longer exists
   useEffect(() => {
@@ -150,8 +159,6 @@ function AppLayout() {
       goToPortfolio(portfolios[0].id);
     }
   }, [activePortfolioId, portfolios, goToPortfolio]);
-
-  const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
 
   const renderMainContent = () => {
     if (page === 'settings') {
@@ -197,18 +204,15 @@ function AppLayout() {
   };
 
   return (
-    <CreatePortfolioContext.Provider value={openCreateModal}>
+    <>
       <div className="flex min-h-screen flex-col">
         <header className="border-b px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
               <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={() => setIsCreateModalOpen(true)} />
-              {(() => {
-                const matched = portfolios?.find((p) => p.id === activePortfolioId);
-                return matched ? (
-                  <PortfolioActions portfolioId={matched.id} portfolioName={matched.name} />
-                ) : null;
-              })()}
+              {activePortfolio == null ? null : (
+                <PortfolioActions portfolioId={activePortfolio.id} portfolioName={activePortfolio.name} />
+              )}
             </div>
             {page !== 'settings' && activePortfolioId !== null && (
               <PageSwitcher tab={portfolioTab} />
@@ -220,15 +224,7 @@ function AppLayout() {
                 <Avatar>
                   {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? user.email} />}
                   <AvatarFallback>
-                    {(() => {
-                      if (user?.name) {
-                        return user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
-                      }
-                      if (user?.email) {
-                        return user.email.slice(0, 2).toUpperCase();
-                      }
-                      return <UserIcon className="h-4 w-4" />;
-                    })()}
+                    {getAvatarInitials(user?.name, user?.email) ?? <UserIcon className="h-4 w-4" />}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -305,7 +301,7 @@ function AppLayout() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
       />
-    </CreatePortfolioContext.Provider>
+    </>
   );
 }
 
