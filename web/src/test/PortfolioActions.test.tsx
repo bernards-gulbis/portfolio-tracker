@@ -11,6 +11,7 @@ const mockNavigation = {
   activePortfolioId: 1 as number | null,
   goToPortfolio: vi.fn(),
   goToFirstPortfolio: vi.fn(),
+  goToTransactions: vi.fn(),
   goToSettings: vi.fn(),
 };
 

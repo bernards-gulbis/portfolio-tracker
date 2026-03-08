@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-type Page = 'portfolio' | 'settings';
+type Page = 'portfolio' | 'transactions' | 'settings';
 
 interface NavigationContextValue {
   page: Page;
   activePortfolioId: number | null;
   goToPortfolio: (id: number) => void;
   goToFirstPortfolio: () => void;
+  goToTransactions: () => void;
   goToSettings: () => void;
 }
 
@@ -26,6 +27,10 @@ export function NavigationProvider({ children }: Readonly<{ children: ReactNode 
     setPage('portfolio');
   }, []);
 
+  const goToTransactions = useCallback(() => {
+    setPage('transactions');
+  }, []);
+
   const goToSettings = useCallback(() => {
     setPage('settings');
   }, []);
@@ -41,8 +46,8 @@ export function NavigationProvider({ children }: Readonly<{ children: ReactNode 
   }, []);
 
   const value = useMemo(
-    () => ({ page, activePortfolioId, goToPortfolio, goToFirstPortfolio, goToSettings }),
-    [page, activePortfolioId, goToPortfolio, goToFirstPortfolio, goToSettings],
+    () => ({ page, activePortfolioId, goToPortfolio, goToFirstPortfolio, goToTransactions, goToSettings }),
+    [page, activePortfolioId, goToPortfolio, goToFirstPortfolio, goToTransactions, goToSettings],
   );
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;

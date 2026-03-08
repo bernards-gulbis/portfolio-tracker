@@ -1,4 +1,8 @@
 const en = {
+  nav: {
+    summary: 'Summary',
+    transactions: 'Transactions',
+  },
   common: {
     notAvailable: 'N/A',
   },

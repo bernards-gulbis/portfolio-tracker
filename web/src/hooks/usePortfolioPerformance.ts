@@ -19,7 +19,7 @@ export const usePortfolioPerformance = (
       return getPortfolioPerformance(portfolioId, startDate, endDate, numPoints);
     },
     enabled: portfolioId !== null,
-    staleTime: 4 * 60 * 60 * 1000,
+    staleTime: 0,
     gcTime: 4 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

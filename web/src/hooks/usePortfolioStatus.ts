@@ -14,7 +14,7 @@ export const usePortfolioStatus = (portfolioId: number | null) => {
       return getPortfolioStatus(portfolioId);
     },
     enabled: !!portfolioId,
-    staleTime: Infinity, // Only refetch when transactions change (via invalidateQueries)
-    refetchOnWindowFocus: false, // Don't refetch on window focus (mutations will invalidate)
+    staleTime: 0, // Refetch on mount when navigating back to Summary tab
+    refetchOnWindowFocus: false,
   });
 };

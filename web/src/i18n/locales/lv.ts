@@ -1,6 +1,10 @@
 import type { Translation } from './en';
 
 const lv: Translation = {
+  nav: {
+    summary: 'Kopsavilkums',
+    transactions: 'Darījumi',
+  },
   common: {
     notAvailable: 'N/A',
   },

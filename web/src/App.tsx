@@ -25,7 +25,7 @@ import {
 import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign, ChevronsUpDown, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
 import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
@@ -86,12 +86,48 @@ function AuthGuard() {
   return <AppLayout />;
 }
 
-function PortfolioPage() {
+const PAGE_OPTIONS = [
+  { value: 'portfolio', icon: LayoutDashboard, key: 'nav.summary' },
+  { value: 'transactions', icon: ArrowLeftRight, key: 'nav.transactions' },
+] as const;
+
+function PageSwitcher({ tab }: Readonly<{ tab: 'portfolio' | 'transactions' }>) {
+  const { t } = useTranslation();
+  const { goToPortfolio, goToTransactions, activePortfolioId } = useNavigation();
+  const [open, setOpen] = useState(false);
+
+  const active = PAGE_OPTIONS.find((o) => o.value === tab) ?? PAGE_OPTIONS[0];
+  const ActiveIcon = active.icon;
+
+  const handleSelect = (value: string) => {
+    if (value === 'transactions') {
+      goToTransactions();
+    } else if (activePortfolioId !== null) {
+      goToPortfolio(activePortfolioId);
+    }
+    setOpen(false);
+  };
+
   return (
-    <>
-      <PortfolioStatusView />
-      <TransactionView />
-    </>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="gap-2 px-2 h-8">
+          <ActiveIcon className="h-4 w-4 shrink-0" />
+          <span className="truncate font-medium text-sm">{t(active.key)}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-40 rounded-lg" align="start" sideOffset={8}>
+        {PAGE_OPTIONS.map(({ value, icon: Icon, key }) => (
+          <DropdownMenuItem key={value} className="gap-2 p-2" onClick={() => handleSelect(value)}>
+            <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
+              <Icon className="h-4 w-4 shrink-0" />
+            </div>
+            <span className="truncate">{t(key)}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -105,6 +141,7 @@ function AppLayout() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { data: portfolios, isLoading: isPortfoliosLoading } = usePortfolios();
   const { page, activePortfolioId, goToPortfolio, goToSettings } = useNavigation();
+  const portfolioTab = page === 'transactions' ? 'transactions' : 'portfolio';
 
   // Auto-select first portfolio when none is selected, or when the stored ID no longer exists
   useEffect(() => {
@@ -154,7 +191,7 @@ function AppLayout() {
 
     return (
       <ErrorBoundary fullScreen={false}>
-        <PortfolioPage />
+        {portfolioTab === 'portfolio' ? <PortfolioStatusView /> : <TransactionView />}
       </ErrorBoundary>
     );
   };
@@ -163,14 +200,19 @@ function AppLayout() {
     <CreatePortfolioContext.Provider value={openCreateModal}>
       <div className="flex min-h-screen flex-col">
         <header className="border-b px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-1">
-            <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={() => setIsCreateModalOpen(true)} />
-            {(() => {
-              const matched = portfolios?.find((p) => p.id === activePortfolioId);
-              return matched ? (
-                <PortfolioActions portfolioId={matched.id} portfolioName={matched.name} />
-              ) : null;
-            })()}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={() => setIsCreateModalOpen(true)} />
+              {(() => {
+                const matched = portfolios?.find((p) => p.id === activePortfolioId);
+                return matched ? (
+                  <PortfolioActions portfolioId={matched.id} portfolioName={matched.name} />
+                ) : null;
+              })()}
+            </div>
+            {page !== 'settings' && activePortfolioId !== null && (
+              <PageSwitcher tab={portfolioTab} />
+            )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
