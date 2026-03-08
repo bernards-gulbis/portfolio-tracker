@@ -84,6 +84,27 @@ export const getValueClass = (value: number | null | undefined): string => {
 };
 
 /**
+ * Format a day count as a human-friendly duration string.
+ * < 31 days  → "Xd"
+ * 31–365     → "Xm Yd" (omit "0d")
+ * > 365      → "Xy Xm" (omit "0m")
+ */
+export const formatDaysHeld = (
+  days: number,
+  labels: { d: string; m: string; y: string } = { d: 'd', m: 'm', y: 'y' },
+): string => {
+  if (days < 31) return `${days}${labels.d}`;
+  if (days <= 365) {
+    const months = Math.floor(days / 30);
+    const remainDays = days - months * 30;
+    return remainDays === 0 ? `${months}${labels.m}` : `${months}${labels.m} ${remainDays}${labels.d}`;
+  }
+  const years = Math.floor(days / 365);
+  const remainMonths = Math.floor((days - years * 365) / 30);
+  return remainMonths === 0 ? `${years}${labels.y}` : `${years}${labels.y} ${remainMonths}${labels.m}`;
+};
+
+/**
  * Format a Date as YYYY-MM-DD using local time (avoids UTC shift from toISOString).
  */
 export const toLocalDateStr = (d: Date): string => {

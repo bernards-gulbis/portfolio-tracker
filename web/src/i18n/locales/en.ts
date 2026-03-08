@@ -5,6 +5,9 @@ const en = {
   },
   common: {
     notAvailable: 'N/A',
+    daysShort: 'd',
+    monthsShort: 'm',
+    yearsShort: 'y',
   },
   errorBoundary: {
     title: 'Something went wrong',

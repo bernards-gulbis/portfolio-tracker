@@ -7,6 +7,9 @@ const lv: Translation = {
   },
   common: {
     notAvailable: 'N/A',
+    daysShort: 'd',
+    monthsShort: 'mēn',
+    yearsShort: 'g',
   },
   errorBoundary: {
     title: 'Kaut kas nogāja greizi',

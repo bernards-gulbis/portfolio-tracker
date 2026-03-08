@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatQuantity, getValueClass } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
 import { applyRateToHolding, type EurMetrics } from '../utils/eurMetrics';
 import type { PricedHolding } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
@@ -140,7 +140,22 @@ export const HoldingsTable = memo(({
             {holdingsWithEur.map(({ holding, eurVals }) => (
                 <TableRow key={holding.ticker}>
                   <TableCell className="font-semibold">{holding.ticker}</TableCell>
-                  <TableCell className="tabular-nums">{daysHeldMap[holding.ticker] ?? '-'}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {daysHeldMap[holding.ticker] == null ? '-' : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help border-b border-dotted border-muted-foreground">
+                              {formatDaysHeld(daysHeldMap[holding.ticker], { d: t('common.daysShort'), m: t('common.monthsShort'), y: t('common.yearsShort') })}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{daysHeldMap[holding.ticker]} {t('status.columns.daysHeld').toLowerCase()}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </TableCell>
                   <TableCell className="tabular-nums">{formatQuantity(holding.quantity)}</TableCell>
                   <TableCell className="tabular-nums">
                     <div className="flex flex-col">

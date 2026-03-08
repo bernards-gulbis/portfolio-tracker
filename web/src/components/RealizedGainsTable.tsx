@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, getValueClass } from '../utils/formatters';
+import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
 import type { RealizedSale, DividendReceived } from '../api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronRightIcon, ChevronLeftIcon } from 'lucide-react';
 
 const PAGE_SIZE = 10;
@@ -463,7 +464,20 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                     return (
                       <TableRow key={`${sale.date}-${idx}`}>
                         <TableCell className="text-muted-foreground">{formatDateCompact(sale.date, locale)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{sale.days_held}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help border-b border-dotted border-muted-foreground">
+                                  {formatDaysHeld(sale.days_held, { d: t('common.daysShort'), m: t('common.monthsShort'), y: t('common.yearsShort') })}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{sale.days_held} {t('status.columns.daysHeld').toLowerCase()}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           <span>{formatQuantity(sale.quantity)}</span>
                           {isPartialSell ? (
