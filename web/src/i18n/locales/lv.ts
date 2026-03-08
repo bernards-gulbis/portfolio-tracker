@@ -405,6 +405,7 @@ const lv: Translation = {
     tax: {
       tab: 'Nodoklis',
       description: 'Konfigurējiet nodokļu likmi, kas tiek piemērota kapitāla pieauguma aprēķiniem.',
+      taxExplanation: 'Nodoklis tiek piemērots tikai tai izmaksu daļai, kas pārsniedz kopējās iemaksas (t.i., ieguldījumu peļņai). Dividendes šajā aprēķinā netiek iekļautas.',
       rateLabel: 'Nodokļu likme (%)',
       submit: 'Saglabāt nodokļu likmi',
     },

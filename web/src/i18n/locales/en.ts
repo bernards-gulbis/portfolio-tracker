@@ -403,6 +403,7 @@ const en = {
     tax: {
       tab: 'Tax',
       description: 'Configure the tax rate applied to capital gains calculations.',
+      taxExplanation: 'Tax is applied only to the portion of withdrawals that exceeds total deposits (i.e. investment gains). Dividends are not included in this calculation.',
       rateLabel: 'Tax rate (%)',
       submit: 'Save tax rate',
     },

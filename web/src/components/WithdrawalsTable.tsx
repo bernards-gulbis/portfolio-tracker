@@ -7,7 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { ChevronRightIcon, ChevronLeftIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ChevronRightIcon, ChevronLeftIcon, InfoIcon } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -129,7 +130,21 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
               >
                 {t('status.columns.realizedFxGL')}{sortKey === 'fx_gain' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
               </TableHead>
-              <TableHead className="text-right">{t('status.columns.tax')} ({(taxRate * 100).toFixed(0)}%)</TableHead>
+              <TableHead className="text-right">
+                <span className="inline-flex items-center gap-1">
+                  {t('status.columns.tax')} ({(taxRate * 100).toFixed(0)}%)
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InfoIcon className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-64">
+                        <p>{t('settings.tax.taxExplanation')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

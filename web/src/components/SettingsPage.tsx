@@ -317,6 +317,10 @@ export const TaxSection = () => {
         <p className="text-sm text-muted-foreground">{t('settings.tax.description')}</p>
       </div>
       <Separator />
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>{t('settings.tax.taxExplanation')}</AlertDescription>
+      </Alert>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <FieldGroup>
           <Controller
