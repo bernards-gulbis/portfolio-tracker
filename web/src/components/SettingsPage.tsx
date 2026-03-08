@@ -491,7 +491,7 @@ export const SettingsPage = () => {
         <button
           type="button"
           onClick={handleBack}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2 cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
           {t('settings.backToPortfolio')}

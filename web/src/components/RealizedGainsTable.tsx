@@ -6,6 +6,7 @@ import type { RealizedSale, DividendReceived } from '../api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -49,6 +50,25 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
   const [sortAsc, setSortAsc] = useState(false);
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [yearFilter, setYearFilter] = useState<string>('all');
+
+  const availableYears = useMemo(() => {
+    const years = new Set([
+      ...realizedSales.map((s) => s.date.slice(0, 4)),
+      ...dividendsReceived.map((d) => d.date.slice(0, 4)),
+    ]);
+    return Array.from(years).sort().reverse();
+  }, [realizedSales, dividendsReceived]);
+
+  const filteredSales = useMemo(() => {
+    if (yearFilter === 'all') return realizedSales;
+    return realizedSales.filter((s) => s.date.startsWith(yearFilter));
+  }, [realizedSales, yearFilter]);
+
+  const filteredDividendsReceived = useMemo(() => {
+    if (yearFilter === 'all') return dividendsReceived;
+    return dividendsReceived.filter((d) => d.date.startsWith(yearFilter));
+  }, [dividendsReceived, yearFilter]);
 
   const handleTabChange = (value: string) => {
     setTab(value as 'gains' | 'dividends');
@@ -58,11 +78,16 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
     setPage(1);
   };
 
+  const handleYearChange = (value: string) => {
+    setYearFilter(value);
+    setPage(1);
+  };
+
   // ================== Realized Gains grouping ==================
 
   const gainGroups = useMemo(() => {
     const map = new Map<string, RealizedSale[]>();
-    for (const sale of realizedSales) {
+    for (const sale of filteredSales) {
       const list = map.get(sale.ticker);
       if (list) {
         list.push(sale);
@@ -80,13 +105,13 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
       });
     }
     return result;
-  }, [realizedSales]);
+  }, [filteredSales]);
 
   // ================== Dividends grouping ==================
 
   const dividendGroups = useMemo(() => {
     const map = new Map<string, DividendReceived[]>();
-    for (const d of dividendsReceived) {
+    for (const d of filteredDividendsReceived) {
       const list = map.get(d.ticker);
       if (list) {
         list.push(d);
@@ -108,7 +133,7 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
       });
     }
     return result;
-  }, [dividendsReceived]);
+  }, [filteredDividendsReceived]);
 
   // ================== Filtering + sorting ==================
 
@@ -219,13 +244,28 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
               </TabsTrigger>
             )}
           </TabsList>
-          <Input
+          <div className="flex items-center gap-2">
+            {availableYears.length > 1 && (
+              <Select value={yearFilter} onValueChange={handleYearChange}>
+                <SelectTrigger className="w-32 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('status.allYears')}</SelectItem>
+                  {availableYears.map((year) => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Input
               name="ticker-filter"
               placeholder={t('status.columns.ticker')}
               value={filter}
               onChange={(e) => handleFilterChange(e.target.value)}
               className="w-40 h-8 text-sm"
             />
+          </div>
         </div>
 
         {/* Realized Gains Tab */}
