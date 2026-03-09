@@ -632,7 +632,7 @@ describe('TransactionTable', () => {
           portfolioId={1}
           onEdit={mockOnEdit}
           {...defaultProps}
-          typeFilter={['DEPOSIT', 'BUY']}
+          typeFilter={['Deposit', 'Buy']}
         />
       </QueryClientProvider>
     );

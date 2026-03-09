@@ -5,16 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TransactionModal } from '../components/TransactionModal';
 import { Holding, TransactionType, Transaction } from '../api';
 
-// Radix Select uses APIs not available in jsdom
-if (!Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = () => false;
-  Element.prototype.setPointerCapture = () => {};
-  Element.prototype.releasePointerCapture = () => {};
-}
-if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = () => {};
-}
-
 vi.mock('../hooks/useTransactions', () => ({
   useCreateTransaction: vi.fn(),
   useUpdateTransaction: vi.fn(),

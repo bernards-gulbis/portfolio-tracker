@@ -6,15 +6,6 @@ import { TransactionView } from '../components/TransactionView';
 import { useTransactions } from '../hooks/useTransactions';
 import { TransactionType, exportTransactionsCSV } from '../api';
 
-if (!Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = () => false;
-  Element.prototype.setPointerCapture = () => {};
-  Element.prototype.releasePointerCapture = () => {};
-}
-if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = () => {};
-}
-
 const mockNavigation = {
   page: 'portfolio' as const,
   activePortfolioId: null as number | null,
@@ -225,6 +216,8 @@ describe('TransactionView', () => {
   it('exports CSV successfully', async () => {
     const mockBlob = new Blob(['csv data'], { type: 'text/csv' });
     vi.mocked(exportTransactionsCSV).mockResolvedValueOnce(mockBlob);
+    const originalCreateObjectURL = globalThis.URL.createObjectURL;
+    const originalRevokeObjectURL = globalThis.URL.revokeObjectURL;
     const mockCreateObjectURL = vi.fn().mockReturnValue('blob:test-url');
     const mockRevokeObjectURL = vi.fn();
     globalThis.URL.createObjectURL = mockCreateObjectURL;
@@ -258,6 +251,9 @@ describe('TransactionView', () => {
       expect(mockCreateObjectURL).toHaveBeenCalled();
       expect(mockRevokeObjectURL).toHaveBeenCalled();
     });
+
+    globalThis.URL.createObjectURL = originalCreateObjectURL;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
   it('shows error when export CSV fails', async () => {

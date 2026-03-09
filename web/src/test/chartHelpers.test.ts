@@ -21,6 +21,12 @@ describe('formatCompactValue', () => {
     expect(formatCompactValue(-25_000, 'USD')).toBe('$-25k');
     expect(formatCompactValue(-1_500_000, 'EUR')).toBe('€-1.5M');
   });
+
+  it('promotes k to M at the boundary', () => {
+    expect(formatCompactValue(999_499, 'USD')).toBe('$999k');
+    expect(formatCompactValue(999_500, 'USD')).toBe('$1.0M');
+    expect(formatCompactValue(1_000_000, 'EUR')).toBe('€1.0M');
+  });
 });
 
 describe('getCutoffDate', () => {

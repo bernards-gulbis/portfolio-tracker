@@ -44,7 +44,8 @@ interface RealizedGainsTableProps {
 
 export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, displayCurrency, locale }: RealizedGainsTableProps) => {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'gains' | 'dividends'>('gains');
+  const initialTab = realizedSales.length > 0 ? 'gains' : 'dividends';
+  const [tab, setTab] = useState<'gains' | 'dividends'>(initialTab);
   const [expandState, setExpandState] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<string>('date');
   const [sortAsc, setSortAsc] = useState(false);
@@ -122,13 +123,13 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
     const result: DividendTickerGroup[] = [];
     for (const [ticker, payments] of map) {
       payments.sort((a, b) => b.date.localeCompare(a.date));
-      const totalAmountEurParts = payments.filter((p) => p.amount_eur != null);
+      const allHaveEur = payments.every((p) => p.amount_eur != null);
       result.push({
         ticker,
         payments,
         totalAmount: payments.reduce((sum, p) => sum + p.amount, 0),
-        totalAmountEur: totalAmountEurParts.length > 0
-          ? totalAmountEurParts.reduce((sum, p) => sum + (p.amount_eur ?? 0), 0)
+        totalAmountEur: allHaveEur
+          ? payments.reduce((sum, p) => sum + (p.amount_eur ?? 0), 0)
           : null,
       });
     }
@@ -186,9 +187,9 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
 
   const dividendTotals = useMemo(() => {
     const totalUsd = filteredDividends.reduce((sum, g) => sum + g.totalAmount, 0);
-    const eurParts = filteredDividends.filter((g) => g.totalAmountEur != null);
-    const totalEur = eurParts.length > 0
-      ? eurParts.reduce((sum, g) => sum + (g.totalAmountEur ?? 0), 0)
+    const allHaveEur = filteredDividends.every((g) => g.totalAmountEur != null);
+    const totalEur = allHaveEur
+      ? filteredDividends.reduce((sum, g) => sum + (g.totalAmountEur ?? 0), 0)
       : null;
     const count = filteredDividends.reduce((sum, g) => sum + g.payments.length, 0);
     return { totalUsd, totalEur, count };

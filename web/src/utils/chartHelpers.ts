@@ -8,7 +8,11 @@ export const formatCompactValue = (value: number, currency: Currency): string =>
   const symbol = currency === 'EUR' ? '€' : '$';
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `${symbol}${(value / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${symbol}${(value / 1_000).toFixed(0)}k`;
+  if (abs >= 1_000) {
+    const kVal = Math.round(value / 1_000);
+    if (Math.abs(kVal) >= 1_000) return `${symbol}${(value / 1_000_000).toFixed(1)}M`;
+    return `${symbol}${kVal}k`;
+  }
   return `${symbol}${value.toFixed(0)}`;
 };
 
