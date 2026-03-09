@@ -704,6 +704,18 @@ class TestImportCSVDeduplication:
         assert len(txs) == 1
         assert skipped == 0
 
+    def test_within_batch_duplicates(self, svc, user_id, portfolio_id):
+        """Duplicate rows within the same CSV batch should be deduplicated."""
+        csv = (
+            "date,type,total_amount\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/02/2024 00:00:00,Deposit,2000\n"
+        )
+        txs, skipped = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs) == 2
+        assert skipped == 1
+
 
 # ── _clean_csv_number ────────────────────────────────────────────────
 

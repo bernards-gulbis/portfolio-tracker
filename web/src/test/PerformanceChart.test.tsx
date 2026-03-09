@@ -25,7 +25,7 @@ describe('PerformanceChart', () => {
   it('shows spinner while loading', () => {
     render(<PerformanceChart data={[]} isLoading={true} />);
 
-    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   it('shows "No performance data available" when data is empty', () => {

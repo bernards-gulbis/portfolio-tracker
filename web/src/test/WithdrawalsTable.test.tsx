@@ -98,17 +98,8 @@ describe('WithdrawalsTable', () => {
   });
 
   it('shows tax column with calculated tax amounts', () => {
-    // threshold = principalEur + totalWithdrawnEur + dividendsEur
-    // = 100 + (800+700) + 50 = 1650
-    // Sorted by date: [w1: 800, w2: 700]
-    // w1: running=800, cumTaxable=max(0, 800-1650)=0
-    // w2: running=1500, cumTaxable=max(0, 1500-1650)=0 → still 0
-    // We need: principalEur low enough that cumulative exceeds threshold
-    // Use principalEur=0, dividendsEur=0: threshold = 0 + 1500 + 0 = 1500
-    // w1: running=800, taxable=max(0, 800-1500)=0
-    // w2: running=1500, taxable=max(0, 1500-1500)=0
-    // The design makes it impossible for single-iteration sums to exceed threshold.
-    // Just verify the tax column header renders with the rate
+    // Tax threshold includes totalWithdrawnEur, so a single batch can't exceed it.
+    // Verify the tax rate header renders correctly.
     const withdrawals: WithdrawalFx[] = [
       makeWithdrawal({ amount: 10000, amount_eur: 10000, amount_eur_avg: 9000, realized_fx_gain: 1000 }),
     ];
@@ -122,7 +113,6 @@ describe('WithdrawalsTable', () => {
       />
     );
 
-    // Tax column header should show the rate
     expect(screen.getByText(/20\.0%/)).toBeInTheDocument();
   });
 

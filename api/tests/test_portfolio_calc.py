@@ -1,4 +1,4 @@
-"""Tests for portfolio_calc.py — transaction handlers, helpers, and edge cases."""
+"""Tests for portfolio_calc.py and portfolio_perf.py — transaction handlers, helpers, and edge cases."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -13,6 +13,7 @@ from app.services.portfolio_calc import (
     _value_holdings_at_date,
     calculate_status,
 )
+from app.services.portfolio_perf import calculate_performance
 from app.services.portfolio_types import _ZERO, _Holding, _TxState
 
 
@@ -483,5 +484,44 @@ class TestCalculateStatus:
         result_reversed = calculate_status(txs_reversed, None, Decimal("0.20"), 1, "B")
         assert result_ordered.cash == result_reversed.cash
         assert result_ordered.principal == result_reversed.principal
+        assert result_ordered.realized_gains == result_reversed.realized_gains
         assert len(result_ordered.holdings) == len(result_reversed.holdings)
+        assert len(result_ordered.realized_sales) == len(result_reversed.realized_sales)
         assert len(result_ordered.warnings) == len(result_reversed.warnings)
+
+
+# ==================== calculate_performance ====================
+
+
+class TestCalculatePerformance:
+    @patch("app.services.portfolio_perf.PriceService")
+    @patch("app.services.portfolio_perf._resolve_usd_to_eur_rate", return_value=0.92)
+    def test_out_of_order_transactions(self, _mock_eur, mock_price_service):
+        """Out-of-order transactions should produce the same performance as sorted ones."""
+        mock_price_service.get_historical_prices_for_multiple_tickers.return_value = {}
+        mock_price_service.get_last_known_price.return_value = None
+
+        txs_ordered = [
+            _make_tx(
+                type=TransactionType.DEPOSIT,
+                total_amount=5000.0,
+                date=datetime(2025, 1, 10),
+            ),
+            _make_tx(
+                type=TransactionType.BUY,
+                ticker="AAPL",
+                quantity=10,
+                total_amount=-1500.0,
+                date=datetime(2025, 1, 16),
+            ),
+        ]
+        txs_reversed = list(reversed(txs_ordered))
+        end = datetime(2025, 2, 1)
+        result_ordered = calculate_performance(txs_ordered, end_date=end, num_points=5)
+        result_reversed = calculate_performance(
+            txs_reversed, end_date=end, num_points=5
+        )
+        assert len(result_ordered) == len(result_reversed)
+        for a, b in zip(result_ordered, result_reversed, strict=True):
+            assert a["principal"] == b["principal"]
+            assert a["current_value"] == b["current_value"]
