@@ -355,6 +355,7 @@ const en = {
       topWinners: 'Top Winners',
       topLosers: 'Top Losers',
       mostTraded: 'Most Traded',
+      longestHeld: 'Longest Held',
       noData: 'No data',
     },
     currency: {

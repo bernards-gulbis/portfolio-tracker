@@ -19,15 +19,16 @@ const makeSale = (overrides: Partial<RealizedSale> = {}): RealizedSale => ({
 const makeGroup = (ticker: string, gain: number, salesCount: number = 1): TickerGroup => ({
   ticker,
   totalGain: gain,
-  sales: Array.from({ length: salesCount }, (_, i) =>
-    makeSale({
+  sales: Array.from({ length: salesCount }, (_, i) => {
+    const month = String(i + 1).padStart(2, '0');
+    return makeSale({
       ticker,
       realized_gain: gain / salesCount,
       cost_basis: 800,
       proceeds: 800 + gain / salesCount,
-      date: `2025-0${i + 1}-15T10:00:00`,
-    }),
-  ),
+      date: `2025-${month}-15T10:00:00`,
+    });
+  }),
 });
 
 describe('RealizedGainsInsights', () => {
@@ -40,13 +41,14 @@ describe('RealizedGainsInsights', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('renders three insight cards when 2+ groups exist', () => {
+  it('renders four insight cards when 2+ groups exist', () => {
     const groups = [makeGroup('AAPL', 500, 3), makeGroup('TSLA', -200, 2)];
     render(<RealizedGainsInsights filteredGains={groups} {...defaultProps} />);
 
     expect(screen.getByText('Top Winners')).toBeInTheDocument();
     expect(screen.getByText('Top Losers')).toBeInTheDocument();
     expect(screen.getByText('Most Traded')).toBeInTheDocument();
+    expect(screen.getByText('Longest Held')).toBeInTheDocument();
   });
 
   it('shows winners sorted by gain descending', () => {
@@ -57,9 +59,13 @@ describe('RealizedGainsInsights', () => {
     ];
     render(<RealizedGainsInsights filteredGains={groups} {...defaultProps} />);
 
-    // All three should appear as winners
-    const cards = screen.getAllByText(/MSFT|AAPL|GOOG/);
-    expect(cards.length).toBeGreaterThanOrEqual(3);
+    // Grab the Winners card by its heading, then check order of tickers within it
+    const winnersHeading = screen.getByText('Top Winners');
+    const winnersCard = winnersHeading.closest('[data-slot="card"]')!;
+    // Each InsightItem has a left flex-col whose first child is the ticker name
+    const tickers = Array.from(winnersCard.querySelectorAll('.flex.flex-col > .text-sm.font-medium:not(.tabular-nums)'))
+      .map((el) => el.textContent);
+    expect(tickers).toEqual(['MSFT', 'AAPL', 'GOOG']);
   });
 
   it('shows losers sorted by gain ascending (most negative first)', () => {
@@ -70,9 +76,11 @@ describe('RealizedGainsInsights', () => {
     ];
     render(<RealizedGainsInsights filteredGains={groups} {...defaultProps} />);
 
-    expect(screen.getByText('Top Losers')).toBeInTheDocument();
-    // TSLA should appear in losers
-    expect(screen.getAllByText('TSLA').length).toBeGreaterThanOrEqual(1);
+    const losersHeading = screen.getByText('Top Losers');
+    const losersCard = losersHeading.closest('[data-slot="card"]')!;
+    const tickers = Array.from(losersCard.querySelectorAll('.flex.flex-col > .text-sm.font-medium:not(.tabular-nums)'))
+      .map((el) => el.textContent);
+    expect(tickers).toEqual(['TSLA', 'AAPL']);
   });
 
   it('shows most traded sorted by sell count descending', () => {
@@ -83,9 +91,38 @@ describe('RealizedGainsInsights', () => {
     ];
     render(<RealizedGainsInsights filteredGains={groups} {...defaultProps} />);
 
-    expect(screen.getByText('Most Traded')).toBeInTheDocument();
-    // MSFT has 7 sells — should appear
-    expect(screen.getAllByText('MSFT').length).toBeGreaterThanOrEqual(1);
+    const tradedHeading = screen.getByText('Most Traded');
+    const tradedCard = tradedHeading.closest('[data-slot="card"]')!;
+    const tickers = Array.from(tradedCard.querySelectorAll('.flex.flex-col > .text-sm.font-medium:not(.tabular-nums)'))
+      .map((el) => el.textContent);
+    expect(tickers).toEqual(['MSFT', 'AAPL', 'GOOG']);
+  });
+
+  it('shows longest held sorted by max hold duration descending', () => {
+    const groups: TickerGroup[] = [
+      {
+        ticker: 'AAPL',
+        totalGain: 100,
+        sales: [makeSale({ ticker: 'AAPL', date: '2025-06-15T10:00:00', first_buy_date: '2025-05-15T10:00:00' })], // ~31 days
+      },
+      {
+        ticker: 'MSFT',
+        totalGain: 200,
+        sales: [makeSale({ ticker: 'MSFT', date: '2025-06-15T10:00:00', first_buy_date: '2023-06-15T10:00:00' })], // ~730 days
+      },
+      {
+        ticker: 'GOOG',
+        totalGain: 50,
+        sales: [makeSale({ ticker: 'GOOG', date: '2025-06-15T10:00:00', first_buy_date: '2024-06-15T10:00:00' })], // ~365 days
+      },
+    ];
+    render(<RealizedGainsInsights filteredGains={groups} {...defaultProps} />);
+
+    const heading = screen.getByText('Longest Held');
+    const card = heading.closest('[data-slot="card"]')!;
+    const tickers = Array.from(card.querySelectorAll('.flex.flex-col > .text-sm.font-medium:not(.tabular-nums)'))
+      .map((el) => el.textContent);
+    expect(tickers).toEqual(['MSFT', 'GOOG', 'AAPL']);
   });
 
   it('shows "No data" for empty categories', () => {

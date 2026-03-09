@@ -357,6 +357,7 @@ const lv: Translation = {
       topWinners: 'Lielākie ieguvēji',
       topLosers: 'Lielākie zaudētāji',
       mostTraded: 'Visvairāk tirgotie',
+      longestHeld: 'Ilgāk turētie',
       noData: 'Nav datu',
     },
     currency: {

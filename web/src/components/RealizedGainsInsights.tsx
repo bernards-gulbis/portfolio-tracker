@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TrendingUpIcon, TrendingDownIcon, RepeatIcon } from 'lucide-react';
+import { TrendingUpIcon, TrendingDownIcon, RepeatIcon, HourglassIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { formatSignedCurrency, formatSignedPercent, getValueClass } from '../utils/formatters';
+import { formatSignedCurrency, formatSignedPercent, formatDaysHeld, getValueClass } from '../utils/formatters';
+import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
 import type { TickerGroup } from '../hooks/useRealizedGainsData';
 
 // ================== Types ==================
@@ -12,6 +13,7 @@ interface InsightEntry {
   gain: number;
   sellCount: number;
   returnPct: number | null;
+  maxDaysHeld: number;
 }
 
 // ================== InsightItem ==================
@@ -20,9 +22,10 @@ interface InsightItemProps {
   entry: InsightEntry;
   locale: string;
   showReturn: boolean;
+  renderRight?: (entry: InsightEntry) => React.ReactNode;
 }
 
-function InsightItem({ entry, locale, showReturn }: InsightItemProps) {
+function InsightItem({ entry, locale, showReturn, renderRight }: InsightItemProps) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between py-1.5">
@@ -32,16 +35,20 @@ function InsightItem({ entry, locale, showReturn }: InsightItemProps) {
           {t('status.sellCount', { count: entry.sellCount })}
         </span>
       </div>
-      <div className="flex flex-col items-end">
-        <span className={`text-sm font-medium tabular-nums ${getValueClass(entry.gain)}`}>
-          {formatSignedCurrency(entry.gain, 'USD', locale)}
-        </span>
-        {showReturn && entry.returnPct != null && (
-          <span className={`text-xs font-bold tabular-nums ${getValueClass(entry.returnPct)}`}>
-            {formatSignedPercent(entry.returnPct)}
+      {renderRight == null ? (
+        <div className="flex flex-col items-end">
+          <span className={`text-sm font-medium tabular-nums ${getValueClass(entry.gain)}`}>
+            {formatSignedCurrency(entry.gain, 'USD', locale)}
           </span>
-        )}
-      </div>
+          {showReturn && entry.returnPct != null && (
+            <span className={`text-xs font-bold tabular-nums ${getValueClass(entry.returnPct)}`}>
+              {formatSignedPercent(entry.returnPct)}
+            </span>
+          )}
+        </div>
+      ) : (
+        renderRight(entry)
+      )}
     </div>
   );
 }
@@ -54,9 +61,10 @@ interface InsightCardProps {
   entries: InsightEntry[];
   locale: string;
   showReturn: boolean;
+  renderRight?: (entry: InsightEntry) => React.ReactNode;
 }
 
-function InsightCard({ title, icon, entries, locale, showReturn }: InsightCardProps) {
+function InsightCard({ title, icon, entries, locale, showReturn, renderRight }: InsightCardProps) {
   const { t } = useTranslation();
   return (
     <Card className="p-4">
@@ -69,7 +77,7 @@ function InsightCard({ title, icon, entries, locale, showReturn }: InsightCardPr
       ) : (
         <div className="divide-y">
           {entries.map((entry) => (
-            <InsightItem key={entry.ticker} entry={entry} locale={locale} showReturn={showReturn} />
+            <InsightItem key={entry.ticker} entry={entry} locale={locale} showReturn={showReturn} renderRight={renderRight} />
           ))}
         </div>
       )}
@@ -86,18 +94,30 @@ interface RealizedGainsInsightsProps {
 
 function toEntry(group: TickerGroup): InsightEntry {
   const totalCostBasis = group.sales.reduce((sum, s) => sum + s.cost_basis, 0);
+  const maxDaysHeld = group.sales.reduce((max, s) => {
+    const days = Math.round(
+      (new Date(s.date).getTime() - new Date(s.first_buy_date).getTime()) / 86_400_000,
+    );
+    return days > max ? days : max;
+  }, 0);
   return {
     ticker: group.ticker,
     gain: group.totalGain,
     sellCount: group.sales.length,
     returnPct: totalCostBasis > 0 ? (group.totalGain / totalCostBasis) * 100 : null,
+    maxDaysHeld,
   };
 }
 
 export function RealizedGainsInsights({ filteredGains, locale }: RealizedGainsInsightsProps) {
   const { t } = useTranslation();
+  const daysLabels = useDaysHeldLabels();
 
-  const { winners, losers, mostTraded } = useMemo(() => {
+  const { winners, losers, mostTraded, longestHeld } = useMemo(() => {
+    if (filteredGains.length < 2) {
+      return { winners: [], losers: [], mostTraded: [], longestHeld: [] };
+    }
+
     const entries = filteredGains.map(toEntry);
 
     const winnersArr = entries
@@ -114,13 +134,23 @@ export function RealizedGainsInsights({ filteredGains, locale }: RealizedGainsIn
       .sort((a, b) => b.sellCount - a.sellCount)
       .slice(0, 3);
 
-    return { winners: winnersArr, losers: losersArr, mostTraded: mostTradedArr };
+    const longestHeldArr = [...entries]
+      .sort((a, b) => b.maxDaysHeld - a.maxDaysHeld)
+      .slice(0, 3);
+
+    return { winners: winnersArr, losers: losersArr, mostTraded: mostTradedArr, longestHeld: longestHeldArr };
   }, [filteredGains]);
+
+  const renderDaysHeld = (entry: InsightEntry) => (
+    <span className="text-sm font-medium tabular-nums text-muted-foreground">
+      {formatDaysHeld(entry.maxDaysHeld, daysLabels)}
+    </span>
+  );
 
   if (filteredGains.length < 2) return null;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
       <InsightCard
         title={t('status.insights.topWinners')}
         icon={<TrendingUpIcon className="h-4 w-4 text-positive" />}
@@ -141,6 +171,14 @@ export function RealizedGainsInsights({ filteredGains, locale }: RealizedGainsIn
         entries={mostTraded}
         locale={locale}
         showReturn={false}
+      />
+      <InsightCard
+        title={t('status.insights.longestHeld')}
+        icon={<HourglassIcon className="h-4 w-4 text-muted-foreground" />}
+        entries={longestHeld}
+        locale={locale}
+        showReturn={false}
+        renderRight={renderDaysHeld}
       />
     </div>
   );
