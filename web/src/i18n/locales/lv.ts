@@ -157,8 +157,8 @@ const lv: Translation = {
       deleted: 'Darījums dzēsts',
       imported_one: 'Importēts {{count}} darījums',
       imported_other: 'Importēti {{count}} darījumi',
-      importedWithSkipped_one: 'Importēts {{count}} darījums, izlaisti {{skipped}} dublikāti',
-      importedWithSkipped_other: 'Importēti {{count}} darījumi, izlaisti {{skipped}} dublikāti',
+      importedWithSkipped_one: 'Importēts {{count}} darījums, ar {{skipped}} izlaistiem dublikātiem',
+      importedWithSkipped_other: 'Importēti {{count}} darījumi, ar {{skipped}} izlaistiem dublikātiem',
     },
     validation: {
       dateRequired: 'Datums ir obligāts',

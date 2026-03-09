@@ -83,21 +83,21 @@ export const HoldingsTable = memo(({
           <TableHeader>
             <TableRow>
               <TableHead>{t('status.columns.ticker')}</TableHead>
-              <TableHead>{t('status.columns.daysHeld')}</TableHead>
-              <TableHead>{t('status.columns.quantity')}</TableHead>
-              <TableHead>
-                <div className="flex flex-col">
+              <TableHead className="text-right">{t('status.columns.daysHeld')}</TableHead>
+              <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
+              <TableHead className="text-right">
+                <div className="flex flex-col items-end">
                   <span>{t('status.columns.cost')}{showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}</span>
                   <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
                 </div>
               </TableHead>
-              <TableHead>
-                <div className="flex flex-col">
+              <TableHead className="text-right">
+                <div className="flex flex-col items-end">
                   <span>{t('status.columns.marketValue')}{showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}</span>
                   <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
                 </div>
               </TableHead>
-              <TableHead>
+              <TableHead className="text-right">
                 {t('status.columns.unrealizedGL')}
                 {showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}
               </TableHead>
@@ -106,13 +106,13 @@ export const HoldingsTable = memo(({
           <TableBody>
             <TableRow key="CASH">
               <TableCell className="font-semibold">CASH</TableCell>
-              <TableCell className="tabular-nums">-</TableCell>
-              <TableCell className="tabular-nums">-</TableCell>
-              <TableCell className="tabular-nums">-</TableCell>
-              <TableCell className="font-medium tabular-nums">
+              <TableCell className="text-right tabular-nums">-</TableCell>
+              <TableCell className="text-right tabular-nums">-</TableCell>
+              <TableCell className="text-right tabular-nums">-</TableCell>
+              <TableCell className="text-right font-medium tabular-nums">
                 {formatCurrency(cashDisplay, displayCurrency, locale)}
               </TableCell>
-              <TableCell className="tabular-nums">
+              <TableCell className="text-right tabular-nums">
                 {showEur && currencyGainsEur !== null ? (
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1">
@@ -143,7 +143,7 @@ export const HoldingsTable = memo(({
             {holdingsWithEur.map(({ holding, eurVals }) => (
                 <TableRow key={holding.ticker}>
                   <TableCell className="font-semibold">{holding.ticker}</TableCell>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="text-right tabular-nums">
                     {daysHeldMap[holding.ticker] == null ? '-' : (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -157,8 +157,8 @@ export const HoldingsTable = memo(({
                       </Tooltip>
                     )}
                   </TableCell>
-                  <TableCell className="tabular-nums">{formatQuantity(holding.quantity)}</TableCell>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="text-right tabular-nums">{formatQuantity(holding.quantity)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
                     <div className="flex flex-col">
                       <span>{formatCurrency(holding.total_cost, 'USD', locale)}</span>
                       <span className="text-xs text-muted-foreground">
@@ -166,7 +166,7 @@ export const HoldingsTable = memo(({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium tabular-nums">
+                  <TableCell className="text-right font-medium tabular-nums">
                     <div className="flex flex-col">
                       <span>
                         {(() => {
@@ -181,7 +181,7 @@ export const HoldingsTable = memo(({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="text-right tabular-nums">
                     {(() => {
                       if (eurVals?.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null) {
                         return (
