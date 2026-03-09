@@ -79,6 +79,10 @@ class TransactionService:
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
 
+        # Validate split_ratio
+        if split_ratio is not None and split_ratio <= 0:
+            raise InvalidTransactionDataException("split_ratio must be positive")
+
         # Validate eur_amount sign matches total_amount sign
         if (
             eur_amount is not None
@@ -224,6 +228,9 @@ class TransactionService:
 
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
+
+        if split_ratio is not None and split_ratio <= 0:
+            raise InvalidTransactionDataException("split_ratio must be positive")
 
         # Validate eur_amount sign matches total_amount sign
         if (
@@ -448,6 +455,8 @@ class TransactionService:
         self._validate_csv_eur_sign(transaction_type, total_amount, eur_amount)
 
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
+        if split_ratio is not None and split_ratio <= 0:
+            raise ValueError(f"split_ratio must be positive, got: {split_ratio}")
 
         currency_raw = row.get("currency", "").strip().upper()
         currency = currency_raw or None

@@ -131,6 +131,34 @@ class TestCreateTransaction:
                 fx_rate=0,
             )
 
+    def test_negative_split_ratio(self, svc, user_id, portfolio_id):
+        with pytest.raises(
+            InvalidTransactionDataException, match="split_ratio must be positive"
+        ):
+            svc.create_transaction(
+                portfolio_id=portfolio_id,
+                user_id=user_id,
+                date=datetime(2024, 1, 1),
+                transaction_type=TransactionType.SPLIT,
+                ticker="AAPL",
+                total_amount=0,
+                split_ratio=-2.0,
+            )
+
+    def test_zero_split_ratio(self, svc, user_id, portfolio_id):
+        with pytest.raises(
+            InvalidTransactionDataException, match="split_ratio must be positive"
+        ):
+            svc.create_transaction(
+                portfolio_id=portfolio_id,
+                user_id=user_id,
+                date=datetime(2024, 1, 1),
+                transaction_type=TransactionType.SPLIT,
+                ticker="AAPL",
+                total_amount=0,
+                split_ratio=0,
+            )
+
     def test_eur_amount_sign_mismatch_positive_total_negative_eur(
         self, svc, user_id, portfolio_id
     ):

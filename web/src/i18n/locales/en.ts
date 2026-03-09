@@ -327,6 +327,8 @@ const en = {
     showAllPayments: 'Show all {{count}} payments',
     total: 'Total',
     pageOf: 'Page {{page}} of {{total}}',
+    previousPage: 'Previous page',
+    nextPage: 'Next page',
     columns: {
       ticker: 'Asset',
       quantity: 'Quantity',

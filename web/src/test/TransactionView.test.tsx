@@ -6,9 +6,16 @@ import { TransactionView } from '../components/TransactionView';
 import { useTransactions } from '../hooks/useTransactions';
 import { TransactionType, exportTransactionsCSV } from '../api';
 
-const mockNavigation = {
-  page: 'portfolio' as const,
-  activePortfolioId: null as number | null,
+const mockNavigation: {
+  page: 'portfolio';
+  activePortfolioId: number | null;
+  goToPortfolio: ReturnType<typeof vi.fn>;
+  goToFirstPortfolio: ReturnType<typeof vi.fn>;
+  goToTransactions: ReturnType<typeof vi.fn>;
+  goToSettings: ReturnType<typeof vi.fn>;
+} = {
+  page: 'portfolio',
+  activePortfolioId: null,
   goToPortfolio: vi.fn(),
   goToFirstPortfolio: vi.fn(),
   goToTransactions: vi.fn(),
@@ -67,6 +74,7 @@ const renderView = () => {
 describe('TransactionView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNavigation.activePortfolioId = null;
   });
 
   it('shows no portfolio message when activePortfolioId is null', () => {

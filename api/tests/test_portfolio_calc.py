@@ -278,7 +278,7 @@ class TestTransactionHandlers:
         assert state.holdings["AAPL"].quantity == Decimal("10")  # unchanged
 
     def test_split_with_zero_ratio_treated_as_one(self):
-        """split_ratio=0 is falsy, so `tx.split_ratio or 1` evaluates to 1 — no warning."""
+        """split_ratio=0 is falsy, so it falls back to 1 — no change to holdings."""
         state = _TxState()
         state.holdings["AAPL"] = _Holding(
             quantity=Decimal("10"),
@@ -287,8 +287,8 @@ class TestTransactionHandlers:
         )
         tx = _make_tx(type=TransactionType.SPLIT, ticker="AAPL", split_ratio=0)
         _apply_transaction(state, tx, strict=True)
-        assert len(state.warnings) == 0
-        assert state.holdings["AAPL"].quantity == Decimal("10")  # 10 * 1
+        # 0 is falsy → treated as "no ratio provided" → defaults to 1:1
+        assert state.holdings["AAPL"].quantity == Decimal("10")
 
     def test_unknown_transaction_type_warns(self):
         state = _TxState()

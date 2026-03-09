@@ -187,7 +187,7 @@ def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
 
 
 def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
-    split_ratio = _to_decimal(tx.split_ratio or 1)
+    split_ratio = _to_decimal(tx.split_ratio) if tx.split_ratio else _ONE
     if split_ratio <= 0:
         if strict:
             state.warnings.append(

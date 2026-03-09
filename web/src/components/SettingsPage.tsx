@@ -82,8 +82,8 @@ const useWarnUnsavedChanges = (isDirty: boolean) => {
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    globalThis.window.addEventListener('beforeunload', handler);
+    return () => globalThis.window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 };
 

@@ -15,6 +15,7 @@ export const PaginationControls = ({ page, totalPages, onPageChange }: Paginatio
       <Button
         variant="ghost"
         size="sm"
+        aria-label={t('status.previousPage')}
         onClick={() => onPageChange(Math.max(1, page - 1))}
         disabled={page <= 1}
       >
@@ -26,6 +27,7 @@ export const PaginationControls = ({ page, totalPages, onPageChange }: Paginatio
       <Button
         variant="ghost"
         size="sm"
+        aria-label={t('status.nextPage')}
         onClick={() => onPageChange(Math.min(totalPages, page + 1))}
         disabled={page >= totalPages}
       >

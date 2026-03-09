@@ -329,6 +329,8 @@ const lv: Translation = {
     showAllPayments: 'Rādīt visus {{count}} maksājumus',
     total: 'Kopā',
     pageOf: '{{page}}. lapa no {{total}}',
+    previousPage: 'Iepriekšējā lapa',
+    nextPage: 'Nākamā lapa',
     columns: {
       ticker: 'Aktīvs',
       quantity: 'Daudzums',
