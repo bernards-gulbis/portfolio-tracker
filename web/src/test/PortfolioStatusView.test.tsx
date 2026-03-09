@@ -163,7 +163,7 @@ describe('PortfolioStatusView', () => {
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Dividends').length).toBeGreaterThan(0);
     expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();
-    expect(screen.getByText('After-tax Value')).toBeInTheDocument();
+    expect(screen.getAllByText('After-tax Value').length).toBeGreaterThan(0);
   });
 
   it('renders CASH row in holdings table', () => {

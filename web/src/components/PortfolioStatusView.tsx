@@ -49,6 +49,24 @@ const formatCurrencyWithPercent = (
   );
 };
 
+// ================== Stat Card ==================
+
+interface StatCardProps {
+  label: string;
+  value: string;
+  caption?: React.ReactNode;
+}
+
+const StatCard = ({ label, value, caption }: StatCardProps) => (
+  <Card>
+    <CardContent>
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="text-2xl font-bold tracking-tight">{value}</p>
+      {caption == null ? null : <div className="text-sm mt-1">{caption}</div>}
+    </CardContent>
+  </Card>
+);
+
 // ================== Collapsible Positions ==================
 
 const CollapsiblePositions = ({ children }: { children: React.ReactNode }) => {
@@ -56,7 +74,7 @@ const CollapsiblePositions = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(true);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.positions')}
@@ -93,7 +111,7 @@ const CollapsibleFinancialSummary = ({
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.financialSummary')}
@@ -140,7 +158,7 @@ const CollapsibleRealizedGains = ({ realizedSales, locale }: CollapsibleRealized
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.realizedGains')}
@@ -165,7 +183,7 @@ const CollapsibleDividendsReceived = ({ dividendsReceived, displayCurrency, loca
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.dividendsReceived')}
@@ -189,7 +207,7 @@ const CollapsibleWithdrawalsSection = ({ status, locale }: CollapsibleWithdrawal
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.withdrawals')}
@@ -245,16 +263,18 @@ const PortfolioStatusContent = ({
 
   if (isEmptyPortfolio) {
     return (
-      <CardContent>
-        {toolbar && <div className="flex justify-end mb-4">{toolbar}</div>}
-        <Alert>
-          <InfoIcon className="h-4 w-4" />
-          <AlertDescription>
-            <span>{t('status.emptyPortfolio')}{' '}
-            <button type="button" className="underline font-medium cursor-pointer" onClick={goToTransactions}>{t('status.emptyPortfolioLink')}</button>.</span>
-          </AlertDescription>
-        </Alert>
-      </CardContent>
+      <Card>
+        <CardContent>
+          {toolbar && <div className="flex justify-end mb-4">{toolbar}</div>}
+          <Alert>
+            <InfoIcon className="h-4 w-4" />
+            <AlertDescription>
+              <span>{t('status.emptyPortfolio')}{' '}
+              <button type="button" className="underline font-medium cursor-pointer" onClick={goToTransactions}>{t('status.emptyPortfolioLink')}</button>.</span>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -268,32 +288,16 @@ const PortfolioStatusContent = ({
   const afterTaxValue = eur?.currentValueAfterTaxEur ?? null;
   const totalReturnAfterTax = eur?.totalReturnAfterTaxEur ?? null;
   const eurRate = eur?.rate ?? null;
+  const realizedGains = status.realized_gains;
 
   return (
-    <CardContent>
-      {/* Toolbar + Market Value */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <p className="text-sm text-muted-foreground mb-1">{t('status.marketValue')}</p>
-          <p className="text-3xl font-bold">
-            {marketValue === null ? '-' : formatCurrency(marketValue, currency, locale)}
-          </p>
-          <p className={`text-sm mt-1 ${getValueClass(unrealizedGains)}`}>
-            {formatCurrencyWithPercent(
-              unrealizedGains,
-              status.unrealized_gains_pct,
-              currency,
-              locale
-            )}
-            <span className="text-muted-foreground ml-2 font-normal">{t('status.unrealized')}</span>
-          </p>
-        </div>
-        {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
-      </div>
+    <>
+      {/* Toolbar */}
+      {toolbar && <div className="flex justify-end">{toolbar}</div>}
 
       {/* Transaction Warnings */}
       {status.warnings.length > 0 && (
-        <Alert variant="destructive" className="mb-4">
+        <Alert variant="destructive">
           <AlertTriangleIcon className="h-4 w-4" />
           <AlertDescription>
             <p className="font-medium">{t('status.transactionWarnings')}</p>
@@ -311,16 +315,53 @@ const PortfolioStatusContent = ({
         </Alert>
       )}
 
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label={t('status.marketValue')}
+          value={marketValue === null ? '-' : formatCurrency(marketValue, currency, locale)}
+          caption={
+            <p className={getValueClass(unrealizedGains)}>
+              {formatCurrencyWithPercent(unrealizedGains, status.unrealized_gains_pct, currency, locale)}
+            </p>
+          }
+        />
+        <StatCard
+          label={t('status.netInvested')}
+          value={formatCurrency(netInvested, currency, locale)}
+        />
+        <StatCard
+          label={t('status.dividends')}
+          value={dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
+        />
+        {showEur ? (
+          <StatCard
+            label={t('status.afterTaxValue')}
+            value={afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
+            caption={
+              <p className={getValueClass(totalReturnAfterTax)}>
+                {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
+              </p>
+            }
+          />
+        ) : (
+          <StatCard
+            label={t('status.realizedGains')}
+            value={formatCurrency(realizedGains, 'USD', locale)}
+          />
+        )}
+      </div>
+
       {/* Charts Section */}
       <Suspense
         fallback={
-          <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
+          <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
             <Skeleton className="h-[340px] w-full rounded-lg" />
             <Skeleton className="h-[340px] w-full rounded-lg" />
           </div>
         }
       >
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
+        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
           <PerformanceChart
             data={performance?.data_points ?? EMPTY_DATA_POINTS}
             isLoading={isPerformanceLoading}
@@ -338,91 +379,113 @@ const PortfolioStatusContent = ({
       </Suspense>
 
       {/* Holdings Table */}
-      <CollapsiblePositions>
-        <HoldingsTable
-          holdings={status.holdings}
-          missingPrices={status.missing_prices}
-          cash={status.cash}
-          displayCurrency={currency}
-          showEur={showEur}
-          eurMetrics={eur}
-          locale={locale}
-        />
-      </CollapsiblePositions>
+      <Card>
+        <CardContent>
+          <CollapsiblePositions>
+            <HoldingsTable
+              holdings={status.holdings}
+              missingPrices={status.missing_prices}
+              cash={status.cash}
+              displayCurrency={currency}
+              showEur={showEur}
+              eurMetrics={eur}
+              locale={locale}
+            />
+          </CollapsiblePositions>
+        </CardContent>
+      </Card>
 
       {/* Financial Summary (collapsed) */}
-      <CollapsibleFinancialSummary
-        netInvested={formatCurrency(netInvested, currency, locale)}
-        dividends={dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
-        showEur={showEur}
-        taxLabel={t('status.estTax', { rate: taxRate })}
-        taxValue={taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
-        taxCaption={
-          capitalGainsEur !== null && taxEur !== null ? (
-            <p className="text-xs mt-0.5 text-muted-foreground">
-              {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
-            </p>
-          ) : null
-        }
-        afterTaxValue={afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
-        afterTaxCaption={
-          <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
-            {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
-          </p>
-        }
-      />
+      <Card>
+        <CardContent>
+          <CollapsibleFinancialSummary
+            netInvested={formatCurrency(netInvested, currency, locale)}
+            dividends={dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
+            showEur={showEur}
+            taxLabel={t('status.estTax', { rate: taxRate })}
+            taxValue={taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
+            taxCaption={
+              capitalGainsEur !== null && taxEur !== null ? (
+                <p className="text-xs mt-0.5 text-muted-foreground">
+                  {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
+                </p>
+              ) : null
+            }
+            afterTaxValue={afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
+            afterTaxCaption={
+              <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
+                {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
+              </p>
+            }
+          />
+        </CardContent>
+      </Card>
 
       {/* Realized Gains */}
       {status.realized_sales.length > 0 && (
-        <CollapsibleRealizedGains
-          realizedSales={status.realized_sales}
-          locale={locale}
-        />
+        <Card>
+          <CardContent>
+            <CollapsibleRealizedGains
+              realizedSales={status.realized_sales}
+              locale={locale}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Dividends Received */}
       {status.dividends_received.length > 0 && (
-        <CollapsibleDividendsReceived
-          dividendsReceived={status.dividends_received}
-          displayCurrency={currency}
-          locale={locale}
-        />
+        <Card>
+          <CardContent>
+            <CollapsibleDividendsReceived
+              dividendsReceived={status.dividends_received}
+              displayCurrency={currency}
+              locale={locale}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Withdrawals Table */}
       {status.realized_withdrawals.length > 0 && (
-        <CollapsibleWithdrawalsSection
-          status={status}
-          locale={locale}
-        />
+        <Card>
+          <CardContent>
+            <CollapsibleWithdrawalsSection
+              status={status}
+              locale={locale}
+            />
+          </CardContent>
+        </Card>
       )}
-    </CardContent>
+    </>
   );
 };
 
 // ================== Loading skeleton ==================
 
 const PortfolioStatusSkeleton = () => (
-  <div className="mb-6 space-y-6">
+  <div className="mb-6 space-y-4">
+    {/* Stat cards */}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i}>
+          <CardContent>
+            <Skeleton className="h-4 w-24 mb-2" />
+            <Skeleton className="h-8 w-32" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+
+    {/* Charts */}
+    <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
+      <Skeleton className="h-[340px] w-full rounded-lg" />
+      <Skeleton className="h-[340px] w-full rounded-lg" />
+    </div>
+
+    {/* Holdings table */}
     <Card>
       <CardContent>
-        {/* Market Value header */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <Skeleton className="h-4 w-24 mb-2" />
-            <Skeleton className="h-9 w-48 mb-1" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-          <Skeleton className="h-5 w-32" />
-        </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-6">
-          <Skeleton className="h-[340px] w-full rounded-lg" />
-          <Skeleton className="h-[340px] w-full rounded-lg" />
-        </div>
-
-        {/* Holdings table */}
         <Skeleton className="h-8 w-full mb-2 rounded" />
         {[1, 2, 3, 4].map((i) => (
           <Skeleton key={i} className="h-10 w-full mb-1 rounded" />
@@ -520,43 +583,41 @@ export const PortfolioStatusView = () => {
   const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (
-    <div className="mb-6 space-y-6">
-        <Card>
-          <PortfolioStatusContent
-            status={effectiveStatus}
-            performance={performance}
-            isPerformanceLoading={isPerformanceLoading}
-            isAllocationLoading={isLivePricesFetching && !livePrices}
-            isEmptyPortfolio={isEmptyPortfolio}
-            toolbar={
-              <div className="flex items-center gap-2">
-                {!isEmptyPortfolio && livePricesError && (
-                  <span className="flex items-center gap-1 text-xs text-destructive">
-                    <AlertTriangleIcon className="h-3.5 w-3.5" />
-                    {t('status.livePriceError')}
-                  </span>
-                )}
-                {!isEmptyPortfolio && latestUpdateAt > 0 && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    {t('status.fetchedAt', {
-                      time: new Date(latestUpdateAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                    })}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={handleRefresh}
-                      disabled={isRefreshing}
-                      aria-label={t('status.refreshPortfolio')}
-                    >
-                      <RefreshCwIcon className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </Button>
-                  </span>
-                )}
-              </div>
-            }
-          />
-        </Card>
+    <div className="mb-6 space-y-4">
+      <PortfolioStatusContent
+        status={effectiveStatus}
+        performance={performance}
+        isPerformanceLoading={isPerformanceLoading}
+        isAllocationLoading={isLivePricesFetching && !livePrices}
+        isEmptyPortfolio={isEmptyPortfolio}
+        toolbar={
+          <div className="flex items-center gap-2">
+            {!isEmptyPortfolio && livePricesError && (
+              <span className="flex items-center gap-1 text-xs text-destructive">
+                <AlertTriangleIcon className="h-3.5 w-3.5" />
+                {t('status.livePriceError')}
+              </span>
+            )}
+            {!isEmptyPortfolio && latestUpdateAt > 0 && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                {t('status.fetchedAt', {
+                  time: new Date(latestUpdateAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                })}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  aria-label={t('status.refreshPortfolio')}
+                >
+                  <RefreshCwIcon className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </span>
+            )}
+          </div>
+        }
+      />
     </div>
   );
 };
