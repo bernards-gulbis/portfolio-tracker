@@ -10,10 +10,10 @@ import {
   Tooltip,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency, formatSignedCurrency, formatSignedPercent, toLocalDateStr } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChartContainer,
@@ -22,8 +22,7 @@ import {
 import type { PerformanceDataPoint } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
 import { computeBaseFactor, rebasePct } from '../utils/performanceCalc';
-
-type TimePeriod = '1month' | '3month' | '6month' | 'ytd' | '1year' | 'all';
+import { type TimePeriod, formatCompactValue, getCutoffDate } from '../utils/chartHelpers';
 
 type ViewMode = 'value' | 'pct';
 
@@ -52,52 +51,6 @@ interface ChartDataPoint {
 const parseYMD = (value: string): Date => {
   const [y, m, d] = value.split('-').map(Number);
   return new Date(y, m - 1, d);
-};
-
-/** Compact currency label for YAxis (e.g. €1.5M, €10k or $1.5M, $10k). */
-const formatCompactValue = (value: number, currency: Currency): string => {
-  const symbol = currency === 'EUR' ? '€' : '$';
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000) return `${symbol}${(value / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${symbol}${(value / 1_000).toFixed(0)}k`;
-  return `${symbol}${value.toFixed(0)}`;
-};
-
-/** Subtract months from a date, clamping to the last day of the target month
- *  (e.g. March 31 minus 1 month → Feb 28, not March 3). */
-const subtractMonths = (date: Date, months: number): Date => {
-  const result = new Date(date);
-  result.setMonth(result.getMonth() - months);
-  // If the day overflowed (e.g. 31 → 3), clamp to last day of target month
-  if (result.getDate() !== date.getDate()) {
-    result.setDate(0);
-  }
-  return result;
-};
-
-/** Get the cutoff date string (YYYY-MM-DD) for a given period. */
-const getCutoffDate = (period: TimePeriod): string | null => {
-  if (period === 'all') return null;
-  const now = new Date();
-  let cutoff: Date;
-  switch (period) {
-    case '1month':
-      cutoff = subtractMonths(now, 1);
-      break;
-    case '3month':
-      cutoff = subtractMonths(now, 3);
-      break;
-    case '6month':
-      cutoff = subtractMonths(now, 6);
-      break;
-    case 'ytd':
-      cutoff = new Date(now.getFullYear(), 0, 1);
-      break;
-    case '1year':
-      cutoff = subtractMonths(now, 12);
-      break;
-  }
-  return toLocalDateStr(cutoff);
 };
 
 /** Header display values for value mode. */
@@ -336,14 +289,8 @@ export const PerformanceChart = ({
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <Skeleton className="h-4 w-24" />
-          <CardAction>
-            <Skeleton className="h-8 w-20 rounded-md" />
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[300px] w-full" />
+        <CardContent className="flex items-center justify-center h-[380px]">
+          <Spinner className="size-8" />
         </CardContent>
       </Card>
     );

@@ -1,4 +1,4 @@
-import type { PricedHolding, PricedPortfolioStatus } from '../api';
+import type { PricedHolding, PricedPortfolioStatus, WithdrawalFx } from '../api';
 
 export interface EurMetrics {
   rate: number;
@@ -33,9 +33,9 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
 
   const currentValueEur = status.current_value == null ? null : status.current_value * rate;
   const unrealizedGainsEur = status.unrealized_gains == null ? null : status.unrealized_gains * rate;
-  const currencyGainsEur = status.principal * rate - status.principal_eur;
+  const currencyGainsEur = status.principal * rate - status.principal_eur_avg;
   const currencyGainsPct =
-    status.principal_eur > 0 ? (currencyGainsEur / status.principal_eur) * 100 : null;
+    status.principal_eur_avg > 0 ? (currencyGainsEur / status.principal_eur_avg) * 100 : null;
   const cashEur = status.cash * rate;
 
   // Skip tax when current value is unavailable (prices not loaded) or dividends EUR is missing
@@ -72,8 +72,35 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
 };
 
 /**
- * Compute EUR values for a single holding by applying the live rate to USD fields.
+ * Compute per-withdrawal taxable amounts.
+ * In the Latvian model, withdrawals are tax-free up to (total deposited EUR + dividends EUR).
+ * Returns a Map from original array index → taxable EUR amount for that withdrawal.
  */
+export const computeWithdrawalTaxMap = (
+  withdrawals: WithdrawalFx[],
+  principalEur: number,
+  dividendsEur: number | null,
+): Map<number, number> => {
+  const totalWithdrawnEur = withdrawals.reduce((s, w) => s + w.amount_eur, 0);
+  const totalDepositedEur = principalEur + totalWithdrawnEur;
+  const threshold = totalDepositedEur + (dividendsEur ?? 0);
+
+  const indexed = withdrawals.map((w, i) => ({ w, i }));
+  indexed.sort((a, b) => a.w.date.localeCompare(b.w.date));
+  const map = new Map<number, number>();
+  let running = 0;
+  let prevTaxable = 0;
+  for (const { w, i } of indexed) {
+    running += w.amount_eur;
+    const cumTaxable = Math.max(0, running - threshold);
+    const taxableThisRow = cumTaxable - prevTaxable;
+    prevTaxable = cumTaxable;
+    map.set(i, taxableThisRow);
+  }
+  return map;
+};
+
+/** Compute EUR values for a single holding by applying the live rate to USD fields. */
 export const applyRateToHolding = (holding: PricedHolding, rate: number): HoldingEurValues => ({
   averageCostEur: holding.average_cost * rate,
   totalCostEur: holding.total_cost * rate,

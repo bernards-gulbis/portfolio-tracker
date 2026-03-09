@@ -110,6 +110,7 @@ export interface TransactionUpdate {
 
 export interface BulkImportResponse {
   imported_count: number;
+  skipped_count: number;
   transactions: Transaction[];
 }
 
@@ -126,6 +127,7 @@ export interface Holding {
   quantity: number;
   average_cost: number;
   total_cost: number;
+  first_buy_date: string;
 }
 
 export interface PricedHolding extends Holding {
@@ -133,6 +135,32 @@ export interface PricedHolding extends Holding {
   current_value: number | null;
   unrealized_gain_loss: number | null;
   unrealized_gain_loss_pct: number | null;
+}
+
+export interface RealizedSale {
+  ticker: string;
+  date: string;
+  quantity: number;
+  quantity_before: number;
+  proceeds: number;
+  cost_basis: number;
+  realized_gain: number;
+  first_buy_date: string;
+}
+
+export interface DividendReceived {
+  ticker: string;
+  date: string;
+  amount: number;
+  amount_eur: number | null;
+}
+
+export interface WithdrawalFx {
+  date: string;
+  amount: number;
+  amount_eur_avg: number;
+  amount_eur: number;
+  realized_fx_gain: number;
 }
 
 export interface TransactionWarning {
@@ -146,12 +174,16 @@ export interface PortfolioStatus {
   portfolio_name: string;
   principal: number;
   principal_eur: number;
+  principal_eur_avg: number;
   dividends: number;
   dividends_eur: number | null;
   cash: number;
   holdings: Holding[];
   holdings_cost: number;
   realized_gains: number;
+  realized_sales: RealizedSale[];
+  dividends_received: DividendReceived[];
+  realized_withdrawals: WithdrawalFx[];
   capital_gains_tax_rate: number;
   warnings: TransactionWarning[];
   usd_to_eur_rate: number | null;

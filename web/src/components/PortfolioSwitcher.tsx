@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { ChevronsUpDown, Plus, BriefcaseBusiness } from 'lucide-react';
 import { usePortfolios } from '../hooks/usePortfolios';
+import { useNavigation } from '../context/NavigationContext';
 import { getErrorMessage } from '../api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ interface PortfolioSwitcherProps {
 export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitcherProps) => {
   const { t } = useTranslation();
   const { data: portfolios, isLoading, error } = usePortfolios();
+  const { goToPortfolio } = useNavigation();
   const [open, setOpen] = useState(false);
 
   const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
@@ -37,16 +38,18 @@ export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: Portfoli
     }
     if (portfolios && portfolios.length > 0) {
       return portfolios.map((portfolio) => (
-        <DropdownMenuItem key={portfolio.id} asChild className="gap-2 p-2">
-          <Link
-            to={`/portfolios/${portfolio.id}`}
-            onClick={() => setOpen(false)}
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
-              <BriefcaseBusiness className="h-4 w-4 shrink-0" />
-            </div>
-            <span className="truncate">{portfolio.name}</span>
-          </Link>
+        <DropdownMenuItem
+          key={portfolio.id}
+          className="gap-2 p-2"
+          onClick={() => {
+            goToPortfolio(portfolio.id);
+            setOpen(false);
+          }}
+        >
+          <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
+            <BriefcaseBusiness className="h-4 w-4 shrink-0" />
+          </div>
+          <span className="truncate">{portfolio.name}</span>
         </DropdownMenuItem>
       ));
     }

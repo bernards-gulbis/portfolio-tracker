@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getPortfolioStatus, PortfolioStatus } from '../api';
 
 /**
- * Hook to fetch portfolio status including holdings, cash balance, and performance metrics
+ * Hook to fetch portfolio status including holdings, cash balance, and performance metrics.
+ * Cache is effectively infinite — only invalidated explicitly after mutations.
  */
 export const usePortfolioStatus = (portfolioId: number | null) => {
   return useQuery<PortfolioStatus>({
@@ -14,7 +15,8 @@ export const usePortfolioStatus = (portfolioId: number | null) => {
       return getPortfolioStatus(portfolioId);
     },
     enabled: !!portfolioId,
-    staleTime: 30000, // Consider data stale after 30 seconds
-    refetchOnWindowFocus: false, // Don't refetch on window focus (mutations will invalidate)
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 };

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import axios from 'axios';
 import type { AxiosHeaders } from 'axios';
-import { isApiError, getErrorMessage } from '../api';
+import { isApiError, getErrorMessage, TransactionType } from '../api';
 
 describe('api.ts', () => {
   describe('isApiError', () => {
@@ -67,6 +67,54 @@ describe('api.ts', () => {
       expect(getErrorMessage('string error')).toBe('An unknown error occurred');
       expect(getErrorMessage(42)).toBe('An unknown error occurred');
       expect(getErrorMessage(undefined)).toBe('An unknown error occurred');
+    });
+  });
+
+  describe('isApiError edge cases', () => {
+    it('returns false for AxiosError without response', () => {
+      const err = new axios.AxiosError('Network Error', 'ERR_NETWORK');
+      expect(isApiError(err)).toBe(false);
+    });
+
+    it('returns false for AxiosError with null response data', () => {
+      const err = new axios.AxiosError('fail', '500', undefined, undefined, {
+        status: 500,
+        data: null,
+        statusText: 'Internal Server Error',
+        headers: {} as AxiosHeaders,
+        config: { headers: {} as AxiosHeaders },
+      });
+      expect(isApiError(err)).toBe(false);
+    });
+  });
+
+  describe('TransactionType enum', () => {
+    it('has all expected transaction types', () => {
+      expect(TransactionType.DEPOSIT).toBe('Deposit');
+      expect(TransactionType.BUY).toBe('Buy');
+      expect(TransactionType.SELL).toBe('Sell');
+      expect(TransactionType.WITHDRAW).toBe('Withdraw');
+      expect(TransactionType.DIVIDEND).toBe('Dividend');
+      expect(TransactionType.FEE).toBe('Fee');
+      expect(TransactionType.SPLIT).toBe('Split');
+    });
+  });
+
+  describe('getErrorMessage with nested errors', () => {
+    it('prefers API detail over error message', () => {
+      const err = new axios.AxiosError('Network Error', '422', undefined, undefined, {
+        status: 422,
+        data: { detail: 'Validation failed' },
+        statusText: 'Unprocessable Entity',
+        headers: {} as AxiosHeaders,
+        config: { headers: {} as AxiosHeaders },
+      });
+      expect(getErrorMessage(err)).toBe('Validation failed');
+    });
+
+    it('falls back to AxiosError message when no response data detail', () => {
+      const err = new axios.AxiosError('Request timeout', 'ECONNABORTED');
+      expect(getErrorMessage(err)).toBe('Request timeout');
     });
   });
 });

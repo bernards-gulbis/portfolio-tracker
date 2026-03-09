@@ -146,10 +146,14 @@ async def import_transactions_csv(
         raise FileUploadException(f"Error reading file: {e!s}") from e
 
     service = TransactionService(session)
-    transactions = service.import_from_csv(csv_content, portfolio_id, user.id)
+    transactions, skipped_count = service.import_from_csv(
+        csv_content, portfolio_id, user.id
+    )
 
     return BulkImportResponse(
-        imported_count=len(transactions), transactions=transactions
+        imported_count=len(transactions),
+        skipped_count=skipped_count,
+        transactions=transactions,
     )
 
 

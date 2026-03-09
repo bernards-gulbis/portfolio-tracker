@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatDateTime, formatSignedPercent, getValueClass, toLocalDateStr } from '../utils/formatters';
+import { formatCurrency, formatDateTime, formatSignedPercent, formatDaysHeld, getValueClass, toLocalDateStr } from '../utils/formatters';
 
 describe('Formatters', () => {
   describe('formatCurrency', () => {
@@ -68,6 +68,36 @@ describe('Formatters', () => {
 
     it('returns text-positive for zero', () => {
       expect(getValueClass(0)).toBe('text-positive');
+    });
+  });
+
+  describe('formatDaysHeld', () => {
+    it('shows days only for < 31', () => {
+      expect(formatDaysHeld(0)).toBe('0d');
+      expect(formatDaysHeld(1)).toBe('1d');
+      expect(formatDaysHeld(15)).toBe('15d');
+      expect(formatDaysHeld(30)).toBe('30d');
+    });
+
+    it('shows months and days for 31–365', () => {
+      expect(formatDaysHeld(31)).toBe('1m 1d');
+      expect(formatDaysHeld(60)).toBe('2m');
+      expect(formatDaysHeld(102)).toBe('3m 12d');
+      expect(formatDaysHeld(365)).toBe('12m 5d');
+    });
+
+    it('shows years and months for > 365', () => {
+      expect(formatDaysHeld(366)).toBe('1y');
+      expect(formatDaysHeld(547)).toBe('1y 6m');
+      expect(formatDaysHeld(730)).toBe('2y');
+      expect(formatDaysHeld(800)).toBe('2y 2m');
+    });
+
+    it('uses custom labels', () => {
+      const labels = { d: 'д', m: 'мес', y: 'г' };
+      expect(formatDaysHeld(15, labels)).toBe('15д');
+      expect(formatDaysHeld(102, labels)).toBe('3мес 12д');
+      expect(formatDaysHeld(547, labels)).toBe('1г 6мес');
     });
   });
 

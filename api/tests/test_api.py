@@ -21,7 +21,8 @@ from app.models.historical_price import (  # noqa: F401 — ensures tables exist
     HistoricalPrice,
 )
 from app.models.user import User
-from app.services.portfolio_service import _apply_transaction, _TxState
+from app.services.portfolio_calc import _apply_transaction
+from app.services.portfolio_types import _Holding, _TxState
 from main import app
 
 
@@ -940,6 +941,7 @@ def test_portfolio_status_empty_portfolio(client: TestClient):
     assert data["portfolio_name"] == "Empty Portfolio"
     assert data["principal"] == pytest.approx(0.0)
     assert data["principal_eur"] == pytest.approx(0.0)
+    assert data["principal_eur_avg"] == pytest.approx(0.0)
     assert data["dividends"] == pytest.approx(0.0)
     assert data["cash"] == pytest.approx(0.0)
     assert data["holdings"] == []
@@ -1036,12 +1038,14 @@ def test_portfolio_status_with_buy_transactions(client: TestClient):
     assert aapl_holding["quantity"] == pytest.approx(10.0)
     assert aapl_holding["average_cost"] == pytest.approx(150.0)
     assert aapl_holding["total_cost"] == pytest.approx(1500.0)
+    assert aapl_holding["first_buy_date"] == "2024-01-02"
 
     # Check MSFT holding
     msft_holding = next(h for h in data["holdings"] if h["ticker"] == "MSFT")
     assert msft_holding["quantity"] == pytest.approx(5.0)
     assert msft_holding["average_cost"] == pytest.approx(300.0)
     assert msft_holding["total_cost"] == pytest.approx(1500.0)
+    assert msft_holding["first_buy_date"] == "2024-01-03"
 
     assert data["holdings_cost"] == pytest.approx(3000.0)
 
@@ -1111,6 +1115,18 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
     # Realized gains: sold 10 shares at 1500 (includes -1 fee) - cost basis 10*100 (1000) = 500
     assert data["realized_gains"] == pytest.approx(500.0)
 
+    # Realized sales breakdown
+    assert len(data["realized_sales"]) == 1
+    sale = data["realized_sales"][0]
+    assert sale["ticker"] == "AAPL"
+    assert sale["quantity"] == pytest.approx(10.0)
+    assert sale["quantity_before"] == pytest.approx(20.0)
+    assert sale["proceeds"] == pytest.approx(1500.0)
+    assert sale["cost_basis"] == pytest.approx(1000.0)
+    assert sale["realized_gain"] == pytest.approx(500.0)
+    assert sale["first_buy_date"] == "2024-01-02T10:00:00"
+    assert "date" in sale
+
 
 def test_portfolio_status_with_dividends(client: TestClient):
     """Test portfolio status with dividend income"""
@@ -1177,6 +1193,15 @@ def test_portfolio_status_with_dividends(client: TestClient):
     )  # 5000 - 1500 + 50 + 50 (fees included in values)
     assert data["dividends"] == pytest.approx(100.0)
     assert len(data["holdings"]) == 1
+
+    # Verify dividends_received breakdown
+    dr = data["dividends_received"]
+    assert len(dr) == 2
+    assert dr[0]["ticker"] == "AAPL"
+    assert dr[0]["amount"] == pytest.approx(50.0)
+    assert dr[1]["ticker"] == "AAPL"
+    assert dr[1]["amount"] == pytest.approx(50.0)
+    assert sum(d["amount"] for d in dr) == pytest.approx(data["dividends"])
 
 
 def test_portfolio_status_with_stock_split(client: TestClient):
@@ -1901,6 +1926,347 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
     assert abs(data["principal_eur"] - expected_principal_eur) < 0.01
 
 
+def test_principal_eur_avg_after_withdrawal(client: TestClient):
+    """Test that principal_eur_avg uses average cost method for withdrawals."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Avg Cost Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx_rate 1.1111 → EUR = 10000/1.1111 ≈ 9000.09
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.1111,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $9,800 at fx_rate 1.1765 → historical EUR = 9800/1.1765 ≈ 8326.39
+    # Average cost EUR = 9800 × (9000.09/10000) = 8820.09
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -9800.0,
+            "fx_rate": 1.1765,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=0.92
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["principal"] == pytest.approx(200.0)
+
+    # principal_eur uses historical rates: 10000/1.1111 - 9800/1.1765
+    deposit_eur = 10000.0 / 1.1111
+    withdraw_eur = 9800.0 / 1.1765
+    assert data["principal_eur"] == pytest.approx(deposit_eur - withdraw_eur, abs=0.1)
+
+    # principal_eur_avg uses average cost: remaining = deposit_eur × (200/10000)
+    expected_avg = deposit_eur * (200.0 / 10000.0)
+    assert data["principal_eur_avg"] == pytest.approx(expected_avg, abs=0.1)
+
+    # realized_withdrawals should contain one entry
+    assert len(data["realized_withdrawals"]) == 1
+    w = data["realized_withdrawals"][0]
+    assert w["date"] == "2024-06-01T10:00:00"
+    assert w["amount"] == pytest.approx(9800.0)
+    # EUR cost at average rate: 9800 × (deposit_eur / 10000)
+    expected_eur_avg = 9800.0 * (deposit_eur / 10000.0)
+    assert w["amount_eur_avg"] == pytest.approx(expected_eur_avg, abs=0.1)
+    # EUR received at historical rate
+    assert w["amount_eur"] == pytest.approx(withdraw_eur, abs=0.1)
+    # Realized FX G/L
+    assert w["realized_fx_gain"] == pytest.approx(
+        withdraw_eur - expected_eur_avg, abs=0.1
+    )
+
+
+def test_withdrawal_fx_gain_multiple_deposits_and_withdrawals(client: TestClient):
+    """Test FX G/L with two deposits at different rates, then two withdrawals."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Multi FX Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx_rate=1.10 → EUR = 10000/1.10 = 9090.909...
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    # Deposit $5,000 at fx_rate=1.25 → EUR = 5000/1.25 = 4000.00
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-02-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fx_rate": 1.25,
+            "fee": 0.0,
+        },
+    )
+
+    # Weighted avg: principal_eur_avg = 9090.909 + 4000 = 13090.909
+    # avg_rate = 13090.909 / 15000 = 0.872727... EUR per USD
+
+    # Withdraw $6,000 at fx_rate=1.15
+    # EUR received (historical) = 6000/1.15 = 5217.391...
+    # EUR avg cost = 6000 × 0.872727 = 5236.364...
+    # FX G/L = 5217.391 - 5236.364 = -18.973...
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -6000.0,
+            "fx_rate": 1.15,
+            "fee": 0.0,
+        },
+    )
+
+    # After W1: principal=9000, principal_eur_avg = 13090.909 - 5236.364 = 7854.545
+    # avg_rate still = 7854.545 / 9000 = 0.872727 (unchanged, as expected)
+
+    # Withdraw $4,000 at fx_rate=1.05
+    # EUR received = 4000/1.05 = 3809.524...
+    # EUR avg cost = 4000 × 0.872727 = 3490.909...
+    # FX G/L = 3809.524 - 3490.909 = +318.615...
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-09-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -4000.0,
+            "fx_rate": 1.05,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        return_value=0.92,
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    dep1_eur = 10000.0 / 1.10  # 9090.909...
+    dep2_eur = 5000.0 / 1.25  # 4000.0
+    total_eur_avg = dep1_eur + dep2_eur  # 13090.909...
+    avg_rate = total_eur_avg / 15000.0  # 0.872727...
+
+    # Remaining principal = 15000 - 6000 - 4000 = 5000
+    assert data["principal"] == pytest.approx(5000.0)
+
+    # Verify withdrawal 1
+    assert len(data["realized_withdrawals"]) == 2
+    w1 = data["realized_withdrawals"][0]
+    assert w1["amount"] == pytest.approx(6000.0)
+    w1_eur_hist = 6000.0 / 1.15
+    w1_eur_avg = 6000.0 * avg_rate
+    assert w1["amount_eur"] == pytest.approx(w1_eur_hist, abs=0.01)
+    assert w1["amount_eur_avg"] == pytest.approx(w1_eur_avg, abs=0.01)
+    assert w1["realized_fx_gain"] == pytest.approx(w1_eur_hist - w1_eur_avg, abs=0.01)
+
+    # Verify withdrawal 2 — avg_rate should be unchanged
+    w2 = data["realized_withdrawals"][1]
+    assert w2["amount"] == pytest.approx(4000.0)
+    w2_eur_hist = 4000.0 / 1.05
+    w2_eur_avg = 4000.0 * avg_rate
+    assert w2["amount_eur"] == pytest.approx(w2_eur_hist, abs=0.01)
+    assert w2["amount_eur_avg"] == pytest.approx(w2_eur_avg, abs=0.01)
+    assert w2["realized_fx_gain"] == pytest.approx(w2_eur_hist - w2_eur_avg, abs=0.01)
+
+    # principal_eur_avg after both withdrawals
+    remaining_eur_avg = total_eur_avg - w1_eur_avg - w2_eur_avg
+    assert data["principal_eur_avg"] == pytest.approx(remaining_eur_avg, abs=0.1)
+
+
+def test_withdrawal_fx_gain_interleaved_deposits(client: TestClient):
+    """Test that a deposit between withdrawals changes the avg rate for later withdrawals."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Interleaved FX Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx=1.10 → EUR = 9090.909
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $5,000 at fx=1.15 → EUR received = 4347.826
+    # avg_rate = 9090.909/10000 = 0.909091
+    # EUR avg cost = 5000 × 0.909091 = 4545.455
+    # FX G/L = 4347.826 - 4545.455 = -197.629
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-03-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -5000.0,
+            "fx_rate": 1.15,
+            "fee": 0.0,
+        },
+    )
+
+    # After W1: principal=5000, principal_eur_avg = 9090.909 - 4545.455 = 4545.455
+
+    # Deposit $5,000 at fx=1.20 → EUR = 4166.667
+    # principal_eur_avg = 4545.455 + 4166.667 = 8712.121
+    # principal = 10000
+    # new avg_rate = 8712.121 / 10000 = 0.871212
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 5000.0,
+            "fx_rate": 1.20,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $5,000 at fx=1.10 → EUR received = 4545.455
+    # avg_rate = 8712.121 / 10000 = 0.871212
+    # EUR avg cost = 5000 × 0.871212 = 4356.061
+    # FX G/L = 4545.455 - 4356.061 = +189.394
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-09-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -5000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        return_value=0.92,
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    dep1_eur = 10000.0 / 1.10  # 9090.909
+    dep2_eur = 5000.0 / 1.20  # 4166.667
+
+    # Withdrawal 1: avg_rate based on dep1 only
+    avg_rate_1 = dep1_eur / 10000.0  # 0.909091
+    w1_eur_hist = 5000.0 / 1.15
+    w1_eur_avg = 5000.0 * avg_rate_1
+
+    assert len(data["realized_withdrawals"]) == 2
+    w1 = data["realized_withdrawals"][0]
+    assert w1["amount_eur"] == pytest.approx(w1_eur_hist, abs=0.01)
+    assert w1["amount_eur_avg"] == pytest.approx(w1_eur_avg, abs=0.01)
+    assert w1["realized_fx_gain"] == pytest.approx(w1_eur_hist - w1_eur_avg, abs=0.01)
+
+    # Withdrawal 2: avg_rate after dep2 added
+    remaining_avg_after_w1 = dep1_eur - w1_eur_avg  # 4545.455
+    new_avg_pool = remaining_avg_after_w1 + dep2_eur  # 8712.121
+    avg_rate_2 = new_avg_pool / 10000.0  # 0.871212
+    w2_eur_hist = 5000.0 / 1.10
+    w2_eur_avg = 5000.0 * avg_rate_2
+
+    w2 = data["realized_withdrawals"][1]
+    assert w2["amount_eur"] == pytest.approx(w2_eur_hist, abs=0.01)
+    assert w2["amount_eur_avg"] == pytest.approx(w2_eur_avg, abs=0.01)
+    assert w2["realized_fx_gain"] == pytest.approx(w2_eur_hist - w2_eur_avg, abs=0.01)
+
+    # Remaining principal = 5000
+    assert data["principal"] == pytest.approx(5000.0)
+    remaining_eur_avg = new_avg_pool - w2_eur_avg
+    assert data["principal_eur_avg"] == pytest.approx(remaining_eur_avg, abs=0.1)
+
+
+def test_withdrawal_fx_gain_full_withdrawal(client: TestClient):
+    """Test full withdrawal leaves principal_eur_avg ≈ 0."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Full Withdraw Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Deposit $10,000 at fx=1.10 → EUR = 9090.909
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "fx_rate": 1.10,
+            "fee": 0.0,
+        },
+    )
+
+    # Withdraw $10,000 at fx=1.20 → EUR received = 8333.333
+    # EUR avg cost = 10000 × (9090.909/10000) = 9090.909
+    # FX G/L = 8333.333 - 9090.909 = -757.576
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-06-01T10:00:00",
+            "type": "Withdraw",
+            "total_amount": -10000.0,
+            "fx_rate": 1.20,
+            "fee": 0.0,
+        },
+    )
+
+    with patch(
+        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        return_value=0.92,
+    ):
+        response = client.get(f"/portfolios/{portfolio_id}/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    dep_eur = 10000.0 / 1.10  # 9090.909
+    w_eur_hist = 10000.0 / 1.20  # 8333.333
+    w_eur_avg = dep_eur  # full withdrawal at avg = full deposit EUR
+
+    assert data["principal"] == pytest.approx(0.0)
+
+    assert len(data["realized_withdrawals"]) == 1
+    w = data["realized_withdrawals"][0]
+    assert w["amount"] == pytest.approx(10000.0)
+    assert w["amount_eur"] == pytest.approx(w_eur_hist, abs=0.01)
+    assert w["amount_eur_avg"] == pytest.approx(w_eur_avg, abs=0.01)
+    assert w["realized_fx_gain"] == pytest.approx(w_eur_hist - w_eur_avg, abs=0.01)
+
+    # principal_eur_avg should be ~0 after full withdrawal
+    assert data["principal_eur_avg"] == pytest.approx(0.0, abs=0.01)
+
+
 # ================== Health Check Test ==================
 
 
@@ -2481,10 +2847,14 @@ def test_sell_non_strict_unknown_ticker():
 
 
 def test_sell_non_strict_oversell():
-    """Oversell in non-strict mode should NOT inflate cash."""
+    """Oversell in non-strict mode should reconcile via partial sell."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {"quantity": Decimal("5"), "total_cost": Decimal("500")}
+    state.holdings["AAPL"] = _Holding(
+        quantity=Decimal("5"),
+        total_cost=Decimal("500"),
+        first_buy_date=datetime(2024, 1, 1),
+    )
 
     tx = Transaction(
         id=1,
@@ -2497,10 +2867,12 @@ def test_sell_non_strict_oversell():
     )
     _apply_transaction(state, tx, strict=False)
 
-    # Cash should remain unchanged — the oversell was skipped entirely
-    assert state.cash == Decimal("5000")
-    # Holdings should remain untouched
-    assert state.holdings["AAPL"]["quantity"] == Decimal("5")
+    # Partial sell: 5/20 of 3000 = 750 added to cash
+    assert state.cash == Decimal("5750")
+    # Holding should be removed after partial sell
+    assert "AAPL" not in state.holdings
+    # No warnings in non-strict mode
+    assert len(state.warnings) == 0
 
 
 def test_sell_without_ticker():
@@ -3230,16 +3602,20 @@ def test_warning_sell_unknown_ticker_strict():
 
     assert state.cash == Decimal("5000")  # sell skipped
     assert len(state.warnings) == 1
-    assert state.warnings[0]["code"] == "sellNotInHoldings"
-    assert state.warnings[0]["date"] == "2024-01-02T00:00:00"
-    assert state.warnings[0]["params"]["ticker"] == "UNKNOWN"
+    assert state.warnings[0].code == "sellNotInHoldings"
+    assert state.warnings[0].date == "2024-01-02T00:00:00"
+    assert state.warnings[0].params["ticker"] == "UNKNOWN"
 
 
 def test_warning_oversell_partial_strict():
     """Strict oversell appends a warning and executes a partial sell."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {"quantity": Decimal("5"), "total_cost": Decimal("500")}
+    state.holdings["AAPL"] = _Holding(
+        quantity=Decimal("5"),
+        total_cost=Decimal("500"),
+        first_buy_date=datetime(2024, 1, 1),
+    )
 
     tx = Transaction(
         id=1,
@@ -3253,9 +3629,9 @@ def test_warning_oversell_partial_strict():
     _apply_transaction(state, tx, strict=True)
 
     assert len(state.warnings) == 1
-    assert state.warnings[0]["code"] == "sellOversell"
-    assert state.warnings[0]["date"] == "2024-01-02T00:00:00"
-    assert state.warnings[0]["params"]["ticker"] == "AAPL"
+    assert state.warnings[0].code == "sellOversell"
+    assert state.warnings[0].date == "2024-01-02T00:00:00"
+    assert state.warnings[0].params["ticker"] == "AAPL"
     # Holdings should be cleared (partial sell of all 5 shares)
     assert "AAPL" not in state.holdings
     # Cash should increase by proportional total: 3000 * (5/20) = 750
@@ -3281,15 +3657,19 @@ def test_warning_withdraw_negative_cash():
     assert state.cash == Decimal("-400")
     assert state.principal == Decimal("-500")
     assert len(state.warnings) == 1
-    assert state.warnings[0]["code"] == "withdrawNegativeCash"
-    assert state.warnings[0]["date"] == "2024-01-02T00:00:00"
+    assert state.warnings[0].code == "withdrawNegativeCash"
+    assert state.warnings[0].date == "2024-01-02T00:00:00"
 
 
 def test_no_warnings_in_non_strict_mode():
-    """Non-strict mode should never append warnings, only skip silently."""
+    """Non-strict mode should never append warnings but still reconcile oversell."""
     state = _TxState()
     state.cash = Decimal("5000")
-    state.holdings["AAPL"] = {"quantity": Decimal("5"), "total_cost": Decimal("500")}
+    state.holdings["AAPL"] = _Holding(
+        quantity=Decimal("5"),
+        total_cost=Decimal("500"),
+        first_buy_date=datetime(2024, 1, 1),
+    )
 
     # Oversell in non-strict mode
     tx = Transaction(
@@ -3304,8 +3684,10 @@ def test_no_warnings_in_non_strict_mode():
     _apply_transaction(state, tx, strict=False)
 
     assert len(state.warnings) == 0
-    assert state.cash == Decimal("5000")
-    assert state.holdings["AAPL"]["quantity"] == Decimal("5")
+    # Partial sell: 5/20 of 3000 = 750 added to cash
+    assert state.cash == Decimal("5750")
+    # Holding removed after partial sell
+    assert "AAPL" not in state.holdings
 
 
 # ================== Live Prices Tests ==================

@@ -29,6 +29,8 @@ export const useTransactions = (
     queryFn: () => getTransactions(portfolioId!, page, pageSize, ticker, normalizedTypes, sortOrder),
     enabled: portfolioId !== null,
     placeholderData: keepPreviousData,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -46,7 +48,6 @@ export const useCreateTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['transactions', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
-      queryClient.invalidateQueries({ queryKey: ['realizedSales', variables.portfolioId] });
       toast.success(t('transaction.toasts.added'));
     },
   });
@@ -72,7 +73,6 @@ export const useUpdateTransaction = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
-      queryClient.invalidateQueries({ queryKey: ['realizedSales', variables.portfolioId] });
       toast.success(t('transaction.toasts.updated'));
     },
   });
@@ -95,7 +95,6 @@ export const useDeleteTransaction = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
-      queryClient.invalidateQueries({ queryKey: ['realizedSales', variables.portfolioId] });
       toast.success(t('transaction.toasts.deleted'));
     },
   });
@@ -118,8 +117,11 @@ export const useImportTransactionsCSV = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
-      queryClient.invalidateQueries({ queryKey: ['realizedSales', variables.portfolioId] });
-      toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
+      if (result.skipped_count > 0) {
+        toast.success(t('transaction.toasts.importedWithSkipped', { count: result.imported_count, skipped: result.skipped_count }));
+      } else {
+        toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
+      }
     },
   });
 };

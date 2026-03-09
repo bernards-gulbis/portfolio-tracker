@@ -3,15 +3,17 @@ import { useTranslation } from 'react-i18next';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
 import { useLivePrices } from '../hooks/useLivePrices';
-import { useActivePortfolioId } from '../hooks/useActivePortfolioId';
+import { useNavigation } from '../context/NavigationContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
-import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, LivePrices } from '../api';
+import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, LivePrices, RealizedSale, DividendReceived } from '../api';
 import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPreference';
 import { computeEurMetrics } from '../utils/eurMetrics';
 import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
+import { RealizedGainsTable, DividendsReceivedTable } from './RealizedGainsTable';
+import { WithdrawalsTable } from './WithdrawalsTable';
 
 const PerformanceChart = lazy(() =>
   import('./PerformanceChart').then((m) => ({ default: m.PerformanceChart }))
@@ -23,7 +25,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { AlertTriangleIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
+import { AlertTriangleIcon, ChevronRightIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const EMPTY_DATA_POINTS: PerformanceDataPoint[] = [];
 const EMPTY_LIVE: LivePrices = { prices: {}, usd_to_eur_rate: null, timestamp: '' };
@@ -43,6 +46,164 @@ const formatCurrencyWithPercent = (
       <span>{formattedCurrency}</span>
       {formattedPercent && <span className={`${percentClass} font-bold ml-1.5`}>{formattedPercent}</span>}
     </>
+  );
+};
+
+// ================== Collapsible Positions ==================
+
+const CollapsiblePositions = ({ children }: { children: React.ReactNode }) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(true);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('status.positions')}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-4">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+// ================== Collapsible Financial Summary ==================
+
+interface CollapsibleFinancialSummaryProps {
+  netInvested: string;
+  dividends: string;
+  showEur: boolean;
+  taxLabel: string;
+  taxValue: string;
+  taxCaption: React.ReactNode;
+  afterTaxValue: string;
+  afterTaxCaption: React.ReactNode;
+}
+
+const CollapsibleFinancialSummary = ({
+  netInvested,
+  dividends,
+  showEur,
+  taxLabel,
+  taxValue,
+  taxCaption,
+  afterTaxValue,
+  afterTaxCaption,
+}: CollapsibleFinancialSummaryProps) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('status.financialSummary')}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className={`grid grid-cols-2 ${showEur ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-4 mt-4`}>
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
+            <p className="text-lg font-semibold">{netInvested}</p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.dividends')}</p>
+            <p className="text-lg font-semibold">{dividends}</p>
+          </div>
+          {showEur && (
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-1">{taxLabel}</p>
+              <p className="text-lg font-semibold">{taxValue}</p>
+              {taxCaption}
+            </div>
+          )}
+          {showEur && (
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
+              <p className="text-lg font-semibold">{afterTaxValue}</p>
+              {afterTaxCaption}
+            </div>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+// ================== Collapsible Realized Gains ==================
+
+interface CollapsibleRealizedGainsProps {
+  realizedSales: RealizedSale[];
+  locale: string;
+}
+
+const CollapsibleRealizedGains = ({ realizedSales, locale }: CollapsibleRealizedGainsProps) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('status.realizedGains')}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <RealizedGainsTable realizedSales={realizedSales} locale={locale} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+// ================== Collapsible Dividends Received ==================
+
+interface CollapsibleDividendsReceivedProps {
+  dividendsReceived: DividendReceived[];
+  displayCurrency: 'EUR' | 'USD';
+  locale: string;
+}
+
+const CollapsibleDividendsReceived = ({ dividendsReceived, displayCurrency, locale }: CollapsibleDividendsReceivedProps) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('status.dividendsReceived')}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <DividendsReceivedTable dividendsReceived={dividendsReceived} displayCurrency={displayCurrency} locale={locale} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+// ================== Collapsible Withdrawals Section ==================
+
+interface CollapsibleWithdrawalsSectionProps {
+  status: PricedPortfolioStatus;
+  locale: string;
+}
+
+const CollapsibleWithdrawalsSection = ({ status, locale }: CollapsibleWithdrawalsSectionProps) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('status.withdrawals')}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <WithdrawalsTable
+          realizedWithdrawals={status.realized_withdrawals}
+          locale={locale}
+          principalEur={status.principal_eur}
+          dividendsEur={status.dividends_eur}
+          taxRate={status.capital_gains_tax_rate}
+        />
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 
@@ -67,6 +228,7 @@ const PortfolioStatusContent = ({
 }: PortfolioStatusContentProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
+  const { goToTransactions } = useNavigation();
   const { currency } = useCurrencyPreference();
   const showEur = currency === 'EUR';
   const eur = useMemo(() => computeEurMetrics(status), [status]);
@@ -87,7 +249,10 @@ const PortfolioStatusContent = ({
         {toolbar && <div className="flex justify-end mb-4">{toolbar}</div>}
         <Alert>
           <InfoIcon className="h-4 w-4" />
-          <AlertDescription>{t('status.emptyPortfolio')}</AlertDescription>
+          <AlertDescription>
+            <span>{t('status.emptyPortfolio')}{' '}
+            <button type="button" className="underline font-medium cursor-pointer" onClick={goToTransactions}>{t('status.emptyPortfolioLink')}</button>.</span>
+          </AlertDescription>
         </Alert>
       </CardContent>
     );
@@ -146,47 +311,6 @@ const PortfolioStatusContent = ({
         </Alert>
       )}
 
-      {/* Financial Summary */}
-      <div className={`grid grid-cols-2 ${showEur ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-4 mb-6`}>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
-          <p className="text-lg font-semibold">{formatCurrency(netInvested, currency, locale)}</p>
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.dividends')}</p>
-          <p className="text-lg font-semibold">
-            {dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
-          </p>
-        </div>
-
-        {showEur && (
-          <div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.estTax', { rate: taxRate })}</p>
-            <p className="text-lg font-semibold">
-              {taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
-            </p>
-            {capitalGainsEur !== null && taxEur !== null && (
-              <p className="text-xs mt-0.5 text-muted-foreground">
-                {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
-              </p>
-            )}
-          </div>
-        )}
-
-        {showEur && (
-          <div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
-            <p className="text-lg font-semibold">
-              {afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
-            </p>
-            <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
-              {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
-            </p>
-          </div>
-        )}
-      </div>
-
       {/* Charts Section */}
       <Suspense
         fallback={
@@ -214,15 +338,64 @@ const PortfolioStatusContent = ({
       </Suspense>
 
       {/* Holdings Table */}
-      <HoldingsTable
-        holdings={status.holdings}
-        missingPrices={status.missing_prices}
-        cash={status.cash}
-        displayCurrency={currency}
+      <CollapsiblePositions>
+        <HoldingsTable
+          holdings={status.holdings}
+          missingPrices={status.missing_prices}
+          cash={status.cash}
+          displayCurrency={currency}
+          showEur={showEur}
+          eurMetrics={eur}
+          locale={locale}
+        />
+      </CollapsiblePositions>
+
+      {/* Financial Summary (collapsed) */}
+      <CollapsibleFinancialSummary
+        netInvested={formatCurrency(netInvested, currency, locale)}
+        dividends={dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
         showEur={showEur}
-        eurMetrics={eur}
-        locale={locale}
+        taxLabel={t('status.estTax', { rate: taxRate })}
+        taxValue={taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
+        taxCaption={
+          capitalGainsEur !== null && taxEur !== null ? (
+            <p className="text-xs mt-0.5 text-muted-foreground">
+              {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
+            </p>
+          ) : null
+        }
+        afterTaxValue={afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
+        afterTaxCaption={
+          <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
+            {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
+          </p>
+        }
       />
+
+      {/* Realized Gains */}
+      {status.realized_sales.length > 0 && (
+        <CollapsibleRealizedGains
+          realizedSales={status.realized_sales}
+          locale={locale}
+        />
+      )}
+
+      {/* Dividends Received */}
+      {status.dividends_received.length > 0 && (
+        <CollapsibleDividendsReceived
+          dividendsReceived={status.dividends_received}
+          displayCurrency={currency}
+          locale={locale}
+        />
+      )}
+
+      {/* Withdrawals Table */}
+      {status.realized_withdrawals.length > 0 && (
+        <CollapsibleWithdrawalsSection
+          status={status}
+          locale={locale}
+        />
+      )}
     </CardContent>
   );
 };
@@ -241,16 +414,6 @@ const PortfolioStatusSkeleton = () => (
             <Skeleton className="h-4 w-36" />
           </div>
           <Skeleton className="h-5 w-32" />
-        </div>
-
-        {/* Financial Summary grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i}>
-              <Skeleton className="h-4 w-20 mb-2" />
-              <Skeleton className="h-6 w-28" />
-            </div>
-          ))}
         </div>
 
         {/* Charts */}
@@ -272,7 +435,7 @@ const PortfolioStatusSkeleton = () => (
 // ================== Main view with data fetching ==================
 
 export const PortfolioStatusView = () => {
-  const portfolioId = useActivePortfolioId();
+  const { activePortfolioId: portfolioId } = useNavigation();
   const { t } = useTranslation();
   const locale = useLocale();
 
@@ -350,7 +513,10 @@ export const PortfolioStatusView = () => {
     && effectiveStatus.principal === 0
     && effectiveStatus.cash === 0
     && effectiveStatus.dividends === 0
-    && effectiveStatus.realized_gains === 0;
+    && effectiveStatus.realized_gains === 0
+    && effectiveStatus.realized_sales.length === 0
+    && effectiveStatus.dividends_received.length === 0
+    && effectiveStatus.realized_withdrawals.length === 0;
   const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (

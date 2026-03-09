@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
+import { AppFooter } from './AppFooter';
 
 const emailValidator = z.email();
 
@@ -116,7 +117,7 @@ export const LoginPage = () => {
   const switchToLogin = () => setMode('login');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
+    <div className="min-h-screen flex flex-col bg-background">
       <div className="absolute top-4 right-4 flex items-center gap-2">
         <LanguageSwitcher />
         <Button
@@ -128,7 +129,8 @@ export const LoginPage = () => {
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
       </div>
-      <Card className="w-full max-w-sm">
+      <div className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle>{mode === 'login' ? t('auth.signIn.title') : t('auth.register.title')}</CardTitle>
           <CardDescription>
@@ -299,7 +301,9 @@ export const LoginPage = () => {
             )}
           </p>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
+      <AppFooter className="border-t" />
     </div>
   );
 };

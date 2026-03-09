@@ -2,8 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from '../components/SettingsPage';
+import { SettingsPage, ProfileSection, PasswordSection, TaxSection, AccountSection } from '../components/SettingsPage';
+
+const mockNavigation = {
+  page: 'settings' as const,
+  activePortfolioId: 1 as number | null,
+  goToPortfolio: vi.fn(),
+  goToFirstPortfolio: vi.fn(),
+  goToTransactions: vi.fn(),
+  goToSettings: vi.fn(),
+};
+
+vi.mock('../context/NavigationContext', () => ({
+  useNavigation: () => mockNavigation,
+}));
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -27,13 +39,11 @@ const createTestQueryClient = () =>
     },
   });
 
-const renderWithProviders = (ui: React.ReactElement, initialEntry = '/settings') => {
+const renderWithProviders = (ui: React.ReactElement) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        {ui}
-      </MemoryRouter>
+      {ui}
     </QueryClientProvider>
   );
 };
@@ -47,65 +57,76 @@ const defaultUser = {
   tax_rate: 0.255,
 };
 
-// ================== SettingsLayout ==================
+// ================== SettingsPage ==================
 
-describe('SettingsLayout', () => {
+describe('SettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useAuth).mockReturnValue({ user: defaultUser } as unknown as ReturnType<typeof useAuth>);
+    vi.mocked(useUpdateProfile).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useUpdateProfile>);
+    vi.mocked(useChangePassword).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useChangePassword>);
+    vi.mocked(useUpdateTaxRate).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useUpdateTaxRate>);
+    vi.mocked(useCloseAccount).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useCloseAccount>);
   });
 
-  const renderLayout = (initialEntry = '/settings/profile') => {
-    const queryClient = createTestQueryClient();
-    return render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <Routes>
-            <Route path="settings" element={<SettingsLayout />}>
-              <Route path="profile" element={<div>Profile Content</div>} />
-              <Route path="password" element={<div>Password Content</div>} />
-              <Route path="tax" element={<div>Tax Content</div>} />
-              <Route path="account" element={<div>Account Content</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-  };
+  const renderPage = () => renderWithProviders(<SettingsPage />);
 
   it('renders Settings heading and description', () => {
-    renderLayout();
+    renderPage();
 
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getByText('Manage your account settings and preferences.')).toBeInTheDocument();
   });
 
-  it('renders four navigation links', () => {
-    renderLayout();
+  it('renders nav buttons for all four sections', () => {
+    renderPage();
 
-    const profileLink = screen.getByText('Profile').closest('a');
-    expect(profileLink).toHaveAttribute('href', '/settings/profile');
-
-    const passwordLink = screen.getByText('Password').closest('a');
-    expect(passwordLink).toHaveAttribute('href', '/settings/password');
-
-    const taxLink = screen.getByText('Tax').closest('a');
-    expect(taxLink).toHaveAttribute('href', '/settings/tax');
-
-    const accountLink = screen.getByText('Account').closest('a');
-    expect(accountLink).toHaveAttribute('href', '/settings/account');
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Password' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tax' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
   });
 
-  it('renders child route content via Outlet', () => {
-    renderLayout('/settings/profile');
+  it('shows Profile section by default', () => {
+    renderPage();
 
-    expect(screen.getByText('Profile Content')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
   });
 
-  it('renders password route content', () => {
-    renderLayout('/settings/password');
+  it('switches to Password section when Password nav is clicked', async () => {
+    renderPage();
 
-    expect(screen.getByText('Password Content')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Password' }));
+
+    expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('switches to Tax section when Tax nav is clicked', async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tax' }));
+
+    expect(screen.getByLabelText('Tax rate (%)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('switches to Account section when Account nav is clicked', async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }));
+
+    expect(screen.getByText('Danger Zone')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('calls goToPortfolio when back button is clicked', async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByText('Back to portfolio'));
+
+    expect(mockNavigation.goToPortfolio).toHaveBeenCalledWith(1);
   });
 });
 
@@ -338,12 +359,6 @@ describe('TaxSection', () => {
     renderWithProviders(<TaxSection />);
 
     expect(screen.getByLabelText('Tax rate (%)')).toHaveValue(25.5);
-  });
-
-  it('renders description text', () => {
-    renderWithProviders(<TaxSection />);
-
-    expect(screen.getByText('Configure the tax rate applied to capital gains calculations.')).toBeInTheDocument();
   });
 
   it('calls updateTaxRate.mutateAsync with decimal value on submit', async () => {

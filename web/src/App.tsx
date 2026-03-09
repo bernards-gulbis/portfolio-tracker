@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useMatch } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { LoginPage } from './components/LoginPage';
 import { useLogout } from './hooks/useAuth';
 import { PortfolioSwitcher } from './components/PortfolioSwitcher';
@@ -25,16 +25,17 @@ import {
 import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign } from 'lucide-react';
-import { createContext, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign, ChevronsUpDown, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
 import { CreatePortfolioModal } from './components/CreatePortfolioModal';
 import { PortfolioActions } from './components/PortfolioActions';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { SettingsLayout, ProfileSection, PasswordSection, TaxSection, AccountSection } from './components/SettingsPage';
+import { SettingsPage } from './components/SettingsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { AppFooter } from './components/AppFooter';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 const queryClient = new QueryClient({
@@ -57,8 +58,6 @@ const CURRENCY_OPTIONS = [
   { value: 'EUR', key: 'status.currency.eurLabel' },
 ] as const;
 
-const CreatePortfolioContext = createContext<(() => void) | null>(null);
-
 function CheckedItem({ checked, onClick, children }: Readonly<{ checked: boolean; onClick: () => void; children: ReactNode }>) {
   return (
     <DropdownMenuItem onClick={onClick}>
@@ -68,13 +67,23 @@ function CheckedItem({ checked, onClick, children }: Readonly<{ checked: boolean
   );
 }
 
+function getAvatarInitials(name?: string | null, email?: string | null): string | null {
+  if (name) {
+    return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  }
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+  return null;
+}
+
 function AuthGuard() {
   const { status } = useAuth();
 
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Skeleton className="h-12 w-48" />
+        <Spinner className="size-8" />
       </div>
     );
   }
@@ -83,7 +92,52 @@ function AuthGuard() {
     return <LoginPage />;
   }
 
-  return <Outlet />;
+  return <AppLayout />;
+}
+
+const PAGE_OPTIONS = [
+  { value: 'portfolio', icon: LayoutDashboard, key: 'nav.summary' },
+  { value: 'transactions', icon: ArrowLeftRight, key: 'nav.transactions' },
+] as const;
+
+function PageSwitcher({ tab }: Readonly<{ tab: 'portfolio' | 'transactions' }>) {
+  const { t } = useTranslation();
+  const { goToPortfolio, goToTransactions, activePortfolioId } = useNavigation();
+  const [open, setOpen] = useState(false);
+
+  const active = PAGE_OPTIONS.find((o) => o.value === tab) ?? PAGE_OPTIONS[0];
+  const ActiveIcon = active.icon;
+
+  const handleSelect = (value: string) => {
+    if (value === 'transactions') {
+      goToTransactions();
+    } else if (activePortfolioId !== null) {
+      goToPortfolio(activePortfolioId);
+    }
+    setOpen(false);
+  };
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="gap-2 px-2 h-8">
+          <ActiveIcon className="h-4 w-4 shrink-0" />
+          <span className="truncate font-medium text-sm">{t(active.key)}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-40 rounded-lg" align="start" sideOffset={8}>
+        {PAGE_OPTIONS.map(({ value, icon: Icon, key }) => (
+          <DropdownMenuItem key={value} className="gap-2 p-2" onClick={() => handleSelect(value)}>
+            <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
+              <Icon className="h-4 w-4 shrink-0" />
+            </div>
+            <span className="truncate">{t(key)}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function AppLayout() {
@@ -94,45 +148,80 @@ function AppLayout() {
   const currentLang = getCurrentLanguage();
   const { currency, setCurrency } = useCurrencyPreference();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { data: portfolios } = usePortfolios();
-  const portfolioMatch = useMatch('/portfolios/:id');
-  const matchedId = portfolioMatch?.params.id == null ? null : Number(portfolioMatch.params.id);
-  const activePortfolioId = Number.isFinite(matchedId) ? matchedId : null;
-  // Derive the "remembered" portfolio ID from the current route and portfolio list.
-  // Uses useMemo so we never need a ref or setState during render/effects.
-  const [prevActiveId, setPrevActiveId] = useState<number | null>(null);
-  const [lastPortfolioId, setLastPortfolioId] = useState<number | null>(null);
+  const { data: portfolios, isLoading: isPortfoliosLoading, isFetching: isPortfoliosFetching } = usePortfolios();
+  const { page, activePortfolioId, goToPortfolio, goToFirstPortfolio, goToSettings } = useNavigation();
+  const portfolioTab = page === 'transactions' ? 'transactions' : 'portfolio';
+  const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
 
-  // Adjust state during render (React-recommended pattern for deriving state from props)
-  if (activePortfolioId !== prevActiveId) {
-    setPrevActiveId(activePortfolioId);
-    if (activePortfolioId !== null) {
-      setLastPortfolioId(activePortfolioId);
+  // Auto-select first portfolio when none is selected, or when the stored ID no longer exists
+  useEffect(() => {
+    if (!portfolios || isPortfoliosFetching) return;
+    if (portfolios.length === 0) {
+      if (activePortfolioId !== null) goToFirstPortfolio();
+      return;
     }
-  }
-
-  const rememberedId = useMemo(() => {
-    if (activePortfolioId !== null) return activePortfolioId;
-    if (lastPortfolioId !== null && portfolios?.some((p) => p.id === lastPortfolioId)) {
-      return lastPortfolioId;
+    if (activePortfolioId === null || !portfolios.some((p) => p.id === activePortfolioId)) {
+      goToPortfolio(portfolios[0].id);
     }
-    return null;
-  }, [activePortfolioId, lastPortfolioId, portfolios]);
+  }, [activePortfolioId, portfolios, isPortfoliosFetching, goToPortfolio, goToFirstPortfolio]);
 
-  const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
+  const renderMainContent = () => {
+    if (page === 'settings') {
+      return (
+        <ErrorBoundary fullScreen={false}>
+          <SettingsPage />
+        </ErrorBoundary>
+      );
+    }
+
+    // Portfolio page
+    if (activePortfolioId === null) {
+      if (isPortfoliosLoading) {
+        return (
+          <div className="flex items-center justify-center py-12">
+            <Skeleton className="h-12 w-48" />
+          </div>
+        );
+      }
+
+      if (!portfolios || portfolios.length === 0) {
+        return (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia>
+                <Briefcase />
+              </EmptyMedia>
+              <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
+              <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        );
+      }
+
+      return null; // useEffect will auto-select first portfolio
+    }
+
+    return (
+      <ErrorBoundary fullScreen={false}>
+        {portfolioTab === 'portfolio' ? <PortfolioStatusView /> : <TransactionView />}
+      </ErrorBoundary>
+    );
+  };
 
   return (
-    <CreatePortfolioContext.Provider value={openCreateModal}>
+    <>
       <div className="flex min-h-screen flex-col">
         <header className="border-b px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-1">
-            <PortfolioSwitcher activePortfolioId={rememberedId} onCreateClick={() => setIsCreateModalOpen(true)} />
-            {(() => {
-              const matched = portfolios?.find((p) => p.id === rememberedId);
-              return matched ? (
-                <PortfolioActions portfolioId={matched.id} portfolioName={matched.name} />
-              ) : null;
-            })()}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={() => setIsCreateModalOpen(true)} />
+              {activePortfolio == null ? null : (
+                <PortfolioActions portfolioId={activePortfolio.id} portfolioName={activePortfolio.name} />
+              )}
+            </div>
+            {page !== 'settings' && activePortfolioId !== null && (
+              <PageSwitcher tab={portfolioTab} />
+            )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -140,15 +229,7 @@ function AppLayout() {
                 <Avatar>
                   {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? user.email} />}
                   <AvatarFallback>
-                    {(() => {
-                      if (user?.name) {
-                        return user.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
-                      }
-                      if (user?.email) {
-                        return user.email.slice(0, 2).toUpperCase();
-                      }
-                      return <UserIcon className="h-4 w-4" />;
-                    })()}
+                    {getAvatarInitials(user?.name, user?.email) ?? <UserIcon className="h-4 w-4" />}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -199,11 +280,9 @@ function AppLayout() {
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t('settings.menuItem')}
-                </Link>
+              <DropdownMenuItem onClick={() => goToSettings()}>
+                <Settings className="mr-2 h-4 w-4" />
+                {t('settings.menuItem')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -219,52 +298,16 @@ function AppLayout() {
         </header>
 
         <main className="flex-1 p-6">
-          <Outlet />
+          {renderMainContent()}
         </main>
+
+        <AppFooter className="border-t" />
       </div>
 
       <CreatePortfolioModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
       />
-    </CreatePortfolioContext.Provider>
-  );
-}
-
-function PortfolioRedirect() {
-  const { data: portfolios, isLoading } = usePortfolios();
-  const { t } = useTranslation();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Skeleton className="h-12 w-48" />
-      </div>
-    );
-  }
-
-  if (portfolios && portfolios.length > 0) {
-    return <Navigate to={`/portfolios/${portfolios[0].id}`} replace />;
-  }
-
-  return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia>
-          <Briefcase />
-        </EmptyMedia>
-        <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
-        <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
-
-function PortfolioPage() {
-  return (
-    <>
-      <PortfolioStatusView />
-      <TransactionView />
     </>
   );
 }
@@ -274,28 +317,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <CurrencyProvider>
-          <BrowserRouter>
-            <AuthProvider>
+          <AuthProvider>
+            <NavigationProvider>
               <ErrorBoundary>
-                <Routes>
-                  <Route element={<AuthGuard />}>
-                    <Route element={<AppLayout />}>
-                      <Route index element={<PortfolioRedirect />} />
-                      <Route path="portfolios/:id" element={<ErrorBoundary fullScreen={false}><PortfolioPage /></ErrorBoundary>} />
-                      <Route path="settings" element={<ErrorBoundary fullScreen={false}><SettingsLayout /></ErrorBoundary>}>
-                        <Route index element={<Navigate to="profile" replace />} />
-                        <Route path="profile" element={<ProfileSection />} />
-                        <Route path="password" element={<PasswordSection />} />
-                        <Route path="tax" element={<TaxSection />} />
-                        <Route path="account" element={<AccountSection />} />
-                      </Route>
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Route>
-                  </Route>
-                </Routes>
+                <AuthGuard />
               </ErrorBoundary>
-            </AuthProvider>
-          </BrowserRouter>
+            </NavigationProvider>
+          </AuthProvider>
           <Toaster position="bottom-right" />
         </CurrencyProvider>
       </ThemeProvider>

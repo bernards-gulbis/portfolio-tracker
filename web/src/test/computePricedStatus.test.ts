@@ -7,15 +7,19 @@ const makeStatus = (overrides: Partial<PortfolioStatus> = {}): PortfolioStatus =
   portfolio_name: 'Test',
   principal: 8_000,
   principal_eur: 7_200,
+  principal_eur_avg: 7_200,
   dividends: 100,
   dividends_eur: 90,
   cash: 1_000,
   holdings: [
-    { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1_500 },
-    { ticker: 'MSFT', quantity: 20, average_cost: 400, total_cost: 8_000 },
+    { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1_500, first_buy_date: '2024-01-01' },
+    { ticker: 'MSFT', quantity: 20, average_cost: 400, total_cost: 8_000, first_buy_date: '2024-01-01' },
   ],
   holdings_cost: 9_500,
   realized_gains: 200,
+  realized_sales: [],
+  dividends_received: [],
+  realized_withdrawals: [],
   capital_gains_tax_rate: 0.25,
   warnings: [],
   usd_to_eur_rate: 0.90,
@@ -113,7 +117,7 @@ describe('computePricedStatus', () => {
 
   it('returns null unrealized_gain_loss_pct when total_cost is 0', () => {
     const status = makeStatus({
-      holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0 }],
+      holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0, first_buy_date: '2024-01-01' }],
       holdings_cost: 0,
     });
     const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: 10 } }));
@@ -126,7 +130,7 @@ describe('computePricedStatus', () => {
 
   it('returns null unrealized_gains_pct when holdings_cost is 0', () => {
     const status = makeStatus({
-      holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0 }],
+      holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0, first_buy_date: '2024-01-01' }],
       holdings_cost: 0,
     });
     const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: 10 } }));

@@ -1,21 +1,25 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '../context/NavigationContext';
 import { getErrorMessage } from '../api';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
-import { User, KeyRound, ShieldAlert, Receipt, Info, ArrowLeft } from 'lucide-react';
+import { Info, ArrowLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type SettingsSection = 'profile' | 'password' | 'tax' | 'account';
+
+const SECTIONS: SettingsSection[] = ['profile', 'password', 'tax', 'account'];
 
 // ================== Schemas ==================
 
@@ -78,62 +82,38 @@ const useWarnUnsavedChanges = (isDirty: boolean) => {
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    globalThis.window.addEventListener('beforeunload', handler);
+    return () => globalThis.window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 };
 
-// ================== Nav item helper ==================
+// ================== Nav ==================
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-    isActive
-      ? 'bg-muted text-foreground'
-      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-  );
-
-// ================== Layout ==================
-
-export const SettingsLayout = () => {
+const SettingsNav = ({
+  active,
+  onChange,
+}: {
+  active: SettingsSection;
+  onChange: (section: SettingsSection) => void;
+}) => {
   const { t } = useTranslation();
 
-  const navItems = [
-    { to: '/settings/profile', label: t('settings.profile.tab'), icon: User },
-    { to: '/settings/password', label: t('settings.password.tab'), icon: KeyRound },
-    { to: '/settings/tax', label: t('settings.tax.tab'), icon: Receipt },
-    { to: '/settings/account', label: t('settings.account.tab'), icon: ShieldAlert },
-  ];
-
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="mb-4">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2">
-          <ArrowLeft className="h-4 w-4" />
-          {t('settings.backToPortfolio')}
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
-        <p className="text-muted-foreground text-sm">{t('settings.description')}</p>
-      </div>
-      <Separator className="mb-4" />
-      <div className="flex flex-col md:flex-row gap-4">
-        <nav className="md:w-52 shrink-0">
-          <ul className="space-y-1">
-            {navItems.map(({ to, label, icon: Icon }) => (
-              <li key={to}>
-                <NavLink to={to} className={navLinkClass} end>
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="flex-1 min-w-0">
-          <Outlet />
-        </div>
-      </div>
-    </div>
+    <nav className="flex flex-row gap-1 md:flex-col md:w-48 md:shrink-0">
+      {SECTIONS.map((section) => (
+        <Button
+          key={section}
+          variant="ghost"
+          className={cn(
+            'justify-start',
+            active === section && 'bg-muted',
+          )}
+          onClick={() => onChange(section)}
+        >
+          {t(`settings.${section}.tab`)}
+        </Button>
+      ))}
+    </nav>
   );
 };
 
@@ -160,52 +140,46 @@ export const ProfileSection = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">{t('settings.profile.tab')}</h2>
-      </div>
-      <Separator />
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <FieldGroup>
-          <Controller
-            name="name"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid || undefined}>
-                <FieldLabel htmlFor="settings-name">{t('settings.profile.nameLabel')}</FieldLabel>
-                <Input
-                  {...field}
-                  id="settings-name"
-                  placeholder={t('settings.profile.namePlaceholder')}
-                  autoComplete="name"
-                  className="max-w-md"
-                />
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
-          <Field>
-            <FieldLabel htmlFor="settings-email">{t('settings.profile.emailLabel')}</FieldLabel>
-            <Input
-              id="settings-email"
-              value={user?.email ?? ''}
-              disabled
-              readOnly
-              className="max-w-md"
-            />
-          </Field>
-          {form.formState.errors.root && (
-            <Alert variant="destructive">
-              <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
-            </Alert>
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      <FieldGroup>
+        <Controller
+          name="name"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid || undefined}>
+              <FieldLabel htmlFor="settings-name">{t('settings.profile.nameLabel')}</FieldLabel>
+              <Input
+                {...field}
+                id="settings-name"
+                placeholder={t('settings.profile.namePlaceholder')}
+                autoComplete="name"
+                className="max-w-md"
+              />
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
           )}
-          <Button type="submit" disabled={updateProfile.isPending}>
-            {updateProfile.isPending && <Spinner />}
-            {t('settings.profile.submit')}
-          </Button>
-        </FieldGroup>
-      </form>
-    </div>
+        />
+        <Field>
+          <FieldLabel htmlFor="settings-email">{t('settings.profile.emailLabel')}</FieldLabel>
+          <Input
+            id="settings-email"
+            value={user?.email ?? ''}
+            disabled
+            readOnly
+            className="max-w-md"
+          />
+        </Field>
+        {form.formState.errors.root && (
+          <Alert variant="destructive">
+            <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
+          </Alert>
+        )}
+        <Button type="submit" disabled={updateProfile.isPending}>
+          {updateProfile.isPending && <Spinner />}
+          {t('settings.profile.submit')}
+        </Button>
+      </FieldGroup>
+    </form>
   );
 };
 
@@ -235,10 +209,6 @@ export const PasswordSection = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">{t('settings.password.tab')}</h2>
-      </div>
-      <Separator />
       {isOauthUser && (
         <Alert>
           <Info className="h-4 w-4" />
@@ -328,11 +298,10 @@ export const TaxSection = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">{t('settings.tax.tab')}</h2>
-        <p className="text-sm text-muted-foreground">{t('settings.tax.description')}</p>
-      </div>
-      <Separator />
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>{t('settings.tax.taxExplanation')}</AlertDescription>
+      </Alert>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <FieldGroup>
           <Controller
@@ -403,80 +372,137 @@ export const AccountSection = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="rounded-lg border border-destructive/50 p-4 space-y-4">
       <div>
-        <h2 className="text-lg font-medium">{t('settings.account.tab')}</h2>
+        <h3 className="text-sm font-semibold text-destructive">{t('settings.account.dangerZone')}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{t('settings.account.closeDescription')}</p>
+      </div>
+
+      {isOauthUser ? (
+        <form onSubmit={confirmForm.handleSubmit(onConfirmSubmit)}>
+          <FieldGroup>
+            <Controller
+              name="confirmation"
+              control={confirmForm.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid || undefined}>
+                  <FieldLabel htmlFor="settings-close-confirmation">{t('settings.account.confirmationLabel')}</FieldLabel>
+                  <Input
+                    {...field}
+                    id="settings-close-confirmation"
+                    placeholder={t('settings.account.confirmationPlaceholder')}
+                    autoComplete="off"
+                    className="max-w-md"
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+            {confirmForm.formState.errors.root && (
+              <Alert variant="destructive">
+                <AlertDescription>{confirmForm.formState.errors.root.message}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" variant="destructive" disabled={closeAccountMutation.isPending}>
+              {closeAccountMutation.isPending && <Spinner />}
+              {t('settings.account.submit')}
+            </Button>
+          </FieldGroup>
+        </form>
+      ) : (
+        <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
+          <FieldGroup>
+            <Controller
+              name="password"
+              control={passwordForm.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid || undefined}>
+                  <FieldLabel htmlFor="settings-close-password">{t('settings.account.passwordLabel')}</FieldLabel>
+                  <Input
+                    {...field}
+                    id="settings-close-password"
+                    type="password"
+                    autoComplete="current-password"
+                    className="max-w-md"
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+            {passwordForm.formState.errors.root && (
+              <Alert variant="destructive">
+                <AlertDescription>{passwordForm.formState.errors.root.message}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" variant="destructive" disabled={closeAccountMutation.isPending}>
+              {closeAccountMutation.isPending && <Spinner />}
+              {t('settings.account.submit')}
+            </Button>
+          </FieldGroup>
+        </form>
+      )}
+    </div>
+  );
+};
+
+// ================== Section Content ==================
+
+const SECTION_COMPONENTS: Record<SettingsSection, React.FC> = {
+  profile: ProfileSection,
+  password: PasswordSection,
+  tax: TaxSection,
+  account: AccountSection,
+};
+
+const SectionContent = ({ section }: { section: SettingsSection }) => {
+  const { t } = useTranslation();
+  const Component = SECTION_COMPONENTS[section];
+
+  return (
+    <div className="flex-1 min-w-0 space-y-6">
+      <div>
+        <h2 className="text-lg font-medium">{t(`settings.${section}.tab`)}</h2>
+        <p className="text-sm text-muted-foreground">{t(`settings.${section}.description`)}</p>
       </div>
       <Separator />
-      <div className="rounded-lg border border-destructive/50 p-4 space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-destructive">{t('settings.account.dangerZone')}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{t('settings.account.closeDescription')}</p>
-        </div>
+      <Component />
+    </div>
+  );
+};
 
-        {isOauthUser ? (
-          <form onSubmit={confirmForm.handleSubmit(onConfirmSubmit)}>
-            <FieldGroup>
-              <Controller
-                name="confirmation"
-                control={confirmForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="settings-close-confirmation">{t('settings.account.confirmationLabel')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="settings-close-confirmation"
-                      placeholder={t('settings.account.confirmationPlaceholder')}
-                      autoComplete="off"
-                      className="max-w-md"
-                    />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              {confirmForm.formState.errors.root && (
-                <Alert variant="destructive">
-                  <AlertDescription>{confirmForm.formState.errors.root.message}</AlertDescription>
-                </Alert>
-              )}
-              <Button type="submit" variant="destructive" disabled={closeAccountMutation.isPending}>
-                {closeAccountMutation.isPending && <Spinner />}
-                {t('settings.account.submit')}
-              </Button>
-            </FieldGroup>
-          </form>
-        ) : (
-          <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
-            <FieldGroup>
-              <Controller
-                name="password"
-                control={passwordForm.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="settings-close-password">{t('settings.account.passwordLabel')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="settings-close-password"
-                      type="password"
-                      autoComplete="current-password"
-                      className="max-w-md"
-                    />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-              {passwordForm.formState.errors.root && (
-                <Alert variant="destructive">
-                  <AlertDescription>{passwordForm.formState.errors.root.message}</AlertDescription>
-                </Alert>
-              )}
-              <Button type="submit" variant="destructive" disabled={closeAccountMutation.isPending}>
-                {closeAccountMutation.isPending && <Spinner />}
-                {t('settings.account.submit')}
-              </Button>
-            </FieldGroup>
-          </form>
-        )}
+// ================== Page ==================
+
+export const SettingsPage = () => {
+  const { t } = useTranslation();
+  const { goToPortfolio, activePortfolioId, goToFirstPortfolio } = useNavigation();
+  const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
+
+  const handleBack = () => {
+    if (activePortfolioId === null) {
+      goToFirstPortfolio();
+    } else {
+      goToPortfolio(activePortfolioId);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2 cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t('settings.backToPortfolio')}
+        </button>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
+        <p className="text-muted-foreground text-sm">{t('settings.description')}</p>
+      </div>
+      <Separator className="mb-4" />
+      <div className="flex flex-col gap-6 md:flex-row md:gap-8">
+        <SettingsNav active={activeSection} onChange={setActiveSection} />
+        <SectionContent section={activeSection} />
       </div>
     </div>
   );

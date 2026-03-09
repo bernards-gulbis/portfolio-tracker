@@ -131,6 +131,34 @@ class TestCreateTransaction:
                 fx_rate=0,
             )
 
+    def test_negative_split_ratio(self, svc, user_id, portfolio_id):
+        with pytest.raises(
+            InvalidTransactionDataException, match="split_ratio must be positive"
+        ):
+            svc.create_transaction(
+                portfolio_id=portfolio_id,
+                user_id=user_id,
+                date=datetime(2024, 1, 1),
+                transaction_type=TransactionType.SPLIT,
+                ticker="AAPL",
+                total_amount=0,
+                split_ratio=-2.0,
+            )
+
+    def test_zero_split_ratio(self, svc, user_id, portfolio_id):
+        with pytest.raises(
+            InvalidTransactionDataException, match="split_ratio must be positive"
+        ):
+            svc.create_transaction(
+                portfolio_id=portfolio_id,
+                user_id=user_id,
+                date=datetime(2024, 1, 1),
+                transaction_type=TransactionType.SPLIT,
+                ticker="AAPL",
+                total_amount=0,
+                split_ratio=0,
+            )
+
     def test_eur_amount_sign_mismatch_positive_total_negative_eur(
         self, svc, user_id, portfolio_id
     ):
@@ -584,8 +612,9 @@ class TestImportCSV:
             "01/15/2024 10:00:00,Deposit,5000,,,,4600,,,USD,1.087\n"
             "01/16/2024 11:00:00,Buy,-1505,AAPL,10,150,5,,,,\n"
         )
-        txs = svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, skipped = svc.import_from_csv(csv, portfolio_id, user_id)
         assert len(txs) == 2
+        assert skipped == 0
         assert txs[0].type == TransactionType.DEPOSIT
         assert txs[1].ticker == "AAPL"
 
@@ -648,13 +677,72 @@ class TestValidateCSVEurSign:
     def test_eur_sign_ok_for_split(self, svc, user_id, portfolio_id):
         """SPLIT skips eur sign validation"""
         csv = "date,type,total_amount,ticker,split_ratio,eur\n01/01/2024 00:00:00,Split,0,AAPL,2,-10\n"
-        txs = svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _skipped = svc.import_from_csv(csv, portfolio_id, user_id)
         assert len(txs) == 1
 
     def test_eur_none_passes(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount,eur\n01/01/2024 00:00:00,Deposit,1000,\n"
-        txs = svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _skipped = svc.import_from_csv(csv, portfolio_id, user_id)
         assert txs[0].eur_amount is None
+
+
+# ── Deduplication ────────────────────────────────────────────────────
+
+
+class TestImportCSVDeduplication:
+    def test_all_duplicates_skipped(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+        txs1, skipped1 = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs1) == 1
+        assert skipped1 == 0
+
+        txs2, skipped2 = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs2) == 0
+        assert skipped2 == 1
+
+    def test_partial_duplicates(self, svc, user_id, portfolio_id):
+        csv1 = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+        svc.import_from_csv(csv1, portfolio_id, user_id)
+
+        csv2 = (
+            "date,type,total_amount\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/02/2024 00:00:00,Deposit,2000\n"
+        )
+        txs, skipped = svc.import_from_csv(csv2, portfolio_id, user_id)
+        assert len(txs) == 1
+        assert skipped == 1
+        assert txs[0].total_amount == 2000
+
+    def test_no_duplicates(self, svc, user_id, portfolio_id):
+        csv1 = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+        svc.import_from_csv(csv1, portfolio_id, user_id)
+
+        csv2 = "date,type,total_amount\n01/02/2024 00:00:00,Deposit,2000\n"
+        txs, skipped = svc.import_from_csv(csv2, portfolio_id, user_id)
+        assert len(txs) == 1
+        assert skipped == 0
+
+    def test_different_field_not_duplicate(self, svc, user_id, portfolio_id):
+        csv1 = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+        svc.import_from_csv(csv1, portfolio_id, user_id)
+
+        csv2 = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,999\n"
+        txs, skipped = svc.import_from_csv(csv2, portfolio_id, user_id)
+        assert len(txs) == 1
+        assert skipped == 0
+
+    def test_within_batch_duplicates(self, svc, user_id, portfolio_id):
+        """Duplicate rows within the same CSV batch should be deduplicated."""
+        csv = (
+            "date,type,total_amount\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/02/2024 00:00:00,Deposit,2000\n"
+        )
+        txs, skipped = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs) == 2
+        assert skipped == 1
 
 
 # ── _clean_csv_number ────────────────────────────────────────────────

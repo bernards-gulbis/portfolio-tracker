@@ -19,6 +19,24 @@ from app.models import Transaction, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.repositories.transaction_repository import TransactionRepository
 
+
+def _dedup_key(t: Transaction) -> tuple:
+    """Build a fingerprint tuple for deduplication."""
+    return (
+        t.date,
+        t.type,
+        t.ticker,
+        t.total_amount,
+        t.quantity,
+        t.price_per_share,
+        t.fee,
+        t.eur_amount,
+        t.split_ratio,
+        t.currency,
+        t.fx_rate,
+    )
+
+
 _ERR_EUR_AMOUNT_SIGN_MISMATCH = "eur_amount sign must match total_amount sign"
 
 
@@ -63,6 +81,10 @@ class TransactionService:
         # Validate fx_rate
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
+
+        # Validate split_ratio
+        if split_ratio is not None and split_ratio <= 0:
+            raise InvalidTransactionDataException("split_ratio must be positive")
 
         # Validate eur_amount sign matches total_amount sign
         if (
@@ -210,6 +232,9 @@ class TransactionService:
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
 
+        if split_ratio is not None and split_ratio <= 0:
+            raise InvalidTransactionDataException("split_ratio must be positive")
+
         # Validate eur_amount sign matches total_amount sign
         if (
             val_eur_amount is not None
@@ -258,13 +283,34 @@ class TransactionService:
 
     def import_from_csv(
         self, csv_content: str, portfolio_id: int, user_id: uuid.UUID
-    ) -> list[Transaction]:
-        """Import transactions from CSV with transaction atomicity (user-scoped)"""
+    ) -> tuple[list[Transaction], int]:
+        """Import transactions from CSV with deduplication (user-scoped).
+
+        Returns (created_transactions, skipped_count).
+        """
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
 
-        transactions = self._parse_csv(csv_content, portfolio_id)
-        return self.transaction_repo.bulk_create(transactions)
+        parsed = self._parse_csv(csv_content, portfolio_id)
+
+        existing = self.transaction_repo.get_by_portfolio_id(portfolio_id)
+        existing_keys = {_dedup_key(t) for t in existing}
+
+        seen = set(existing_keys)
+        new_transactions: list[Transaction] = []
+        for t in parsed:
+            key = _dedup_key(t)
+            if key not in seen:
+                seen.add(key)
+                new_transactions.append(t)
+        skipped_count = len(parsed) - len(new_transactions)
+
+        if new_transactions:
+            created = self.transaction_repo.bulk_create(new_transactions)
+        else:
+            created = []
+
+        return created, skipped_count
 
     def _validate_transaction_data(
         self,
@@ -412,6 +458,8 @@ class TransactionService:
         self._validate_csv_eur_sign(transaction_type, total_amount, eur_amount)
 
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
+        if split_ratio is not None and split_ratio <= 0:
+            raise ValueError(f"split_ratio must be positive, got: {split_ratio}")
 
         currency_raw = row.get("currency", "").strip().upper()
         currency = currency_raw or None

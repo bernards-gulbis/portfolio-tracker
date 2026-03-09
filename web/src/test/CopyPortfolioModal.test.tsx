@@ -2,8 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
 import { CopyPortfolioModal } from '../components/CopyPortfolioModal';
+
+const mockNavigation = {
+  page: 'portfolio' as const,
+  activePortfolioId: null as number | null,
+  goToPortfolio: vi.fn(),
+  goToFirstPortfolio: vi.fn(),
+  goToTransactions: vi.fn(),
+  goToSettings: vi.fn(),
+};
+
+vi.mock('../context/NavigationContext', () => ({
+  useNavigation: () => mockNavigation,
+}));
 
 vi.mock('../hooks/usePortfolios', () => ({
   useCopyPortfolio: vi.fn(),
@@ -30,9 +42,7 @@ const renderModal = (props = defaultProps) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <CopyPortfolioModal {...props} />
-      </MemoryRouter>
+      <CopyPortfolioModal {...props} />
     </QueryClientProvider>
   );
 };

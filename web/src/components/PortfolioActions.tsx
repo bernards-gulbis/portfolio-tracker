@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+
 import { useDeletePortfolio } from '../hooks/usePortfolios';
+import { useNavigation } from '../context/NavigationContext';
 import { getErrorMessage } from '../api';
 import { toast } from 'sonner';
 import { EditPortfolioModal } from './EditPortfolioModal';
@@ -36,8 +36,8 @@ interface PortfolioActionsProps {
 
 export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioActionsProps) => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { goToFirstPortfolio } = useNavigation();
+
   const deletePortfolio = useDeletePortfolio();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -47,8 +47,7 @@ export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioAction
     if (deletePortfolio.isPending) return;
     try {
       await deletePortfolio.mutateAsync(portfolioId);
-      await queryClient.invalidateQueries({ queryKey: ['portfolios'] });
-      navigate('/', { replace: true });
+      goToFirstPortfolio();
     } catch (err) {
       toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(err) }));
     } finally {
