@@ -4,7 +4,7 @@ For setup and commands see the [main README](../README.md). Full API reference a
 
 ## Project Structure
 
-```
+```text
 main.py                          # FastAPI app, CORS, exception handlers
 app/
   core/                          # Database, auth (FastAPI Users), exceptions

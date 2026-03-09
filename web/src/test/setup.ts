@@ -29,3 +29,13 @@ Object.defineProperty(globalThis, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 });
+
+// Radix Select uses pointer/scroll APIs not available in jsdom
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}

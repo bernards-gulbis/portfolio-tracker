@@ -4,7 +4,7 @@ For setup and commands see the [main README](../README.md).
 
 ## Project Structure
 
-```
+```text
 src/
   api.ts                         # Axios client, API functions, TS interfaces
   App.tsx                        # Provider tree, layout, routing
@@ -19,7 +19,7 @@ src/
 
 ## Architecture
 
-```
+```text
 api.ts (Axios) -> hooks (TanStack Query) -> components (React Context for UI state)
 ```
 

@@ -4,16 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { RealizedGainsTable } from '../components/RealizedGainsTable';
 import type { RealizedSale, DividendReceived } from '../api';
 
-// Radix Select uses APIs not available in jsdom
-if (!Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = () => false;
-  Element.prototype.setPointerCapture = () => {};
-  Element.prototype.releasePointerCapture = () => {};
-}
-if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = () => {};
-}
-
 const makeSale = (overrides: Partial<RealizedSale> = {}): RealizedSale => ({
   ticker: 'AAPL',
   date: '2025-06-15T10:00:00',

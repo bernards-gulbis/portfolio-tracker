@@ -276,6 +276,8 @@ def calculate_performance(
     if not transactions:
         return []
 
+    transactions = sorted(transactions, key=lambda t: t.date)
+
     if start_date is None:
         start_date = min(t.date for t in transactions)
     if end_date is None:

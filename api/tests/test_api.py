@@ -2847,7 +2847,7 @@ def test_sell_non_strict_unknown_ticker():
 
 
 def test_sell_non_strict_oversell():
-    """Oversell in non-strict mode should NOT inflate cash."""
+    """Oversell in non-strict mode should reconcile via partial sell."""
     state = _TxState()
     state.cash = Decimal("5000")
     state.holdings["AAPL"] = _Holding(
@@ -2867,10 +2867,12 @@ def test_sell_non_strict_oversell():
     )
     _apply_transaction(state, tx, strict=False)
 
-    # Cash should remain unchanged — the oversell was skipped entirely
-    assert state.cash == Decimal("5000")
-    # Holdings should remain untouched
-    assert state.holdings["AAPL"].quantity == Decimal("5")
+    # Partial sell: 5/20 of 3000 = 750 added to cash
+    assert state.cash == Decimal("5750")
+    # Holding should be removed after partial sell
+    assert "AAPL" not in state.holdings
+    # No warnings in non-strict mode
+    assert len(state.warnings) == 0
 
 
 def test_sell_without_ticker():
@@ -3660,7 +3662,7 @@ def test_warning_withdraw_negative_cash():
 
 
 def test_no_warnings_in_non_strict_mode():
-    """Non-strict mode should never append warnings, only skip silently."""
+    """Non-strict mode should never append warnings but still reconcile oversell."""
     state = _TxState()
     state.cash = Decimal("5000")
     state.holdings["AAPL"] = _Holding(
@@ -3682,8 +3684,10 @@ def test_no_warnings_in_non_strict_mode():
     _apply_transaction(state, tx, strict=False)
 
     assert len(state.warnings) == 0
-    assert state.cash == Decimal("5000")
-    assert state.holdings["AAPL"].quantity == Decimal("5")
+    # Partial sell: 5/20 of 3000 = 750 added to cash
+    assert state.cash == Decimal("5750")
+    # Holding removed after partial sell
+    assert "AAPL" not in state.holdings
 
 
 # ================== Live Prices Tests ==================

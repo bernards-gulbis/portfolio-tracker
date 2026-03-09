@@ -20,7 +20,7 @@ export function AppFooter({ className }: { className?: string }) {
       <div className="flex items-baseline justify-between">
         <span>
           {t('app.footer.copyright', { year: new Date().getFullYear() })}
-          {' · '}
+          <span aria-hidden="true" className="mx-1">·</span>
           <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
             {t('app.footer.license')}
           </a>

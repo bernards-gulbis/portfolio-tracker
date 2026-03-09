@@ -344,6 +344,7 @@ class TestTransactionHandlers:
         assert "AAPL" not in state.holdings
         assert len(state.realized_sales) == 1
         assert state.realized_sales[0].realized_gain == 500.0
+        assert state.realized_sales[0].first_buy_date == "2025-01-01T00:00:00"
 
     def test_buy_creates_new_holding(self):
         state = _TxState()
@@ -376,6 +377,29 @@ class TestTransactionHandlers:
         _apply_transaction(state, tx, strict=True)
         assert state.holdings["GOOG"].quantity == Decimal("8")
         assert state.holdings["GOOG"].total_cost == Decimal("1600")
+
+    def test_sell_oversell_nonstrict_reconciles(self):
+        """In non-strict mode, oversell should still reconcile (partial sell + remove holding)."""
+        state = _TxState()
+        state.cash = Decimal("0")
+        state.holdings["AAPL"] = _Holding(
+            quantity=Decimal("5"),
+            total_cost=Decimal("750"),
+            first_buy_date=datetime(2025, 1, 1),
+        )
+        tx = _make_tx(
+            type=TransactionType.SELL, ticker="AAPL", quantity=10, total_amount=2000.0
+        )
+        _apply_transaction(state, tx, strict=False)
+        # No warnings in non-strict mode
+        assert len(state.warnings) == 0
+        # Holding should be removed
+        assert "AAPL" not in state.holdings
+        # Partial sell: 5/10 of proceeds = 1000
+        assert state.cash == Decimal("1000")
+        # Realized gain = 1000 - 750 = 250
+        assert state.realized_gains == Decimal("250")
+        assert len(state.realized_sales) == 1
 
 
 # ==================== _build_holdings_list ====================
@@ -437,3 +461,27 @@ class TestCalculateStatus:
         assert len(result.holdings) == 1
         assert result.holdings[0].ticker == "AAPL"
         assert result.holdings[0].quantity == 10.0
+
+    def test_out_of_order_transactions(self):
+        """Transactions passed out of chronological order should produce the same result."""
+        txs_ordered = [
+            _make_tx(
+                type=TransactionType.DEPOSIT,
+                total_amount=5000.0,
+                date=datetime(2025, 1, 10),
+            ),
+            _make_tx(
+                type=TransactionType.BUY,
+                ticker="AAPL",
+                quantity=10,
+                total_amount=-1500.0,
+                date=datetime(2025, 1, 16),
+            ),
+        ]
+        txs_reversed = list(reversed(txs_ordered))
+        result_ordered = calculate_status(txs_ordered, None, Decimal("0.20"), 1, "A")
+        result_reversed = calculate_status(txs_reversed, None, Decimal("0.20"), 1, "B")
+        assert result_ordered.cash == result_reversed.cash
+        assert result_ordered.principal == result_reversed.principal
+        assert len(result_ordered.holdings) == len(result_reversed.holdings)
+        assert len(result_ordered.warnings) == len(result_reversed.warnings)

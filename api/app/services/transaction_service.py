@@ -286,7 +286,13 @@ class TransactionService:
         existing = self.transaction_repo.get_by_portfolio_id(portfolio_id)
         existing_keys = {_dedup_key(t) for t in existing}
 
-        new_transactions = [t for t in parsed if _dedup_key(t) not in existing_keys]
+        seen = set(existing_keys)
+        new_transactions: list[Transaction] = []
+        for t in parsed:
+            key = _dedup_key(t)
+            if key not in seen:
+                seen.add(key)
+                new_transactions.append(t)
         skipped_count = len(parsed) - len(new_transactions)
 
         if new_transactions:

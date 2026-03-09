@@ -113,7 +113,6 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
     h = state.holdings[ticker]
     if quantity > h.quantity + HOLDINGS_EPSILON:
         if strict:
-            held = h.quantity
             state.warnings.append(
                 _Warning(
                     code="sellOversell",
@@ -121,28 +120,29 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
                     params={
                         "ticker": ticker,
                         "quantity": str(quantity),
-                        "available": str(held),
+                        "available": str(h.quantity),
                     },
                 )
             )
-            # Partial sell: sell only what is held, with proportional total
-            partial_total = total * (held / quantity) if quantity > 0 else _ZERO
-            cost_basis = h.total_cost
-            state.cash += partial_total
-            state.realized_gains += partial_total - cost_basis
-            state.realized_sales.append(
-                _RealizedSale(
-                    ticker=ticker,
-                    date=tx.date.strftime(_ISO_DATETIME_FMT),
-                    quantity=float(held),
-                    quantity_before=float(held),
-                    proceeds=float(partial_total),
-                    cost_basis=float(cost_basis),
-                    realized_gain=float(partial_total - cost_basis),
-                    first_buy_date=h.first_buy_date.strftime(_ISO_DATETIME_FMT),
-                )
+        # Partial sell: sell only what is held, with proportional total
+        held = h.quantity
+        partial_total = total * (held / quantity) if quantity > 0 else _ZERO
+        cost_basis = h.total_cost
+        state.cash += partial_total
+        state.realized_gains += partial_total - cost_basis
+        state.realized_sales.append(
+            _RealizedSale(
+                ticker=ticker,
+                date=tx.date.strftime(_ISO_DATETIME_FMT),
+                quantity=float(held),
+                quantity_before=float(held),
+                proceeds=float(partial_total),
+                cost_basis=float(cost_basis),
+                realized_gain=float(partial_total - cost_basis),
+                first_buy_date=h.first_buy_date.strftime(_ISO_DATETIME_FMT),
             )
-            del state.holdings[ticker]
+        )
+        del state.holdings[ticker]
         return
     state.cash += total
     # Proportional cost removal: avoids intermediate avg_cost rounding
@@ -393,6 +393,7 @@ def calculate_status(
     portfolio_name: str,
 ) -> PortfolioStatusResponse:
     """Calculate comprehensive portfolio status from transactions."""
+    transactions = sorted(transactions, key=lambda t: t.date)
     state = _TxState()
     state.usd_to_eur_fallback = usd_to_eur_rate
     for tx in transactions:

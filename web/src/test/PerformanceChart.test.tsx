@@ -25,8 +25,7 @@ describe('PerformanceChart', () => {
   it('shows spinner while loading', () => {
     render(<PerformanceChart data={[]} isLoading={true} />);
 
-    const spinner = document.querySelector('[class*="animate-spin"]');
-    expect(spinner).toBeInTheDocument();
+    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
   });
 
   it('shows "No performance data available" when data is empty', () => {

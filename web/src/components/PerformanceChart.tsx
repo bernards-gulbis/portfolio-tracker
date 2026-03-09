@@ -337,7 +337,7 @@ export const PerformanceChart = ({
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-[380px]">
-          <Spinner className="size-8" />
+          <Spinner data-testid="loading-spinner" className="size-8" />
         </CardContent>
       </Card>
     );

@@ -22,7 +22,9 @@ function computeDaysHeld(holdings: PricedHolding[]): Record<string, number> {
   const now = Date.now();
   const map: Record<string, number> = {};
   for (const h of holdings) {
-    map[h.ticker] = Math.floor((now - new Date(h.first_buy_date).getTime()) / 86_400_000);
+    // Append 'T00:00:00Z' to date-only strings to ensure UTC parsing
+    const dateStr = h.first_buy_date.length === 10 ? `${h.first_buy_date}T00:00:00Z` : h.first_buy_date;
+    map[h.ticker] = Math.floor((now - new Date(dateStr).getTime()) / 86_400_000);
   }
   return map;
 }

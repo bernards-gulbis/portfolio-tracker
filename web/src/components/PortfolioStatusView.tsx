@@ -491,7 +491,10 @@ export const PortfolioStatusView = () => {
     && effectiveStatus.principal === 0
     && effectiveStatus.cash === 0
     && effectiveStatus.dividends === 0
-    && effectiveStatus.realized_gains === 0;
+    && effectiveStatus.realized_gains === 0
+    && effectiveStatus.realized_sales.length === 0
+    && effectiveStatus.dividends_received.length === 0
+    && effectiveStatus.realized_withdrawals.length === 0;
   const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (
