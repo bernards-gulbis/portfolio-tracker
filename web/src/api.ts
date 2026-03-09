@@ -145,7 +145,7 @@ export interface RealizedSale {
   proceeds: number;
   cost_basis: number;
   realized_gain: number;
-  days_held: number;
+  first_buy_date: string;
 }
 
 export interface DividendReceived {

@@ -1124,7 +1124,7 @@ def test_portfolio_status_with_sell_transactions(client: TestClient):
     assert sale["proceeds"] == pytest.approx(1500.0)
     assert sale["cost_basis"] == pytest.approx(1000.0)
     assert sale["realized_gain"] == pytest.approx(500.0)
-    assert sale["days_held"] == 8  # 2024-01-02 -> 2024-01-10
+    assert sale["first_buy_date"] == "2024-01-02T10:00:00"
     assert "date" in sale
 
 

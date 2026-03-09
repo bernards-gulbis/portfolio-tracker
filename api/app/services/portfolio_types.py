@@ -62,7 +62,7 @@ class _RealizedSale:
     proceeds: float
     cost_basis: float
     realized_gain: float
-    days_held: int
+    first_buy_date: str
 
 
 @dataclass

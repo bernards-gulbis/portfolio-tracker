@@ -139,7 +139,7 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
                     proceeds=float(partial_total),
                     cost_basis=float(cost_basis),
                     realized_gain=float(partial_total - cost_basis),
-                    days_held=(tx.date - h.first_buy_date).days,
+                    first_buy_date=h.first_buy_date.strftime(_ISO_DATETIME_FMT),
                 )
             )
             del state.holdings[ticker]
@@ -157,7 +157,7 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
             proceeds=float(total),
             cost_basis=float(cost_basis),
             realized_gain=float(total - cost_basis),
-            days_held=(tx.date - h.first_buy_date).days,
+            first_buy_date=h.first_buy_date.strftime(_ISO_DATETIME_FMT),
         )
     )
     h.quantity -= quantity

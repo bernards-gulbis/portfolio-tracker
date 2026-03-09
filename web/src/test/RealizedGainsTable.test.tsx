@@ -22,7 +22,7 @@ const makeSale = (overrides: Partial<RealizedSale> = {}): RealizedSale => ({
   proceeds: 1000,
   cost_basis: 800,
   realized_gain: 200,
-  days_held: 365,
+  first_buy_date: '2024-06-15T10:00:00',
   ...overrides,
 });
 

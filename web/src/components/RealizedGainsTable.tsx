@@ -469,6 +469,7 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                     const sellPrice = sale.quantity > 0 ? sale.proceeds / sale.quantity : 0;
                     const buyPrice = sale.quantity > 0 ? sale.cost_basis / sale.quantity : 0;
                     const isPartialSell = sale.quantity_before - sale.quantity > 1e-6;
+                    const daysHeld = Math.floor((new Date(sale.date).getTime() - new Date(sale.first_buy_date).getTime()) / 86_400_000);
                     return (
                       <TableRow key={`${sale.date}-${idx}`}>
                         <TableCell className="text-muted-foreground">{formatDateCompact(sale.date, locale)}</TableCell>
@@ -476,11 +477,11 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="cursor-help border-b border-dotted border-muted-foreground">
-                                {formatDaysHeld(sale.days_held, daysLabels)}
+                                {formatDaysHeld(daysHeld, daysLabels)}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>{sale.days_held} {t('status.columns.daysHeld').toLocaleLowerCase()}</p>
+                              <p>{daysHeld} {t('status.columns.daysHeld').toLocaleLowerCase()}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TableCell>
