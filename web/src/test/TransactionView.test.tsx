@@ -1,9 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TransactionView } from '../components/TransactionView';
 import { useTransactions } from '../hooks/useTransactions';
-import { TransactionType } from '../api';
+import { TransactionType, exportTransactionsCSV } from '../api';
+
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
 
 const mockNavigation = {
   page: 'portfolio' as const,
@@ -37,6 +47,14 @@ vi.mock('../hooks/useLivePrices', () => ({
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+vi.mock('../api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api')>();
+  return {
+    ...actual,
+    exportTransactionsCSV: vi.fn(),
+  };
+});
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -151,5 +169,126 @@ describe('TransactionView', () => {
 
     renderView();
     expect(screen.getByText('No Transactions Yet')).toBeInTheDocument();
+  });
+
+  it('opens add transaction modal when Add Transaction is clicked', async () => {
+    mockNavigation.activePortfolioId = 1;
+    vi.mocked(useTransactions).mockReturnValue({
+      data: {
+        transactions: [
+          {
+            id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
+            type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+            price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+          },
+        ],
+        total: 1, page: 1, page_size: 20, total_pages: 1,
+      },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderView();
+
+    await userEvent.click(screen.getByText('Add Transaction'));
+    expect(screen.getByRole('heading', { name: 'Add Transaction' })).toBeInTheDocument();
+  });
+
+  it('opens import CSV modal via actions menu', async () => {
+    mockNavigation.activePortfolioId = 1;
+    vi.mocked(useTransactions).mockReturnValue({
+      data: {
+        transactions: [
+          {
+            id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
+            type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+            price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+          },
+        ],
+        total: 1, page: 1, page_size: 20, total_pages: 1,
+      },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderView();
+
+    // Open actions menu
+    const actionsBtn = screen.getByLabelText('Transaction table actions menu');
+    await userEvent.click(actionsBtn);
+
+    // Click Import CSV
+    await userEvent.click(await screen.findByText('Import CSV'));
+
+    // Import modal should appear
+    expect(screen.getByRole('heading', { name: /upload transactions csv/i })).toBeInTheDocument();
+  });
+
+  it('exports CSV successfully', async () => {
+    const mockBlob = new Blob(['csv data'], { type: 'text/csv' });
+    vi.mocked(exportTransactionsCSV).mockResolvedValueOnce(mockBlob);
+    const mockCreateObjectURL = vi.fn().mockReturnValue('blob:test-url');
+    const mockRevokeObjectURL = vi.fn();
+    globalThis.URL.createObjectURL = mockCreateObjectURL;
+    globalThis.URL.revokeObjectURL = mockRevokeObjectURL;
+
+    mockNavigation.activePortfolioId = 1;
+    vi.mocked(useTransactions).mockReturnValue({
+      data: {
+        transactions: [
+          {
+            id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
+            type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+            price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+          },
+        ],
+        total: 1, page: 1, page_size: 20, total_pages: 1,
+      },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderView();
+
+    // Open actions menu
+    const actionsBtn = screen.getByLabelText('Transaction table actions menu');
+    await userEvent.click(actionsBtn);
+
+    // Click Export CSV
+    await userEvent.click(await screen.findByText('Export CSV'));
+
+    await waitFor(() => {
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockRevokeObjectURL).toHaveBeenCalled();
+    });
+  });
+
+  it('shows error when export CSV fails', async () => {
+    vi.mocked(exportTransactionsCSV).mockRejectedValueOnce(new Error('Export failed'));
+
+    mockNavigation.activePortfolioId = 1;
+    vi.mocked(useTransactions).mockReturnValue({
+      data: {
+        transactions: [
+          {
+            id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
+            type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+            price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+          },
+        ],
+        total: 1, page: 1, page_size: 20, total_pages: 1,
+      },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderView();
+
+    // Open actions menu
+    const actionsBtn = screen.getByLabelText('Transaction table actions menu');
+    await userEvent.click(actionsBtn);
+
+    // Click Export CSV
+    await userEvent.click(await screen.findByText('Export CSV'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Export failed/)).toBeInTheDocument();
+    });
   });
 });

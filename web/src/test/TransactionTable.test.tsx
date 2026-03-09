@@ -405,4 +405,276 @@ describe('TransactionTable', () => {
       expect(toast.error).toHaveBeenCalledWith('Failed to delete transaction: Delete failed');
     });
   });
+
+  it('navigates to next page when Next is clicked', async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={2}
+          totalPages={5}
+          total={100}
+        />
+      </QueryClientProvider>
+    );
+
+    await userEvent.click(screen.getByText('Next'));
+    expect(mockOnPageChange).toHaveBeenCalledWith(3);
+  });
+
+  it('navigates to previous page when Previous is clicked', async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={3}
+          totalPages={5}
+          total={100}
+        />
+      </QueryClientProvider>
+    );
+
+    await userEvent.click(screen.getByText('Previous'));
+    expect(mockOnPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('navigates to specific page when page link is clicked', async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={1}
+          totalPages={5}
+          total={100}
+        />
+      </QueryClientProvider>
+    );
+
+    await userEvent.click(screen.getByText('3'));
+    expect(mockOnPageChange).toHaveBeenCalledWith(3);
+  });
+
+  it('shows all page numbers without ellipsis when totalPages <= 7', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={1}
+          totalPages={5}
+          total={100}
+        />
+      </QueryClientProvider>
+    );
+
+    for (let i = 1; i <= 5; i++) {
+      expect(screen.getByText(String(i))).toBeInTheDocument();
+    }
+    expect(screen.queryByText('More pages')).not.toBeInTheDocument();
+  });
+
+  it('shows start ellipsis when currentPage > 3', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={5}
+          totalPages={10}
+          total={200}
+        />
+      </QueryClientProvider>
+    );
+
+    // Should have at least one ellipsis element (More pages is the accessible name for PaginationEllipsis)
+    const ellipses = screen.getAllByText('More pages');
+    expect(ellipses.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows both ellipses when in middle of many pages', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={5}
+          totalPages={10}
+          total={200}
+        />
+      </QueryClientProvider>
+    );
+
+    const ellipses = screen.getAllByText('More pages');
+    expect(ellipses).toHaveLength(2);
+  });
+
+  it('shows end ellipsis but not start when currentPage <= 3', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={2}
+          totalPages={10}
+          total={200}
+        />
+      </QueryClientProvider>
+    );
+
+    const ellipses = screen.getAllByText('More pages');
+    expect(ellipses).toHaveLength(1);
+  });
+
+  it('calls onTickerSearchChange when typing in search input', async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
+      </QueryClientProvider>
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search asset...');
+    await userEvent.type(searchInput, 'MSFT');
+    expect(mockOnTickerSearchChange).toHaveBeenCalled();
+  });
+
+  it('toggles sort from asc to desc when date header is clicked', async () => {
+    const onSortOrderChange = vi.fn();
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          sortOrder="asc"
+          onSortOrderChange={onSortOrderChange}
+        />
+      </QueryClientProvider>
+    );
+
+    const dateButton = screen.getByRole('button', { name: /Date/ });
+    await userEvent.click(dateButton);
+    expect(onSortOrderChange).toHaveBeenCalledWith('desc');
+  });
+
+  it('calls onTypeFilterChange when a type checkbox is toggled', async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+        />
+      </QueryClientProvider>
+    );
+
+    // Open the filter dropdown
+    const filterButton = screen.getByRole('button', { name: /All Types/i });
+    await userEvent.click(filterButton);
+
+    // Click a checkbox item
+    const depositItem = await screen.findByRole('menuitemcheckbox', { name: /Deposit/i });
+    await userEvent.click(depositItem);
+
+    expect(mockOnTypeFilterChange).toHaveBeenCalledWith(['Deposit']);
+  });
+
+  it('shows filter count label when filters are active', () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={mockTransactions}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          typeFilter={['DEPOSIT', 'BUY']}
+        />
+      </QueryClientProvider>
+    );
+
+    // With 2 active filters, should show count label like "2 types"
+    expect(screen.getByText(/2 types/i)).toBeInTheDocument();
+  });
+
+  it('navigates to previous page when last transaction on page is deleted', async () => {
+    const mockDeleteMutateAsync = vi.fn().mockResolvedValueOnce({});
+    vi.mocked(useDeleteTransaction).mockReturnValue({
+      mutateAsync: mockDeleteMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useDeleteTransaction>);
+
+    const singleTransaction: Transaction[] = [mockTransactions[0]];
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={singleTransaction}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          currentPage={3}
+          totalPages={3}
+          total={41}
+        />
+      </QueryClientProvider>
+    );
+
+    // Open actions menu
+    await userEvent.click(screen.getByLabelText(/Actions for/));
+    // Click delete
+    await userEvent.click(await screen.findByText('Delete'));
+    // Confirm in dialog
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(mockOnPageChange).toHaveBeenCalledWith(2);
+    });
+  });
 });

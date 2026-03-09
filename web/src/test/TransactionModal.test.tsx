@@ -423,3 +423,231 @@ describe('TransactionModal — edit mode', () => {
     });
   });
 });
+
+describe('TransactionModal — validation & create', () => {
+  const mockCreateMutateAsync = vi.fn();
+  const mockUpdateMutateAsync = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    vi.mocked(useCreateTransaction).mockReturnValue({
+      mutateAsync: mockCreateMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreateTransaction>);
+
+    vi.mocked(useUpdateTransaction).mockReturnValue({
+      mutateAsync: mockUpdateMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTransaction>);
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: { holdings: mockHoldings, usd_to_eur_rate: 0.92 },
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
+    } as unknown as ReturnType<typeof useLivePrices>);
+  });
+
+  it('shows ticker required error for BUY with empty ticker', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/asset symbol is required/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows quantity error for BUY with quantity 0', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
+    await user.type(tickerInput, 'AAPL');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/quantity must be/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows split ratio error for SPLIT with empty ratio', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Split');
+
+    // Fill ticker (required for SPLIT)
+    const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
+    await user.type(tickerInput, 'AAPL');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/split ratio must be/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows total amount error for DIVIDEND with empty total', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Dividend');
+
+    // Select a ticker via combobox
+    const tickerSelect = screen.getByRole('combobox', { name: 'Asset' });
+    await user.click(tickerSelect);
+    const aaplOption = await screen.findByRole('option', { name: 'AAPL (10 shares)' });
+    await user.click(aaplOption);
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/total amount must be/i)).toBeInTheDocument();
+    });
+  });
+
+  it('calls createTransaction with correct data for DEPOSIT', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    // Default type is DEPOSIT
+    const totalInput = screen.getByLabelText('Total Amount');
+    await user.type(totalInput, '5000');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          portfolioId: 1,
+          data: expect.objectContaining({
+            type: 'Deposit',
+            total_amount: 5000,
+          }),
+        })
+      );
+    });
+  });
+
+  it('shows root error alert when mutation rejects', async () => {
+    mockCreateMutateAsync.mockRejectedValueOnce(new Error('Server error'));
+    const user = userEvent.setup();
+    renderModal();
+
+    const totalInput = screen.getByLabelText('Total Amount');
+    await user.type(totalInput, '5000');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Server error')).toBeInTheDocument();
+    });
+  });
+
+  it('sends negative total_amount for WITHDRAW', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Withdraw');
+
+    const totalInput = screen.getByLabelText('Total Amount');
+    await user.type(totalInput, '2000');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Withdraw',
+            total_amount: -2000,
+          }),
+        })
+      );
+    });
+  });
+
+  it('auto-calculates EUR field for DEPOSIT from usd_to_eur_rate', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    // DEPOSIT is default type. usd_to_eur_rate is 0.92
+    const totalInput = screen.getByLabelText('Total Amount');
+    await user.type(totalInput, '1000');
+
+    await waitFor(() => {
+      const eurInput = screen.getByLabelText('Amount in EUR') as HTMLInputElement;
+      expect(eurInput.value).toBe('920.00');
+    });
+  });
+
+  it('allows typing custom ticker in BUY mode', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    const tickerInput = screen.getByRole('textbox', { name: 'Asset' }) as HTMLInputElement;
+    await user.type(tickerInput, 'NVDA');
+
+    expect(tickerInput.value).toBe('NVDA');
+  });
+
+  it('includes fee and fxRate in DIVIDEND submission data', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Dividend');
+
+    // Select AAPL ticker
+    const tickerSelect = screen.getByRole('combobox', { name: 'Asset' });
+    await user.click(tickerSelect);
+    const aaplOption = await screen.findByRole('option', { name: 'AAPL (10 shares)' });
+    await user.click(aaplOption);
+
+    // Fill total amount
+    const totalInput = screen.getByLabelText('Total Amount');
+    await user.type(totalInput, '50');
+
+    // Fill fee
+    const feeInput = screen.getByLabelText('Fee');
+    await user.clear(feeInput);
+    await user.type(feeInput, '2.50');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Dividend',
+            ticker: 'AAPL',
+            total_amount: 50,
+            fee: 2.5,
+            fx_rate: 0.92,
+          }),
+        })
+      );
+    });
+  });
+});
