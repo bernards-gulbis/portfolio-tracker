@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ChevronRightIcon } from 'lucide-react';
 import { PaginationControls } from './PaginationControls';
 import { SortableTableHead } from './SortableTableHead';
-import { RealizedGainsInsights } from './RealizedGainsInsights';
+
 
 // ================== Filter Controls ==================
 
@@ -81,7 +81,6 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
         filter={filter}
         onFilterChange={handleFilterChange}
       />
-      <RealizedGainsInsights filteredGains={filteredGains} locale={locale} />
       <Card className="overflow-hidden">
         <Table>
           <TableHeader>
