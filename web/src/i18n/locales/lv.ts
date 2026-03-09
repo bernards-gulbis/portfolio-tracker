@@ -27,11 +27,11 @@ const lv: Translation = {
     },
     version: 'v{{version}}',
     footer: {
-      copyright: '\u00a9 {{year}} Bernards Gulbis. Licencēts saskaņā ar',
-      license: 'MIT licenci',
-      dataAttribution: 'Datus nodrošina',
+      copyright: '\u00a9 {{year}} Bernards Gulbis',
+      license: 'MIT licence',
+      dataAttribution: 'Dati no',
       dataSource: 'Yahoo Finance',
-      disclaimer: 'Kotācijas aizkavētas vismaz 15 minūtes. Visi biržas laiki ir ET zonā. Šī lietotne ir paredzēta tikai informatīviem nolūkiem un nav uzskatāma par finanšu konsultāciju.',
+      disclaimer: 'Kotācijas aizkavētas vismaz 15 minūtes. Tikai informatīviem nolūkiem — nav finanšu konsultācija.',
     },
   },
   auth: {
@@ -323,6 +323,7 @@ const lv: Translation = {
     paymentCount_other: '{{count}} maksājumi',
     partiallySold: '{{sold}} no {{total}} akcijām pārdotas',
     priceCaption: 'cena',
+    currentPriceCaption: 'pašreizējā cena',
     allSold: 'visa pārdota',
     ofTotal: 'no {{total}}',
     showAllSells: 'Rādīt visas {{count}} pārdošanas',

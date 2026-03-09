@@ -25,11 +25,11 @@ const en = {
     },
     version: 'v{{version}}',
     footer: {
-      copyright: '\u00a9 {{year}} Bernards Gulbis. Licensed under the',
+      copyright: '\u00a9 {{year}} Bernards Gulbis',
       license: 'MIT License',
-      dataAttribution: 'Data provided by',
+      dataAttribution: 'Data from',
       dataSource: 'Yahoo Finance',
-      disclaimer: 'Quotes delayed at least 15 minutes. All exchange times are in ET. This application is for informational purposes only and does not constitute financial advice.',
+      disclaimer: 'Quotes delayed at least 15 minutes. For informational purposes only — not financial advice.',
     },
   },
   auth: {
@@ -321,6 +321,7 @@ const en = {
     paymentCount_other: '{{count}} payments',
     partiallySold: '{{sold}} of {{total}} shares sold',
     priceCaption: 'price',
+    currentPriceCaption: 'current price',
     allSold: 'all sold',
     ofTotal: 'of {{total}}',
     showAllSells: 'Show all {{count}} sells',

@@ -94,7 +94,7 @@ export const HoldingsTable = memo(({
               <TableHead className="text-right">
                 <div className="flex flex-col items-end">
                   <span>{t('status.columns.marketValue')}{showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground">{t('status.currentPriceCaption')}</span>
                 </div>
               </TableHead>
               <TableHead className="text-right">
@@ -114,7 +114,7 @@ export const HoldingsTable = memo(({
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {showEur && currencyGainsEur !== null ? (
-                  <div className="flex flex-col">
+                  <div className="flex flex-col items-end">
                     <div className="flex items-center gap-1">
                       <span className={`font-semibold ${getValueClass(currencyGainsEur)}`}>
                         {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
@@ -159,7 +159,7 @@ export const HoldingsTable = memo(({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatQuantity(holding.quantity)}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    <div className="flex flex-col">
+                    <div className="flex flex-col items-end">
                       <span>{formatCurrency(holding.total_cost, 'USD', locale)}</span>
                       <span className="text-xs text-muted-foreground">
                         {formatCurrency(holding.average_cost, 'USD', locale)}
@@ -167,7 +167,7 @@ export const HoldingsTable = memo(({
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
-                    <div className="flex flex-col">
+                    <div className="flex flex-col items-end">
                       <span>
                         {(() => {
                           if (eurVals == null) {
@@ -185,7 +185,7 @@ export const HoldingsTable = memo(({
                     {(() => {
                       if (eurVals?.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null) {
                         return (
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-end">
                             <span className={`font-semibold ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
                               {formatSignedCurrency(eurVals.unrealizedGainLossEur, 'EUR', locale)}
                             </span>
@@ -197,7 +197,7 @@ export const HoldingsTable = memo(({
                       }
                       if (holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null) {
                         return (
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-end">
                             <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
                               {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
                             </span>
