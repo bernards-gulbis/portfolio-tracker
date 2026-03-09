@@ -95,7 +95,7 @@ interface RealizedGainsInsightsProps {
 function toEntry(group: TickerGroup): InsightEntry {
   const totalCostBasis = group.sales.reduce((sum, s) => sum + s.cost_basis, 0);
   const maxDaysHeld = group.sales.reduce((max, s) => {
-    const days = Math.round(
+    const days = Math.floor(
       (new Date(s.date).getTime() - new Date(s.first_buy_date).getTime()) / 86_400_000,
     );
     return days > max ? days : max;

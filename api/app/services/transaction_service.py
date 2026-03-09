@@ -31,6 +31,9 @@ def _dedup_key(t: Transaction) -> tuple:
         t.price_per_share,
         t.fee,
         t.eur_amount,
+        t.split_ratio,
+        t.currency,
+        t.fx_rate,
     )
 
 

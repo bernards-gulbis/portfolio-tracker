@@ -7,12 +7,12 @@ import { useNavigation } from '../context/NavigationContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
-import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, LivePrices } from '../api';
+import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, LivePrices, RealizedSale, DividendReceived } from '../api';
 import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPreference';
 import { computeEurMetrics } from '../utils/eurMetrics';
 import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
-import { RealizedGainsTable } from './RealizedGainsTable';
+import { RealizedGainsTable, DividendsReceivedTable } from './RealizedGainsTable';
 import { WithdrawalsTable } from './WithdrawalsTable';
 
 const PerformanceChart = lazy(() =>
@@ -128,36 +128,50 @@ const CollapsibleFinancialSummary = ({
   );
 };
 
-// ================== Collapsible Realized Section ==================
+// ================== Collapsible Realized Gains ==================
 
-interface CollapsibleRealizedSectionProps {
-  status: PricedPortfolioStatus;
-  displayCurrency: 'EUR' | 'USD';
+interface CollapsibleRealizedGainsProps {
+  realizedSales: RealizedSale[];
   locale: string;
 }
 
-const CollapsibleRealizedSection = ({ status, displayCurrency, locale }: CollapsibleRealizedSectionProps) => {
+const CollapsibleRealizedGains = ({ realizedSales, locale }: CollapsibleRealizedGainsProps) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-
-  const label = [
-    status.realized_sales.length > 0 ? t('status.realizedGains') : null,
-    status.dividends_received.length > 0 ? t('status.dividendsReceived') : null,
-  ].filter(Boolean).join(' & ');
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
-        {label}
+        {t('status.realizedGains')}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <RealizedGainsTable
-          realizedSales={status.realized_sales}
-          dividendsReceived={status.dividends_received}
-          displayCurrency={displayCurrency}
-          locale={locale}
-        />
+        <RealizedGainsTable realizedSales={realizedSales} locale={locale} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+// ================== Collapsible Dividends Received ==================
+
+interface CollapsibleDividendsReceivedProps {
+  dividendsReceived: DividendReceived[];
+  displayCurrency: 'EUR' | 'USD';
+  locale: string;
+}
+
+const CollapsibleDividendsReceived = ({ dividendsReceived, displayCurrency, locale }: CollapsibleDividendsReceivedProps) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('status.dividendsReceived')}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <DividendsReceivedTable dividendsReceived={dividendsReceived} displayCurrency={displayCurrency} locale={locale} />
       </CollapsibleContent>
     </Collapsible>
   );
@@ -358,10 +372,18 @@ const PortfolioStatusContent = ({
         }
       />
 
-      {/* Realized Gains / Dividends Table */}
-      {(status.realized_sales.length > 0 || status.dividends_received.length > 0) && (
-        <CollapsibleRealizedSection
-          status={status}
+      {/* Realized Gains */}
+      {status.realized_sales.length > 0 && (
+        <CollapsibleRealizedGains
+          realizedSales={status.realized_sales}
+          locale={locale}
+        />
+      )}
+
+      {/* Dividends Received */}
+      {status.dividends_received.length > 0 && (
+        <CollapsibleDividendsReceived
+          dividendsReceived={status.dividends_received}
           displayCurrency={currency}
           locale={locale}
         />

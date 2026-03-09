@@ -231,37 +231,39 @@ describe('TransactionView', () => {
     globalThis.URL.createObjectURL = mockCreateObjectURL;
     globalThis.URL.revokeObjectURL = mockRevokeObjectURL;
 
-    mockNavigation.activePortfolioId = 1;
-    vi.mocked(useTransactions).mockReturnValue({
-      data: {
-        transactions: [
-          {
-            id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
-            type: TransactionType.DEPOSIT, ticker: null, quantity: null,
-            price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
-          },
-        ],
-        total: 1, page: 1, page_size: 20, total_pages: 1,
-      },
-      isLoading: false, isFetching: false, error: null,
-    } as unknown as ReturnType<typeof useTransactions>);
+    try {
+      mockNavigation.activePortfolioId = 1;
+      vi.mocked(useTransactions).mockReturnValue({
+        data: {
+          transactions: [
+            {
+              id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
+              type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+              price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+            },
+          ],
+          total: 1, page: 1, page_size: 20, total_pages: 1,
+        },
+        isLoading: false, isFetching: false, error: null,
+      } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+      renderView();
 
-    // Open actions menu
-    const actionsBtn = screen.getByLabelText('Transaction table actions menu');
-    await userEvent.click(actionsBtn);
+      // Open actions menu
+      const actionsBtn = screen.getByLabelText('Transaction table actions menu');
+      await userEvent.click(actionsBtn);
 
-    // Click Export CSV
-    await userEvent.click(await screen.findByText('Export CSV'));
+      // Click Export CSV
+      await userEvent.click(await screen.findByText('Export CSV'));
 
-    await waitFor(() => {
-      expect(mockCreateObjectURL).toHaveBeenCalled();
-      expect(mockRevokeObjectURL).toHaveBeenCalled();
-    });
-
-    globalThis.URL.createObjectURL = originalCreateObjectURL;
-    globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
+      await waitFor(() => {
+        expect(mockCreateObjectURL).toHaveBeenCalled();
+        expect(mockRevokeObjectURL).toHaveBeenCalled();
+      });
+    } finally {
+      globalThis.URL.createObjectURL = originalCreateObjectURL;
+      globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
+    }
   });
 
   it('shows error when export CSV fails', async () => {

@@ -2,14 +2,13 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
 import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
-import { useRealizedGainsData } from '../hooks/useRealizedGainsData';
+import { useGainsTableData, useDividendsTableData } from '../hooks/useRealizedGainsData';
 import type { TickerGroup, DividendTickerGroup } from '../hooks/useRealizedGainsData';
 import type { RealizedSale, DividendReceived } from '../api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,178 +17,201 @@ import { PaginationControls } from './PaginationControls';
 import { SortableTableHead } from './SortableTableHead';
 import { RealizedGainsInsights } from './RealizedGainsInsights';
 
-// ================== Props ==================
+// ================== Filter Controls ==================
+
+interface FilterControlsProps {
+  availableYears: string[];
+  yearFilter: string;
+  onYearChange: (value: string) => void;
+  filter: string;
+  onFilterChange: (value: string) => void;
+}
+
+const FilterControls = ({ availableYears, yearFilter, onYearChange, filter, onFilterChange }: FilterControlsProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      {availableYears.length > 1 && (
+        <Select value={yearFilter} onValueChange={onYearChange}>
+          <SelectTrigger className="w-32 h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('status.allYears')}</SelectItem>
+            {availableYears.map((year) => (
+              <SelectItem key={year} value={year}>{year}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      <Input
+        name="ticker-filter"
+        placeholder={t('status.columns.ticker')}
+        value={filter}
+        onChange={(e) => onFilterChange(e.target.value)}
+        className="w-40 h-8 text-sm"
+      />
+    </div>
+  );
+};
+
+// ================== Realized Gains Table ==================
 
 interface RealizedGainsTableProps {
   realizedSales: RealizedSale[];
-  dividendsReceived: DividendReceived[];
-  displayCurrency: 'EUR' | 'USD';
   locale: string;
 }
 
-export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, displayCurrency, locale }: RealizedGainsTableProps) => {
+export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGainsTableProps) => {
   const { t } = useTranslation();
   const {
-    tab, expandState, sortKey, sortAsc, filter, yearFilter,
-    availableYears, filteredGains, filteredDividends,
-    pagedGains, pagedDividends, gainsTotals, dividendTotals,
+    expandState, sortKey, sortAsc, filter, yearFilter,
+    availableYears, filteredGains, pagedGains, gainsTotals,
     safePage, totalPages, setPage,
-    handleTabChange, handleYearChange, handleFilterChange, handleSort, toggleExpand,
-    hasGains, hasDividends,
-  } = useRealizedGainsData({ realizedSales, dividendsReceived });
-
-  if (!hasGains && !hasDividends) {
-    return null;
-  }
+    handleYearChange, handleFilterChange, handleSort, toggleExpand,
+  } = useGainsTableData({ realizedSales });
 
   return (
-    <div className="mt-6">
-      <Tabs value={tab} onValueChange={handleTabChange}>
-        <div className="flex items-center justify-between mb-3">
-          <TabsList className="h-8">
-            {hasGains && (
-              <TabsTrigger value="gains" className="text-xs px-3">
-                {t('status.realizedGains')}
-              </TabsTrigger>
+    <div className="mt-4">
+      <FilterControls
+        availableYears={availableYears}
+        yearFilter={yearFilter}
+        onYearChange={handleYearChange}
+        filter={filter}
+        onFilterChange={handleFilterChange}
+      />
+      <RealizedGainsInsights filteredGains={filteredGains} locale={locale} />
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead />
+              <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <SortableTableHead label={t('status.columns.sells')} sortKey="count" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <SortableTableHead label={t('status.columns.realizedGL')} sortKey="gain" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pagedGains.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">
+                  {t('status.noRealizedGains')}
+                </TableCell>
+              </TableRow>
             )}
-            {hasDividends && (
-              <TabsTrigger value="dividends" className="text-xs px-3">
-                {t('status.dividendsReceived')}
-              </TabsTrigger>
+            {pagedGains.map((group) => (
+              <GainsTickerGroupRow
+                key={group.ticker}
+                group={group}
+                isExpanded={expandState.has(group.ticker)}
+                onToggle={toggleExpand}
+                locale={locale}
+              />
+            ))}
+            {filteredGains.length > 0 && (
+              <TableRow className="bg-muted/30 font-semibold">
+                <TableCell className="text-sm">{t('status.total')}</TableCell>
+                <TableCell />
+                <TableCell>
+                  <Badge variant="secondary" className="text-xs">
+                    {t('status.sellCount', { count: gainsTotals.count })}
+                  </Badge>
+                </TableCell>
+                <TableCell className={`min-w-[7rem] text-right text-sm tabular-nums ${getValueClass(gainsTotals.gain)}`}>
+                  {formatSignedCurrency(gainsTotals.gain, 'USD', locale)}
+                </TableCell>
+              </TableRow>
             )}
-          </TabsList>
-          <div className="flex items-center gap-2">
-            {availableYears.length > 1 && (
-              <Select value={yearFilter} onValueChange={handleYearChange}>
-                <SelectTrigger className="w-32 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('status.allYears')}</SelectItem>
-                  {availableYears.map((year) => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Input
-              name="ticker-filter"
-              placeholder={t('status.columns.ticker')}
-              value={filter}
-              onChange={(e) => handleFilterChange(e.target.value)}
-              className="w-40 h-8 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Realized Gains Tab */}
-        <TabsContent value="gains">
-          <RealizedGainsInsights filteredGains={filteredGains} locale={locale} />
-          <Card className="overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead />
-                  <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                  <SortableTableHead label={t('status.columns.sells')} sortKey="count" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                  <SortableTableHead label={t('status.columns.realizedGL')} sortKey="gain" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedGains.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">
-                      {t('status.noRealizedGains')}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {pagedGains.map((group) => (
-                  <GainsTickerGroupRow
-                    key={group.ticker}
-                    group={group}
-                    isExpanded={expandState.has(group.ticker)}
-                    onToggle={toggleExpand}
-                    locale={locale}
-                  />
-                ))}
-                {filteredGains.length > 0 && (
-                  <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell className="text-sm">{t('status.total')}</TableCell>
-                    <TableCell />
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {t('status.sellCount', { count: gainsTotals.count })}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={`min-w-[7rem] text-right text-sm tabular-nums ${getValueClass(gainsTotals.gain)}`}>
-                      {formatSignedCurrency(gainsTotals.gain, 'USD', locale)}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            {totalPages > 1 && <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />}
-          </Card>
-        </TabsContent>
-
-        {/* Dividends Tab */}
-        <TabsContent value="dividends">
-          <Card className="overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead />
-                  <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                  <SortableTableHead label={t('status.columns.payments')} sortKey="count" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                  <SortableTableHead label={t('status.columns.amount')} sortKey="amount" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedDividends.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">
-                      {t('status.noDividends')}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {pagedDividends.map((group) => (
-                  <DividendTickerGroupRow
-                    key={group.ticker}
-                    group={group}
-                    isExpanded={expandState.has(group.ticker)}
-                    onToggle={toggleExpand}
-                    displayCurrency={displayCurrency}
-                    locale={locale}
-                  />
-                ))}
-                {filteredDividends.length > 0 && (
-                  <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell className="text-sm">{t('status.total')}</TableCell>
-                    <TableCell />
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {t('status.paymentCount', { count: dividendTotals.count })}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="min-w-[7rem] text-right text-sm tabular-nums">
-                      {displayCurrency === 'EUR' && dividendTotals.totalEur != null
-                        ? formatCurrency(dividendTotals.totalEur, 'EUR', locale)
-                        : formatCurrency(dividendTotals.totalUsd, 'USD', locale)}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            {totalPages > 1 && <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />}
-          </Card>
-        </TabsContent>
-
-      </Tabs>
+          </TableBody>
+        </Table>
+        {totalPages > 1 && <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />}
+      </Card>
     </div>
   );
 });
 
 RealizedGainsTable.displayName = 'RealizedGainsTable';
+
+// ================== Dividends Received Table ==================
+
+interface DividendsReceivedTableProps {
+  dividendsReceived: DividendReceived[];
+  displayCurrency: 'EUR' | 'USD';
+  locale: string;
+}
+
+export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency, locale }: DividendsReceivedTableProps) => {
+  const { t } = useTranslation();
+  const {
+    expandState, sortKey, sortAsc, filter, yearFilter,
+    availableYears, filteredDividends, pagedDividends, dividendTotals,
+    safePage, totalPages, setPage,
+    handleYearChange, handleFilterChange, handleSort, toggleExpand,
+  } = useDividendsTableData({ dividendsReceived });
+
+  return (
+    <div className="mt-4">
+      <FilterControls
+        availableYears={availableYears}
+        yearFilter={yearFilter}
+        onYearChange={handleYearChange}
+        filter={filter}
+        onFilterChange={handleFilterChange}
+      />
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead />
+              <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <SortableTableHead label={t('status.columns.payments')} sortKey="count" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <SortableTableHead label={t('status.columns.amount')} sortKey="amount" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pagedDividends.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">
+                  {t('status.noDividends')}
+                </TableCell>
+              </TableRow>
+            )}
+            {pagedDividends.map((group) => (
+              <DividendTickerGroupRow
+                key={group.ticker}
+                group={group}
+                isExpanded={expandState.has(group.ticker)}
+                onToggle={toggleExpand}
+                displayCurrency={displayCurrency}
+                locale={locale}
+              />
+            ))}
+            {filteredDividends.length > 0 && (
+              <TableRow className="bg-muted/30 font-semibold">
+                <TableCell className="text-sm">{t('status.total')}</TableCell>
+                <TableCell />
+                <TableCell>
+                  <Badge variant="secondary" className="text-xs">
+                    {t('status.paymentCount', { count: dividendTotals.count })}
+                  </Badge>
+                </TableCell>
+                <TableCell className="min-w-[7rem] text-right text-sm tabular-nums">
+                  {displayCurrency === 'EUR' && dividendTotals.totalEur != null
+                    ? formatCurrency(dividendTotals.totalEur, 'EUR', locale)
+                    : formatCurrency(dividendTotals.totalUsd, 'USD', locale)}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        {totalPages > 1 && <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />}
+      </Card>
+    </div>
+  );
+});
+
+DividendsReceivedTable.displayName = 'DividendsReceivedTable';
 
 // ================== Gains Row ==================
 

@@ -187,7 +187,7 @@ def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
 
 
 def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
-    split_ratio = _to_decimal(tx.split_ratio) if tx.split_ratio else _ONE
+    split_ratio = _to_decimal(tx.split_ratio) if tx.split_ratio is not None else _ONE
     if split_ratio <= 0:
         if strict:
             state.warnings.append(
@@ -259,6 +259,8 @@ def _compute_forward_split_factors(
         if cutoff_date is not None and tx.date.date() <= cutoff_date.date():
             continue
         ratio = _to_decimal(tx.split_ratio)
+        if ratio <= 0:
+            continue
         factors[tx.ticker] = factors.get(tx.ticker, _ONE) * ratio
     return factors
 
