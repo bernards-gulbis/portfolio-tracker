@@ -478,10 +478,10 @@ export const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
 
   const handleBack = () => {
-    if (activePortfolioId !== null) {
-      goToPortfolio(activePortfolioId);
-    } else {
+    if (activePortfolioId === null) {
       goToFirstPortfolio();
+    } else {
+      goToPortfolio(activePortfolioId);
     }
   };
 

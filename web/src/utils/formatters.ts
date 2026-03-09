@@ -89,9 +89,11 @@ export const getValueClass = (value: number | null | undefined): string => {
  * 31–365     → "Xm Yd" (omit "0d")
  * > 365      → "Xy Xm" (omit "0m")
  */
+const defaultDaysHeldLabels: { d: string; m: string; y: string } = { d: 'd', m: 'm', y: 'y' };
+
 export const formatDaysHeld = (
   days: number,
-  labels: { d: string; m: string; y: string } = { d: 'd', m: 'm', y: 'y' },
+  labels = defaultDaysHeldLabels,
 ): string => {
   if (days < 31) return `${days}${labels.d}`;
   if (days <= 365) {

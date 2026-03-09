@@ -1,7 +1,9 @@
-import { memo, useMemo, useState } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
 import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
+import { useRealizedGainsData } from '../hooks/useRealizedGainsData';
+import type { TickerGroup, DividendTickerGroup } from '../hooks/useRealizedGainsData';
 import type { RealizedSale, DividendReceived } from '../api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,25 +15,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronRightIcon } from 'lucide-react';
 import { PaginationControls } from './PaginationControls';
-
-const PAGE_SIZE = 10;
-
-// ================== Realized Gains types ==================
-
-interface TickerGroup {
-  ticker: string;
-  sales: RealizedSale[];
-  totalGain: number;
-}
-
-// ================== Dividends types ==================
-
-interface DividendTickerGroup {
-  ticker: string;
-  payments: DividendReceived[];
-  totalAmount: number;
-  totalAmountEur: number | null;
-}
+import { SortableTableHead } from './SortableTableHead';
+import { RealizedGainsInsights } from './RealizedGainsInsights';
 
 // ================== Props ==================
 
@@ -44,186 +29,14 @@ interface RealizedGainsTableProps {
 
 export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, displayCurrency, locale }: RealizedGainsTableProps) => {
   const { t } = useTranslation();
-  const initialTab = realizedSales.length > 0 ? 'gains' : 'dividends';
-  const [tab, setTab] = useState<'gains' | 'dividends'>(initialTab);
-  const [expandState, setExpandState] = useState<Set<string>>(new Set());
-  const [sortKey, setSortKey] = useState<string>('date');
-  const [sortAsc, setSortAsc] = useState(false);
-  const [filter, setFilter] = useState('');
-  const [page, setPage] = useState(1);
-  const [yearFilter, setYearFilter] = useState<string>('all');
-
-  const availableYears = useMemo(() => {
-    const years = new Set([
-      ...realizedSales.map((s) => s.date.slice(0, 4)),
-      ...dividendsReceived.map((d) => d.date.slice(0, 4)),
-    ]);
-    return Array.from(years).sort().reverse();
-  }, [realizedSales, dividendsReceived]);
-
-  const filteredSales = useMemo(() => {
-    if (yearFilter === 'all') return realizedSales;
-    return realizedSales.filter((s) => s.date.startsWith(yearFilter));
-  }, [realizedSales, yearFilter]);
-
-  const filteredDividendsReceived = useMemo(() => {
-    if (yearFilter === 'all') return dividendsReceived;
-    return dividendsReceived.filter((d) => d.date.startsWith(yearFilter));
-  }, [dividendsReceived, yearFilter]);
-
-  const handleTabChange = (value: string) => {
-    setTab(value as 'gains' | 'dividends');
-    setExpandState(new Set());
-    setSortKey('date');
-    setSortAsc(false);
-    setPage(1);
-  };
-
-  const handleYearChange = (value: string) => {
-    setYearFilter(value);
-    setPage(1);
-  };
-
-  // ================== Realized Gains grouping ==================
-
-  const gainGroups = useMemo(() => {
-    const map = new Map<string, RealizedSale[]>();
-    for (const sale of filteredSales) {
-      const list = map.get(sale.ticker);
-      if (list) {
-        list.push(sale);
-      } else {
-        map.set(sale.ticker, [sale]);
-      }
-    }
-    const result: TickerGroup[] = [];
-    for (const [ticker, sales] of map) {
-      sales.sort((a, b) => b.date.localeCompare(a.date));
-      result.push({
-        ticker,
-        sales,
-        totalGain: sales.reduce((sum, s) => sum + s.realized_gain, 0),
-      });
-    }
-    return result;
-  }, [filteredSales]);
-
-  // ================== Dividends grouping ==================
-
-  const dividendGroups = useMemo(() => {
-    const map = new Map<string, DividendReceived[]>();
-    for (const d of filteredDividendsReceived) {
-      const list = map.get(d.ticker);
-      if (list) {
-        list.push(d);
-      } else {
-        map.set(d.ticker, [d]);
-      }
-    }
-    const result: DividendTickerGroup[] = [];
-    for (const [ticker, payments] of map) {
-      payments.sort((a, b) => b.date.localeCompare(a.date));
-      const allHaveEur = payments.every((p) => p.amount_eur != null);
-      result.push({
-        ticker,
-        payments,
-        totalAmount: payments.reduce((sum, p) => sum + p.amount, 0),
-        totalAmountEur: allHaveEur
-          ? payments.reduce((sum, p) => sum + (p.amount_eur ?? 0), 0)
-          : null,
-      });
-    }
-    return result;
-  }, [filteredDividendsReceived]);
-
-  // ================== Filtering + sorting ==================
-
-  const filteredGains = useMemo(() => {
-    const q = filter.trim().toUpperCase();
-    const list = q ? gainGroups.filter((g) => g.ticker.includes(q)) : gainGroups;
-    return [...list].sort((a, b) => {
-      if (sortKey === 'date') {
-        const diff = a.sales[0].date.localeCompare(b.sales[0].date);
-        return sortAsc ? diff : -diff;
-      }
-      const diff = sortKey === 'count'
-        ? a.sales.length - b.sales.length
-        : a.totalGain - b.totalGain;
-      return sortAsc ? diff : -diff;
-    });
-  }, [gainGroups, filter, sortKey, sortAsc]);
-
-  const filteredDividends = useMemo(() => {
-    const q = filter.trim().toUpperCase();
-    const list = q ? dividendGroups.filter((g) => g.ticker.includes(q)) : dividendGroups;
-    return [...list].sort((a, b) => {
-      if (sortKey === 'date') {
-        const diff = a.payments[0].date.localeCompare(b.payments[0].date);
-        return sortAsc ? diff : -diff;
-      }
-      const diff = sortKey === 'count'
-        ? a.payments.length - b.payments.length
-        : (a.totalAmountEur ?? a.totalAmount) - (b.totalAmountEur ?? b.totalAmount);
-      return sortAsc ? diff : -diff;
-    });
-  }, [dividendGroups, filter, sortKey, sortAsc]);
-
-  // ================== Withdrawals sorting ==================
-
-  const activeListLength = tab === 'gains' ? filteredGains.length : filteredDividends.length;
-  const totalPages = Math.max(1, Math.ceil(activeListLength / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-
-  const pagedGains = tab === 'gains'
-    ? filteredGains.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-    : [];
-  const pagedDividends = tab === 'dividends'
-    ? filteredDividends.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-    : [];
-  const gainsTotals = useMemo(() => ({
-    gain: filteredGains.reduce((sum, g) => sum + g.totalGain, 0),
-    count: filteredGains.reduce((sum, g) => sum + g.sales.length, 0),
-  }), [filteredGains]);
-
-  const dividendTotals = useMemo(() => {
-    const totalUsd = filteredDividends.reduce((sum, g) => sum + g.totalAmount, 0);
-    const allHaveEur = filteredDividends.every((g) => g.totalAmountEur != null);
-    const totalEur = allHaveEur
-      ? filteredDividends.reduce((sum, g) => sum + (g.totalAmountEur ?? 0), 0)
-      : null;
-    const count = filteredDividends.reduce((sum, g) => sum + g.payments.length, 0);
-    return { totalUsd, totalEur, count };
-  }, [filteredDividends]);
-
-  const handleFilterChange = (value: string) => {
-    setFilter(value);
-    setPage(1);
-  };
-
-  const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortAsc((prev) => !prev);
-    } else {
-      setSortKey(key);
-      setSortAsc(false);
-    }
-    setPage(1);
-  };
-
-  const toggleExpand = (ticker: string) => {
-    setExpandState((prev) => {
-      const next = new Set(prev);
-      if (next.has(ticker)) {
-        next.delete(ticker);
-      } else {
-        next.add(ticker);
-      }
-      return next;
-    });
-  };
-
-  const hasGains = realizedSales.length > 0;
-  const hasDividends = dividendsReceived.length > 0;
+  const {
+    tab, expandState, sortKey, sortAsc, filter, yearFilter,
+    availableYears, filteredGains, filteredDividends,
+    pagedGains, pagedDividends, gainsTotals, dividendTotals,
+    safePage, totalPages, setPage,
+    handleTabChange, handleYearChange, handleFilterChange, handleSort, toggleExpand,
+    hasGains, hasDividends,
+  } = useRealizedGainsData({ realizedSales, dividendsReceived });
 
   if (!hasGains && !hasDividends) {
     return null;
@@ -271,29 +84,15 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
 
         {/* Realized Gains Tab */}
         <TabsContent value="gains">
+          <RealizedGainsInsights filteredGains={filteredGains} locale={locale} />
           <Card className="overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead />
-                  <TableHead
-                    className="cursor-pointer select-none hover:text-foreground"
-                    onClick={() => handleSort('date')}
-                  >
-                    {t('status.columns.date')}{sortKey === 'date' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none hover:text-foreground"
-                    onClick={() => handleSort('count')}
-                  >
-                    {t('status.columns.sells')}{sortKey === 'count' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-                  </TableHead>
-                  <TableHead
-                    className="min-w-[7rem] text-right cursor-pointer select-none hover:text-foreground"
-                    onClick={() => handleSort('gain')}
-                  >
-                    {t('status.columns.realizedGL')}{sortKey === 'gain' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-                  </TableHead>
+                  <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                  <SortableTableHead label={t('status.columns.sells')} sortKey="count" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                  <SortableTableHead label={t('status.columns.realizedGL')} sortKey="gain" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -340,24 +139,9 @@ export const RealizedGainsTable = memo(({ realizedSales, dividendsReceived, disp
               <TableHeader>
                 <TableRow>
                   <TableHead />
-                  <TableHead
-                    className="cursor-pointer select-none hover:text-foreground"
-                    onClick={() => handleSort('date')}
-                  >
-                    {t('status.columns.date')}{sortKey === 'date' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none hover:text-foreground"
-                    onClick={() => handleSort('count')}
-                  >
-                    {t('status.columns.payments')}{sortKey === 'count' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-                  </TableHead>
-                  <TableHead
-                    className="min-w-[7rem] text-right cursor-pointer select-none hover:text-foreground"
-                    onClick={() => handleSort('amount')}
-                  >
-                    {t('status.columns.amount')}{sortKey === 'amount' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-                  </TableHead>
+                  <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                  <SortableTableHead label={t('status.columns.payments')} sortKey="count" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                  <SortableTableHead label={t('status.columns.amount')} sortKey="amount" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
                 </TableRow>
               </TableHeader>
               <TableBody>

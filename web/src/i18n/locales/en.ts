@@ -351,6 +351,12 @@ const en = {
       daysHeld: 'Days held',
     },
     taxCaption: 'Tax ({{rate}}%): {{amount}}',
+    insights: {
+      topWinners: 'Top Winners',
+      topLosers: 'Top Losers',
+      mostTraded: 'Most Traded',
+      noData: 'No data',
+    },
     currency: {
       toggle: 'Currency',
       usdLabel: 'USD',

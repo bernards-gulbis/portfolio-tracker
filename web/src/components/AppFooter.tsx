@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { APP_VERSION } from '../constants/app';
 
-export function AppFooter({ className }: { className?: string }) {
+export function AppFooter({ className }: Readonly<{ className?: string }>) {
   const { t } = useTranslation();
 
   return (

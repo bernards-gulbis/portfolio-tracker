@@ -47,12 +47,12 @@ describe('RealizedGainsTable', () => {
       <RealizedGainsTable realizedSales={sales} dividendsReceived={[]} {...defaultProps} />
     );
 
-    expect(screen.getByText('AAPL')).toBeInTheDocument();
-    expect(screen.getByText('MSFT')).toBeInTheDocument();
-    // AAPL group has 2 sells
-    expect(screen.getByText('2 sells')).toBeInTheDocument();
+    expect(screen.getAllByText('AAPL').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('MSFT').length).toBeGreaterThanOrEqual(1);
+    // AAPL group has 2 sells (insights cards may also show sell counts)
+    expect(screen.getAllByText('2 sells').length).toBeGreaterThanOrEqual(1);
     // MSFT group has 1 sell
-    expect(screen.getByText('1 sell')).toBeInTheDocument();
+    expect(screen.getAllByText('1 sell').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows empty state message when gains tab has no results after filter', async () => {

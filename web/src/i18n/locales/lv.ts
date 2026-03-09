@@ -353,6 +353,12 @@ const lv: Translation = {
       daysHeld: 'Turēšanas dienas',
     },
     taxCaption: 'Nodoklis ({{rate}}%): {{amount}}',
+    insights: {
+      topWinners: 'Lielākie ieguvēji',
+      topLosers: 'Lielākie zaudētāji',
+      mostTraded: 'Visvairāk tirgotie',
+      noData: 'Nav datu',
+    },
     currency: {
       toggle: 'Valūta',
       usdLabel: 'USD',

@@ -9,6 +9,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { InfoIcon } from 'lucide-react';
 import { PaginationControls } from './PaginationControls';
+import { SortableTableHead } from './SortableTableHead';
 
 const PAGE_SIZE = 10;
 
@@ -29,7 +30,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
 
   const availableYears = useMemo(() => {
     const years = new Set(realizedWithdrawals.map((w) => w.date.slice(0, 4)));
-    return Array.from(years).sort().reverse();
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [realizedWithdrawals]);
 
   const indexedWithdrawals = useMemo(
@@ -114,26 +115,11 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead
-                className="cursor-pointer select-none hover:text-foreground"
-                onClick={() => handleSort('date')}
-              >
-                {t('status.columns.date')}{sortKey === 'date' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-              </TableHead>
-              <TableHead
-                className="text-right cursor-pointer select-none hover:text-foreground"
-                onClick={() => handleSort('amount')}
-              >
-                {t('status.columns.amountUsd')}{sortKey === 'amount' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-              </TableHead>
+              <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+              <SortableTableHead label={t('status.columns.amountUsd')} sortKey="amount" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="text-right" />
               <TableHead className="text-right">{t('status.columns.eurCostAvg')}</TableHead>
               <TableHead className="text-right">{t('status.columns.eurReceived')}</TableHead>
-              <TableHead
-                className="min-w-[7rem] text-right cursor-pointer select-none hover:text-foreground"
-                onClick={() => handleSort('fx_gain')}
-              >
-                {t('status.columns.realizedFxGL')}{sortKey === 'fx_gain' ? (sortAsc ? ' \u25B2' : ' \u25BC') : ''}
-              </TableHead>
+              <SortableTableHead label={t('status.columns.realizedFxGL')} sortKey="fx_gain" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
               <TableHead className="text-right">
                 <span className="inline-flex items-center gap-1">
                   {t('status.columns.tax')} ({new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(taxRate * 100)}%)
