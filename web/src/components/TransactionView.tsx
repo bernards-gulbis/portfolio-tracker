@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, MoreVertical, UploadIcon, DownloadIcon, ReceiptIcon } from 'lucide-react';
+import { AlertTriangleIcon, Plus, MoreVertical, UploadIcon, DownloadIcon, ReceiptIcon } from 'lucide-react';
 
 export const TransactionView = () => {
   const { t } = useTranslation();
@@ -145,7 +145,10 @@ export const TransactionView = () => {
         </CardHeader>
         <Separator />
         <CardContent className="py-8">
-          <p className="text-center text-destructive text-sm">{t('transaction.view.error', { message: getErrorMessage(error) })}</p>
+          <Alert variant="destructive">
+            <AlertTriangleIcon className="h-4 w-4" />
+            <AlertDescription>{t('transaction.view.error', { message: getErrorMessage(error) })}</AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );

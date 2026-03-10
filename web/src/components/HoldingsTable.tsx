@@ -82,6 +82,18 @@ export const HoldingsTable = memo(({
     return hasValue ? sum : null;
   }, [holdingsWithEur, showEur]);
 
+  const totalMarketValue = useMemo(() => {
+    let sum = cashDisplay;
+    for (const { holding, eurVals } of holdingsWithEur) {
+      if (showEur && eurVals?.currentValueEur != null) {
+        sum += eurVals.currentValueEur;
+      } else if (holding.current_value != null) {
+        sum += holding.current_value;
+      }
+    }
+    return sum;
+  }, [holdingsWithEur, showEur, cashDisplay]);
+
   const totalCost = useMemo(() => {
     return holdingsWithEur.reduce((sum, { holding, eurVals }) => {
       if (showEur && eurVals != null) return sum + eurVals.totalCostEur;
@@ -202,19 +214,26 @@ export const HoldingsTable = memo(({
                 </TableRow>
             ))}
           </TableBody>
-          {totalUnrealizedGL != null && (
+          {(totalUnrealizedGL != null || totalMarketValue != null) && (
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={5} className="text-right font-semibold">{t('status.total')}</TableCell>
-                <TableCell className={`text-right font-semibold tabular-nums ${getValueClass(totalUnrealizedGL)}`}>
-                  <div className="flex flex-col items-end">
-                    <span>{formatSignedCurrency(totalUnrealizedGL, showEur ? 'EUR' : 'USD', locale)}</span>
-                    {totalUnrealizedPct != null && (
-                      <span className={`text-xs ${getValueClass(totalUnrealizedGL)}`}>
-                        {formatSignedPercent(totalUnrealizedPct)}
-                      </span>
-                    )}
-                  </div>
+                <TableCell colSpan={4} className="text-right font-semibold">{t('status.total')}</TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">
+                  {totalMarketValue != null
+                    ? formatCurrency(totalMarketValue, displayCurrency, locale)
+                    : '-'}
+                </TableCell>
+                <TableCell className={`text-right font-semibold tabular-nums ${totalUnrealizedGL != null ? getValueClass(totalUnrealizedGL) : ''}`}>
+                  {totalUnrealizedGL != null ? (
+                    <div className="flex flex-col items-end">
+                      <span>{formatSignedCurrency(totalUnrealizedGL, showEur ? 'EUR' : 'USD', locale)}</span>
+                      {totalUnrealizedPct != null && (
+                        <span className={`text-xs ${getValueClass(totalUnrealizedGL)}`}>
+                          {formatSignedPercent(totalUnrealizedPct)}
+                        </span>
+                      )}
+                    </div>
+                  ) : '-'}
                 </TableCell>
               </TableRow>
             </TableFooter>

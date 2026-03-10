@@ -25,7 +25,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { AlertTriangleIcon, ChevronRightIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { AlertTriangleIcon, BriefcaseIcon, ChevronRightIcon, InboxIcon, InfoIcon, RefreshCwIcon } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const EMPTY_DATA_POINTS: PerformanceDataPoint[] = [];
@@ -479,11 +480,14 @@ export const PortfolioStatusView = () => {
 
   if (!portfolioId) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <p className="text-center text-muted-foreground">{t('status.noPortfolio')}</p>
-        </CardContent>
-      </Card>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia>
+            <BriefcaseIcon />
+          </EmptyMedia>
+          <EmptyTitle>{t('status.noPortfolio')}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
@@ -493,21 +497,23 @@ export const PortfolioStatusView = () => {
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <p className="text-center text-destructive">{t('status.error', { message: getErrorMessage(error) })}</p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <AlertTriangleIcon className="h-4 w-4" />
+        <AlertDescription>{t('status.error', { message: getErrorMessage(error) })}</AlertDescription>
+      </Alert>
     );
   }
 
   if (!effectiveStatus) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <p className="text-center text-muted-foreground">{t('status.noData')}</p>
-        </CardContent>
-      </Card>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia>
+            <InboxIcon />
+          </EmptyMedia>
+          <EmptyTitle>{t('status.noData')}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
