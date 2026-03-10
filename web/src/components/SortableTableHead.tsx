@@ -1,5 +1,6 @@
 import { TableHead } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
 
 interface SortableTableHeadProps {
   label: string;
@@ -11,10 +12,7 @@ interface SortableTableHeadProps {
 }
 
 export const SortableTableHead = ({ label, sortKey, activeSortKey, sortAsc, onSort, className }: SortableTableHeadProps) => {
-  let indicator = '';
-  if (sortKey === activeSortKey) {
-    indicator = sortAsc ? ' ▲' : ' ▼';
-  }
+  const isActive = sortKey === activeSortKey;
   return (
     <TableHead
       role="button"
@@ -28,7 +26,13 @@ export const SortableTableHead = ({ label, sortKey, activeSortKey, sortAsc, onSo
         }
       }}
     >
-      {label}{indicator}
+      <span className="inline-flex items-center gap-0.5">
+        {label}
+        {isActive && (sortAsc
+          ? <ChevronUpIcon className="h-3.5 w-3.5" />
+          : <ChevronDownIcon className="h-3.5 w-3.5" />
+        )}
+      </span>
     </TableHead>
   );
 };

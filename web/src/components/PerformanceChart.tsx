@@ -363,7 +363,7 @@ export const PerformanceChart = ({
       <CardHeader>
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-semibold">
               {viewMode === 'value' ? t('chart.performance.titleValue') : t('chart.performance.title')}
             </CardTitle>
             {headerInfo?.isHovering && (
@@ -382,18 +382,18 @@ export const PerformanceChart = ({
                 </span>
               )}
               {headerInfo.mode === 'value' && headerInfo.principalDisplay != null && (
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <span
-                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    className="inline-block h-2 w-2 rounded-[2px] shrink-0"
                     style={{ backgroundColor: 'var(--chart-2)' }}
                   />
                   {t('chart.performance.principal')}: {headerInfo.principalDisplay}
                 </div>
               )}
               {headerInfo.mode === 'pct' && headerInfo.sp500Display != null && (
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <span
-                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    className="inline-block h-2 w-2 rounded-[2px] shrink-0"
                     style={{ backgroundColor: 'var(--chart-4)' }}
                   />
                   {t('chart.performance.sp500')}: {headerInfo.sp500Display}

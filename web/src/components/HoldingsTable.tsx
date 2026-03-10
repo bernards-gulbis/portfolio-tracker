@@ -125,19 +125,18 @@ export const HoldingsTable = memo(({
               <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
               <TableHead className="text-right">
                 <div className="flex flex-col items-end">
-                  <span>{t('status.columns.cost')}{showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                  <span className="flex items-center gap-1">{t('status.columns.cost')}{showEur && <span className="text-muted-foreground font-normal">USD</span>}</span>
+                  <span className="text-sm font-normal text-muted-foreground">{t('status.priceCaption')}</span>
                 </div>
               </TableHead>
               <TableHead className="text-right">
                 <div className="flex flex-col items-end">
-                  <span>{t('status.columns.marketValue')}{showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{t('status.currentPriceCaption')}</span>
+                  <span className="flex items-center gap-1">{t('status.columns.marketValue')}{showEur && eurAvailable && <span className="text-muted-foreground font-normal">EUR</span>}</span>
+                  <span className="text-sm font-normal text-muted-foreground">{t('status.currentPriceCaption')}</span>
                 </div>
               </TableHead>
               <TableHead className="text-right">
-                {t('status.columns.unrealizedGL')}
-                {showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}
+                <span className="flex items-center gap-1">{t('status.columns.unrealizedGL')}{showEur && eurAvailable && <span className="text-muted-foreground font-normal">EUR</span>}</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -162,7 +161,7 @@ export const HoldingsTable = memo(({
                   <TableCell className="text-right tabular-nums">
                     <div className="flex flex-col items-end">
                       <span>{formatCurrency(holding.total_cost, 'USD', locale)}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         {formatCurrency(holding.average_cost, 'USD', locale)}
                       </span>
                     </div>
@@ -177,7 +176,7 @@ export const HoldingsTable = memo(({
                           return eurVals.currentValueEur == null ? '-' : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
                         })()}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         {holding.current_price == null ? '-' : formatCurrency(holding.current_price, 'USD', locale)}
                       </span>
                     </div>
@@ -190,7 +189,7 @@ export const HoldingsTable = memo(({
                             <span className={`font-semibold ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
                               {formatSignedCurrency(eurVals.unrealizedGainLossEur, 'EUR', locale)}
                             </span>
-                            <span className={`text-xs ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
+                            <span className={`text-sm ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
                               {formatSignedPercent(holding.unrealized_gain_loss_pct)}
                             </span>
                           </div>
@@ -202,7 +201,7 @@ export const HoldingsTable = memo(({
                             <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
                               {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
                             </span>
-                            <span className={`text-xs ${getValueClass(holding.unrealized_gain_loss)}`}>
+                            <span className={`text-sm ${getValueClass(holding.unrealized_gain_loss)}`}>
                               {formatSignedPercent(holding.unrealized_gain_loss_pct)}
                             </span>
                           </div>
@@ -216,19 +215,22 @@ export const HoldingsTable = memo(({
           </TableBody>
           {(totalUnrealizedGL != null || totalMarketValue != null) && (
             <TableFooter>
-              <TableRow>
-                <TableCell colSpan={4} className="text-right font-semibold">{t('status.total')}</TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">
+              <TableRow className="bg-muted/30 font-semibold">
+                <TableCell>{t('status.total')}</TableCell>
+                <TableCell />
+                <TableCell />
+                <TableCell />
+                <TableCell className="text-right tabular-nums">
                   {totalMarketValue != null
                     ? formatCurrency(totalMarketValue, displayCurrency, locale)
                     : '-'}
                 </TableCell>
-                <TableCell className={`text-right font-semibold tabular-nums ${totalUnrealizedGL != null ? getValueClass(totalUnrealizedGL) : ''}`}>
+                <TableCell className={`text-right tabular-nums ${totalUnrealizedGL != null ? getValueClass(totalUnrealizedGL) : ''}`}>
                   {totalUnrealizedGL != null ? (
                     <div className="flex flex-col items-end">
                       <span>{formatSignedCurrency(totalUnrealizedGL, showEur ? 'EUR' : 'USD', locale)}</span>
                       {totalUnrealizedPct != null && (
-                        <span className={`text-xs ${getValueClass(totalUnrealizedGL)}`}>
+                        <span className={`text-sm ${getValueClass(totalUnrealizedGL)}`}>
                           {formatSignedPercent(totalUnrealizedPct)}
                         </span>
                       )}

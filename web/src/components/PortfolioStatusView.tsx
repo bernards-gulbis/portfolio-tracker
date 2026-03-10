@@ -80,7 +80,7 @@ const CollapsiblePositions = ({ children }: { children: React.ReactNode }) => {
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.positions')}
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-4">{children}</CollapsibleContent>
+      <CollapsibleContent className="pt-4">{children}</CollapsibleContent>
     </Collapsible>
   );
 };
