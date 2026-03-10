@@ -97,7 +97,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
   return (
     <div className="mt-4">
       {availableYears.length > 1 && (
-        <div className="flex justify-end mb-2">
+        <div className="flex items-center gap-2 mb-3">
           <Select value={yearFilter} onValueChange={handleYearChange}>
             <SelectTrigger className="w-32 h-8 text-xs">
               <SelectValue />
@@ -111,7 +111,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
           </Select>
         </div>
       )}
-      <Card className="overflow-hidden">
+      <Card>
         <Table>
           <TableHeader>
             <TableRow>
@@ -142,18 +142,18 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
               const taxable = withdrawalTaxMap.get(origIdx) ?? 0;
               return (
                 <TableRow key={`${w.date}-${idx}`}>
-                  <TableCell className="text-sm">{formatDateCompact(w.date, locale)}</TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">{formatCurrency(w.amount, 'USD', locale)}</TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">{formatCurrency(w.amount_eur_avg, 'EUR', locale)}</TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">{formatCurrency(w.amount_eur, 'EUR', locale)}</TableCell>
-                  <TableCell className={`min-w-[7rem] text-right text-sm tabular-nums ${getValueClass(w.realized_fx_gain)}`}>
+                  <TableCell>{formatDateCompact(w.date, locale)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(w.amount, 'USD', locale)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(w.amount_eur_avg, 'EUR', locale)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(w.amount_eur, 'EUR', locale)}</TableCell>
+                  <TableCell className={`min-w-[7rem] text-right tabular-nums ${getValueClass(w.realized_fx_gain)}`}>
                     {formatSignedCurrency(w.realized_fx_gain, 'EUR', locale)}
                   </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums">
+                  <TableCell className="text-right tabular-nums">
                     {taxable > 0 ? (
                       <>
                         <span>{formatCurrency(taxable * taxRate, 'EUR', locale)}</span>
-                        <span className="block text-[10px] text-muted-foreground">
+                        <span className="block text-xs text-muted-foreground">
                           {t('status.on')} {formatCurrency(taxable, 'EUR', locale)}
                         </span>
                       </>
@@ -164,18 +164,18 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
             })}
             {sortedWithdrawals.length > 0 && (
               <TableRow className="bg-muted/30 font-semibold">
-                <TableCell className="text-sm">{t('status.total')}</TableCell>
-                <TableCell className="text-right text-sm tabular-nums">{formatCurrency(withdrawalTotals.amount, 'USD', locale)}</TableCell>
-                <TableCell className="text-right text-sm tabular-nums">{formatCurrency(withdrawalTotals.eurAvg, 'EUR', locale)}</TableCell>
-                <TableCell className="text-right text-sm tabular-nums">{formatCurrency(withdrawalTotals.eurReceived, 'EUR', locale)}</TableCell>
-                <TableCell className={`min-w-[7rem] text-right text-sm tabular-nums ${getValueClass(withdrawalTotals.fxGain)}`}>
+                <TableCell>{t('status.total')}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(withdrawalTotals.amount, 'USD', locale)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(withdrawalTotals.eurAvg, 'EUR', locale)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(withdrawalTotals.eurReceived, 'EUR', locale)}</TableCell>
+                <TableCell className={`min-w-[7rem] text-right tabular-nums ${getValueClass(withdrawalTotals.fxGain)}`}>
                   {formatSignedCurrency(withdrawalTotals.fxGain, 'EUR', locale)}
                 </TableCell>
-                <TableCell className="text-right text-sm tabular-nums">
+                <TableCell className="text-right tabular-nums">
                   {withdrawalTotals.taxable > 0 ? (
                     <>
                       <span>{formatCurrency(withdrawalTotals.taxable * taxRate, 'EUR', locale)}</span>
-                      <span className="block text-[10px] font-normal text-muted-foreground">
+                      <span className="block text-xs font-normal text-muted-foreground">
                         {t('status.on')} {formatCurrency(withdrawalTotals.taxable, 'EUR', locale)}
                       </span>
                     </>

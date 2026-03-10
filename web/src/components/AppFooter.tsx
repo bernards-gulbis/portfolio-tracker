@@ -23,7 +23,7 @@ export function AppFooter({ className }: Readonly<{ className?: string }>) {
         </a>
         <span className="ml-auto">{t('app.version', { version: APP_VERSION })}</span>
       </div>
-      <p className="text-[0.65rem] text-muted-foreground/60">{t('app.footer.disclaimer')}</p>
+      <p className="text-xs text-muted-foreground">{t('app.footer.disclaimer')}</p>
     </footer>
   );
 }

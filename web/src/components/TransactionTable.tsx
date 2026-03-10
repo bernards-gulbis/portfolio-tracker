@@ -4,7 +4,6 @@ import { Transaction, TransactionType, getErrorMessage } from '../api';
 import { useDeleteTransaction } from '../hooks/useTransactions';
 import { formatCurrency, formatDateTime, formatDateCompact } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
-import { MAX_VISIBLE_PAGES } from '../constants/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,16 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
-import { MoreVertical, PencilIcon, TrashIcon, ReceiptIcon, Trash2Icon, SearchIcon, FilterIcon, ArrowUpIcon, ArrowDownIcon } from 'lucide-react';
+import { MoreVertical, PencilIcon, TrashIcon, ReceiptIcon, Trash2Icon, SearchIcon, FilterIcon } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +44,8 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { toast } from 'sonner';
+import { SortableTableHead } from './SortableTableHead';
+import { PaginationControls } from './PaginationControls';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -85,7 +77,6 @@ export const TransactionTable = ({
   responsePage,
   responsePageSize,
   onPageChange,
-  isLoading,
   tickerSearch,
   onTickerSearchChange,
   typeFilter,
@@ -139,37 +130,6 @@ export const TransactionTable = ({
   const handlePageChange = (page: number) => {
     onPageChange(page);
     document.querySelector('[data-table-container]')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const getPageNumbers = (): (number | string)[] => {
-    const pages: (number | string)[] = [];
-
-    if (totalPages <= MAX_VISIBLE_PAGES) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-
-      if (currentPage > 3) {
-        pages.push('...');
-      }
-
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (currentPage < totalPages - 2) {
-        pages.push('...');
-      }
-
-      pages.push(totalPages);
-    }
-
-    return pages;
   };
 
   const getTransactionDetails = (transaction: Transaction): string => {
@@ -299,19 +259,13 @@ export const TransactionTable = ({
         <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1 -ml-2 h-auto p-1"
-                  onClick={() => onSortOrderChange(sortOrder === 'desc' ? 'asc' : 'desc')}
-                >
-                  {t('transaction.table.columns.date')}
-                  {sortOrder === 'desc'
-                    ? <ArrowDownIcon className="h-3.5 w-3.5" />
-                    : <ArrowUpIcon className="h-3.5 w-3.5" />}
-                </Button>
-              </TableHead>
+              <SortableTableHead
+                label={t('transaction.table.columns.date')}
+                sortKey="date"
+                activeSortKey="date"
+                sortAsc={sortOrder === 'asc'}
+                onSort={() => onSortOrderChange(sortOrder === 'desc' ? 'asc' : 'desc')}
+              />
               <TableHead>{t('transaction.table.columns.type')}</TableHead>
               <TableHead>{t('transaction.table.columns.ticker')}</TableHead>
               <TableHead>{t('transaction.table.columns.details')}</TableHead>
@@ -332,7 +286,7 @@ export const TransactionTable = ({
                 <TableCell>
                   {getTransactionDetails(transaction)}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right tabular-nums">
                   {formatCurrency(transaction.total_amount, 'USD', locale)}
                 </TableCell>
                 <TableCell className="text-center">
@@ -379,43 +333,7 @@ export const TransactionTable = ({
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-4 flex justify-center">
-          <Pagination className="w-auto mx-0">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  aria-disabled={currentPage === 1 || isLoading}
-                  className={currentPage === 1 || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-
-              {getPageNumbers().map((page, index) => (
-                <PaginationItem key={typeof page === 'number' ? page : `ellipsis-${index}`}>
-                  {typeof page === 'number' ? (
-                    <PaginationLink
-                      onClick={() => handlePageChange(page)}
-                      isActive={page === currentPage}
-                      className={isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                    >
-                      {page}
-                    </PaginationLink>
-                  ) : (
-                    <PaginationEllipsis />
-                  )}
-                </PaginationItem>
-              ))}
-
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  aria-disabled={currentPage === totalPages || isLoading}
-                  className={currentPage === totalPages || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+        <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
       )}
 
       <AlertDialog

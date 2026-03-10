@@ -81,7 +81,7 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
         filter={filter}
         onFilterChange={handleFilterChange}
       />
-      <Card className="overflow-hidden">
+      <Card>
         <Table>
           <TableHeader>
             <TableRow>
@@ -158,7 +158,7 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
         filter={filter}
         onFilterChange={handleFilterChange}
       />
-      <Card className="overflow-hidden">
+      <Card>
         <Table>
           <TableHeader>
             <TableRow>
@@ -227,7 +227,13 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
 
   return (
     <>
-      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => onToggle(group.ticker)}>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => onToggle(group.ticker)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(group.ticker); } }}
+        tabIndex={0}
+        role="button"
+      >
         <TableCell>
           <div className="flex items-center gap-2.5">
             <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -258,13 +264,13 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                     <TableHead className="text-right">
                       <div className="flex flex-col">
                         <span>{t('status.columns.buyTotal')}</span>
-                        <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                        <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
                       </div>
                     </TableHead>
                     <TableHead className="text-right">
                       <div className="flex flex-col">
                         <span>{t('status.columns.sellTotal')}</span>
-                        <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                        <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
                       </div>
                     </TableHead>
                     <TableHead className="text-right">{t('status.columns.realizedGL')}</TableHead>
@@ -296,25 +302,25 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                           {isPartialSell ? (
                             <span className="flex items-center justify-end gap-1.5 mt-0.5">
                               <Progress value={(sale.quantity / sale.quantity_before) * 100} className="h-1 w-16" />
-                              <span className="text-[10px] text-muted-foreground/70">
+                              <span className="text-xs text-muted-foreground">
                                 {t('status.ofTotal', { total: formatQuantity(sale.quantity_before) })}
                               </span>
                             </span>
                           ) : (
-                            <span className="block text-[10px] text-muted-foreground/70">{t('status.allSold')}</span>
+                            <span className="block text-xs text-muted-foreground">{t('status.allSold')}</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           <span>{formatCurrency(sale.cost_basis, 'USD', locale)}</span>
-                          <span className="block text-[10px] text-muted-foreground/70">{formatCurrency(buyPrice, 'USD', locale)}</span>
+                          <span className="block text-xs text-muted-foreground">{formatCurrency(buyPrice, 'USD', locale)}</span>
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           <span>{formatCurrency(sale.proceeds, 'USD', locale)}</span>
-                          <span className="block text-[10px] text-muted-foreground/70">{formatCurrency(sellPrice, 'USD', locale)}</span>
+                          <span className="block text-xs text-muted-foreground">{formatCurrency(sellPrice, 'USD', locale)}</span>
                         </TableCell>
                         <TableCell className={`text-right tabular-nums ${getValueClass(sale.realized_gain)}`}>
                           <span>{formatSignedCurrency(sale.realized_gain, 'USD', locale)}</span>
-                          <span className={`block text-[10px] font-bold ${getValueClass(sale.realized_gain)}`}>
+                          <span className={`block text-xs font-bold ${getValueClass(sale.realized_gain)}`}>
                             {formatSignedPercent(sale.cost_basis > 0 ? (sale.realized_gain / sale.cost_basis) * 100 : null)}
                           </span>
                         </TableCell>
@@ -347,7 +353,13 @@ const DividendTickerGroupRow = ({ group, isExpanded, onToggle, displayCurrency, 
 
   return (
     <>
-      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => onToggle(group.ticker)}>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => onToggle(group.ticker)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(group.ticker); } }}
+        tabIndex={0}
+        role="button"
+      >
         <TableCell>
           <div className="flex items-center gap-2.5">
             <ChevronRightIcon className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />

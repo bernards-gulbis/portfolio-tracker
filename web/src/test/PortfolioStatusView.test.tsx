@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PortfolioStatusView } from '../components/PortfolioStatusView';
 import { CurrencyProvider } from '../hooks/useCurrencyPreference';
@@ -146,7 +146,7 @@ describe('PortfolioStatusView', () => {
     expect(screen.getByText(/Error loading portfolio status/)).toBeInTheDocument();
   });
 
-  it('renders market value, net invested, dividends, tax, after-tax sections', () => {
+  it('renders stat cards: Net Invested, Total Return, After-tax Value', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: mockStatus,
       isLoading: false,
@@ -155,14 +155,8 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0);
-
-    // Financial summary is collapsed by default — expand it
-    fireEvent.click(screen.getByText('Financial Summary'));
-
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Dividends').length).toBeGreaterThan(0);
-    expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();
+    expect(screen.getAllByText('Total Return').length).toBeGreaterThan(0);
     expect(screen.getAllByText('After-tax Value').length).toBeGreaterThan(0);
   });
 

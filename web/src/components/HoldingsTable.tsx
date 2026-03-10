@@ -11,12 +11,12 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
+import { AlertTriangleIcon } from 'lucide-react';
 
 function computeDaysHeld(holdings: PricedHolding[]): Record<string, number> {
   const now = Date.now();
@@ -52,8 +52,6 @@ export const HoldingsTable = memo(({
   const daysLabels = useDaysHeldLabels();
   const eurAvailable = eurMetrics !== null;
   const cashDisplay = showEur && eurAvailable ? eurMetrics.cashEur : cash;
-  const currencyGainsEur = eurMetrics?.currencyGainsEur ?? null;
-  const currencyGainsPct = eurMetrics?.currencyGainsPct ?? null;
 
   const daysHeldMap = useMemo(() => computeDaysHeld(holdings), [holdings]);
 
@@ -67,6 +65,33 @@ export const HoldingsTable = memo(({
     }));
   }, [holdings, showEur, eurAvailable, eurMetrics]);
 
+  // Total unrealized G/L across all holdings
+  const totalUnrealizedGL = useMemo(() => {
+    let sum = 0;
+    let hasValue = false;
+    for (const { holding, eurVals } of holdingsWithEur) {
+      if (showEur && eurVals?.unrealizedGainLossEur != null) {
+        sum += eurVals.unrealizedGainLossEur;
+        hasValue = true;
+      } else if (holding.unrealized_gain_loss != null) {
+        sum += holding.unrealized_gain_loss;
+        hasValue = true;
+      }
+    }
+    return hasValue ? sum : null;
+  }, [holdingsWithEur, showEur]);
+
+  const totalCost = useMemo(() => {
+    return holdingsWithEur.reduce((sum, { holding, eurVals }) => {
+      if (showEur && eurVals != null) return sum + eurVals.totalCostEur;
+      return sum + holding.total_cost;
+    }, 0);
+  }, [holdingsWithEur, showEur]);
+
+  const totalUnrealizedPct = totalUnrealizedGL != null && totalCost > 0
+    ? (totalUnrealizedGL / totalCost) * 100
+    : null;
+
   return (
     <div>
       {missingPrices.length > 0 && (
@@ -77,8 +102,7 @@ export const HoldingsTable = memo(({
           </AlertDescription>
         </Alert>
       )}
-      <TooltipProvider>
-      <Card className="overflow-x-auto">
+      <Card>
         <Table>
           <TableHeader>
             <TableRow>
@@ -88,13 +112,13 @@ export const HoldingsTable = memo(({
               <TableHead className="text-right">
                 <div className="flex flex-col items-end">
                   <span>{t('status.columns.cost')}{showEur && <span className="ml-1 text-muted-foreground font-normal">USD</span>}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+                  <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
                 </div>
               </TableHead>
               <TableHead className="text-right">
                 <div className="flex flex-col items-end">
                   <span>{t('status.columns.marketValue')}{showEur && eurAvailable && <span className="ml-1 text-muted-foreground font-normal">EUR</span>}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">{t('status.currentPriceCaption')}</span>
+                  <span className="text-xs font-normal text-muted-foreground">{t('status.currentPriceCaption')}</span>
                 </div>
               </TableHead>
               <TableHead className="text-right">
@@ -112,50 +136,13 @@ export const HoldingsTable = memo(({
               <TableCell className="text-right font-medium tabular-nums">
                 {formatCurrency(cashDisplay, displayCurrency, locale)}
               </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {showEur && currencyGainsEur !== null ? (
-                  <div className="flex flex-col items-end">
-                    <div className="flex items-center gap-1">
-                      <span className={`font-semibold ${getValueClass(currencyGainsEur)}`}>
-                        {formatSignedCurrency(currencyGainsEur, 'EUR', locale)}
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground cursor-help">
-                            {t('status.fx')}
-                            <InfoIcon className="h-3 w-3" />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{t('status.cashFxTooltip')}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    {currencyGainsPct !== null && (
-                      <span className={`text-xs ${getValueClass(currencyGainsEur)}`}>
-                        {formatSignedPercent(currencyGainsPct)}
-                      </span>
-                    )}
-                  </div>
-                ) : '-'}
-              </TableCell>
+              <TableCell className="text-right tabular-nums">-</TableCell>
             </TableRow>
             {holdingsWithEur.map(({ holding, eurVals }) => (
                 <TableRow key={holding.ticker}>
                   <TableCell className="font-semibold">{holding.ticker}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {daysHeldMap[holding.ticker] == null ? '-' : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="cursor-help border-b border-dotted border-muted-foreground">
-                            {formatDaysHeld(daysHeldMap[holding.ticker], daysLabels)}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{daysHeldMap[holding.ticker]} {t('status.columns.daysHeld').toLocaleLowerCase()}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {daysHeldMap[holding.ticker] == null ? '-' : formatDaysHeld(daysHeldMap[holding.ticker], daysLabels)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatQuantity(holding.quantity)}</TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -213,9 +200,25 @@ export const HoldingsTable = memo(({
                 </TableRow>
             ))}
           </TableBody>
+          {totalUnrealizedGL != null && (
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={5} className="text-right font-semibold">{t('status.total')}</TableCell>
+                <TableCell className={`text-right font-semibold tabular-nums ${getValueClass(totalUnrealizedGL)}`}>
+                  <div className="flex flex-col items-end">
+                    <span>{formatSignedCurrency(totalUnrealizedGL, showEur ? 'EUR' : 'USD', locale)}</span>
+                    {totalUnrealizedPct != null && (
+                      <span className={`text-xs ${getValueClass(totalUnrealizedGL)}`}>
+                        {formatSignedPercent(totalUnrealizedPct)}
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          )}
         </Table>
       </Card>
-      </TooltipProvider>
     </div>
   );
 });

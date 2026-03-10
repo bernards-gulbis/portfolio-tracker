@@ -1,4 +1,5 @@
 import { TableHead } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 interface SortableTableHeadProps {
   label: string;
@@ -16,8 +17,16 @@ export const SortableTableHead = ({ label, sortKey, activeSortKey, sortAsc, onSo
   }
   return (
     <TableHead
-      className={`cursor-pointer select-none hover:text-foreground ${className ?? ''}`}
+      role="button"
+      tabIndex={0}
+      className={cn('cursor-pointer select-none hover:text-foreground', className)}
       onClick={() => onSort(sortKey)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSort(sortKey);
+        }
+      }}
     >
       {label}{indicator}
     </TableHead>

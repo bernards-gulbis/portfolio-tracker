@@ -61,7 +61,7 @@ const StatCard = ({ label, value, caption }: StatCardProps) => (
   <Card>
     <CardContent>
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="text-2xl font-bold tracking-tight">{value}</p>
+      <p className="text-2xl font-bold tracking-tight tabular-nums">{value}</p>
       {caption == null ? null : <div className="text-sm mt-1">{caption}</div>}
     </CardContent>
   </Card>
@@ -75,73 +75,11 @@ const CollapsiblePositions = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.positions')}
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-4">{children}</CollapsibleContent>
-    </Collapsible>
-  );
-};
-
-// ================== Collapsible Financial Summary ==================
-
-interface CollapsibleFinancialSummaryProps {
-  netInvested: string;
-  dividends: string;
-  showEur: boolean;
-  taxLabel: string;
-  taxValue: string;
-  taxCaption: React.ReactNode;
-  afterTaxValue: string;
-  afterTaxCaption: React.ReactNode;
-}
-
-const CollapsibleFinancialSummary = ({
-  netInvested,
-  dividends,
-  showEur,
-  taxLabel,
-  taxValue,
-  taxCaption,
-  afterTaxValue,
-  afterTaxCaption,
-}: CollapsibleFinancialSummaryProps) => {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
-        {t('status.financialSummary')}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className={`grid grid-cols-2 ${showEur ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-4 mt-4`}>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.netInvested')}</p>
-            <p className="text-lg font-semibold">{netInvested}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.dividends')}</p>
-            <p className="text-lg font-semibold">{dividends}</p>
-          </div>
-          {showEur && (
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">{taxLabel}</p>
-              <p className="text-lg font-semibold">{taxValue}</p>
-              {taxCaption}
-            </div>
-          )}
-          {showEur && (
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">{t('status.afterTaxValue')}</p>
-              <p className="text-lg font-semibold">{afterTaxValue}</p>
-              {afterTaxCaption}
-            </div>
-          )}
-        </div>
-      </CollapsibleContent>
     </Collapsible>
   );
 };
@@ -159,7 +97,7 @@ const CollapsibleRealizedGains = ({ realizedSales, locale }: CollapsibleRealized
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.realizedGains')}
       </CollapsibleTrigger>
@@ -184,7 +122,7 @@ const CollapsibleDividendsReceived = ({ dividendsReceived, displayCurrency, loca
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.dividendsReceived')}
       </CollapsibleTrigger>
@@ -208,7 +146,7 @@ const CollapsibleWithdrawalsSection = ({ status, locale }: CollapsibleWithdrawal
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('status.withdrawals')}
       </CollapsibleTrigger>
@@ -250,16 +188,45 @@ const PortfolioStatusContent = ({
   const { currency } = useCurrencyPreference();
   const showEur = currency === 'EUR';
   const eur = useMemo(() => computeEurMetrics(status), [status]);
-  const taxRate = useMemo(() =>
-    new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
-      status.capital_gains_tax_rate * 100
-    ), [locale, status.capital_gains_tax_rate]);
   const liveLastPoint = useMemo(
     () => status.current_value == null
       ? undefined
       : { currentValue: status.current_value, fxRate: status.usd_to_eur_rate },
     [status.current_value, status.usd_to_eur_rate],
   );
+
+  // Compute EUR-adjusted TWR % (same formula as chart) for "All" period
+  const lastReturnPct = useMemo(() => {
+    const points = performance?.data_points;
+    if (!points || points.length < 2) return null;
+    const last = points[points.length - 1];
+    if (last.return_pct == null) return null;
+
+    if (!showEur) return last.return_pct;
+
+    // EUR adjustment: (1 + return%) × current_fx / ((1 + first_return%) × first_fx) - 1
+    const liveFx = status.usd_to_eur_rate;
+    const effectiveFxLast = liveFx ?? last.fx_rate;
+    const first = points.find(p => p.return_pct != null && p.fx_rate != null);
+    if (!first || first.return_pct == null || first.fx_rate == null || effectiveFxLast == null) return last.return_pct;
+    const baseFactor = (1 + first.return_pct / 100) * first.fx_rate;
+    if (baseFactor <= 0) return null;
+    const lastFactor = (1 + last.return_pct / 100) * effectiveFxLast;
+    return (lastFactor / baseFactor - 1) * 100;
+  }, [performance, showEur, status.usd_to_eur_rate]);
+
+  // Compute annualized return from the EUR-adjusted TWR
+  const annualizedReturn = useMemo(() => {
+    if (lastReturnPct == null) return null;
+    const points = performance?.data_points;
+    if (!points || points.length < 2) return null;
+    const firstDate = new Date(points[0].date);
+    const lastDate = new Date(points[points.length - 1].date);
+    const days = Math.max(1, (lastDate.getTime() - firstDate.getTime()) / 86_400_000);
+    if (days < 30) return null;
+    const twr = lastReturnPct / 100;
+    return (Math.pow(1 + twr, 365 / days) - 1) * 100;
+  }, [performance, lastReturnPct]);
 
   if (isEmptyPortfolio) {
     return (
@@ -279,16 +246,29 @@ const PortfolioStatusContent = ({
   }
 
   // Resolve display values based on currency
-  const marketValue = showEur ? (eur?.currentValueEur ?? null) : status.current_value;
-  const unrealizedGains = showEur ? (eur?.unrealizedGainsEur ?? null) : status.unrealized_gains;
+  const totalValue = showEur ? (eur?.currentValueEur ?? null) : status.current_value;
   const netInvested = showEur ? status.principal_eur : status.principal;
-  const dividends = showEur ? status.dividends_eur : status.dividends;
-  const taxEur = eur?.taxEur ?? null;
-  const capitalGainsEur = eur?.capitalGainsEur ?? null;
-  const afterTaxValue = eur?.currentValueAfterTaxEur ?? null;
-  const totalReturnAfterTax = eur?.totalReturnAfterTaxEur ?? null;
   const eurRate = eur?.rate ?? null;
-  const realizedGains = status.realized_gains;
+  // Total return = current value - net invested (consistent with chart header)
+  const totalReturn = totalValue != null
+    ? totalValue - netInvested
+    : null;
+
+  // After-tax value: total value minus estimated capital gains tax
+  const estimatedTax = (() => {
+    if (totalValue == null) return null;
+    if (showEur) return eur?.taxEur ?? null;
+    const capitalGains = totalValue - status.principal - status.dividends;
+    return capitalGains > 0 ? capitalGains * status.capital_gains_tax_rate : 0;
+  })();
+  const afterTaxValue = totalValue != null && estimatedTax != null
+    ? totalValue - estimatedTax
+    : (showEur ? (eur?.currentValueAfterTaxEur ?? null) : null);
+  const taxRatePct = (status.capital_gains_tax_rate * 100).toFixed(1).replace(/\.0$/, '');
+
+  // FX impact caption for Net Invested (EUR mode)
+  const fxImpact = showEur ? (eur?.currencyGainsEur ?? null) : null;
+  const fxImpactPct = showEur ? (eur?.currencyGainsPct ?? null) : null;
 
   return (
     <>
@@ -316,40 +296,41 @@ const PortfolioStatusContent = ({
       )}
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label={t('status.marketValue')}
-          value={marketValue === null ? '-' : formatCurrency(marketValue, currency, locale)}
-          caption={
-            <p className={getValueClass(unrealizedGains)}>
-              {formatCurrencyWithPercent(unrealizedGains, status.unrealized_gains_pct, currency, locale)}
-            </p>
-          }
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label={t('status.netInvested')}
           value={formatCurrency(netInvested, currency, locale)}
+          caption={
+            fxImpact != null ? (
+              <p className={getValueClass(fxImpact)}>
+                {formatCurrencyWithPercent(fxImpact, fxImpactPct, 'EUR', locale)}
+                <span className="text-muted-foreground ml-1">{t('status.fxImpact')}</span>
+              </p>
+            ) : undefined
+          }
         />
         <StatCard
-          label={t('status.dividends')}
-          value={dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
-        />
-        {showEur ? (
-          <StatCard
-            label={t('status.afterTaxValue')}
-            value={afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
-            caption={
-              <p className={getValueClass(totalReturnAfterTax)}>
-                {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
+          label={t('status.totalReturn')}
+          value={totalReturn == null ? '-' : formatSignedCurrency(totalReturn, currency, locale)}
+          caption={
+            annualizedReturn != null ? (
+              <p className={`${getValueClass(annualizedReturn)} font-medium`}>
+                {formatSignedPercent(annualizedReturn)} {t('status.annualized').toLowerCase()}
               </p>
-            }
-          />
-        ) : (
-          <StatCard
-            label={t('status.realizedGains')}
-            value={formatCurrency(realizedGains, 'USD', locale)}
-          />
-        )}
+            ) : undefined
+          }
+        />
+        <StatCard
+          label={t('status.afterTaxValue')}
+          value={afterTaxValue == null ? '-' : formatCurrency(afterTaxValue, currency, locale)}
+          caption={
+            estimatedTax != null ? (
+              <p className="text-muted-foreground">
+                {t('status.estTax', { rate: taxRatePct })}: −{formatCurrency(estimatedTax, currency, locale)}
+              </p>
+            ) : undefined
+          }
+        />
       </div>
 
       {/* Charts Section */}
@@ -379,83 +360,41 @@ const PortfolioStatusContent = ({
       </Suspense>
 
       {/* Holdings Table */}
-      <Card>
-        <CardContent>
-          <CollapsiblePositions>
-            <HoldingsTable
-              holdings={status.holdings}
-              missingPrices={status.missing_prices}
-              cash={status.cash}
-              displayCurrency={currency}
-              showEur={showEur}
-              eurMetrics={eur}
-              locale={locale}
-            />
-          </CollapsiblePositions>
-        </CardContent>
-      </Card>
-
-      {/* Financial Summary (collapsed) */}
-      <Card>
-        <CardContent>
-          <CollapsibleFinancialSummary
-            netInvested={formatCurrency(netInvested, currency, locale)}
-            dividends={dividends === null ? '-' : formatCurrency(dividends, currency, locale)}
-            showEur={showEur}
-            taxLabel={t('status.estTax', { rate: taxRate })}
-            taxValue={taxEur === null ? '-' : formatCurrency(taxEur, 'EUR', locale)}
-            taxCaption={
-              capitalGainsEur !== null && taxEur !== null ? (
-                <p className="text-xs mt-0.5 text-muted-foreground">
-                  {t('status.on')} {formatCurrency(capitalGainsEur, 'EUR', locale)}
-                </p>
-              ) : null
-            }
-            afterTaxValue={afterTaxValue === null ? '-' : formatCurrency(afterTaxValue, 'EUR', locale)}
-            afterTaxCaption={
-              <p className={`text-xs mt-0.5 ${getValueClass(totalReturnAfterTax)}`}>
-                {formatSignedCurrency(totalReturnAfterTax, 'EUR', locale)}
-              </p>
-            }
-          />
-        </CardContent>
-      </Card>
+      <CollapsiblePositions>
+        <HoldingsTable
+          holdings={status.holdings}
+          missingPrices={status.missing_prices}
+          cash={status.cash}
+          displayCurrency={currency}
+          showEur={showEur}
+          eurMetrics={eur}
+          locale={locale}
+        />
+      </CollapsiblePositions>
 
       {/* Realized Gains */}
       {status.realized_sales.length > 0 && (
-        <Card>
-          <CardContent>
-            <CollapsibleRealizedGains
-              realizedSales={status.realized_sales}
-              locale={locale}
-            />
-          </CardContent>
-        </Card>
+        <CollapsibleRealizedGains
+          realizedSales={status.realized_sales}
+          locale={locale}
+        />
       )}
 
       {/* Dividends Received */}
       {status.dividends_received.length > 0 && (
-        <Card>
-          <CardContent>
-            <CollapsibleDividendsReceived
-              dividendsReceived={status.dividends_received}
-              displayCurrency={currency}
-              locale={locale}
-            />
-          </CardContent>
-        </Card>
+        <CollapsibleDividendsReceived
+          dividendsReceived={status.dividends_received}
+          displayCurrency={currency}
+          locale={locale}
+        />
       )}
 
-      {/* Withdrawals Table */}
+      {/* Withdrawals & Taxes */}
       {status.realized_withdrawals.length > 0 && (
-        <Card>
-          <CardContent>
-            <CollapsibleWithdrawalsSection
-              status={status}
-              locale={locale}
-            />
-          </CardContent>
-        </Card>
+        <CollapsibleWithdrawalsSection
+          status={status}
+          locale={locale}
+        />
       )}
     </>
   );
@@ -464,10 +403,10 @@ const PortfolioStatusContent = ({
 // ================== Loading skeleton ==================
 
 const PortfolioStatusSkeleton = () => (
-  <div className="mb-6 space-y-4">
+  <div className="space-y-4">
     {/* Stat cards */}
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {[1, 2, 3, 4].map((i) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {[1, 2, 3].map((i) => (
         <Card key={i}>
           <CardContent>
             <Skeleton className="h-4 w-24 mb-2" />
@@ -540,7 +479,7 @@ export const PortfolioStatusView = () => {
 
   if (!portfolioId) {
     return (
-      <Card className="mb-6">
+      <Card>
         <CardContent className="py-8">
           <p className="text-center text-muted-foreground">{t('status.noPortfolio')}</p>
         </CardContent>
@@ -554,7 +493,7 @@ export const PortfolioStatusView = () => {
 
   if (error) {
     return (
-      <Card className="mb-6">
+      <Card>
         <CardContent className="py-8">
           <p className="text-center text-destructive">{t('status.error', { message: getErrorMessage(error) })}</p>
         </CardContent>
@@ -564,7 +503,7 @@ export const PortfolioStatusView = () => {
 
   if (!effectiveStatus) {
     return (
-      <Card className="mb-6">
+      <Card>
         <CardContent className="py-8">
           <p className="text-center text-muted-foreground">{t('status.noData')}</p>
         </CardContent>
@@ -583,7 +522,7 @@ export const PortfolioStatusView = () => {
   const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (
-    <div className="mb-6 space-y-4">
+    <div className="space-y-4">
       <PortfolioStatusContent
         status={effectiveStatus}
         performance={performance}
