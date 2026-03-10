@@ -5,7 +5,7 @@ import type { WithdrawalFx } from '../api';
 import { computeWithdrawalTaxMap } from '../utils/eurMetrics';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Table, TableCaption, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { InfoIcon } from 'lucide-react';
 import { PaginationControls } from './PaginationControls';
@@ -113,6 +113,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
       )}
       <Card>
         <Table>
+          <TableCaption className="sr-only">{t('status.withdrawals')}</TableCaption>
           <TableHeader>
             <TableRow>
               <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />

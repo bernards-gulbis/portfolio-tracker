@@ -363,6 +363,7 @@ const en = {
   chart: {
     performance: {
       title: 'Performance',
+      titleValue: 'Portfolio Value',
       noData: 'No performance data available',
       insufficientData: 'Not enough data points to display performance chart.',
       insufficientDataForPeriod: 'Not enough data points for this time period. Try a longer period or "All".',

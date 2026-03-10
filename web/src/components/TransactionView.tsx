@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, MoreVertical, UploadIcon, DownloadIcon } from 'lucide-react';
+import { Plus, MoreVertical, UploadIcon, DownloadIcon, ReceiptIcon } from 'lucide-react';
 
 export const TransactionView = () => {
   const { t } = useTranslation();
@@ -102,11 +103,16 @@ export const TransactionView = () => {
   if (!activePortfolioId) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            <h2 className="text-lg font-medium mb-1">{t('transaction.view.noPortfolio.title')}</h2>
-            <p className="text-sm">{t('transaction.view.noPortfolio.description')}</p>
-          </div>
+        <CardContent>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia>
+                <ReceiptIcon />
+              </EmptyMedia>
+              <EmptyTitle>{t('transaction.view.noPortfolio.title')}</EmptyTitle>
+              <EmptyDescription>{t('transaction.view.noPortfolio.description')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </CardContent>
       </Card>
     );

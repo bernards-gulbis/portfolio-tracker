@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -257,6 +258,7 @@ export const TransactionTable = ({
       {filterBar}
       <div className="overflow-x-auto" data-table-container>
         <Table className="min-w-[600px]">
+          <TableCaption className="sr-only">{t('transaction.view.title')}</TableCaption>
           <TableHeader>
             <TableRow>
               <SortableTableHead

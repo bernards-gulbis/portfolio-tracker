@@ -146,7 +146,7 @@ describe('TransactionView', () => {
     } as unknown as ReturnType<typeof useTransactions>);
 
     renderView();
-    expect(screen.getByText('Transactions')).toBeInTheDocument();
+    expect(screen.getAllByText('Transactions').length).toBeGreaterThan(0);
     expect(screen.getByText('$1,000.00')).toBeInTheDocument();
     expect(screen.getByText('Add Transaction')).toBeInTheDocument();
   });

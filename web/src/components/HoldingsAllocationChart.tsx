@@ -178,7 +178,7 @@ export const HoldingsAllocationChart = ({
         <CardTitle>{t('chart.allocation.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]">
+        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]" aria-label={t('chart.allocation.title')}>
           <PieChart>
             <Pie
               data={chartData}

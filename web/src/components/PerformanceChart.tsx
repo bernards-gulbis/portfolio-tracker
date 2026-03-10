@@ -364,7 +364,7 @@ export const PerformanceChart = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t('chart.performance.title')}
+              {viewMode === 'value' ? t('chart.performance.titleValue') : t('chart.performance.title')}
             </CardTitle>
             {headerInfo?.isHovering && (
               <span className="text-xs text-muted-foreground">{headerInfo.date}</span>
@@ -415,7 +415,7 @@ export const PerformanceChart = ({
         </CardAction>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        <ChartContainer config={chartConfig} className="h-[300px] w-full" aria-label={t('chart.performance.title')}>
           <ComposedChart
             accessibilityLayer
             data={chartData}

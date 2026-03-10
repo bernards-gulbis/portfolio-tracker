@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableFooter,
   TableHead,
@@ -104,6 +105,7 @@ export const HoldingsTable = memo(({
       )}
       <Card>
         <Table>
+          <TableCaption className="sr-only">{t('status.positions')}</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>{t('status.columns.ticker')}</TableHead>

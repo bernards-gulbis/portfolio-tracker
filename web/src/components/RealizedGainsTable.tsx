@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Table, TableCaption, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronRightIcon } from 'lucide-react';
 import { PaginationControls } from './PaginationControls';
@@ -83,6 +83,7 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
       />
       <Card>
         <Table>
+          <TableCaption className="sr-only">{t('status.realizedGains')}</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead />
@@ -160,6 +161,7 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
       />
       <Card>
         <Table>
+          <TableCaption className="sr-only">{t('status.dividendsReceived')}</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead />
