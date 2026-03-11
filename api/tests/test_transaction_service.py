@@ -619,45 +619,81 @@ class TestImportCSV:
         assert txs[1].ticker == "AAPL"
 
 
-# ── _validate_csv_total_amount_sign ──────────────────────────────────
+# ── _apply_csv_total_amount_sign ─────────────────────────────────────
 
 
-class TestValidateCSVTotalAmountSign:
-    def test_buy_positive_rejected(self, svc, user_id, portfolio_id):
+class TestApplyCSVTotalAmountSign:
+    def test_buy_positive_corrected(self, svc, user_id, portfolio_id):
         csv = (
             "date,type,total_amount,ticker,quantity,price_per_share\n"
             "01/01/2024 00:00:00,Buy,1000,AAPL,10,100\n"
         )
-        with pytest.raises(InvalidCSVFormatException, match="negative total_amount"):
-            svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == -1000
 
-    def test_sell_negative_rejected(self, svc, user_id, portfolio_id):
+    def test_buy_negative_unchanged(self, svc, user_id, portfolio_id):
+        csv = (
+            "date,type,total_amount,ticker,quantity,price_per_share\n"
+            "01/01/2024 00:00:00,Buy,-1000,AAPL,10,100\n"
+        )
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == -1000
+
+    def test_sell_negative_corrected(self, svc, user_id, portfolio_id):
         csv = (
             "date,type,total_amount,ticker,quantity,price_per_share\n"
             "01/01/2024 00:00:00,Sell,-1000,AAPL,10,100\n"
         )
-        with pytest.raises(InvalidCSVFormatException, match="positive total_amount"):
-            svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 1000
 
-    def test_deposit_negative_rejected(self, svc, user_id, portfolio_id):
+    def test_sell_positive_unchanged(self, svc, user_id, portfolio_id):
+        csv = (
+            "date,type,total_amount,ticker,quantity,price_per_share\n"
+            "01/01/2024 00:00:00,Sell,1000,AAPL,10,100\n"
+        )
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 1000
+
+    def test_deposit_negative_corrected(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,-500\n"
-        with pytest.raises(InvalidCSVFormatException, match="positive total_amount"):
-            svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 500
 
-    def test_withdraw_positive_rejected(self, svc, user_id, portfolio_id):
+    def test_deposit_positive_unchanged(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,500\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 500
+
+    def test_withdraw_positive_corrected(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount\n01/01/2024 00:00:00,Withdraw,500\n"
-        with pytest.raises(InvalidCSVFormatException, match="negative total_amount"):
-            svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == -500
 
-    def test_fee_positive_rejected(self, svc, user_id, portfolio_id):
+    def test_withdraw_negative_unchanged(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Withdraw,-500\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == -500
+
+    def test_fee_positive_corrected(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount\n01/01/2024 00:00:00,Fee,10\n"
-        with pytest.raises(InvalidCSVFormatException, match="negative total_amount"):
-            svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == -10
 
-    def test_dividend_negative_rejected(self, svc, user_id, portfolio_id):
+    def test_fee_negative_unchanged(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Fee,-10\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == -10
+
+    def test_dividend_negative_corrected(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount,ticker\n01/01/2024 00:00:00,Dividend,-50,AAPL\n"
-        with pytest.raises(InvalidCSVFormatException, match="positive total_amount"):
-            svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 50
+
+    def test_dividend_positive_unchanged(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount,ticker\n01/01/2024 00:00:00,Dividend,50,AAPL\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 50
 
     def test_split_nonzero_rejected(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount,ticker,split_ratio\n01/01/2024 00:00:00,Split,100,AAPL,2\n"
@@ -665,17 +701,22 @@ class TestValidateCSVTotalAmountSign:
             svc.import_from_csv(csv, portfolio_id, user_id)
 
 
-# ── _validate_csv_eur_sign ───────────────────────────────────────────
+# ── _apply_csv_eur_sign ─────────────────────────────────────────────
 
 
-class TestValidateCSVEurSign:
-    def test_eur_sign_mismatch(self, svc, user_id, portfolio_id):
+class TestApplyCSVEurSign:
+    def test_eur_sign_corrected(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount,eur\n01/01/2024 00:00:00,Deposit,1000,-500\n"
-        with pytest.raises(InvalidCSVFormatException, match="sign must match"):
-            svc.import_from_csv(csv, portfolio_id, user_id)
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].eur_amount == 500
+
+    def test_eur_sign_already_correct(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount,eur\n01/01/2024 00:00:00,Deposit,1000,500\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].eur_amount == 500
 
     def test_eur_sign_ok_for_split(self, svc, user_id, portfolio_id):
-        """SPLIT skips eur sign validation"""
+        """SPLIT skips eur sign correction"""
         csv = "date,type,total_amount,ticker,split_ratio,eur\n01/01/2024 00:00:00,Split,0,AAPL,2,-10\n"
         txs, _skipped = svc.import_from_csv(csv, portfolio_id, user_id)
         assert len(txs) == 1

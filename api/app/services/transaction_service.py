@@ -3,6 +3,7 @@ Transaction service for business logic
 """
 
 import csv
+import math
 import uuid
 from datetime import datetime
 from io import StringIO
@@ -452,10 +453,12 @@ class TransactionService:
         if total_amount is None:
             raise ValueError(f"Invalid total_amount: {total_amount_str}")
 
-        self._validate_csv_total_amount_sign(transaction_type, total_amount)
+        total_amount = self._apply_csv_total_amount_sign(transaction_type, total_amount)
 
         eur_amount = self._clean_csv_number(row.get("eur", ""), "eur")
-        self._validate_csv_eur_sign(transaction_type, total_amount, eur_amount)
+        eur_amount = self._apply_csv_eur_sign(
+            transaction_type, total_amount, eur_amount
+        )
 
         split_ratio = self._clean_csv_number(row.get("split_ratio", ""), "split_ratio")
         if split_ratio is not None and split_ratio <= 0:
@@ -486,10 +489,10 @@ class TransactionService:
         )
 
     @staticmethod
-    def _validate_csv_total_amount_sign(
+    def _apply_csv_total_amount_sign(
         transaction_type: TransactionType, total_amount: float
-    ) -> None:
-        """Raise if total_amount has the wrong sign for the transaction type."""
+    ) -> float:
+        """Return total_amount with the correct sign for the transaction type."""
         negative_types = {
             TransactionType.BUY,
             TransactionType.WITHDRAW,
@@ -501,30 +504,26 @@ class TransactionService:
             TransactionType.DIVIDEND,
         }
 
-        if transaction_type in negative_types and total_amount > 0:
-            raise ValueError(
-                f"{transaction_type.value} transactions must have a negative total_amount"
-            )
-        if transaction_type in positive_types and total_amount < 0:
-            raise ValueError(
-                f"{transaction_type.value} transactions must have a positive total_amount"
-            )
+        if transaction_type in negative_types:
+            return -abs(total_amount)
+        if transaction_type in positive_types:
+            return abs(total_amount)
         if transaction_type == TransactionType.SPLIT and total_amount != 0:
             raise ValueError("SPLIT transactions must have total_amount of 0")
+        return total_amount
 
     @staticmethod
-    def _validate_csv_eur_sign(
-        transaction_type: TransactionType, total_amount: float, eur_amount: float | None
-    ) -> None:
-        """Raise if eur_amount sign doesn't match total_amount sign."""
+    def _apply_csv_eur_sign(
+        transaction_type: TransactionType,
+        total_amount: float,
+        eur_amount: float | None,
+    ) -> float | None:
+        """Return eur_amount with the same sign as the corrected total_amount."""
         if eur_amount is None:
-            return
+            return None
         if transaction_type == TransactionType.SPLIT:
-            return
-        if (total_amount > 0 and eur_amount < 0) or (
-            total_amount < 0 and eur_amount > 0
-        ):
-            raise ValueError(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
+            return eur_amount
+        return math.copysign(abs(eur_amount), total_amount)
 
     @staticmethod
     def _clean_csv_number(value: str, field_name: str = "field") -> float | None:
