@@ -39,6 +39,43 @@ describe('getCutoffDate', () => {
     const year = new Date().getFullYear();
     expect(result).toBe(`${year}-01-01`);
   });
+
+  it('returns a date string approximately 1 month ago for "1month"', () => {
+    const result = getCutoffDate('1month');
+    expect(result).not.toBeNull();
+    const cutoff = new Date(result!);
+    const diff = Date.now() - cutoff.getTime();
+    // Within a day of 30 days ago
+    expect(diff).toBeGreaterThan(27 * 24 * 60 * 60 * 1000);
+    expect(diff).toBeLessThan(33 * 24 * 60 * 60 * 1000);
+  });
+
+  it('returns a date string approximately 3 months ago for "3month"', () => {
+    const result = getCutoffDate('3month');
+    expect(result).not.toBeNull();
+    const cutoff = new Date(result!);
+    const diff = Date.now() - cutoff.getTime();
+    expect(diff).toBeGreaterThan(85 * 24 * 60 * 60 * 1000);
+    expect(diff).toBeLessThan(97 * 24 * 60 * 60 * 1000);
+  });
+
+  it('returns a date string approximately 6 months ago for "6month"', () => {
+    const result = getCutoffDate('6month');
+    expect(result).not.toBeNull();
+    const cutoff = new Date(result!);
+    const diff = Date.now() - cutoff.getTime();
+    expect(diff).toBeGreaterThan(175 * 24 * 60 * 60 * 1000);
+    expect(diff).toBeLessThan(190 * 24 * 60 * 60 * 1000);
+  });
+
+  it('returns a date string approximately 1 year ago for "1year"', () => {
+    const result = getCutoffDate('1year');
+    expect(result).not.toBeNull();
+    const cutoff = new Date(result!);
+    const diff = Date.now() - cutoff.getTime();
+    expect(diff).toBeGreaterThan(362 * 24 * 60 * 60 * 1000);
+    expect(diff).toBeLessThan(370 * 24 * 60 * 60 * 1000);
+  });
 });
 
 describe('subtractMonths', () => {

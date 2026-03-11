@@ -3737,3 +3737,62 @@ def test_live_prices_fx_rate_failure(client: TestClient):
     data = response.json()
     assert data["prices"] == {"AAPL": 192.5}
     assert data["usd_to_eur_rate"] is None
+
+
+def test_live_prices_too_many_tickers(client: TestClient):
+    """Test /prices/live returns 400 when more than MAX_TICKERS are requested"""
+    tickers = [f"TICK{i}" for i in range(101)]
+    response = client.get("/portfolios/prices/live", params={"tickers": tickers})
+    assert response.status_code == 400
+    assert "Too many tickers" in response.json()["detail"]
+
+
+def test_live_prices_price_fetch_error_returns_none_prices(client: TestClient):
+    """Test /prices/live falls back to None prices when price service raises"""
+    with patch("app.routers.portfolios.PriceService") as mock_ps:
+        mock_ps.get_current_prices.side_effect = RuntimeError("yfinance down")
+        mock_ps.get_usd_to_eur_rate_safe.return_value = 0.91
+
+        response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
+
+    assert response.status_code == 200
+    data = response.json()
+    # prices should be {ticker: null} when service raised
+    assert "AAPL" in data["prices"]
+    assert data["prices"]["AAPL"] is None
+
+
+def test_csv_upload_file_too_large(client: TestClient):
+    """Test uploading a CSV file that exceeds the 5 MB size limit"""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Big File Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Generate content slightly over 5 MB
+    oversized_content = b"x" * (5 * 1024 * 1024 + 1)
+    files = {"file": ("transactions.csv", BytesIO(oversized_content), "text/csv")}
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import", files=files
+    )
+
+    assert response.status_code == 400
+    assert "size" in response.json()["detail"].lower()
+
+
+def test_csv_upload_invalid_encoding(client: TestClient):
+    """Test uploading a CSV file with non-UTF-8 encoding returns 400"""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Encoding Portfolio"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    # Latin-1 encoded content that is not valid UTF-8
+    latin1_content = "date,type,ticker\n2025-01-01,Deposit,\xff\n".encode("latin-1")
+    files = {"file": ("transactions.csv", BytesIO(latin1_content), "text/csv")}
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import", files=files
+    )
+
+    assert response.status_code == 400
+    assert "UTF-8" in response.json()["detail"]
