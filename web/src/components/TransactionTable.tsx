@@ -353,7 +353,7 @@ export const TransactionTable = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel variant="outline">{t('transaction.delete.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel variant="outline">{t('common.actions.cancel')}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
               {t('transaction.delete.confirm')}
             </AlertDialogAction>

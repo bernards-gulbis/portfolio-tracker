@@ -4,12 +4,12 @@ import { formatSignedCurrency, formatDateCompact, formatCurrency, getValueClass 
 import type { WithdrawalFx } from '../api';
 import { computeWithdrawalTaxMap } from '../utils/eurMetrics';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableCaption, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { InfoIcon } from 'lucide-react';
 import { PaginationControls } from './PaginationControls';
 import { SortableTableHead } from './SortableTableHead';
+import { FilterControls } from './RealizedGainsTable';
 
 const PAGE_SIZE = 10;
 
@@ -96,21 +96,11 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
 
   return (
     <div className="mt-4">
-      {availableYears.length > 1 && (
-        <div className="flex items-center gap-2 mb-3">
-          <Select value={yearFilter} onValueChange={handleYearChange}>
-            <SelectTrigger className="w-32 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('status.allYears')}</SelectItem>
-              {availableYears.map((year) => (
-                <SelectItem key={year} value={year}>{year}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <FilterControls
+        availableYears={availableYears}
+        yearFilter={yearFilter}
+        onYearChange={handleYearChange}
+      />
       <Card>
         <Table>
           <TableCaption className="sr-only">{t('status.withdrawals')}</TableCaption>

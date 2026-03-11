@@ -122,7 +122,7 @@ export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioAction
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel variant="outline">{t('portfolio.delete.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel variant="outline">{t('common.actions.cancel')}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm} disabled={deletePortfolio.isPending}>
               {t('portfolio.delete.confirm')}
             </AlertDialogAction>
