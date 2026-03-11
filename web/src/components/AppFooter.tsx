@@ -10,7 +10,7 @@ export function AppFooter({ className }: Readonly<{ className?: string }>) {
     <footer className={cn('space-y-1 px-6 py-3 text-xs text-muted-foreground', className)}>
       <div className="flex flex-wrap items-center gap-x-1">
         <span>
-          <Trans i18nKey="app.footer.dataAttribution" components={{ source: <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground" /> }} />
+          <Trans i18nKey="app.footer.dataAttribution" components={{ source: <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground" aria-label="Yahoo Finance" /> }} />
         </span>
         <span aria-hidden="true">·</span>
         <span>{t('app.footer.copyright', { year })}</span>

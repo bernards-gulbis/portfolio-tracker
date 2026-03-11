@@ -95,13 +95,13 @@ export const HoldingsTable = memo(({
   const daysHeldMap = useMemo(() => computeDaysHeld(holdings), [holdings]);
 
   const holdingsWithEur = useMemo(() => {
-    if (!showEur || !eurAvailable) {
-      return holdings.map((h) => ({ holding: h, eurVals: null }));
+    if (showEur && eurAvailable) {
+      return holdings.map((h) => ({
+        holding: h,
+        eurVals: applyRateToHolding(h, eurMetrics.rate),
+      }));
     }
-    return holdings.map((h) => ({
-      holding: h,
-      eurVals: applyRateToHolding(h, eurMetrics.rate),
-    }));
+    return holdings.map((h) => ({ holding: h, eurVals: null }));
   }, [holdings, showEur, eurAvailable, eurMetrics]);
 
   // Total unrealized G/L across all holdings
@@ -231,12 +231,12 @@ export const HoldingsTable = memo(({
                 <TableCell />
                 <TableCell />
                 <TableCell className="text-right tabular-nums">
-                  {totalMarketValue != null
-                    ? formatCurrency(totalMarketValue, effectiveCurrency, locale)
-                    : '-'}
+                  {totalMarketValue == null
+                    ? '-'
+                    : formatCurrency(totalMarketValue, effectiveCurrency, locale)}
                 </TableCell>
-                <TableCell className={`text-right tabular-nums ${totalUnrealizedGL != null ? getValueClass(totalUnrealizedGL) : ''}`}>
-                  {totalUnrealizedGL != null ? (
+                <TableCell className={`text-right tabular-nums ${totalUnrealizedGL == null ? '' : getValueClass(totalUnrealizedGL)}`}>
+                  {totalUnrealizedGL == null ? '-' : (
                     <div className="flex flex-col items-end">
                       <span>{formatSignedCurrency(totalUnrealizedGL, effectiveCurrency, locale)}</span>
                       {totalUnrealizedPct != null && (
@@ -245,7 +245,7 @@ export const HoldingsTable = memo(({
                         </span>
                       )}
                     </div>
-                  ) : '-'}
+                  )}
                 </TableCell>
               </TableRow>
             </TableFooter>

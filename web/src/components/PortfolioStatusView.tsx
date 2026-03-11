@@ -209,7 +209,7 @@ const PortfolioStatusContent = ({
     const liveFx = status.usd_to_eur_rate;
     const effectiveFxLast = liveFx ?? last.fx_rate;
     const first = points.find(p => p.return_pct != null && p.fx_rate != null);
-    if (!first || first.return_pct == null || first.fx_rate == null || effectiveFxLast == null) return last.return_pct;
+    if (first?.return_pct == null || first?.fx_rate == null || effectiveFxLast == null) return last.return_pct;
     const baseFactor = (1 + first.return_pct / 100) * first.fx_rate;
     if (baseFactor <= 0) return null;
     const lastFactor = (1 + last.return_pct / 100) * effectiveFxLast;
@@ -251,9 +251,9 @@ const PortfolioStatusContent = ({
   const netInvested = showEur ? status.principal_eur : status.principal;
   const eurRate = eur?.rate ?? null;
   // Total return = current value - net invested (consistent with chart header)
-  const totalReturn = totalValue != null
-    ? totalValue - netInvested
-    : null;
+  const totalReturn = totalValue == null
+    ? null
+    : totalValue - netInvested;
 
   // After-tax value: total value minus estimated capital gains tax
   const estimatedTax = (() => {
@@ -264,7 +264,7 @@ const PortfolioStatusContent = ({
   })();
   const afterTaxValue = totalValue != null && estimatedTax != null
     ? totalValue - estimatedTax
-    : (showEur ? (eur?.currentValueAfterTaxEur ?? null) : null);
+    : null;
   const taxRatePct = (status.capital_gains_tax_rate * 100).toFixed(1).replace(/\.0$/, '');
 
   // FX impact caption for Net Invested (EUR mode)
@@ -302,34 +302,34 @@ const PortfolioStatusContent = ({
           label={t('status.netInvested')}
           value={formatCurrency(netInvested, currency, locale)}
           caption={
-            fxImpact != null ? (
+            fxImpact == null ? undefined : (
               <p className={getValueClass(fxImpact)}>
                 {formatCurrencyWithPercent(fxImpact, fxImpactPct, 'EUR', locale)}
                 <span className="text-muted-foreground ml-1">{t('status.fxImpact')}</span>
               </p>
-            ) : undefined
+            )
           }
         />
         <StatCard
           label={t('status.totalReturn')}
           value={totalReturn == null ? '-' : formatSignedCurrency(totalReturn, currency, locale)}
           caption={
-            annualizedReturn != null ? (
+            annualizedReturn == null ? undefined : (
               <p className={`${getValueClass(annualizedReturn)} font-medium`}>
                 {formatSignedPercent(annualizedReturn)} {t('status.annualized').toLowerCase()}
               </p>
-            ) : undefined
+            )
           }
         />
         <StatCard
           label={t('status.afterTaxValue')}
           value={afterTaxValue == null ? '-' : formatCurrency(afterTaxValue, currency, locale)}
           caption={
-            estimatedTax != null ? (
+            estimatedTax == null ? undefined : (
               <p className="text-muted-foreground">
                 {t('status.estTax', { rate: taxRatePct })}: −{formatCurrency(estimatedTax, currency, locale)}
               </p>
-            ) : undefined
+            )
           }
         />
       </div>

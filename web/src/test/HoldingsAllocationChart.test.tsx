@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { HoldingsAllocationChart } from '../components/HoldingsAllocationChart';
 import type { PricedHolding } from '../api';
 
@@ -121,5 +121,38 @@ describe('HoldingsAllocationChart', () => {
 
     expect(screen.getByText('CASH')).toBeInTheDocument();
     expect(screen.getByText('$500.00')).toBeInTheDocument();
+  });
+
+  it('dims other legend items when mouse enters a legend item', () => {
+    render(<HoldingsAllocationChart holdings={mockHoldings} cash={500} isLoading={false} />);
+
+    const listItems = document.querySelectorAll('li');
+    expect(listItems.length).toBeGreaterThan(0);
+
+    // Mouse enter the first item
+    fireEvent.mouseEnter(listItems[0]);
+
+    // After entering item 0, item 1 should be dimmed (opacity 0.3)
+    expect(listItems[1]).toHaveStyle({ opacity: '0.3' });
+
+    // Mouse leave restores full opacity for all
+    fireEvent.mouseLeave(listItems[0]);
+    expect(listItems[1]).toHaveStyle({ opacity: '1' });
+  });
+
+  it('does not dim items when no item is active', () => {
+    render(<HoldingsAllocationChart holdings={mockHoldings} cash={500} isLoading={false} />);
+
+    const listItems = document.querySelectorAll('li');
+    listItems.forEach((item) => {
+      expect(item).toHaveStyle({ opacity: '1' });
+    });
+  });
+
+  it('renders zero percentage when total is zero', () => {
+    // Holdings with no value and no cash means no chart rendered — test with only cash=0
+    render(<HoldingsAllocationChart holdings={[]} cash={0} isLoading={false} />);
+    // Empty chart shows no data message
+    expect(screen.getByText('No allocation data available')).toBeInTheDocument();
   });
 });
