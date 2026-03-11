@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { formatCompactValue, subtractMonths, getCutoffDate } from '../utils/chartHelpers';
 
 describe('formatCompactValue', () => {
@@ -30,51 +30,48 @@ describe('formatCompactValue', () => {
 });
 
 describe('getCutoffDate', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns null for "all" period', () => {
     expect(getCutoffDate('all')).toBeNull();
   });
 
   it('returns Jan 1 of current year for "ytd"', () => {
-    const result = getCutoffDate('ytd');
-    const year = new Date().getFullYear();
-    expect(result).toBe(`${year}-01-01`);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 11)); // March 11, 2026
+    expect(getCutoffDate('ytd')).toBe('2026-01-01');
   });
 
-  it('returns a date string approximately 1 month ago for "1month"', () => {
-    const result = getCutoffDate('1month');
-    expect(result).not.toBeNull();
-    const cutoff = new Date(result!);
-    const diff = Date.now() - cutoff.getTime();
-    // Within a day of 30 days ago
-    expect(diff).toBeGreaterThan(27 * 24 * 60 * 60 * 1000);
-    expect(diff).toBeLessThan(33 * 24 * 60 * 60 * 1000);
+  it('returns exact date 1 month ago for "1month"', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 11)); // March 11, 2026
+    expect(getCutoffDate('1month')).toBe('2026-02-11');
   });
 
-  it('returns a date string approximately 3 months ago for "3month"', () => {
-    const result = getCutoffDate('3month');
-    expect(result).not.toBeNull();
-    const cutoff = new Date(result!);
-    const diff = Date.now() - cutoff.getTime();
-    expect(diff).toBeGreaterThan(85 * 24 * 60 * 60 * 1000);
-    expect(diff).toBeLessThan(97 * 24 * 60 * 60 * 1000);
+  it('returns exact date 3 months ago for "3month"', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 11)); // March 11, 2026
+    expect(getCutoffDate('3month')).toBe('2025-12-11');
   });
 
-  it('returns a date string approximately 6 months ago for "6month"', () => {
-    const result = getCutoffDate('6month');
-    expect(result).not.toBeNull();
-    const cutoff = new Date(result!);
-    const diff = Date.now() - cutoff.getTime();
-    expect(diff).toBeGreaterThan(175 * 24 * 60 * 60 * 1000);
-    expect(diff).toBeLessThan(190 * 24 * 60 * 60 * 1000);
+  it('returns exact date 6 months ago for "6month"', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 11)); // March 11, 2026
+    expect(getCutoffDate('6month')).toBe('2025-09-11');
   });
 
-  it('returns a date string approximately 1 year ago for "1year"', () => {
-    const result = getCutoffDate('1year');
-    expect(result).not.toBeNull();
-    const cutoff = new Date(result!);
-    const diff = Date.now() - cutoff.getTime();
-    expect(diff).toBeGreaterThan(362 * 24 * 60 * 60 * 1000);
-    expect(diff).toBeLessThan(370 * 24 * 60 * 60 * 1000);
+  it('returns exact date 1 year ago for "1year"', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 11)); // March 11, 2026
+    expect(getCutoffDate('1year')).toBe('2025-03-11');
+  });
+
+  it('clamps month-end when subtracting months', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 31)); // March 31, 2026
+    expect(getCutoffDate('1month')).toBe('2026-02-28');
   });
 });
 

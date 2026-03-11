@@ -16,7 +16,7 @@ interface PaginationControlsProps {
   onPageChange: (page: number) => void;
 }
 
-function getPageNumbers(currentPage: number, totalPages: number): (number | string)[] {
+export function getPageNumbers(currentPage: number, totalPages: number): (number | string)[] {
   const pages: (number | string)[] = [];
 
   if (totalPages <= MAX_VISIBLE_PAGES) {

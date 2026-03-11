@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PaginationControls } from '../components/PaginationControls';
+import { PaginationControls, getPageNumbers } from '../components/PaginationControls';
 
 describe('PaginationControls', () => {
   it('renders page number links', () => {
@@ -93,5 +93,39 @@ describe('PaginationControls', () => {
     for (let i = 1; i <= 5; i++) {
       expect(screen.getByText(String(i))).toBeInTheDocument();
     }
+  });
+});
+
+describe('getPageNumbers', () => {
+  it('returns all pages when totalPages <= MAX_VISIBLE_PAGES', () => {
+    expect(getPageNumbers(1, 5)).toEqual([1, 2, 3, 4, 5]);
+    expect(getPageNumbers(3, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('returns trailing ellipsis when currentPage is near the start', () => {
+    expect(getPageNumbers(2, 10)).toEqual([1, 2, 3, '...', 10]);
+  });
+
+  it('returns leading ellipsis when currentPage is near the end', () => {
+    expect(getPageNumbers(9, 10)).toEqual([1, '...', 8, 9, 10]);
+    expect(getPageNumbers(10, 10)).toEqual([1, '...', 9, 10]);
+  });
+
+  it('returns both ellipses when currentPage is in the middle', () => {
+    expect(getPageNumbers(5, 10)).toEqual([1, '...', 4, 5, 6, '...', 10]);
+  });
+
+  it('includes first and last page always', () => {
+    const pages = getPageNumbers(6, 12);
+    expect(pages[0]).toBe(1);
+    expect(pages[pages.length - 1]).toBe(12);
+  });
+
+  it('omits leading ellipsis at boundary (currentPage = 3)', () => {
+    expect(getPageNumbers(3, 10)).toEqual([1, 2, 3, 4, '...', 10]);
+  });
+
+  it('omits trailing ellipsis at boundary (currentPage = totalPages - 2)', () => {
+    expect(getPageNumbers(8, 10)).toEqual([1, '...', 7, 8, 9, 10]);
   });
 });

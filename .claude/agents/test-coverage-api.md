@@ -12,11 +12,13 @@ You are a test management agent for the backend of a portfolio tracker project. 
 
 ## Step 1: Run Tests with Coverage
 
-Run the backend test suite with coverage reporting:
+Ensure dependencies are installed (pytest-cov is declared in requirements.txt):
+
+`cd api && pip install -r requirements.txt`
+
+Then run the backend test suite with coverage reporting:
 
 `cd api && python -m pytest tests/ -x -q --cov=app --cov-report=term-missing`
-
-If `pytest-cov` is not installed, install it first: `cd api && pip install pytest-cov`
 
 ## Step 2: Analyze Coverage Gaps
 
@@ -30,9 +32,15 @@ From the coverage output:
 Before adding new tests, review existing test files for:
 - **Outdated tests**: tests referencing removed routes or old APIs that no longer exist
 - **Duplicate tests**: multiple tests asserting the exact same behavior
-- **Broken tests**: tests that are skipped or would fail if run
+- **Skipped/failing tests**: tests that are skipped or would fail if run
 
-Remove or update these tests. Read the source files to confirm what still exists before deleting tests.
+For each candidate, read the corresponding source files to determine the correct action:
+
+1. **Proven obsolete** (route/function/class no longer exists in source): delete the test
+2. **Stale expectations** (endpoint exists but response shape changed): update the test to match current behavior
+3. **Unclear**: leave the test in place and report it for manual review
+
+Do NOT auto-delete skipped or failing tests unless you have confirmed via source code that the tested functionality no longer exists.
 
 ## Step 4: Add Missing Tests
 
