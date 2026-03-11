@@ -80,6 +80,12 @@ describe('PaginationControls', () => {
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('6')).toBeInTheDocument();
+    // Hidden middle pages should not be rendered
+    expect(screen.queryByText('2')).not.toBeInTheDocument();
+    expect(screen.queryByText('3')).not.toBeInTheDocument();
+    // Ellipsis should be present
+    const ellipses = screen.getAllByText('More pages');
+    expect(ellipses.length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows all page numbers without ellipsis when totalPages <= 7', () => {

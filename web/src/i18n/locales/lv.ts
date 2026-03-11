@@ -33,8 +33,7 @@ const lv: Translation = {
     footer: {
       copyright: '\u00a9 {{year}} Bernards Gulbis',
       license: 'MIT licence',
-      dataAttribution: 'Dati no',
-      dataSource: 'Yahoo Finance',
+      dataAttribution: 'Dati no <source>Yahoo Finance</source>',
       disclaimer: 'Kotācijas aizkavētas vismaz 15 minūtes. Tikai informatīviem nolūkiem — nav finanšu konsultācija.',
     },
   },

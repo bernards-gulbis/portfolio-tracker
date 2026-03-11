@@ -95,10 +95,15 @@ export const HoldingsTable = memo(({
   }, [holdingsWithEur, showEur, cashDisplay]);
 
   const totalCost = useMemo(() => {
-    return holdingsWithEur.reduce((sum, { holding, eurVals }) => {
-      if (showEur && eurVals != null) return sum + eurVals.totalCostEur;
-      return sum + holding.total_cost;
-    }, 0);
+    let sum = 0;
+    for (const { holding, eurVals } of holdingsWithEur) {
+      if (showEur) {
+        if (eurVals?.unrealizedGainLossEur != null) sum += eurVals.totalCostEur;
+      } else {
+        if (holding.unrealized_gain_loss != null) sum += holding.total_cost;
+      }
+    }
+    return sum;
   }, [holdingsWithEur, showEur]);
 
   const totalUnrealizedPct = totalUnrealizedGL != null && totalCost > 0

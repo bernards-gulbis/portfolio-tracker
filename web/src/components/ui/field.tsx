@@ -12,7 +12,7 @@ function Field({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
-  return <Label data-slot="field-label" className={cn(className)} {...props} />;
+  return <Label data-slot="field-label" className={className} {...props} />;
 }
 
 function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {

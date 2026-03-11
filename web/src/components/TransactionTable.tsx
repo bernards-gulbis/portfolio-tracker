@@ -58,7 +58,6 @@ interface TransactionTableProps {
   responsePage: number;
   responsePageSize: number;
   onPageChange: (page: number) => void;
-  isLoading: boolean;
   tickerSearch: string;
   onTickerSearchChange: (value: string) => void;
   typeFilter: string[];

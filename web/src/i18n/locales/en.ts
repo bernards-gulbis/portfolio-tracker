@@ -31,8 +31,7 @@ const en = {
     footer: {
       copyright: '\u00a9 {{year}} Bernards Gulbis',
       license: 'MIT License',
-      dataAttribution: 'Data from',
-      dataSource: 'Yahoo Finance',
+      dataAttribution: 'Data from <source>Yahoo Finance</source>',
       disclaimer: 'Quotes delayed at least 15 minutes. For informational purposes only — not financial advice.',
     },
   },

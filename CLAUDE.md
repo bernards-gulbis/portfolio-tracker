@@ -1,6 +1,6 @@
 # Claude.md
 
-Green-field project — structure can be changed freely. Use shadcn components for UI. Add unit tests. After the main task is done, run the `/verify` agent to check build, lint, and tests across both web and api.
+Green-field project — structure can be changed freely. Use shadcn components for UI. Add unit tests. After the main task is done, run `/verify-api` and `/verify-web` agents to check build, lint, and tests.
 
 ## Known gotchas
 

@@ -31,7 +31,7 @@ export const TransactionView = () => {
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const debouncedTicker = useDebounce(tickerSearch, 150);
-  const { data: paginatedData, isLoading, isFetching, error } = useTransactions(
+  const { data: paginatedData, isLoading, error } = useTransactions(
     activePortfolioId, currentPage, DEFAULT_PAGE_SIZE,
     debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
     sortOrder
@@ -205,7 +205,6 @@ export const TransactionView = () => {
           responsePage={responsePage}
           responsePageSize={responsePageSize}
           onPageChange={setCurrentPage}
-          isLoading={isFetching}
           tickerSearch={tickerSearch}
           onTickerSearchChange={setTickerSearch}
           typeFilter={typeFilter}
