@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, MoreVertical, UploadIcon, DownloadIcon } from 'lucide-react';
+import { AlertTriangleIcon, Plus, MoreVertical, UploadIcon, DownloadIcon, ReceiptIcon } from 'lucide-react';
 
 export const TransactionView = () => {
   const { t } = useTranslation();
@@ -30,7 +31,7 @@ export const TransactionView = () => {
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const debouncedTicker = useDebounce(tickerSearch, 150);
-  const { data: paginatedData, isLoading, isFetching, error } = useTransactions(
+  const { data: paginatedData, isLoading, error } = useTransactions(
     activePortfolioId, currentPage, DEFAULT_PAGE_SIZE,
     debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
     sortOrder
@@ -102,11 +103,16 @@ export const TransactionView = () => {
   if (!activePortfolioId) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            <h2 className="text-lg font-medium mb-1">{t('transaction.view.noPortfolio.title')}</h2>
-            <p className="text-sm">{t('transaction.view.noPortfolio.description')}</p>
-          </div>
+        <CardContent>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia>
+                <ReceiptIcon />
+              </EmptyMedia>
+              <EmptyTitle>{t('transaction.view.noPortfolio.title')}</EmptyTitle>
+              <EmptyDescription>{t('transaction.view.noPortfolio.description')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </CardContent>
       </Card>
     );
@@ -139,7 +145,10 @@ export const TransactionView = () => {
         </CardHeader>
         <Separator />
         <CardContent className="py-8">
-          <p className="text-center text-destructive text-sm">{t('transaction.view.error', { message: getErrorMessage(error) })}</p>
+          <Alert variant="destructive">
+            <AlertTriangleIcon className="h-4 w-4" />
+            <AlertDescription>{t('transaction.view.error', { message: getErrorMessage(error) })}</AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
@@ -196,7 +205,6 @@ export const TransactionView = () => {
           responsePage={responsePage}
           responsePageSize={responsePageSize}
           onPageChange={setCurrentPage}
-          isLoading={isFetching}
           tickerSearch={tickerSearch}
           onTickerSearchChange={setTickerSearch}
           typeFilter={typeFilter}

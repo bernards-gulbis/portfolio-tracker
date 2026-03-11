@@ -9,6 +9,7 @@ from app.services.portfolio_calc import (
     _apply_transaction,
     _build_holdings_list,
     _compute_forward_split_factors,
+    _fetch_historical_prices,
     _resolve_nearest_date_value,
     _value_holdings_at_date,
     calculate_status,
@@ -122,6 +123,61 @@ class TestComputeForwardSplitFactors:
         factors = _compute_forward_split_factors(txs)
         assert "AAPL" not in factors
         assert factors["MSFT"] == Decimal("2")
+
+    def test_skips_split_with_negative_ratio(self):
+        """A split with ratio <= 0 should be silently skipped."""
+        txs = [
+            _make_tx(
+                type=TransactionType.SPLIT,
+                ticker="AAPL",
+                split_ratio=-2.0,
+                date=datetime(2025, 6, 1),
+            )
+        ]
+        factors = _compute_forward_split_factors(txs)
+        assert "AAPL" not in factors
+
+
+# ==================== _fetch_historical_prices ====================
+
+
+class TestFetchHistoricalPrices:
+    def test_returns_empty_dict_for_no_tickers(self):
+        result = _fetch_historical_prices([], datetime(2025, 6, 15))
+        assert result == {}
+
+    @patch("app.services.portfolio_calc.PriceService")
+    def test_returns_empty_dict_when_no_prices_available(self, mock_ps):
+        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {}
+        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
+        assert result == {}
+
+    @patch("app.services.portfolio_calc.PriceService")
+    def test_returns_price_for_nearest_earlier_date(self, mock_ps):
+        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
+            "AAPL": {"2025-06-13": 190.0, "2025-06-14": 195.0}
+        }
+        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
+        assert result["AAPL"] == 195.0
+
+    @patch("app.services.portfolio_calc.PriceService")
+    def test_uses_earliest_available_when_all_dates_after_target(self, mock_ps):
+        """If all available dates are after the target date, use the earliest one."""
+        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
+            "AAPL": {"2025-06-17": 200.0, "2025-06-18": 205.0}
+        }
+        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
+        assert result["AAPL"] == 200.0
+
+    @patch("app.services.portfolio_calc.PriceService")
+    def test_skips_ticker_with_empty_date_prices(self, mock_ps):
+        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
+            "AAPL": {},
+            "MSFT": {"2025-06-14": 410.0},
+        }
+        result = _fetch_historical_prices(["AAPL", "MSFT"], datetime(2025, 6, 15))
+        assert "AAPL" not in result
+        assert result["MSFT"] == 410.0
 
 
 # ==================== _value_holdings_at_date ====================

@@ -1,32 +1,26 @@
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
 import { APP_VERSION } from '../constants/app';
 
 export function AppFooter({ className }: Readonly<{ className?: string }>) {
   const { t } = useTranslation();
+  const year = new Date().getFullYear();
 
   return (
-    <footer className={cn('px-6 py-3 text-xs text-muted-foreground', className)}>
-      <p className="text-center text-[0.65rem] text-muted-foreground/70">
-        {t('app.footer.dataAttribution')}{' '}
-        <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-          {t('app.footer.dataSource')}
-        </a>
-        {'. '}
-        {t('app.footer.disclaimer')}
-      </p>
-      <Separator className="my-2" />
-      <div className="flex items-baseline justify-between">
+    <footer className={cn('space-y-1 px-6 py-3 text-xs text-muted-foreground', className)}>
+      <div className="flex flex-wrap items-center gap-x-1">
         <span>
-          {t('app.footer.copyright', { year: new Date().getFullYear() })}
-          <span aria-hidden="true" className="mx-1">·</span>
-          <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-            {t('app.footer.license')}
-          </a>
+          <Trans i18nKey="app.footer.dataAttribution" components={{ source: <a href="https://finance.yahoo.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground" aria-label="Yahoo Finance" /> }} />
         </span>
-        <span>{t('app.version', { version: APP_VERSION })}</span>
+        <span aria-hidden="true">·</span>
+        <span>{t('app.footer.copyright', { year })}</span>
+        <span aria-hidden="true">·</span>
+        <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+          {t('app.footer.license')}
+        </a>
+        <span className="ml-auto">{t('app.version', { version: APP_VERSION })}</span>
       </div>
+      <p className="text-xs text-muted-foreground">{t('app.footer.disclaimer')}</p>
     </footer>
   );
 }

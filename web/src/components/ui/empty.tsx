@@ -1,36 +1,34 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-const Empty = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+function Empty({ className, ...props }: React.ComponentProps<"div">) {
+  return (
     <div
-      ref={ref}
+      data-slot="empty"
       className={cn('flex flex-col items-center gap-4 py-12 text-center', className)}
       {...props}
     />
-  )
-);
-Empty.displayName = 'Empty';
+  );
+}
 
-const EmptyHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
     <div
-      ref={ref}
+      data-slot="empty-header"
       className={cn('flex flex-col items-center gap-2', className)}
       {...props}
     />
-  )
-);
-EmptyHeader.displayName = 'EmptyHeader';
-
-interface EmptyMediaProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'icon' | 'image';
+  );
 }
 
-const EmptyMedia = React.forwardRef<HTMLDivElement, EmptyMediaProps>(
-  ({ className, variant = 'icon', ...props }, ref) => (
+function EmptyMedia({
+  className,
+  variant = 'icon',
+  ...props
+}: React.ComponentProps<"div"> & { variant?: 'icon' | 'image' }) {
+  return (
     <div
-      ref={ref}
+      data-slot="empty-media"
       className={cn(
         'flex items-center justify-center',
         variant === 'icon' &&
@@ -39,43 +37,44 @@ const EmptyMedia = React.forwardRef<HTMLDivElement, EmptyMediaProps>(
       )}
       {...props}
     />
-  )
-);
-EmptyMedia.displayName = 'EmptyMedia';
+  );
+}
 
-const EmptyTitle = React.forwardRef<
-  HTMLHeadingElement,
-  React.HTMLAttributes<HTMLHeadingElement>
->(({ className, children, ...props }, ref) =>
-  children ? (
-    <h3 ref={ref} className={cn('text-base font-semibold', className)} {...props}>
+function EmptyTitle({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"h3">) {
+  if (!children) return null;
+  return (
+    <h3
+      data-slot="empty-title"
+      className={cn('text-base font-semibold', className)}
+      {...props}
+    >
       {children}
     </h3>
-  ) : null
-);
-EmptyTitle.displayName = 'EmptyTitle';
+  );
+}
 
-const EmptyDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
-  <p
-    ref={ref}
-    className={cn('max-w-xs text-sm text-muted-foreground', className)}
-    {...props}
-  />
-));
-EmptyDescription.displayName = 'EmptyDescription';
+function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="empty-description"
+      className={cn('max-w-xs text-sm text-muted-foreground', className)}
+      {...props}
+    />
+  );
+}
 
-const EmptyContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
+  return (
     <div
-      ref={ref}
+      data-slot="empty-content"
       className={cn('flex flex-col items-center gap-2', className)}
       {...props}
     />
-  )
-);
-EmptyContent.displayName = 'EmptyContent';
+  );
+}
 
 export { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent };

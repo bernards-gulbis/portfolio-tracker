@@ -45,7 +45,7 @@ const PieCenterLabel = ({ viewBox, locale, currency, activeEntry, total, totalLa
     const pct = total > 0 ? ((activeEntry.value / total) * 100).toFixed(1) : '0.0';
     return (
       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-        <tspan x={cx} y={cy - 18} className="fill-muted-foreground text-[11px]">
+        <tspan x={cx} y={cy - 18} className="fill-muted-foreground text-xs">
           {activeEntry.name}
         </tspan>
         <tspan x={cx} y={cy + 4} className="fill-foreground text-base font-bold">
@@ -178,7 +178,7 @@ export const HoldingsAllocationChart = ({
         <CardTitle>{t('chart.allocation.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]">
+        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]" aria-label={t('chart.allocation.title')}>
           <PieChart>
             <Pie
               data={chartData}
@@ -213,7 +213,7 @@ export const HoldingsAllocationChart = ({
             return (
               <li
                 key={entry.name}
-                className="flex items-center justify-between text-xs cursor-default"
+                className="flex items-center justify-between text-sm cursor-default"
                 style={{ opacity: dimmed ? 0.3 : 1, ...TRANSITION_STYLE }}
                 onMouseEnter={() => setActiveIndex(index)}
                 onMouseLeave={() => setActiveIndex(null)}

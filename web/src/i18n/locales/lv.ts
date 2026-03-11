@@ -10,6 +10,10 @@ const lv: Translation = {
     daysShort: 'd',
     monthsShort: 'mēn',
     yearsShort: 'g',
+    actions: {
+      cancel: 'Atcelt',
+      delete: 'Dzēst',
+    },
   },
   errorBoundary: {
     title: 'Kaut kas nogāja greizi',
@@ -27,11 +31,10 @@ const lv: Translation = {
     },
     version: 'v{{version}}',
     footer: {
-      copyright: '\u00a9 {{year}} Bernards Gulbis. Licencēts saskaņā ar',
-      license: 'MIT licenci',
-      dataAttribution: 'Datus nodrošina',
-      dataSource: 'Yahoo Finance',
-      disclaimer: 'Kotācijas aizkavētas vismaz 15 minūtes. Visi biržas laiki ir ET zonā. Šī lietotne ir paredzēta tikai informatīviem nolūkiem un nav uzskatāma par finanšu konsultāciju.',
+      copyright: '\u00a9 {{year}} Bernards Gulbis',
+      license: 'MIT licence',
+      dataAttribution: 'Dati no <source>Yahoo Finance</source>',
+      disclaimer: 'Kotācijas aizkavētas vismaz 15 minūtes. Tikai informatīviem nolūkiem — nav finanšu konsultācija.',
     },
   },
   auth: {
@@ -119,7 +122,6 @@ const lv: Translation = {
     delete: {
       title: 'Dzēst portfeli?',
       description: 'Tas neatgriezeniski izdzēsīs šo portfeli un visus tā darījumus. Šo darbību nevar atsaukt.',
-      cancel: 'Atcelt',
       confirm: 'Dzēst',
       errorToast: 'Neizdevās dzēst portfeli: {{message}}',
     },
@@ -128,7 +130,6 @@ const lv: Translation = {
       description: 'Forma jauna portfeļa izveidošanai',
       nameLabel: 'Portfeļa nosaukums',
       namePlaceholder: 'piem., Mans ieguldījumu portfelis',
-      cancel: 'Atcelt',
       submit: 'Izveidot portfeli',
     },
     edit: {
@@ -136,7 +137,6 @@ const lv: Translation = {
       description: 'Forma portfeļa pārdēvēšanai',
       nameLabel: 'Portfeļa nosaukums',
       namePlaceholder: 'piem., Mans ieguldījumu portfelis',
-      cancel: 'Atcelt',
       submit: 'Atjaunināt portfeli',
     },
     copy: {
@@ -145,7 +145,6 @@ const lv: Translation = {
       nameLabel: 'Jaunā portfeļa nosaukums',
       namePlaceholder: 'Ievadiet jaunā portfeļa nosaukumu',
       nameDescription: 'Tiks kopēts "{{name}}" ar visiem tā darījumiem.',
-      cancel: 'Atcelt',
       submit: 'Kopēt portfeli',
       defaultName: '{{name}} (Kopija)',
     },
@@ -218,7 +217,6 @@ const lv: Translation = {
     delete: {
       title: 'Dzēst darījumu?',
       description: 'Tas neatgriezeniski izdzēsīs šo darījumu. Šo darbību nevar atsaukt.',
-      cancel: 'Atcelt',
       confirm: 'Dzēst',
       errorToast: 'Neizdevās dzēst darījumu: {{message}}',
     },
@@ -227,7 +225,6 @@ const lv: Translation = {
       editTitle: 'Rediģēt darījumu',
       addDescription: 'Forma jauna darījuma pievienošanai',
       editDescription: 'Forma esošā darījuma rediģēšanai',
-      cancel: 'Atcelt',
       add: 'Pievienot darījumu',
       update: 'Atjaunināt',
       fields: {
@@ -276,7 +273,6 @@ const lv: Translation = {
       chooseFile: 'Izvēlēties failu',
       noFileChosen: 'Nav izvēlētas datnes',
       selected: 'Izvēlēts',
-      cancel: 'Atcelt',
       submit: 'Importēt',
     },
   },
@@ -303,12 +299,14 @@ const lv: Translation = {
     netInvested: 'Neto ieguldīts',
     netInvestedTooltip: 'Iemaksas mīnus izmaksas. EUR konvertācijas kursa izmaiņas ietekmē peļņu.',
     fx: 'Valūta',
+    fxImpact: 'Valūtas ietekme',
     cashFxTooltip: 'Valūtas ietekme: peļņa/zaudējumi no EUR/USD kursa izmaiņām uz jūsu iemaksām',
     dividends: 'Dividendes',
+    totalReturn: 'Kopējā peļņa',
+    annualized: 'Gada',
     estTax: 'Aplēstais nodoklis ({{rate}}%)',
     on: 'no',
     afterTaxValue: 'Vērtība pēc nodokļa',
-    financialSummary: 'Finanšu kopsavilkums',
     positions: 'Pozīcijas',
     realizedGains: 'Realizētā peļņa',
     dividendsReceived: 'Saņemtās dividendes',
@@ -323,6 +321,7 @@ const lv: Translation = {
     paymentCount_other: '{{count}} maksājumi',
     partiallySold: '{{sold}} no {{total}} akcijām pārdotas',
     priceCaption: 'cena',
+    currentPriceCaption: 'pašreizējā cena',
     allSold: 'visa pārdota',
     ofTotal: 'no {{total}}',
     showAllSells: 'Rādīt visas {{count}} pārdošanas',
@@ -362,6 +361,7 @@ const lv: Translation = {
   chart: {
     performance: {
       title: 'Sniegums',
+      titleValue: 'Portfeļa vērtība',
       noData: 'Nav pieejami snieguma dati',
       insufficientData: 'Nepietiekami datu punkti, lai attēlotu snieguma grafiku.',
       insufficientDataForPeriod: 'Nepietiekami datu punkti šim laika periodam. Izmēģiniet garāku periodu vai "Visi".',
@@ -388,7 +388,6 @@ const lv: Translation = {
       namePlaceholder: 'Jūsu vārds',
       emailLabel: 'E-pasts',
       submit: 'Saglabāt izmaiņas',
-      cancel: 'Atcelt',
     },
     password: {
       tab: 'Parole',
@@ -397,7 +396,6 @@ const lv: Translation = {
       confirmPasswordLabel: 'Apstiprināt jauno paroli',
       submit: 'Mainīt paroli',
       submitOauth: 'Iestatīt paroli',
-      cancel: 'Atcelt',
       oauthNote: 'Jūs ierakstījāties ar Google. Iestatot paroli, tiks iespējota arī e-pasta ierakstīšanās.',
     },
     account: {

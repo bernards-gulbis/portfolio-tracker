@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { withTranslation, type WithTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface Props extends WithTranslation {
   children: ReactNode;
@@ -27,7 +28,7 @@ class ErrorBoundaryInner extends Component<Props, State> {
       const { t } = this.props;
       const fullScreen = this.props.fullScreen ?? true;
       return (
-        <div className={`${fullScreen ? 'min-h-screen bg-background' : ''} flex flex-col items-center justify-center gap-4 py-12 text-foreground`}>
+        <div className={cn('flex flex-col items-center justify-center gap-4 py-12 text-foreground', fullScreen && 'min-h-screen bg-background')}>
           <h1 className="text-2xl font-semibold tracking-tight">{t('errorBoundary.title')}</h1>
           <Button onClick={() => this.setState({ hasError: false })}>
             {t('errorBoundary.tryAgain')}

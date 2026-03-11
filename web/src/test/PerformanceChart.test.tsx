@@ -37,10 +37,10 @@ describe('PerformanceChart', () => {
   it('renders chart with header value when data is provided', () => {
     render(<PerformanceChart data={mockData} isLoading={false} />);
 
-    expect(screen.getByText('Performance')).toBeInTheDocument();
+    expect(screen.getByText('Portfolio Value')).toBeInTheDocument();
     // The header should show the latest current value in EUR (12706 * 0.92 = 11689.52)
-    // formatted as currency — just verify Performance title is rendered
-  });
+    // formatted as currency — just verify Portfolio Value title is rendered
+  })
 
   it('renders all period tab triggers', () => {
     render(<PerformanceChart data={mockData} isLoading={false} />);
@@ -81,6 +81,15 @@ describe('PerformanceChart', () => {
     expect(screen.getByRole('tab', { name: '%' })).toHaveAttribute('data-state', 'active');
   });
 
+  it('shows "Performance" title when in % mode and "Portfolio Value" in value mode', async () => {
+    render(<PerformanceChart data={mockData} isLoading={false} />);
+
+    expect(screen.getByText('Portfolio Value')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: '%' }));
+    expect(screen.getByText('Performance')).toBeInTheDocument();
+  });
+
   it('shows insufficient data message when filtered data has < 2 points', () => {
     render(<PerformanceChart data={oldMockData} isLoading={false} />);
 
@@ -104,6 +113,6 @@ describe('all-null return_pct handling', () => {
 
     // Should render without throwing
     render(<PerformanceChart data={nullReturnData} isLoading={false} />);
-    expect(screen.getByText('Performance')).toBeInTheDocument();
+    expect(screen.getByText('Portfolio Value')).toBeInTheDocument();
   });
 });

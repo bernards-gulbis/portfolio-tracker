@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PortfolioStatusView } from '../components/PortfolioStatusView';
 import { CurrencyProvider } from '../hooks/useCurrencyPreference';
@@ -146,7 +146,7 @@ describe('PortfolioStatusView', () => {
     expect(screen.getByText(/Error loading portfolio status/)).toBeInTheDocument();
   });
 
-  it('renders market value, net invested, dividends, tax, after-tax sections', () => {
+  it('renders stat cards: Net Invested, Total Return, After-tax Value', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: mockStatus,
       isLoading: false,
@@ -155,15 +155,9 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0);
-
-    // Financial summary is collapsed by default — expand it
-    fireEvent.click(screen.getByText('Financial Summary'));
-
     expect(screen.getAllByText('Net Invested').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Dividends').length).toBeGreaterThan(0);
-    expect(screen.getByText('Est. Tax (25.5%)')).toBeInTheDocument();
-    expect(screen.getByText('After-tax Value')).toBeInTheDocument();
+    expect(screen.getAllByText('Total Return').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('After-tax Value').length).toBeGreaterThan(0);
   });
 
   it('renders CASH row in holdings table', () => {
@@ -261,6 +255,84 @@ describe('PortfolioStatusView', () => {
     expect(screen.queryByText('Transaction warnings')).not.toBeInTheDocument();
   });
 
+  it('shows no data empty state when status is undefined after loading', () => {
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: 0,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: undefined,
+      isFetching: false,
+      dataUpdatedAt: 0,
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    renderComponent(1);
+
+    expect(screen.getByText('No status data available')).toBeInTheDocument();
+  });
+
+  it('shows live price error banner when live prices fail', () => {
+    const livePriceError = new Error('Price fetch failed');
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: livePriceError,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    renderComponent(1);
+
+    expect(screen.getByText('Live prices temporarily unavailable')).toBeInTheDocument();
+  });
+
+  it('calls invalidateQueries when refresh button is clicked', async () => {
+    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+    const queryClient = createTestQueryClient();
+    queryClient.invalidateQueries = invalidateQueries;
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    mockNavigation.activePortfolioId = 1;
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CurrencyProvider>
+          <PortfolioStatusView />
+        </CurrencyProvider>
+      </QueryClientProvider>
+    );
+
+    const refreshButton = screen.getByRole('button', { name: /refresh portfolio/i });
+    fireEvent.click(refreshButton);
+
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledTimes(3);
+    });
+  });
+
   it('renders dashes when prices not yet loaded', () => {
     // No live prices → computePricedStatus returns null price fields → dashes
     vi.mocked(useLivePrices).mockReturnValue({
@@ -287,5 +359,30 @@ describe('PortfolioStatusView', () => {
     // Null monetary values (market value, dividends, tax, after-tax) render as '-'
     const dashes = screen.getAllByText('-');
     expect(dashes.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('displays EUR values in stat cards when currency is EUR', () => {
+    localStorage.setItem('pt_currency', 'EUR');
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    renderComponent(1);
+
+    // EUR principal = 7360, formatted as €7,360.00
+    expect(screen.getByText('€7,360.00')).toBeInTheDocument();
+
+    localStorage.removeItem('pt_currency');
   });
 });

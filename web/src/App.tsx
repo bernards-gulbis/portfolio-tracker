@@ -61,7 +61,7 @@ const CURRENCY_OPTIONS = [
 function CheckedItem({ checked, onClick, children }: Readonly<{ checked: boolean; onClick: () => void; children: ReactNode }>) {
   return (
     <DropdownMenuItem onClick={onClick}>
-      {checked ? <Check className="mr-2 h-4 w-4" /> : <span className="mr-2 w-4" />}
+      {checked ? <Check /> : <span className="w-4" />}
       {children}
     </DropdownMenuItem>
   );
@@ -211,7 +211,7 @@ function AppLayout() {
   return (
     <>
       <div className="flex min-h-screen flex-col">
-        <header className="border-b px-4 py-3 flex justify-between items-center">
+        <header className="border-b px-6 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
               <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={() => setIsCreateModalOpen(true)} />
@@ -242,7 +242,7 @@ function AppLayout() {
               <DropdownMenuSeparator />
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
-                  {theme === 'light' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                  {theme === 'light' ? <Sun /> : <Moon />}
                   {t('app.header.themeLabel')}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
@@ -255,7 +255,7 @@ function AppLayout() {
               </DropdownMenuSub>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
-                  <Languages className="mr-2 h-4 w-4" />
+                  <Languages />
                   {t('language.switchLabel')}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
@@ -268,7 +268,7 @@ function AppLayout() {
               </DropdownMenuSub>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
-                  <DollarSign className="mr-2 h-4 w-4" />
+                  <DollarSign />
                   {t('status.currency.toggle')}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
@@ -281,7 +281,7 @@ function AppLayout() {
               </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => goToSettings()}>
-                <Settings className="mr-2 h-4 w-4" />
+                <Settings />
                 {t('settings.menuItem')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -290,7 +290,7 @@ function AppLayout() {
                 onClick={() => logoutMutation.mutate()}
                 disabled={logoutMutation.isPending}
               >
-                {logoutMutation.isPending ? <Spinner className="mr-2" /> : <LogOut className="mr-2 h-4 w-4" />}
+                {logoutMutation.isPending ? <Spinner /> : <LogOut />}
                 {t('app.header.signOut')}
               </DropdownMenuItem>
             </DropdownMenuContent>

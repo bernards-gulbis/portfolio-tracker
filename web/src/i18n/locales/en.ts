@@ -8,6 +8,10 @@ const en = {
     daysShort: 'd',
     monthsShort: 'm',
     yearsShort: 'y',
+    actions: {
+      cancel: 'Cancel',
+      delete: 'Delete',
+    },
   },
   errorBoundary: {
     title: 'Something went wrong',
@@ -25,11 +29,10 @@ const en = {
     },
     version: 'v{{version}}',
     footer: {
-      copyright: '\u00a9 {{year}} Bernards Gulbis. Licensed under the',
+      copyright: '\u00a9 {{year}} Bernards Gulbis',
       license: 'MIT License',
-      dataAttribution: 'Data provided by',
-      dataSource: 'Yahoo Finance',
-      disclaimer: 'Quotes delayed at least 15 minutes. All exchange times are in ET. This application is for informational purposes only and does not constitute financial advice.',
+      dataAttribution: 'Data from <source>Yahoo Finance</source>',
+      disclaimer: 'Quotes delayed at least 15 minutes. For informational purposes only — not financial advice.',
     },
   },
   auth: {
@@ -117,7 +120,6 @@ const en = {
     delete: {
       title: 'Delete portfolio?',
       description: 'This will permanently delete this portfolio and all its transactions. This action cannot be undone.',
-      cancel: 'Cancel',
       confirm: 'Delete',
       errorToast: 'Failed to delete portfolio: {{message}}',
     },
@@ -126,7 +128,6 @@ const en = {
       description: 'Form to create a new portfolio',
       nameLabel: 'Portfolio Name',
       namePlaceholder: 'e.g., My Investment Portfolio',
-      cancel: 'Cancel',
       submit: 'Create Portfolio',
     },
     edit: {
@@ -134,7 +135,6 @@ const en = {
       description: 'Form to rename this portfolio',
       nameLabel: 'Portfolio Name',
       namePlaceholder: 'e.g., My Investment Portfolio',
-      cancel: 'Cancel',
       submit: 'Update Portfolio',
     },
     copy: {
@@ -143,7 +143,6 @@ const en = {
       nameLabel: 'New Portfolio Name',
       namePlaceholder: 'Enter new portfolio name',
       nameDescription: 'This will copy "{{name}}" with all its transactions.',
-      cancel: 'Cancel',
       submit: 'Copy Portfolio',
       defaultName: '{{name}} (Copy)',
     },
@@ -216,7 +215,6 @@ const en = {
     delete: {
       title: 'Delete transaction?',
       description: 'This will permanently delete this transaction. This action cannot be undone.',
-      cancel: 'Cancel',
       confirm: 'Delete',
       errorToast: 'Failed to delete transaction: {{message}}',
     },
@@ -225,7 +223,6 @@ const en = {
       editTitle: 'Edit Transaction',
       addDescription: 'Form to add a new transaction',
       editDescription: 'Form to edit an existing transaction',
-      cancel: 'Cancel',
       add: 'Add Transaction',
       update: 'Update',
       fields: {
@@ -274,7 +271,6 @@ const en = {
       chooseFile: 'Choose file',
       noFileChosen: 'No file chosen',
       selected: 'Selected',
-      cancel: 'Cancel',
       submit: 'Import',
     },
   },
@@ -301,12 +297,14 @@ const en = {
     netInvested: 'Net Invested',
     netInvestedTooltip: 'Deposits minus withdrawals. EUR conversion rate changes affect gains.',
     fx: 'FX',
+    fxImpact: 'FX impact',
     cashFxTooltip: 'FX impact: gain/loss from EUR/USD rate changes on your deposits',
     dividends: 'Dividends',
+    totalReturn: 'Total Return',
+    annualized: 'Annualized',
     estTax: 'Est. Tax ({{rate}}%)',
     on: 'on',
     afterTaxValue: 'After-tax Value',
-    financialSummary: 'Financial Summary',
     positions: 'Positions',
     realizedGains: 'Realized Gains',
     dividendsReceived: 'Dividends Received',
@@ -321,6 +319,7 @@ const en = {
     paymentCount_other: '{{count}} payments',
     partiallySold: '{{sold}} of {{total}} shares sold',
     priceCaption: 'price',
+    currentPriceCaption: 'current price',
     allSold: 'all sold',
     ofTotal: 'of {{total}}',
     showAllSells: 'Show all {{count}} sells',
@@ -360,6 +359,7 @@ const en = {
   chart: {
     performance: {
       title: 'Performance',
+      titleValue: 'Portfolio Value',
       noData: 'No performance data available',
       insufficientData: 'Not enough data points to display performance chart.',
       insufficientDataForPeriod: 'Not enough data points for this time period. Try a longer period or "All".',
@@ -386,7 +386,6 @@ const en = {
       namePlaceholder: 'Your name',
       emailLabel: 'Email',
       submit: 'Save changes',
-      cancel: 'Cancel',
     },
     password: {
       tab: 'Password',
@@ -395,7 +394,6 @@ const en = {
       confirmPasswordLabel: 'Confirm new password',
       submit: 'Change password',
       submitOauth: 'Set password',
-      cancel: 'Cancel',
       oauthNote: 'You signed in with Google. Setting a password will also enable email login.',
     },
     account: {

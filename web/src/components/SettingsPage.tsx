@@ -488,14 +488,15 @@ export const SettingsPage = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-4">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleBack}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2 cursor-pointer"
+          className="gap-1 text-muted-foreground hover:text-foreground mb-2 -ml-2"
         >
           <ArrowLeft className="h-4 w-4" />
           {t('settings.backToPortfolio')}
-        </button>
+        </Button>
         <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
         <p className="text-muted-foreground text-sm">{t('settings.description')}</p>
       </div>

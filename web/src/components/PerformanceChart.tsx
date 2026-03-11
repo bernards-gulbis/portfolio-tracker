@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChartContainer,
@@ -288,9 +288,18 @@ export const PerformanceChart = ({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center h-[380px]">
-          <Spinner className="size-8" />
+      <Card role="status">
+        <CardHeader>
+          <div>
+            <Skeleton className="h-4 w-32 mb-2" />
+            <Skeleton className="h-8 w-40" />
+          </div>
+          <CardAction>
+            <Skeleton className="h-8 w-48" />
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[300px] w-full rounded-lg" />
         </CardContent>
       </Card>
     );
@@ -354,8 +363,8 @@ export const PerformanceChart = ({
       <CardHeader>
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t('chart.performance.title')}
+            <CardTitle className="text-sm font-semibold">
+              {viewMode === 'value' ? t('chart.performance.titleValue') : t('chart.performance.title')}
             </CardTitle>
             {headerInfo?.isHovering && (
               <span className="text-xs text-muted-foreground">{headerInfo.date}</span>
@@ -363,7 +372,7 @@ export const PerformanceChart = ({
           </div>
           {headerInfo && (
             <div>
-              <span className="text-2xl font-bold tabular-nums">
+              <span className="text-2xl font-bold tracking-tight tabular-nums">
                 {headerInfo.displayValue}
               </span>
               {headerInfo.mode === 'value' && headerInfo.changeDisplay != null && (
@@ -373,18 +382,18 @@ export const PerformanceChart = ({
                 </span>
               )}
               {headerInfo.mode === 'value' && headerInfo.principalDisplay != null && (
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <span
-                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    className="inline-block h-2 w-2 rounded-[2px] shrink-0"
                     style={{ backgroundColor: 'var(--chart-2)' }}
                   />
                   {t('chart.performance.principal')}: {headerInfo.principalDisplay}
                 </div>
               )}
               {headerInfo.mode === 'pct' && headerInfo.sp500Display != null && (
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <span
-                    className="inline-block h-2 w-2 rounded-[2px] mr-1 align-middle"
+                    className="inline-block h-2 w-2 rounded-[2px] shrink-0"
                     style={{ backgroundColor: 'var(--chart-4)' }}
                   />
                   {t('chart.performance.sp500')}: {headerInfo.sp500Display}
@@ -406,7 +415,7 @@ export const PerformanceChart = ({
         </CardAction>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        <ChartContainer config={chartConfig} className="h-[300px] w-full" aria-label={t('chart.performance.title')}>
           <ComposedChart
             accessibilityLayer
             data={chartData}

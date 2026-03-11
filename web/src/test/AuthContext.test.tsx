@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
@@ -55,6 +55,11 @@ describe('AuthContext', () => {
     mockQueryClient.clear.mockReset();
   });
 
+  afterEach(() => {
+    // Clean up any modified URL query params
+    globalThis.history.replaceState({}, '', globalThis.location.pathname);
+  });
+
   it('starts in loading state before getCurrentUser resolves', () => {
     vi.mocked(api.getCurrentUser).mockImplementation(() => new Promise(() => {}));
     renderAuth();
@@ -98,6 +103,30 @@ describe('AuthContext', () => {
     );
     expect(screen.getByTestId('email')).toHaveTextContent('none');
     expect(mockQueryClient.clear).toHaveBeenCalled();
+  });
+
+  it('shows error toast when oauth_error query param is present', async () => {
+    vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new Error('Unauthorized'));
+
+    // Set oauth_error param before rendering
+    globalThis.history.replaceState({}, '', '?oauth_error=access_denied');
+
+    const { Toaster } = await import('sonner');
+    render(
+      <>
+        <Toaster />
+        <AuthProvider>
+          <StatusDisplay />
+        </AuthProvider>
+      </>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated')
+    );
+
+    // The URL should be cleaned up
+    expect(globalThis.location.search).toBe('');
   });
 
   describe('logout()', () => {
