@@ -522,7 +522,7 @@ class TransactionService:
         if eur_amount is None:
             return None
         if transaction_type == TransactionType.SPLIT:
-            return eur_amount
+            return 0.0
         return math.copysign(abs(eur_amount), total_amount)
 
     @staticmethod

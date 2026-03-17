@@ -716,10 +716,11 @@ class TestApplyCSVEurSign:
         assert txs[0].eur_amount == 500
 
     def test_eur_sign_ok_for_split(self, svc, user_id, portfolio_id):
-        """SPLIT skips eur sign correction"""
+        """SPLIT normalizes eur_amount to zero (no cash impact)"""
         csv = "date,type,total_amount,ticker,split_ratio,eur\n01/01/2024 00:00:00,Split,0,AAPL,2,-10\n"
         txs, _skipped = svc.import_from_csv(csv, portfolio_id, user_id)
         assert len(txs) == 1
+        assert txs[0].eur_amount == 0.0
 
     def test_eur_none_passes(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount,eur\n01/01/2024 00:00:00,Deposit,1000,\n"
