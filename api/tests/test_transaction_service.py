@@ -727,6 +727,11 @@ class TestApplyCSVEurSign:
         txs, _skipped = svc.import_from_csv(csv, portfolio_id, user_id)
         assert txs[0].eur_amount is None
 
+    def test_eur_sign_corrected_negative_total(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount,eur\n01/01/2024 00:00:00,Withdraw,-500,300\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].eur_amount == -300
+
 
 # ── Deduplication ────────────────────────────────────────────────────
 
