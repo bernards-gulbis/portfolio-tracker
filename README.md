@@ -52,4 +52,4 @@ date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,curre
 01/18/2024 11:00:00,Dividend,AAPL,,,0.00,50.00,,,,
 ```
 
-Types: `Deposit`, `Buy`, `Sell`, `Withdraw`, `Dividend`, `Fee`, `Split`. Buy/Withdraw/Fee = negative `total_amount`; Deposit/Sell/Dividend = positive; Split = 0. Leave fields blank if not applicable.
+Types: `Deposit`, `Buy`, `Sell`, `Withdraw`, `Dividend`, `Fee`, `Split`. The importer is sign-agnostic — `total_amount` and `eur` signs are automatically corrected based on transaction type (Buy/Withdraw/Fee → negative, Deposit/Sell/Dividend → positive, Split → 0). Leave fields blank if not applicable.
