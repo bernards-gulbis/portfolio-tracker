@@ -7,6 +7,7 @@ import { LoginPage } from './components/LoginPage';
 import { useLogout } from './hooks/useAuth';
 import { PortfolioSwitcher } from './components/PortfolioSwitcher';
 import { usePortfolios } from './hooks/usePortfolios';
+import { usePortfolioStatus } from './hooks/usePortfolioStatus';
 import { TransactionView } from './components/TransactionView';
 import { PortfolioStatusView } from './components/PortfolioStatusView';
 import { Button } from '@/components/ui/button';
@@ -25,8 +26,9 @@ import {
 import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
-import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign, ChevronsUpDown, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
@@ -95,51 +97,6 @@ function AuthGuard() {
   return <AppLayout />;
 }
 
-const PAGE_OPTIONS = [
-  { value: 'portfolio', icon: LayoutDashboard, key: 'nav.summary' },
-  { value: 'transactions', icon: ArrowLeftRight, key: 'nav.transactions' },
-] as const;
-
-function PageSwitcher({ tab }: Readonly<{ tab: 'portfolio' | 'transactions' }>) {
-  const { t } = useTranslation();
-  const { goToPortfolio, goToTransactions, activePortfolioId } = useNavigation();
-  const [open, setOpen] = useState(false);
-
-  const active = PAGE_OPTIONS.find((o) => o.value === tab) ?? PAGE_OPTIONS[0];
-  const ActiveIcon = active.icon;
-
-  const handleSelect = (value: string) => {
-    if (value === 'transactions') {
-      goToTransactions();
-    } else if (activePortfolioId !== null) {
-      goToPortfolio(activePortfolioId);
-    }
-    setOpen(false);
-  };
-
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="gap-2 px-2 h-8">
-          <ActiveIcon className="h-4 w-4 shrink-0" />
-          <span className="truncate font-medium text-sm">{t(active.key)}</span>
-          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="min-w-40 rounded-lg" align="start" sideOffset={8}>
-        {PAGE_OPTIONS.map(({ value, icon: Icon, key }) => (
-          <DropdownMenuItem key={value} className="gap-2 p-2" onClick={() => handleSelect(value)}>
-            <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
-              <Icon className="h-4 w-4 shrink-0" />
-            </div>
-            <span className="truncate">{t(key)}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 function AppLayout() {
   const { theme, preference: themePreference, setPreference: setThemePreference } = useTheme();
   const { user } = useAuth();
@@ -149,9 +106,21 @@ function AppLayout() {
   const { currency, setCurrency } = useCurrencyPreference();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { data: portfolios, isLoading: isPortfoliosLoading, isFetching: isPortfoliosFetching } = usePortfolios();
-  const { page, activePortfolioId, goToPortfolio, goToFirstPortfolio, goToSettings } = useNavigation();
+  const { page, activePortfolioId, goToPortfolio, goToTransactions, goToFirstPortfolio, goToSettings } = useNavigation();
   const portfolioTab = page === 'transactions' ? 'transactions' : 'portfolio';
   const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
+  const { data: portfolioStatus } = usePortfolioStatus(activePortfolioId);
+  const emptyRedirectedRef = useRef<number | null>(null);
+
+  // Auto-navigate to Transactions when portfolio has no transactions
+  useEffect(() => {
+    if (activePortfolioId === null || !portfolioStatus) return;
+    if (emptyRedirectedRef.current === activePortfolioId) return;
+    if (portfolioStatus.holdings.length === 0) {
+      emptyRedirectedRef.current = activePortfolioId;
+      goToTransactions();
+    }
+  }, [activePortfolioId, portfolioStatus, goToTransactions]);
 
   // Auto-select first portfolio when none is selected, or when the stored ID no longer exists
   useEffect(() => {
@@ -220,7 +189,27 @@ function AppLayout() {
               )}
             </div>
             {page !== 'settings' && activePortfolioId !== null && (
-              <PageSwitcher tab={portfolioTab} />
+              <Tabs
+                value={portfolioTab}
+                onValueChange={(value) => {
+                  if (value === 'transactions') {
+                    goToTransactions();
+                  } else if (activePortfolioId !== null) {
+                    goToPortfolio(activePortfolioId);
+                  }
+                }}
+              >
+                <TabsList variant="line">
+                  <TabsTrigger value="portfolio">
+                    <LayoutDashboard className="h-4 w-4" />
+                    {t('nav.summary')}
+                  </TabsTrigger>
+                  <TabsTrigger value="transactions">
+                    <ArrowLeftRight className="h-4 w-4" />
+                    {t('nav.transactions')}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             )}
           </div>
           <DropdownMenu>
