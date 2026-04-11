@@ -5,6 +5,7 @@ Transaction service for business logic
 import csv
 import math
 import uuid
+from collections import Counter
 from datetime import datetime
 from io import StringIO
 
@@ -295,14 +296,14 @@ class TransactionService:
         parsed = self._parse_csv(csv_content, portfolio_id)
 
         existing = self.transaction_repo.get_by_portfolio_id(portfolio_id)
-        existing_keys = {_dedup_key(t) for t in existing}
+        remaining = Counter(_dedup_key(t) for t in existing)
 
-        seen = set(existing_keys)
         new_transactions: list[Transaction] = []
         for t in parsed:
             key = _dedup_key(t)
-            if key not in seen:
-                seen.add(key)
+            if remaining[key] > 0:
+                remaining[key] -= 1
+            else:
                 new_transactions.append(t)
         skipped_count = len(parsed) - len(new_transactions)
 
