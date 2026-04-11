@@ -112,11 +112,12 @@ function AppLayout() {
   const { data: portfolioStatus } = usePortfolioStatus(activePortfolioId);
   const emptyRedirectedRef = useRef<number | null>(null);
 
-  // Auto-navigate to Transactions when portfolio has no transactions
+  // Auto-navigate to Transactions for brand-new portfolios (no transactions entered yet)
   useEffect(() => {
     if (activePortfolioId === null || !portfolioStatus) return;
     if (emptyRedirectedRef.current === activePortfolioId) return;
-    if (portfolioStatus.holdings.length === 0) {
+    const isBrandNew = portfolioStatus.holdings.length === 0 && portfolioStatus.principal === 0;
+    if (isBrandNew) {
       emptyRedirectedRef.current = activePortfolioId;
       goToTransactions();
     }
