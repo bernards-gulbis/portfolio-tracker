@@ -933,13 +933,12 @@ class TestCSVErrorPath:
             def __iter__(self):
                 raise csv_module.Error("malformed CSV")
 
-        csv_content = (
-            "date,type,total_amount\n"
-            "1/15/2024 10:00:00,Deposit,1000\n"
-        )
-        with patch("app.services.transaction_service.csv.DictReader", ErrorDictReader):
-            with pytest.raises(InvalidCSVFormatException):
-                svc.import_from_csv(csv_content, portfolio_id, user_id)
+        csv_content = "date,type,total_amount\n1/15/2024 10:00:00,Deposit,1000\n"
+        with (
+            patch("app.services.transaction_service.csv.DictReader", ErrorDictReader),
+            pytest.raises(InvalidCSVFormatException),
+        ):
+            svc.import_from_csv(csv_content, portfolio_id, user_id)
 
 
 class TestCSVTotalAmountNone:
@@ -955,9 +954,11 @@ class TestCSVTotalAmountNone:
             "date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate\n"
             "1/15/2024 10:00:00,Deposit,,,,,1000,,,, \n"
         )
-        with patch.object(svc, "_clean_csv_number", side_effect=patched_clean):
-            with pytest.raises(InvalidCSVFormatException):
-                svc.import_from_csv(csv_content, portfolio_id, user_id)
+        with (
+            patch.object(svc, "_clean_csv_number", side_effect=patched_clean),
+            pytest.raises(InvalidCSVFormatException),
+        ):
+            svc.import_from_csv(csv_content, portfolio_id, user_id)
 
 
 class TestCSVNegativeSplitRatio:

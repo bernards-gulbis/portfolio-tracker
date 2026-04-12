@@ -63,6 +63,8 @@ class TestTransactionRepositoryEdgeCases:
             type=TransactionType.DEPOSIT,
             total_amount=1000,
         )
-        with patch.object(session, "commit", side_effect=SQLAlchemyError("db error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.bulk_create([tx])
+        with (
+            patch.object(session, "commit", side_effect=SQLAlchemyError("db error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.bulk_create([tx])

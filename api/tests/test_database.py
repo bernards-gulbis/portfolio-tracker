@@ -30,21 +30,24 @@ class TestDatabaseUtilities:
     def test_create_db_and_tables_reraises_on_error(self):
         from app.core import database as db_module
 
-        with patch(
-            "app.core.database.SQLModel.metadata.create_all",
-            side_effect=RuntimeError("schema error"),
+        with (
+            patch(
+                "app.core.database.SQLModel.metadata.create_all",
+                side_effect=RuntimeError("schema error"),
+            ),
+            pytest.raises(RuntimeError, match="schema error"),
         ):
-            with pytest.raises(RuntimeError, match="schema error"):
-                db_module.create_db_and_tables()
+            db_module.create_db_and_tables()
 
     def test_get_session_yields_session(self):
         from sqlmodel import Session as SqSession
+
         from app.core.database import get_session
 
         gen = get_session()
         s = next(gen)
         assert isinstance(s, SqSession)
-        try:
+        import contextlib
+
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass

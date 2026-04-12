@@ -6,6 +6,7 @@ from unittest.mock import patch
 class TestConfigHelpers:
     def test_get_bool_unrecognized_value_logs_warning(self):
         import os
+
         from app.core import config as cfg_module
 
         with patch.dict(os.environ, {"DATABASE_ECHO": "maybe"}):
@@ -14,6 +15,7 @@ class TestConfigHelpers:
 
     def test_get_int_invalid_value_returns_default(self):
         import os
+
         from app.core import config as cfg_module
 
         with patch.dict(os.environ, {"DB_POOL_SIZE": "notanint"}):
@@ -22,6 +24,7 @@ class TestConfigHelpers:
 
     def test_get_bool_true_values(self):
         import os
+
         from app.core import config as cfg_module
 
         for val in ("true", "1", "yes"):
@@ -30,6 +33,7 @@ class TestConfigHelpers:
 
     def test_get_bool_false_values(self):
         import os
+
         from app.core import config as cfg_module
 
         for val in ("false", "0", "no", ""):

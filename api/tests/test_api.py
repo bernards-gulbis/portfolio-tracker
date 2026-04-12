@@ -3820,7 +3820,11 @@ class TestTransactionBaseValidators:
         pid = self._make_portfolio(client)
         client.post(
             f"/portfolios/{pid}/transactions/",
-            json={"date": "2024-01-01T00:00:00", "type": "Deposit", "total_amount": 1000},
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 1000,
+            },
         )
         r = client.post(
             f"/portfolios/{pid}/transactions/",
@@ -3994,7 +3998,11 @@ class TestTransactionUpdateTickerValidator:
         pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
         tx_resp = client.post(
             f"/portfolios/{pid}/transactions/",
-            json={"date": "2024-01-01T00:00:00", "type": "Deposit", "total_amount": 1000},
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 1000,
+            },
         )
         tx_id = tx_resp.json()["id"]
         r = client.put(f"/transactions/{tx_id}", json={"ticker": "   "})
@@ -4005,7 +4013,11 @@ class TestTransactionUpdateTickerValidator:
         pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
         tx_resp = client.post(
             f"/portfolios/{pid}/transactions/",
-            json={"date": "2024-01-01T00:00:00", "type": "Deposit", "total_amount": 1000},
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 1000,
+            },
         )
         tx_id = tx_resp.json()["id"]
         r = client.put(f"/transactions/{tx_id}", json={"ticker": "A@B"})
@@ -4013,11 +4025,17 @@ class TestTransactionUpdateTickerValidator:
 
 
 class TestTransactionCreateWhitespaceTicker:
-    def test_whitespace_only_ticker_in_create_normalized_to_none(self, client: TestClient):
+    def test_whitespace_only_ticker_in_create_normalized_to_none(
+        self, client: TestClient
+    ):
         pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
         client.post(
             f"/portfolios/{pid}/transactions/",
-            json={"date": "2024-01-01T00:00:00", "type": "Deposit", "total_amount": 5000},
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 5000,
+            },
         )
         r = client.post(
             f"/portfolios/{pid}/transactions/",
@@ -4052,6 +4070,8 @@ class TestPortfolioServiceEdgeCases:
         r = client.post("/portfolios/", json={"name": long_name})
         assert r.status_code == 422
 
-    def test_get_performance_nonexistent_portfolio_returns_404(self, client: TestClient):
+    def test_get_performance_nonexistent_portfolio_returns_404(
+        self, client: TestClient
+    ):
         r = client.get("/portfolios/99999/performance")
         assert r.status_code == 404
