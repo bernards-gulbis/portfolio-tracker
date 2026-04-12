@@ -871,8 +871,10 @@ class TestUpdateTransactionSplitRatio:
             portfolio_id=portfolio_id,
             user_id=user_id,
             date=datetime(2024, 1, 1),
-            transaction_type=TransactionType.DEPOSIT,
-            total_amount=1000,
+            transaction_type=TransactionType.SPLIT,
+            total_amount=0,
+            ticker="AAPL",
+            split_ratio=2.0,
         )
         with pytest.raises(InvalidTransactionDataException):
             svc.update_transaction(
@@ -886,8 +888,10 @@ class TestUpdateTransactionSplitRatio:
             portfolio_id=portfolio_id,
             user_id=user_id,
             date=datetime(2024, 1, 1),
-            transaction_type=TransactionType.DEPOSIT,
-            total_amount=1000,
+            transaction_type=TransactionType.SPLIT,
+            total_amount=0,
+            ticker="AAPL",
+            split_ratio=2.0,
         )
         with pytest.raises(InvalidTransactionDataException):
             svc.update_transaction(
@@ -912,7 +916,7 @@ class TestCSVParsingEdgeCases:
     def test_csv_negative_split_ratio_rejected(self, svc, user_id, portfolio_id):
         csv_content = (
             "date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate\n"
-            "1/15/2024 10:00:00,Split,AAPL,,,, 0.00,,,-0.5,,\n"
+            "1/15/2024 10:00:00,Split,AAPL,,,,0.00,,-0.5,,\n"
         )
         with pytest.raises(InvalidCSVFormatException):
             svc.import_from_csv(csv_content, portfolio_id, user_id)
@@ -965,7 +969,7 @@ class TestCSVNegativeSplitRatio:
     def test_zero_split_ratio_in_csv_rejected(self, svc, user_id, portfolio_id):
         csv_content = (
             "date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate\n"
-            "1/15/2024 10:00:00,Split,AAPL,,,,0.00,,-0.5,,\n"
+            "1/15/2024 10:00:00,Split,AAPL,,,,0.00,,0.0,,\n"
         )
         with pytest.raises(InvalidCSVFormatException):
             svc.import_from_csv(csv_content, portfolio_id, user_id)

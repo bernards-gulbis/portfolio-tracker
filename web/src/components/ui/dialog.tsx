@@ -66,9 +66,17 @@ function DialogContent({
           className
         )}
         onOpenAutoFocus={(e) => {
-          const input = contentRef.current?.querySelector<HTMLElement>(
-            'input:not([type="hidden"]):not(.sr-only), textarea'
+          const candidates = contentRef.current?.querySelectorAll<HTMLElement>(
+            'input:not([type="hidden"]):not(.sr-only):not([disabled]):not([aria-hidden="true"]), textarea:not(.sr-only):not([disabled]):not([aria-hidden="true"])'
           );
+          const input = candidates
+            ? Array.from(candidates).find((el) => {
+                const style = window.getComputedStyle(el);
+                return (
+                  style.display !== "none" && style.visibility !== "hidden"
+                );
+              })
+            : undefined;
           if (input) {
             e.preventDefault();
             input.focus();

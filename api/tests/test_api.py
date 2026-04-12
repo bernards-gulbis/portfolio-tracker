@@ -3818,27 +3818,17 @@ class TestTransactionBaseValidators:
 
     def test_ticker_empty_after_strip_becomes_none(self, client: TestClient):
         pid = self._make_portfolio(client)
-        client.post(
+        r = client.post(
             f"/portfolios/{pid}/transactions/",
             json={
                 "date": "2024-01-01T00:00:00",
                 "type": "Deposit",
+                "ticker": "   ",
                 "total_amount": 1000,
             },
         )
-        r = client.post(
-            f"/portfolios/{pid}/transactions/",
-            json={
-                "date": "2024-01-02T00:00:00",
-                "type": "Buy",
-                "ticker": "AAPL",
-                "quantity": 5,
-                "price_per_share": 100,
-                "total_amount": -500,
-            },
-        )
         assert r.status_code == 201
-        assert r.json()["ticker"] == "AAPL"
+        assert r.json()["ticker"] is None
 
     def test_ticker_with_invalid_chars_rejected(self, client: TestClient):
         pid = self._make_portfolio(client)
@@ -3984,9 +3974,15 @@ class TestLivePricesEndpoint:
         assert "100" in r.json()["detail"]
 
     def test_price_fetch_error_falls_back_to_none(self, client: TestClient):
-        with patch(
-            "app.routers.portfolios.PriceService.get_current_prices",
-            side_effect=RuntimeError("yahoo down"),
+        with (
+            patch(
+                "app.routers.portfolios.PriceService.get_current_prices",
+                side_effect=RuntimeError("yahoo down"),
+            ),
+            patch(
+                "app.routers.portfolios.PriceService.get_usd_to_eur_rate_safe",
+                return_value=1.0,
+            ),
         ):
             r = client.get("/portfolios/prices/live", params=[("tickers", "AAPL")])
         assert r.status_code == 200

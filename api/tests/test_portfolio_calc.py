@@ -637,7 +637,7 @@ class TestCalculatePerformanceEdgeCases:
             calculate_performance(
                 [tx],
                 start_date=datetime(2025, 1, 1),
-                end_date=datetime(2024, 1, 1),
+                end_date=datetime(2025, 1, 1),
             )
 
     def test_num_points_less_than_2_raises(self):

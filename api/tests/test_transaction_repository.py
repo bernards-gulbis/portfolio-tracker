@@ -65,6 +65,8 @@ class TestTransactionRepositoryEdgeCases:
         )
         with (
             patch.object(session, "commit", side_effect=SQLAlchemyError("db error")),
+            patch.object(session, "rollback") as mock_rollback,
             pytest.raises(SQLAlchemyError),
         ):
             repo.bulk_create([tx])
+        mock_rollback.assert_called_once()

@@ -1,15 +1,20 @@
 """Tests for app/core/database.py — utility functions."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 
 class TestDatabaseUtilities:
     def test_verify_connection_success(self):
-        from app.core.database import verify_connection
+        from app.core import database as db_module
 
-        assert verify_connection() is True
+        mock_conn = MagicMock()
+        mock_conn.__enter__ = MagicMock(return_value=mock_conn)
+        mock_conn.__exit__ = MagicMock(return_value=False)
+
+        with patch.object(db_module.engine, "connect", return_value=mock_conn):
+            assert db_module.verify_connection() is True
 
     def test_verify_connection_failure_returns_false(self):
         from app.core import database as db_module
@@ -23,9 +28,11 @@ class TestDatabaseUtilities:
         assert result is False
 
     def test_create_db_and_tables_success(self):
-        from app.core.database import create_db_and_tables
+        from app.core import database as db_module
 
-        create_db_and_tables()
+        with patch("app.core.database.SQLModel.metadata.create_all") as mock_create:
+            db_module.create_db_and_tables()
+        mock_create.assert_called_once_with(db_module.engine)
 
     def test_create_db_and_tables_reraises_on_error(self):
         from app.core import database as db_module

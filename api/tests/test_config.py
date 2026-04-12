@@ -9,9 +9,13 @@ class TestConfigHelpers:
 
         from app.core import config as cfg_module
 
+        initial_len = len(cfg_module._warnings)
         with patch.dict(os.environ, {"DATABASE_ECHO": "maybe"}):
             result = cfg_module._get_bool("DATABASE_ECHO")
-            assert result is False
+        assert result is False
+        assert len(cfg_module._warnings) > initial_len
+        assert "maybe" in cfg_module._warnings[-1]
+        cfg_module._warnings.pop()
 
     def test_get_int_invalid_value_returns_default(self):
         import os
