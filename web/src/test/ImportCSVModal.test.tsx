@@ -105,4 +105,19 @@ describe('ImportCSVModal', () => {
       expect(screen.getByText('Invalid CSV format')).toBeInTheDocument();
     });
   });
+
+  it('shows validation error when file is not a .csv', async () => {
+    renderModal();
+
+    const input = screen.getByLabelText('CSV File');
+    const file = new File(['data'], 'data.txt', { type: 'text/plain' });
+    setFileOnInput(input, file);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Please select a CSV file')).toBeInTheDocument();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
 });

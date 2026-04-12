@@ -176,6 +176,24 @@ describe('useDividendsTableData', () => {
     expect(result.current.dividendTotals.count).toBe(2);
   });
 
+  it('sorts by amount (EUR when available, USD otherwise)', () => {
+    const dividends = [
+      makeDividend({ ticker: 'AAPL', amount: 50, amount_eur: 46 }),
+      makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
+      makeDividend({ ticker: 'TSLA', amount: 200, amount_eur: null }),
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    // Sort by amount descending (default after clicking 'amount')
+    act(() => {
+      result.current.handleSort('amount');
+    });
+    // TSLA uses USD amount (200), MSFT has EUR 92, AAPL has EUR 46
+    // Sorting: TSLA(200) > MSFT(92) > AAPL(46)
+    expect(result.current.filteredDividends[0].ticker).toBe('TSLA');
+    expect(result.current.filteredDividends[1].ticker).toBe('MSFT');
+    expect(result.current.filteredDividends[2].ticker).toBe('AAPL');
+  });
+
   it('returns null totalEur when some groups lack EUR', () => {
     const dividends = [
       makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
@@ -183,5 +201,57 @@ describe('useDividendsTableData', () => {
     ];
     const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
     expect(result.current.dividendTotals.totalEur).toBeNull();
+  });
+
+  it('sorts dividends by date descending by default', () => {
+    const dividends = [
+      makeDividend({ ticker: 'AAPL', date: '2025-01-01T10:00:00' }),
+      makeDividend({ ticker: 'MSFT', date: '2025-06-01T10:00:00' }),
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    // Default sort is 'date' descending — MSFT (Jun) should come first
+    expect(result.current.filteredDividends[0].ticker).toBe('MSFT');
+  });
+
+  it('sorts dividends by date ascending when toggled', () => {
+    const dividends = [
+      makeDividend({ ticker: 'AAPL', date: '2025-01-01T10:00:00' }),
+      makeDividend({ ticker: 'MSFT', date: '2025-06-01T10:00:00' }),
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    // Default is 'date' descending. First click on 'date' toggles to ascending.
+    act(() => {
+      result.current.handleSort('date');
+    });
+    // Now ascending — AAPL (Jan) should come first
+    expect(result.current.filteredDividends[0].ticker).toBe('AAPL');
+  });
+
+  it('sorts dividends by count', () => {
+    const dividends = [
+      makeDividend({ ticker: 'AAPL', amount: 50 }),
+      makeDividend({ ticker: 'MSFT', amount: 100 }),
+      makeDividend({ ticker: 'MSFT', date: '2025-05-01T10:00:00', amount: 80 }),
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    act(() => {
+      result.current.handleSort('count');
+    });
+    // MSFT has 2 payments, AAPL has 1 — descending by count
+    expect(result.current.filteredDividends[0].ticker).toBe('MSFT');
+  });
+
+  it('sorts amount ascending when toggled twice', () => {
+    const dividends = [
+      makeDividend({ ticker: 'AAPL', amount: 50, amount_eur: 46 }),
+      makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    act(() => { result.current.handleSort('amount'); });
+    // Descending: MSFT first
+    expect(result.current.filteredDividends[0].ticker).toBe('MSFT');
+    act(() => { result.current.handleSort('amount'); });
+    // Ascending: AAPL first
+    expect(result.current.filteredDividends[0].ticker).toBe('AAPL');
   });
 });

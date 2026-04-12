@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatDateTime, formatSignedPercent, formatDaysHeld, getValueClass, toLocalDateStr } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatDateTime, formatSignedPercent, formatDaysHeld, getValueClass, toLocalDateStr } from '../utils/formatters';
 
 describe('Formatters', () => {
   describe('formatCurrency', () => {
@@ -12,6 +12,32 @@ describe('Formatters', () => {
     it('formats EUR currency correctly', () => {
       expect(formatCurrency(1000, 'EUR')).toBe('€1,000.00');
       expect(formatCurrency(2760.27, 'EUR')).toBe('€2,760.27');
+    });
+  });
+
+  describe('formatSignedCurrency', () => {
+    it('returns dash for null', () => {
+      expect(formatSignedCurrency(null)).toBe('-');
+    });
+
+    it('returns dash for undefined', () => {
+      expect(formatSignedCurrency(undefined)).toBe('-');
+    });
+
+    it('prepends + for positive values', () => {
+      expect(formatSignedCurrency(500)).toBe('+$500.00');
+    });
+
+    it('does not prepend sign for negative values (negative sign is included)', () => {
+      expect(formatSignedCurrency(-250)).toBe('-$250.00');
+    });
+
+    it('does not prepend + for zero', () => {
+      expect(formatSignedCurrency(0)).toBe('$0.00');
+    });
+
+    it('supports EUR currency', () => {
+      expect(formatSignedCurrency(1000, 'EUR')).toBe('+€1,000.00');
     });
   });
 

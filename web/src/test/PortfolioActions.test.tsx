@@ -130,6 +130,42 @@ describe('PortfolioActions', () => {
     });
   });
 
+  it('closes edit modal when onClose is called', async () => {
+    const user = userEvent.setup();
+    renderActions();
+
+    // Open modal
+    await user.click(screen.getByRole('button', { name: /actions for my portfolio/i }));
+    await user.click(await screen.findByText('Rename'));
+    expect(await screen.findByText('Rename Portfolio')).toBeInTheDocument();
+
+    // Close via the dialog close button (X)
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await user.click(closeButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Rename Portfolio')).not.toBeInTheDocument();
+    });
+  });
+
+  it('closes copy modal when onClose is called', async () => {
+    const user = userEvent.setup();
+    renderActions();
+
+    // Open modal
+    await user.click(screen.getByRole('button', { name: /actions for my portfolio/i }));
+    await user.click(await screen.findByText('Copy'));
+    expect(await screen.findByLabelText('New Portfolio Name')).toBeInTheDocument();
+
+    // Close via dialog close button
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await user.click(closeButton);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('New Portfolio Name')).not.toBeInTheDocument();
+    });
+  });
+
   it('shows error toast when delete fails', { timeout: 15000 }, async () => {
     mockDeleteMutateAsync.mockRejectedValueOnce(new Error('Cannot delete'));
     const user = userEvent.setup();
