@@ -99,7 +99,6 @@ export const CopyPortfolioModal = ({
                     id="copy-portfolio-name"
                     placeholder={t('portfolio.copy.namePlaceholder')}
                     autoComplete="off"
-                    autoFocus
                     aria-invalid={fieldState.invalid}
                   />
                   <FieldDescription>
