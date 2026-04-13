@@ -114,9 +114,9 @@ const mockBrandNewStatus: PortfolioStatus = {
   realized_sales: [],
   dividends_received: [],
   realized_withdrawals: [],
-  deposits_eur: 0,
+  capital_gains_tax_rate: 0,
+  warnings: [],
   usd_to_eur_rate: null,
-  fees: 0,
 };
 
 const mockStatusWithHoldings: PortfolioStatus = {
