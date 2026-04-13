@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import type { PortfolioStatus } from '../api';
 
 const mockNavigation = {
@@ -14,17 +15,17 @@ const mockNavigation = {
 };
 
 vi.mock('../context/NavigationContext', () => ({
-  NavigationProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  NavigationProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useNavigation: () => mockNavigation,
 }));
 
 vi.mock('../context/AuthContext', () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useAuth: () => ({ status: 'authenticated', user: { email: 'test@test.com', name: 'Test' } }),
 }));
 
 vi.mock('../context/ThemeContext', () => ({
-  ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  ThemeProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useTheme: () => ({ theme: 'light', preference: 'system', setPreference: vi.fn() }),
 }));
 
@@ -41,7 +42,7 @@ vi.mock('../hooks/usePortfolioStatus', () => ({
 }));
 
 vi.mock('../hooks/useCurrencyPreference', () => ({
-  CurrencyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  CurrencyProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useCurrencyPreference: () => ({ currency: 'USD', setCurrency: vi.fn() }),
 }));
 
@@ -74,7 +75,7 @@ vi.mock('../components/CreatePortfolioModal', () => ({
 }));
 
 vi.mock('../components/ErrorBoundary', () => ({
-  ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  ErrorBoundary: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('../components/AppFooter', () => ({
