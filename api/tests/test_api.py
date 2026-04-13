@@ -3796,3 +3796,278 @@ def test_csv_upload_invalid_encoding(client: TestClient):
 
     assert response.status_code == 400
     assert "UTF-8" in response.json()["detail"]
+
+
+# ── Schema validation edge cases ─────────────────────────────────────
+
+
+class TestPortfolioBaseValidator:
+    def test_whitespace_name_rejected(self, client: TestClient):
+        response = client.post("/portfolios/", json={"name": "   "})
+        assert response.status_code == 422
+
+    def test_empty_name_rejected(self, client: TestClient):
+        response = client.post("/portfolios/", json={"name": ""})
+        assert response.status_code == 422
+
+
+class TestTransactionBaseValidators:
+    def _make_portfolio(self, client):
+        r = client.post("/portfolios/", json={"name": "P"})
+        return r.json()["id"]
+
+    def test_ticker_empty_after_strip_becomes_none(self, client: TestClient):
+        pid = self._make_portfolio(client)
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "ticker": "   ",
+                "total_amount": 1000,
+            },
+        )
+        assert r.status_code == 201
+        assert r.json()["ticker"] is None
+
+    def test_ticker_with_invalid_chars_rejected(self, client: TestClient):
+        pid = self._make_portfolio(client)
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Buy",
+                "ticker": "AA PL!",
+                "quantity": 5,
+                "price_per_share": 100,
+                "total_amount": -500,
+            },
+        )
+        assert r.status_code == 422
+
+    def test_split_ratio_zero_rejected(self, client: TestClient):
+        pid = self._make_portfolio(client)
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Split",
+                "ticker": "AAPL",
+                "split_ratio": 0.0,
+                "total_amount": 0,
+            },
+        )
+        assert r.status_code == 422
+
+    def test_fee_negative_rejected(self, client: TestClient):
+        pid = self._make_portfolio(client)
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 1000,
+                "fee": -5.0,
+            },
+        )
+        assert r.status_code == 422
+
+    def test_split_total_amount_nonzero_rejected(self, client: TestClient):
+        pid = self._make_portfolio(client)
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Split",
+                "ticker": "AAPL",
+                "split_ratio": 2.0,
+                "total_amount": 100,
+            },
+        )
+        assert r.status_code == 422
+
+    def test_buy_positive_total_amount_rejected(self, client: TestClient):
+        pid = self._make_portfolio(client)
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Buy",
+                "ticker": "AAPL",
+                "quantity": 5,
+                "price_per_share": 100,
+                "total_amount": 500,
+            },
+        )
+        assert r.status_code == 422
+
+    def test_deposit_negative_total_amount_rejected(self, client: TestClient):
+        pid = self._make_portfolio(client)
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": -500,
+            },
+        )
+        assert r.status_code == 422
+
+
+# ── Router error handling ────────────────────────────────────────────
+
+
+class TestPortfolioStatusErrors:
+    def test_status_value_error_returns_400(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        with patch(
+            "app.routers.portfolios.PortfolioService.calculate_portfolio_status",
+            side_effect=ValueError("bad data"),
+        ):
+            r = client.get(f"/portfolios/{pid}/status")
+        assert r.status_code == 400
+        assert "bad data" in r.json()["detail"]
+
+
+class TestPortfolioPerformanceEndpointErrors:
+    def test_invalid_start_date_returns_400(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        r = client.get(
+            f"/portfolios/{pid}/performance", params={"start_date": "not-a-date"}
+        )
+        assert r.status_code == 400
+        assert "date" in r.json()["detail"].lower()
+
+    def test_invalid_end_date_returns_400(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        r = client.get(
+            f"/portfolios/{pid}/performance", params={"end_date": "2025/01/01"}
+        )
+        assert r.status_code == 400
+
+    def test_start_after_end_returns_400(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        r = client.get(
+            f"/portfolios/{pid}/performance",
+            params={"start_date": "2025-06-01", "end_date": "2025-01-01"},
+        )
+        assert r.status_code == 400
+        assert "start_date" in r.json()["detail"]
+
+    def test_performance_value_error_returns_400(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        with patch(
+            "app.routers.portfolios.PortfolioService.get_portfolio_performance",
+            side_effect=ValueError("bad range"),
+        ):
+            r = client.get(f"/portfolios/{pid}/performance")
+        assert r.status_code == 400
+        assert "bad range" in r.json()["detail"]
+
+
+class TestLivePricesEndpoint:
+    def test_too_many_tickers_returns_400(self, client: TestClient):
+        tickers = [f"T{i}" for i in range(101)]
+        params = [("tickers", t) for t in tickers]
+        r = client.get("/portfolios/prices/live", params=params)
+        assert r.status_code == 400
+        assert "100" in r.json()["detail"]
+
+    def test_price_fetch_error_falls_back_to_none(self, client: TestClient):
+        with (
+            patch(
+                "app.routers.portfolios.PriceService.get_current_prices",
+                side_effect=RuntimeError("yahoo down"),
+            ),
+            patch(
+                "app.routers.portfolios.PriceService.get_usd_to_eur_rate_safe",
+                return_value=1.0,
+            ),
+        ):
+            r = client.get("/portfolios/prices/live", params=[("tickers", "AAPL")])
+        assert r.status_code == 200
+        assert r.json()["prices"]["AAPL"] is None
+
+
+class TestTransactionUpdateTickerValidator:
+    def test_whitespace_ticker_in_update_becomes_none(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        tx_resp = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 1000,
+            },
+        )
+        tx_id = tx_resp.json()["id"]
+        r = client.put(f"/transactions/{tx_id}", json={"ticker": "   "})
+        assert r.status_code == 200
+        assert r.json()["ticker"] is None
+
+    def test_invalid_ticker_in_update_rejected(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        tx_resp = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 1000,
+            },
+        )
+        tx_id = tx_resp.json()["id"]
+        r = client.put(f"/transactions/{tx_id}", json={"ticker": "A@B"})
+        assert r.status_code == 422
+
+
+class TestTransactionCreateWhitespaceTicker:
+    def test_whitespace_only_ticker_in_create_normalized_to_none(
+        self, client: TestClient
+    ):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-01T00:00:00",
+                "type": "Deposit",
+                "total_amount": 5000,
+            },
+        )
+        r = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-02T00:00:00",
+                "type": "Deposit",
+                "total_amount": 100,
+                "ticker": "  ",
+            },
+        )
+        assert r.status_code == 201
+        assert r.json()["ticker"] is None
+
+
+class TestImportTransactionFileErrors:
+    def test_generic_read_error_returns_400(self, client: TestClient):
+        pid = client.post("/portfolios/", json={"name": "P"}).json()["id"]
+        files = {
+            "file": (
+                "test.csv",
+                BytesIO(b"\xff\xfe invalid utf8"),
+                "text/csv",
+            )
+        }
+        r = client.post(f"/portfolios/{pid}/transactions/import", files=files)
+        assert r.status_code == 400
+
+
+class TestPortfolioServiceEdgeCases:
+    def test_portfolio_name_too_long_returns_422(self, client: TestClient):
+        long_name = "A" * 256
+        r = client.post("/portfolios/", json={"name": long_name})
+        assert r.status_code == 422
+
+    def test_get_performance_nonexistent_portfolio_returns_404(
+        self, client: TestClient
+    ):
+        r = client.get("/portfolios/99999/performance")
+        assert r.status_code == 404

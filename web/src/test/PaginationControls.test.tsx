@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PaginationControls, getPageNumbers } from '../components/PaginationControls';
+import { PaginationControls } from '../components/PaginationControls';
+import { getPageNumbers } from '../constants/pagination';
 
 describe('PaginationControls', () => {
   it('renders page number links', () => {

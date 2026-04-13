@@ -2,7 +2,9 @@
 
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.models import Transaction, TransactionType
 from app.services.portfolio_calc import (
@@ -11,10 +13,11 @@ from app.services.portfolio_calc import (
     _compute_forward_split_factors,
     _fetch_historical_prices,
     _resolve_nearest_date_value,
+    _resolve_usd_to_eur_rate,
     _value_holdings_at_date,
     calculate_status,
 )
-from app.services.portfolio_perf import calculate_performance
+from app.services.portfolio_perf import _generate_date_points, calculate_performance
 from app.services.portfolio_types import _ZERO, _Holding, _TxState
 
 
@@ -581,3 +584,104 @@ class TestCalculatePerformance:
         for a, b in zip(result_ordered, result_reversed, strict=True):
             assert a["principal"] == b["principal"]
             assert a["current_value"] == b["current_value"]
+
+
+# ── portfolio_perf.py: _generate_date_points edge cases ──────────────
+
+
+class TestGenerateDatePoints:
+    def test_zero_total_days_returns_two_points(self):
+        d = datetime(2025, 1, 1)
+        points = _generate_date_points(d, d, 60)
+        assert len(points) == 2
+        assert points[0] == d
+        assert points[1] == d
+
+    def test_fewer_days_than_num_points(self):
+        start = datetime(2025, 1, 1)
+        end = datetime(2025, 1, 5)
+        points = _generate_date_points(start, end, 60)
+        assert len(points) == 5
+        assert points[0].date() == start.date()
+        assert points[-1].date() == end.date()
+
+    def test_more_days_than_num_points_evenly_spaced(self):
+        start = datetime(2025, 1, 1)
+        end = datetime(2025, 12, 31)
+        num = 10
+        points = _generate_date_points(start, end, num)
+        assert len(points) == num
+        assert points[0].date() == start.date()
+        assert points[-1].date() == end.date()
+
+    def test_last_point_adjusted_to_end(self):
+        start = datetime(2025, 1, 1)
+        end = datetime(2025, 3, 31)
+        points = _generate_date_points(start, end, 7)
+        assert points[-1].date() == end.date()
+
+
+# ── portfolio_perf.py: calculate_performance edge cases ──────────────
+
+
+class TestCalculatePerformanceEdgeCases:
+    def test_empty_transactions_returns_empty_list(self):
+        result = calculate_performance([])
+        assert result == []
+
+    def test_start_date_equal_to_end_raises(self):
+        tx = MagicMock()
+        tx.date = datetime(2024, 1, 15)
+        tx.ticker = None
+        with pytest.raises(ValueError, match="start_date"):
+            calculate_performance(
+                [tx],
+                start_date=datetime(2025, 1, 1),
+                end_date=datetime(2025, 1, 1),
+            )
+
+    def test_num_points_less_than_2_raises(self):
+        tx = MagicMock()
+        tx.date = datetime(2024, 1, 15)
+        tx.ticker = None
+        with pytest.raises(ValueError, match="num_points"):
+            calculate_performance(
+                [tx],
+                start_date=datetime(2024, 1, 1),
+                end_date=datetime(2025, 1, 1),
+                num_points=1,
+            )
+
+
+# ── portfolio_calc.py: _resolve_usd_to_eur_rate ─────────────────────
+
+
+class TestResolveUsdToEurRate:
+    def test_fallback_to_live_rate_when_no_historical(self):
+        with (
+            patch(
+                "app.services.portfolio_calc.PriceService.get_historical_usd_to_eur_rates",
+                return_value={},
+            ),
+            patch(
+                "app.services.portfolio_calc.PriceService.get_usd_to_eur_rate_safe",
+                return_value=0.92,
+            ) as mock_live,
+        ):
+            rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
+        mock_live.assert_called_once()
+        assert rate == pytest.approx(0.92)
+
+    def test_returns_historical_rate_when_available(self):
+        with (
+            patch(
+                "app.services.portfolio_calc.PriceService.get_historical_usd_to_eur_rates",
+                return_value={"2024-06-15": 0.91},
+            ),
+            patch(
+                "app.services.portfolio_calc.PriceService.get_usd_to_eur_rate_safe",
+            ) as mock_live,
+        ):
+            rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
+        mock_live.assert_not_called()
+        assert rate == pytest.approx(0.91)

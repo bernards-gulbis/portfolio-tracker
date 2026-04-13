@@ -5,6 +5,7 @@ Uses a real in-memory SQLite database with SQLModel.
 
 import uuid
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import event
@@ -779,8 +780,8 @@ class TestImportCSVDeduplication:
         assert len(txs) == 1
         assert skipped == 0
 
-    def test_within_batch_duplicates(self, svc, user_id, portfolio_id):
-        """Duplicate rows within the same CSV batch should be deduplicated."""
+    def test_within_batch_duplicates_all_imported(self, svc, user_id, portfolio_id):
+        """Identical rows within the same CSV batch are all imported (they are real trades)."""
         csv = (
             "date,type,total_amount\n"
             "01/01/2024 00:00:00,Deposit,1000\n"
@@ -788,8 +789,54 @@ class TestImportCSVDeduplication:
             "01/02/2024 00:00:00,Deposit,2000\n"
         )
         txs, skipped = svc.import_from_csv(csv, portfolio_id, user_id)
-        assert len(txs) == 2
+        assert len(txs) == 3
+        assert skipped == 0
+
+    def test_reimport_batch_with_duplicates_all_skipped(
+        self, svc, user_id, portfolio_id
+    ):
+        """Re-importing a CSV whose rows include duplicates skips all of them."""
+        csv = (
+            "date,type,total_amount\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/02/2024 00:00:00,Deposit,2000\n"
+        )
+        txs1, skipped1 = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs1) == 3
+        assert skipped1 == 0
+
+        txs2, skipped2 = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs2) == 0
+        assert skipped2 == 3
+
+    def test_partial_reimport_with_duplicates(self, svc, user_id, portfolio_id):
+        """If DB has 1 of 2 identical rows, re-importing the pair adds exactly 1."""
+        csv_one = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+        svc.import_from_csv(csv_one, portfolio_id, user_id)
+
+        csv_two = (
+            "date,type,total_amount\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+        )
+        txs, skipped = svc.import_from_csv(csv_two, portfolio_id, user_id)
+        assert len(txs) == 1
         assert skipped == 1
+
+    def test_duplicate_buy_rows_both_imported(self, svc, user_id, portfolio_id):
+        """Two identical Buy rows in CSV represent real separate trades."""
+        csv = (
+            "date,type,total_amount,ticker,quantity,price_per_share,fee,eur,"
+            "split_ratio,currency,fx_rate\n"
+            "07/31/2023 15:27:08,Buy,-9999.57,AAPL,51,196.07,0,,,,1.1034\n"
+            "07/31/2023 15:27:08,Buy,-9999.57,AAPL,51,196.07,0,,,,1.1034\n"
+        )
+        txs, skipped = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs) == 2
+        assert skipped == 0
+        assert all(t.ticker == "AAPL" for t in txs)
+        assert all(t.quantity == 51 for t in txs)
 
 
 # ── _clean_csv_number ────────────────────────────────────────────────
@@ -813,3 +860,116 @@ class TestCleanCSVNumber:
     def test_invalid_raises(self):
         with pytest.raises(ValueError, match="Invalid number"):
             TransactionService._clean_csv_number("abc", "x")
+
+
+# ── update_transaction: split_ratio validation ───────────────────────
+
+
+class TestUpdateTransactionSplitRatio:
+    def test_negative_split_ratio_rejected(self, svc, user_id, portfolio_id):
+        tx = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 1, 1),
+            transaction_type=TransactionType.SPLIT,
+            total_amount=0,
+            ticker="AAPL",
+            split_ratio=2.0,
+        )
+        with pytest.raises(InvalidTransactionDataException):
+            svc.update_transaction(
+                transaction_id=tx.id,
+                user_id=user_id,
+                split_ratio=-1.0,
+            )
+
+    def test_zero_split_ratio_rejected(self, svc, user_id, portfolio_id):
+        tx = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 1, 1),
+            transaction_type=TransactionType.SPLIT,
+            total_amount=0,
+            ticker="AAPL",
+            split_ratio=2.0,
+        )
+        with pytest.raises(InvalidTransactionDataException):
+            svc.update_transaction(
+                transaction_id=tx.id,
+                user_id=user_id,
+                split_ratio=0.0,
+            )
+
+
+# ── CSV parsing edge cases ───────────────────────────────────────────
+
+
+class TestCSVParsingEdgeCases:
+    def test_csv_invalid_total_amount_string(self, svc, user_id, portfolio_id):
+        csv_content = (
+            "date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate\n"
+            "1/15/2024 10:00:00,Deposit,,,,,notanumber,,,, \n"
+        )
+        with pytest.raises(InvalidCSVFormatException):
+            svc.import_from_csv(csv_content, portfolio_id, user_id)
+
+    def test_csv_negative_split_ratio_rejected(self, svc, user_id, portfolio_id):
+        csv_content = (
+            "date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate\n"
+            "1/15/2024 10:00:00,Split,AAPL,,,,0.00,,-0.5,,\n"
+        )
+        with pytest.raises(InvalidCSVFormatException):
+            svc.import_from_csv(csv_content, portfolio_id, user_id)
+
+
+class TestCSVErrorPath:
+    def test_csv_reader_error_wrapped(self, svc, user_id, portfolio_id):
+        import csv as csv_module
+
+        class ErrorDictReader:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            @property
+            def fieldnames(self):
+                return ["date", "type", "total_amount"]
+
+            def __iter__(self):
+                raise csv_module.Error("malformed CSV")
+
+        csv_content = "date,type,total_amount\n1/15/2024 10:00:00,Deposit,1000\n"
+        with (
+            patch("app.services.transaction_service.csv.DictReader", ErrorDictReader),
+            pytest.raises(InvalidCSVFormatException),
+        ):
+            svc.import_from_csv(csv_content, portfolio_id, user_id)
+
+
+class TestCSVTotalAmountNone:
+    def test_total_amount_none_after_cleaning(self, svc, user_id, portfolio_id):
+        original_clean = svc._clean_csv_number
+
+        def patched_clean(value, field_name):
+            if field_name == "total_amount":
+                return None
+            return original_clean(value, field_name)
+
+        csv_content = (
+            "date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate\n"
+            "1/15/2024 10:00:00,Deposit,,,,,1000,,,, \n"
+        )
+        with (
+            patch.object(svc, "_clean_csv_number", side_effect=patched_clean),
+            pytest.raises(InvalidCSVFormatException),
+        ):
+            svc.import_from_csv(csv_content, portfolio_id, user_id)
+
+
+class TestCSVNegativeSplitRatio:
+    def test_zero_split_ratio_in_csv_rejected(self, svc, user_id, portfolio_id):
+        csv_content = (
+            "date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate\n"
+            "1/15/2024 10:00:00,Split,AAPL,,,,0.00,,0.0,,\n"
+        )
+        with pytest.raises(InvalidCSVFormatException):
+            svc.import_from_csv(csv_content, portfolio_id, user_id)

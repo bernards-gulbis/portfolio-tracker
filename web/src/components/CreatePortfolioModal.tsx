@@ -91,7 +91,6 @@ export const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalPr
                     id="create-portfolio-name"
                     placeholder={t('portfolio.create.namePlaceholder')}
                     autoComplete="off"
-                    autoFocus
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

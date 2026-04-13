@@ -102,7 +102,6 @@ export const EditPortfolioModal = ({
                     id="edit-portfolio-name"
                     placeholder={t('portfolio.edit.namePlaceholder')}
                     autoComplete="off"
-                    autoFocus
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
