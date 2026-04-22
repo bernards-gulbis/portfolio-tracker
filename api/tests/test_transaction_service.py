@@ -5,6 +5,7 @@ Uses a real in-memory SQLite database with SQLModel.
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
@@ -367,8 +368,8 @@ class TestCreateTransaction:
             fx_rate=1.087,
         )
         assert tx.id is not None
-        assert tx.total_amount == pytest.approx(1000)
-        assert tx.fx_rate == pytest.approx(1.087)
+        assert tx.total_amount == Decimal("1000")
+        assert tx.fx_rate == Decimal("1.087")
 
 
 # ── get_transaction ───────────────────────────────────────────────────
@@ -973,3 +974,76 @@ class TestCSVNegativeSplitRatio:
         )
         with pytest.raises(InvalidCSVFormatException):
             svc.import_from_csv(csv_content, portfolio_id, user_id)
+
+
+class TestDecimalFloatInterop:
+    """Regression tests for bugs where DB Decimal values mixed with freshly-
+    provided float inputs, producing silent duplicates and TypeError crashes."""
+
+    def test_csv_reimport_with_fractional_fx_rate_dedupes(
+        self, svc, user_id, portfolio_id
+    ):
+        """Re-importing the same CSV with a non-representable float (1.087)
+        must skip the duplicate, not create it. Regression for a bug where
+        hash(float) != hash(Decimal) broke the dedup Counter."""
+        svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2025, 1, 1),
+            transaction_type=TransactionType.DEPOSIT,
+            total_amount=1000.0,
+            fx_rate=1.087,
+        )
+        csv = (
+            "date,type,total_amount,fx_rate\n"
+            "01/01/2025 00:00:00,Deposit,1000.0,1.087\n"
+        )
+        created, skipped = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(created) == 0
+        assert skipped == 1
+
+    def test_partial_update_of_buy_with_fractional_values(
+        self, svc, user_id, portfolio_id
+    ):
+        """Updating a single field of a BUY whose other fields are fractional
+        Decimals from the DB must not raise TypeError. Regression for a bug
+        where _validate_buy_sell mixed Decimal * Decimal + float."""
+        svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2025, 1, 1),
+            transaction_type=TransactionType.DEPOSIT,
+            total_amount=10000.0,
+        )
+        buy = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2025, 1, 2),
+            transaction_type=TransactionType.BUY,
+            ticker="AAPL",
+            quantity=10.33,
+            price_per_share=150.50,
+            fee=1.0,
+            total_amount=-(10.33 * 150.50 + 1.0),
+        )
+        updated = svc.update_transaction(
+            transaction_id=buy.id, user_id=user_id, fee=2.0
+        )
+        assert updated.fee == Decimal("2.0000")
+
+    def test_create_transaction_coerces_float_to_decimal(
+        self, svc, user_id, portfolio_id
+    ):
+        """Service-layer create must leave the returned transaction with
+        Decimal-typed attrs regardless of input type."""
+        tx = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2025, 1, 1),
+            transaction_type=TransactionType.DEPOSIT,
+            total_amount=1000.0,  # float input
+            fx_rate=1.087,  # non-representable float
+        )
+        assert isinstance(tx.total_amount, Decimal)
+        assert isinstance(tx.fx_rate, Decimal)
+        assert tx.fx_rate == Decimal("1.087")

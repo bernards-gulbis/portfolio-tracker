@@ -284,6 +284,8 @@ const en = {
     fetchedAt: 'Updated {{time}}',
     livePriceError: 'Live prices temporarily unavailable',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
+    stalePrices: 'Using last known prices for: {{tickers}}. Live quotes are temporarily unavailable.',
+    priceStaleBadge: 'Last known price as of {{asOf}}',
     transactionWarnings: 'Transaction warnings',
     warnings: {
       sellNotInHoldings: '[{{date}}] Cannot sell {{ticker}}: not in holdings (skipped)',

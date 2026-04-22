@@ -37,7 +37,7 @@ describe('useLivePrices', () => {
 
   it('fetches when tickers are provided and enabled', async () => {
     vi.mocked(getLivePrices).mockResolvedValue({
-      prices: { AAPL: 150 },
+      prices: { AAPL: { price: 150, source: 'live', as_of: '2026-03-03T12:00:00Z' } },
       usd_to_eur_rate: 0.91,
       timestamp: '2026-03-03T12:00:00Z',
     });
@@ -48,12 +48,15 @@ describe('useLivePrices', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(getLivePrices).toHaveBeenCalledWith(['AAPL']);
-    expect(result.current.data?.prices.AAPL).toBe(150);
+    expect(result.current.data?.prices.AAPL.price).toBe(150);
   });
 
   it('uses sorted tickers in the query key (same cache for different order)', async () => {
     vi.mocked(getLivePrices).mockResolvedValue({
-      prices: { AAPL: 150, MSFT: 420 },
+      prices: {
+        AAPL: { price: 150, source: 'live', as_of: '2026-03-03T12:00:00Z' },
+        MSFT: { price: 420, source: 'live', as_of: '2026-03-03T12:00:00Z' },
+      },
       usd_to_eur_rate: 0.91,
       timestamp: '2026-03-03T12:00:00Z',
     });

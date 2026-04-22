@@ -58,3 +58,81 @@ class TestDatabaseUtilities:
 
         with contextlib.suppress(StopIteration):
             next(gen)
+
+    def test_run_migrations_invokes_alembic_upgrade_head(self):
+        from app.core import database as db_module
+
+        with (
+            patch("alembic.command.upgrade") as mock_upgrade,
+            patch("alembic.command.stamp") as mock_stamp,
+            patch("alembic.config.Config") as mock_config_cls,
+            patch(
+                "app.core.database.sa_inspect"
+            ) as mock_inspect,
+        ):
+            # Simulate empty DB: no stamping path taken.
+            mock_inspector = MagicMock()
+            mock_inspector.get_table_names.return_value = []
+            mock_inspect.return_value = mock_inspector
+            mock_cfg = MagicMock()
+            mock_config_cls.return_value = mock_cfg
+            db_module.run_migrations()
+
+        mock_config_cls.assert_called_once()
+        mock_cfg.set_main_option.assert_called_once_with(
+            "sqlalchemy.url", db_module.DATABASE_URL
+        )
+        mock_stamp.assert_not_called()
+        mock_upgrade.assert_called_once_with(mock_cfg, "head")
+
+    def test_run_migrations_auto_stamps_pre_alembic_db(self, tmp_path):
+        """A DB populated by legacy create_db_and_tables (tables exist, no
+        alembic_version) must be stamped to baseline before upgrade runs."""
+        from sqlalchemy import create_engine
+        from sqlmodel import SQLModel
+
+        import app.models  # noqa: F401 — register tables on metadata
+
+        db_path = tmp_path / "legacy.db"
+        db_url = f"sqlite:///{db_path}"
+
+        legacy = create_engine(db_url)
+        SQLModel.metadata.create_all(legacy)
+        legacy.dispose()
+
+        from app.core import config as config_module
+        from app.core import database as db_module
+
+        with (
+            patch.object(db_module, "DATABASE_URL", db_url),
+            patch.object(config_module, "DATABASE_URL", db_url),
+            patch.object(db_module, "engine", create_engine(db_url)),
+        ):
+            db_module.run_migrations()  # must not raise
+
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        tables = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        assert "alembic_version" in tables
+        version = conn.execute(
+            "SELECT version_num FROM alembic_version"
+        ).fetchone()[0]
+        assert version is not None and len(version) > 0
+        conn.close()
+
+    def test_run_migrations_raises_when_ini_missing(self, tmp_path, monkeypatch):
+        from app.core import database as db_module
+
+        monkeypatch.setattr(
+            db_module,
+            "__file__",
+            str(tmp_path / "a" / "b" / "c" / "database.py"),
+        )
+        with pytest.raises(RuntimeError, match=r"alembic\.ini not found"):
+            db_module.run_migrations()

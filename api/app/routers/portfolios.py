@@ -11,6 +11,7 @@ from app.core import get_session
 from app.core.auth import current_active_user
 from app.models.user import User
 from app.schemas import (
+    LivePriceInfo,
     LivePricesResponse,
     PerformanceDataPoint,
     PortfolioCopy,
@@ -60,7 +61,13 @@ def get_live_prices(
     _user: Annotated[User, Depends(current_active_user)],
     tickers: Annotated[list[str] | None, Query()] = None,
 ):
-    """Get current prices and FX rate without replaying transactions"""
+    """Get current prices and FX rate without replaying transactions.
+
+    Each ticker's ``source`` is ``live`` when Yahoo Finance returned a fresh
+    price, ``last_known`` when the DB cache was used because the live fetch
+    failed, or ``missing`` when neither is available. Clients render
+    stale/missing badges and banners based on this.
+    """
     tickers = tickers or []
     if len(tickers) > MAX_TICKERS:
         raise HTTPException(
@@ -68,15 +75,36 @@ def get_live_prices(
             detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
         )
     try:
-        prices = PriceService.get_current_prices(tickers) if tickers else {}
+        live_prices = PriceService.get_current_prices(tickers) if tickers else {}
     except Exception as e:
         logger.error("Error fetching live prices: %s", e, exc_info=True)
-        prices = dict.fromkeys(tickers)
+        live_prices = dict.fromkeys(tickers)
+
+    now = datetime.now(UTC)
+    prices: dict[str, LivePriceInfo] = {}
+    for ticker in tickers:
+        live = live_prices.get(ticker)
+        if live is not None and live > 0:
+            prices[ticker] = LivePriceInfo(
+                price=float(live), source="live", as_of=now
+            )
+            continue
+        fallback = PriceService.get_last_known_price_with_date(ticker)
+        if fallback is not None:
+            price, date_str = fallback
+            prices[ticker] = LivePriceInfo(
+                price=price,
+                source="last_known",
+                as_of=datetime.fromisoformat(date_str).replace(tzinfo=UTC),
+            )
+        else:
+            prices[ticker] = LivePriceInfo(price=None, source="missing", as_of=None)
+
     usd_to_eur_rate = PriceService.get_usd_to_eur_rate_safe()
     return LivePricesResponse(
         prices=prices,
         usd_to_eur_rate=usd_to_eur_rate,
-        timestamp=datetime.now(UTC),
+        timestamp=now,
     )
 
 

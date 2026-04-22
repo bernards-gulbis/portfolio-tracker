@@ -180,17 +180,25 @@ class PriceService:
         Uses the HistoricalPrice table (composite PK on ticker+date), so
         ORDER BY date DESC LIMIT 1 is index-friendly.
         """
+        result = cls.get_last_known_price_with_date(ticker, session)
+        return result[0] if result is not None else None
 
-        def _query(s: Session) -> float | None:
+    @classmethod
+    def get_last_known_price_with_date(
+        cls, ticker: str, session: Session | None = None
+    ) -> tuple[float, str] | None:
+        """Return (price, date_str YYYY-MM-DD) of the most recent cached price, or None."""
+
+        def _query(s: Session) -> tuple[float, str] | None:
             statement = (
                 select(HistoricalPrice)
                 .where(HistoricalPrice.ticker == ticker)
                 .order_by(HistoricalPrice.date.desc())
                 .limit(1)
             )
-            result = s.exec(statement).first()
-            if result:
-                return result.price
+            row = s.exec(statement).first()
+            if row:
+                return float(row.price), row.date
             return None
 
         if session is not None:

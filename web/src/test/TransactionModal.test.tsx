@@ -92,7 +92,14 @@ describe('TransactionModal — sell suggestions', () => {
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
     vi.mocked(useLivePrices).mockReturnValue({
-      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
+      data: {
+        prices: {
+          AAPL: { price: 175.50, source: 'live', as_of: '' },
+          MSFT: { price: 420.00, source: 'live', as_of: '' },
+        },
+        usd_to_eur_rate: 0.92,
+        timestamp: '',
+      },
     } as unknown as ReturnType<typeof useLivePrices>);
   });
 
@@ -331,7 +338,14 @@ describe('TransactionModal — edit mode', () => {
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
     vi.mocked(useLivePrices).mockReturnValue({
-      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
+      data: {
+        prices: {
+          AAPL: { price: 175.50, source: 'live', as_of: '' },
+          MSFT: { price: 420.00, source: 'live', as_of: '' },
+        },
+        usd_to_eur_rate: 0.92,
+        timestamp: '',
+      },
     } as unknown as ReturnType<typeof useLivePrices>);
   });
 
@@ -436,7 +450,14 @@ describe('TransactionModal — validation & create', () => {
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
     vi.mocked(useLivePrices).mockReturnValue({
-      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
+      data: {
+        prices: {
+          AAPL: { price: 175.50, source: 'live', as_of: '' },
+          MSFT: { price: 420.00, source: 'live', as_of: '' },
+        },
+        usd_to_eur_rate: 0.92,
+        timestamp: '',
+      },
     } as unknown as ReturnType<typeof useLivePrices>);
   });
 

@@ -1,10 +1,13 @@
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from fastapi_users import schemas as fu_schemas
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models import TransactionType
+
+PriceSource = Literal["live", "last_known", "missing"]
 
 # ================== User Schemas ==================
 
@@ -323,10 +326,24 @@ class PortfolioStatusResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LivePriceInfo(BaseModel):
+    """Per-ticker live-price result with provenance.
+
+    ``source`` distinguishes a fresh Yahoo Finance fetch (``live``) from a
+    stale fallback pulled from the HistoricalPrice cache (``last_known``) and
+    from the "no data at all" case (``missing``). ``as_of`` is the timestamp
+    of the price — now for live, the cached date for last_known, None for missing.
+    """
+
+    price: float | None = None
+    source: PriceSource = "missing"
+    as_of: datetime | None = None
+
+
 class LivePricesResponse(BaseModel):
     """Schema for live price polling (no transaction replay)"""
 
-    prices: dict[str, float | None]
+    prices: dict[str, LivePriceInfo]
     usd_to_eur_rate: float | None = None
     timestamp: datetime
 

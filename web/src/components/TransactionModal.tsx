@@ -510,7 +510,7 @@ export const TransactionModal = ({
   // Auto-fill sell price when livePrices arrives after ticker was already selected
   useEffect(() => {
     if (!isSell || !watchedTicker || !livePrices) return;
-    const livePrice = livePrices.prices[watchedTicker];
+    const livePrice = livePrices.prices[watchedTicker]?.price ?? null;
     if (livePrice != null && !form.getValues('pricePerShare')) {
       form.setValue('pricePerShare', livePrice.toFixed(2));
     }
@@ -672,7 +672,8 @@ export const TransactionModal = ({
                         onChange={(value) => {
                           field.onChange(value);
                           if (isSell) {
-                            const livePrice = livePrices?.prices[value];
+                            const livePrice =
+                              livePrices?.prices[value]?.price ?? null;
                             if (livePrice == null) {
                               form.setValue('pricePerShare', '');
                             } else {

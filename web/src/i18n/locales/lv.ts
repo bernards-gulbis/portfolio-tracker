@@ -286,6 +286,8 @@ const lv: Translation = {
     fetchedAt: 'Atjaunināts {{time}}',
     livePriceError: 'Tiešsaistes cenas īslaicīgi nav pieejamas',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
+    stalePrices: 'Tiek izmantotas pēdējās zināmās cenas: {{tickers}}. Tiešsaistes kotējumi īslaicīgi nav pieejami.',
+    priceStaleBadge: 'Pēdējā zināmā cena uz {{asOf}}',
     transactionWarnings: 'Darījumu brīdinājumi',
     warnings: {
       sellNotInHoldings: '[{{date}}] Nevar pārdot {{ticker}}: nav turējumos (izlaists)',

@@ -24,10 +24,15 @@ export const computePricedStatus = (
         current_value: null,
         unrealized_gain_loss: null,
         unrealized_gain_loss_pct: null,
+        price_source: 'missing',
+        price_as_of: null,
       };
     }
 
-    const price = livePrices.prices[h.ticker];
+    const info = livePrices.prices[h.ticker];
+    const price = info?.price ?? null;
+    const source = info?.source ?? 'missing';
+    const asOf = info?.as_of ?? null;
 
     if (price == null) {
       missingPrices.push(h.ticker);
@@ -37,6 +42,8 @@ export const computePricedStatus = (
         current_value: null,
         unrealized_gain_loss: null,
         unrealized_gain_loss_pct: null,
+        price_source: source,
+        price_as_of: asOf,
       };
     }
 
@@ -51,6 +58,8 @@ export const computePricedStatus = (
       current_value: currentValue,
       unrealized_gain_loss: unrealizedGainLoss,
       unrealized_gain_loss_pct: unrealizedGainLossPct,
+      price_source: source,
+      price_as_of: asOf,
     };
   });
 

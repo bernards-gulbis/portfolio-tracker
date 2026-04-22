@@ -176,6 +176,8 @@ describe('applyRateToHolding', () => {
     current_value: 2000,
     unrealized_gain_loss: 500,
     unrealized_gain_loss_pct: 33.33,
+    price_source: 'live',
+    price_as_of: null,
   };
 
   it('converts all fields correctly', () => {

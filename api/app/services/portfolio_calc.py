@@ -41,7 +41,12 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.principal += total
-    eur = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
+    eur = _eur_from_tx(
+        tx,
+        total,
+        state.usd_to_eur_fallback,
+        state.historical_usd_to_eur_rates,
+    )
     state.principal_eur += eur
     state.principal_eur_avg += eur
 
@@ -49,7 +54,12 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
 def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)  # total is negative
     state.cash += total
-    eur_historical = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
+    eur_historical = _eur_from_tx(
+        tx,
+        total,
+        state.usd_to_eur_fallback,
+        state.historical_usd_to_eur_rates,
+    )
     # Average cost: withdraw at weighted-average rate (before updating principal)
     if state.principal > 0:
         avg_rate = state.principal_eur_avg / state.principal
@@ -170,7 +180,12 @@ def _apply_dividend(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.dividends += total
-    eur = _eur_from_tx(tx, total, state.usd_to_eur_fallback)
+    eur = _eur_from_tx(
+        tx,
+        total,
+        state.usd_to_eur_fallback,
+        state.historical_usd_to_eur_rates,
+    )
     state.dividends_eur += eur
     state.dividends_received.append(
         _DividendReceived(
@@ -387,6 +402,40 @@ def _build_holdings_list(
 # ================== Status calculation ==================
 
 
+_FX_AWARE_TX_TYPES = {
+    TransactionType.DEPOSIT,
+    TransactionType.WITHDRAW,
+    TransactionType.DIVIDEND,
+}
+
+
+def _prefetch_historical_fx_rates(
+    transactions: list[Transaction],
+) -> dict[str, float]:
+    """Fetch historical USD→EUR rates spanning the dates of transactions that
+    lack both ``eur_amount`` and ``fx_rate``.
+
+    Returns an empty dict if nothing needs historical lookup, or if the price
+    provider is unavailable — the caller then falls back to the current rate.
+    """
+    fx_blind = [
+        tx
+        for tx in transactions
+        if tx.type in _FX_AWARE_TX_TYPES
+        and tx.eur_amount is None
+        and tx.fx_rate is None
+    ]
+    if not fx_blind:
+        return {}
+    start = min(tx.date for tx in fx_blind) - timedelta(days=5)
+    end = max(tx.date for tx in fx_blind) + timedelta(days=1)
+    try:
+        return PriceService.get_historical_usd_to_eur_rates(start, end)
+    except Exception as exc:
+        logger.warning("Historical USD/EUR rate fetch failed: %s", exc)
+        return {}
+
+
 def calculate_status(
     transactions: list[Transaction],
     usd_to_eur_rate: float | None,
@@ -398,6 +447,7 @@ def calculate_status(
     transactions = sorted(transactions, key=lambda t: t.date)
     state = _TxState()
     state.usd_to_eur_fallback = usd_to_eur_rate
+    state.historical_usd_to_eur_rates = _prefetch_historical_fx_rates(transactions)
     for tx in transactions:
         _apply_transaction(state, tx, strict=True)
 
