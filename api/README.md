@@ -12,8 +12,10 @@ app/
   schemas/schemas.py             # Pydantic request/response DTOs
   repositories/                  # Data access, pagination
   services/
-    portfolio_service.py         # Orchestration (delegates to calc + perf)
-    portfolio_calc.py            # Holdings, gains, cost basis, tax
+    portfolio_service.py         # Orchestration (delegates to status + perf)
+    portfolio_handlers.py        # Per-type transaction handlers + dispatch
+    portfolio_valuation.py       # Price + FX resolution for historical dates
+    portfolio_status.py          # calculate_status orchestrator
     portfolio_perf.py            # Time-series performance
     portfolio_types.py           # TypedDict definitions
     transaction_service.py       # CRUD, CSV import/export

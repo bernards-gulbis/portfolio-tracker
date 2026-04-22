@@ -21,7 +21,7 @@ from app.models.historical_price import (  # noqa: F401 — ensures tables exist
     HistoricalPrice,
 )
 from app.models.user import User
-from app.services.portfolio_calc import _apply_transaction
+from app.services.portfolio_handlers import _apply_transaction
 from app.services.portfolio_types import _Holding, _TxState
 from main import app
 
@@ -1741,7 +1741,7 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
             return_value=0.92,
         ),
         patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
             return_value={},
         ),
@@ -1813,7 +1813,7 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
             return_value=None,
         ),
         patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
             return_value={},
         ),

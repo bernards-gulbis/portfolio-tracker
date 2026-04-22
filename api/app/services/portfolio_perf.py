@@ -7,10 +7,9 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.models import Transaction, TransactionType
-from app.services.portfolio_calc import (
+from app.services.portfolio_handlers import (
     _apply_transaction,
     _compute_forward_split_factors,
-    _resolve_usd_to_eur_rate,
 )
 from app.services.portfolio_types import (
     _ONE,
@@ -18,6 +17,7 @@ from app.services.portfolio_types import (
     _to_decimal,
     _TxState,
 )
+from app.services.portfolio_valuation import _resolve_usd_to_eur_rate
 from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)

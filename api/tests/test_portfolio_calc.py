@@ -1,4 +1,5 @@
-"""Tests for portfolio_calc.py and portfolio_perf.py — transaction handlers, helpers, and edge cases."""
+"""Tests for the portfolio calculation subsystem — handlers, valuation,
+status — and for portfolio_perf.py."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -7,18 +8,22 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.models import Transaction, TransactionType
-from app.services.portfolio_calc import (
+from app.services.portfolio_handlers import (
     _apply_transaction,
-    _build_holdings_list,
     _compute_forward_split_factors,
+)
+from app.services.portfolio_perf import _generate_date_points, calculate_performance
+from app.services.portfolio_status import (
+    _build_holdings_list,
+    calculate_status,
+)
+from app.services.portfolio_types import _ZERO, _Holding, _TxState
+from app.services.portfolio_valuation import (
     _fetch_historical_prices,
     _resolve_nearest_date_value,
     _resolve_usd_to_eur_rate,
     _value_holdings_at_date,
-    calculate_status,
 )
-from app.services.portfolio_perf import _generate_date_points, calculate_performance
-from app.services.portfolio_types import _ZERO, _Holding, _TxState
 
 
 def _make_tx(**kwargs) -> Transaction:
@@ -149,13 +154,13 @@ class TestFetchHistoricalPrices:
         result = _fetch_historical_prices([], datetime(2025, 6, 15))
         assert result == {}
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_returns_empty_dict_when_no_prices_available(self, mock_ps):
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {}
         result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
         assert result == {}
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_returns_price_for_nearest_earlier_date(self, mock_ps):
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
             "AAPL": {"2025-06-13": 190.0, "2025-06-14": 195.0}
@@ -163,7 +168,7 @@ class TestFetchHistoricalPrices:
         result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
         assert result["AAPL"] == 195.0
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_uses_earliest_available_when_all_dates_after_target(self, mock_ps):
         """If all available dates are after the target date, use the earliest one."""
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
@@ -172,7 +177,7 @@ class TestFetchHistoricalPrices:
         result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
         assert result["AAPL"] == 200.0
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_skips_ticker_with_empty_date_prices(self, mock_ps):
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
             "AAPL": {},
@@ -217,7 +222,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("10") * Decimal("50") * Decimal("4")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_falls_back_to_db_price(self, mock_price_service):
         mock_price_service.get_last_known_price.return_value = 180.0
         state = _TxState()
@@ -234,7 +239,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("10") * Decimal("180")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_falls_back_to_cost_basis(self, mock_price_service):
         mock_price_service.get_last_known_price.return_value = None
         state = _TxState()
@@ -251,7 +256,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("1500")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_handles_none_historical_prices(self, mock_price_service):
         mock_price_service.get_last_known_price.return_value = 150.0
         state = _TxState()
@@ -268,7 +273,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("5") * Decimal("150")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_skips_zero_price(self, mock_price_service):
         """Price of 0 should not be used; fall back to DB cache."""
         mock_price_service.get_last_known_price.return_value = 100.0
@@ -653,18 +658,18 @@ class TestCalculatePerformanceEdgeCases:
             )
 
 
-# ── portfolio_calc.py: _resolve_usd_to_eur_rate ─────────────────────
+# ── portfolio_valuation: _resolve_usd_to_eur_rate ─────────────────────
 
 
 class TestResolveUsdToEurRate:
     def test_fallback_to_live_rate_when_no_historical(self):
         with (
             patch(
-                "app.services.portfolio_calc.PriceService.get_historical_usd_to_eur_rates",
+                "app.services.portfolio_valuation.PriceService.get_historical_usd_to_eur_rates",
                 return_value={},
             ),
             patch(
-                "app.services.portfolio_calc.PriceService.get_usd_to_eur_rate_safe",
+                "app.services.portfolio_valuation.PriceService.get_usd_to_eur_rate_safe",
                 return_value=0.92,
             ) as mock_live,
         ):
@@ -675,11 +680,11 @@ class TestResolveUsdToEurRate:
     def test_returns_historical_rate_when_available(self):
         with (
             patch(
-                "app.services.portfolio_calc.PriceService.get_historical_usd_to_eur_rates",
+                "app.services.portfolio_valuation.PriceService.get_historical_usd_to_eur_rates",
                 return_value={"2024-06-15": 0.91},
             ),
             patch(
-                "app.services.portfolio_calc.PriceService.get_usd_to_eur_rate_safe",
+                "app.services.portfolio_valuation.PriceService.get_usd_to_eur_rate_safe",
             ) as mock_live,
         ):
             rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
@@ -732,7 +737,7 @@ class TestDecimalPrecision:
         ]
         historical = {"2024-06-01": 1.10, "2025-06-01": 1.05}
         with patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
             return_value=historical,
         ):
@@ -766,7 +771,7 @@ class TestDecimalPrecision:
             ),
         ]
         with patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
             side_effect=RuntimeError("yahoo down"),
         ):
@@ -792,7 +797,7 @@ class TestDecimalPrecision:
             ),
         ]
         with patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
         ) as mock_fetch:
             result = calculate_status(
