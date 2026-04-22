@@ -754,6 +754,57 @@ class TestDecimalPrecision:
             -25.0
         )
 
+    def test_prefetch_fx_fallback_on_provider_error(self):
+        """If PriceService raises, calculate_status must still produce a result
+        using the current-rate fallback (not crash)."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2024, 6, 1),
+                total_amount=1000.0,
+            ),
+        ]
+        with patch(
+            "app.services.portfolio_calc."
+            "PriceService.get_historical_usd_to_eur_rates",
+            side_effect=RuntimeError("yahoo down"),
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.90,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="FX fallback",
+            )
+        # Fallback to current rate: 1000 * 0.90 = 900
+        assert result.principal_eur == pytest.approx(900.0)
+
+    def test_prefetch_skipped_when_no_fx_blind_transactions(self):
+        """Deposit with eur_amount set → no PriceService call at all."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2024, 6, 1),
+                total_amount=1000.0,
+                eur_amount=900.0,  # explicit EUR → skip historical lookup
+            ),
+        ]
+        with patch(
+            "app.services.portfolio_calc."
+            "PriceService.get_historical_usd_to_eur_rates",
+        ) as mock_fetch:
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.50,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="skip fetch",
+            )
+        mock_fetch.assert_not_called()
+        assert result.principal_eur == pytest.approx(900.0)
+
     def test_db_roundtrip_preserves_displayed_precision(self):
         """A value saved to the DB must read back at its displayed precision.
 

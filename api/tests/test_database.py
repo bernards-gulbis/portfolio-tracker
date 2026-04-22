@@ -134,3 +134,28 @@ class TestDatabaseUtilities:
         )
         with pytest.raises(RuntimeError, match=r"alembic\.ini not found"):
             db_module.run_migrations()
+
+    def test_run_migrations_refuses_to_stamp_when_multiple_bases(self):
+        """Defensive check: if the migration tree has >1 root revision we
+        refuse to guess which one to stamp on a pre-Alembic DB."""
+        from app.core import database as db_module
+
+        with (
+            patch("alembic.config.Config") as mock_config_cls,
+            patch("app.core.database.sa_inspect") as mock_inspect,
+            patch("app.core.database.create_engine") as mock_engine,
+            patch("alembic.script.ScriptDirectory.from_config") as mock_from_config,
+        ):
+            mock_inspector = MagicMock()
+            # Existing tables → triggers the stamp path.
+            mock_inspector.get_table_names.return_value = ["portfolio"]
+            mock_inspect.return_value = mock_inspector
+            mock_engine.return_value = MagicMock()
+            mock_config_cls.return_value = MagicMock()
+            # Two base revisions — ambiguous, must raise.
+            mock_script_dir = MagicMock()
+            mock_script_dir.get_bases.return_value = ["rev_a", "rev_b"]
+            mock_from_config.return_value = mock_script_dir
+
+            with pytest.raises(RuntimeError, match="exactly one base revision"):
+                db_module.run_migrations()
