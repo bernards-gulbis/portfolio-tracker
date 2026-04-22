@@ -334,7 +334,10 @@ class LivePriceInfo(BaseModel):
     from the "no data at all" case (``missing``). ``as_of`` is the timestamp
     of the price — now for live, the cached date for last_known, None for missing.
 
-    Invariant: ``price is None`` iff ``source == 'missing'``.
+    Invariants:
+      * ``price is None`` iff ``source == 'missing'``.
+      * ``as_of is None`` iff ``source == 'missing'``. A priced result always
+        carries a timestamp; "missing" carries neither.
     """
 
     price: float | None = None
@@ -342,15 +345,25 @@ class LivePriceInfo(BaseModel):
     as_of: datetime | None = None
 
     @model_validator(mode="after")
-    def _price_source_invariant(self) -> "LivePriceInfo":
-        if self.source == "missing" and self.price is not None:
-            raise ValueError(
-                "LivePriceInfo with source='missing' must have price=None"
-            )
-        if self.source != "missing" and self.price is None:
-            raise ValueError(
-                f"LivePriceInfo with source='{self.source}' must have a non-None price"
-            )
+    def _source_invariants(self) -> "LivePriceInfo":
+        if self.source == "missing":
+            if self.price is not None:
+                raise ValueError(
+                    "LivePriceInfo with source='missing' must have price=None"
+                )
+            if self.as_of is not None:
+                raise ValueError(
+                    "LivePriceInfo with source='missing' must have as_of=None"
+                )
+        else:
+            if self.price is None:
+                raise ValueError(
+                    f"LivePriceInfo with source='{self.source}' must have a non-None price"
+                )
+            if self.as_of is None:
+                raise ValueError(
+                    f"LivePriceInfo with source='{self.source}' must have a non-None as_of timestamp"
+                )
         return self
 
 

@@ -507,9 +507,16 @@ export const TransactionModal = ({
     }
   }, [watchedQuantity, watchedPrice, watchedFee, type, isSell, form]);
 
-  // Track whether pricePerShare was auto-filled from a live price — so we only
-  // clear it on ticker change when we put the value there, not when the user did.
+  // Track the provenance of pricePerShare so we can decide what to do on
+  // ticker change:
+  //   - priceWasAutoFilled: did WE fill this (via livePrices), or did the user?
+  //   - priceOwnerTicker: which ticker was this price entered/filled for?
+  // On ticker change, we clear the price iff it was auto-filled OR belongs to
+  // a different ticker (so user-typed values for the *same* ticker survive).
   const priceWasAutoFilled = useRef(false);
+  const priceOwnerTicker = useRef<string | null>(
+    isEdit ? transaction?.ticker ?? null : null,
+  );
 
   // Auto-fill sell price when livePrices arrives after ticker was already selected
   useEffect(() => {
@@ -518,6 +525,7 @@ export const TransactionModal = ({
     if (livePrice != null && !form.getValues('pricePerShare')) {
       form.setValue('pricePerShare', livePrice.toFixed(2));
       priceWasAutoFilled.current = true;
+      priceOwnerTicker.current = watchedTicker;
     }
   }, [isSell, watchedTicker, livePrices, form]);
 
@@ -682,11 +690,22 @@ export const TransactionModal = ({
                             if (livePrice != null) {
                               form.setValue('pricePerShare', livePrice.toFixed(2));
                               priceWasAutoFilled.current = true;
-                            } else if (priceWasAutoFilled.current) {
-                              // Wipe only if we put the previous value there;
-                              // user-typed values are preserved.
-                              form.setValue('pricePerShare', '');
-                              priceWasAutoFilled.current = false;
+                              priceOwnerTicker.current = value;
+                            } else {
+                              // Clear iff the existing price belongs to us
+                              // (auto-fill) or to a different ticker. A
+                              // user-typed value for the SAME ticker survives.
+                              const belongsToOtherTicker =
+                                priceOwnerTicker.current !== null &&
+                                priceOwnerTicker.current !== value;
+                              if (
+                                priceWasAutoFilled.current ||
+                                belongsToOtherTicker
+                              ) {
+                                form.setValue('pricePerShare', '');
+                                priceWasAutoFilled.current = false;
+                              }
+                              priceOwnerTicker.current = value;
                             }
                           }
                         }}
@@ -785,6 +804,8 @@ export const TransactionModal = ({
                         onChange={(e) => {
                           field.onChange(e);
                           priceWasAutoFilled.current = false;
+                          // User-typed value belongs to the currently selected ticker.
+                          priceOwnerTicker.current = watchedTicker || null;
                         }}
                         onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />

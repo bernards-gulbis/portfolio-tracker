@@ -189,18 +189,18 @@ describe('applyRateToHolding', () => {
     expect(result.unrealizedGainLossEur).toBeCloseTo(500 * 0.92);
   });
 
-  it('does not mutate the holding or strip provenance fields', () => {
-    // Regression guard: callers still access holding.price_source / price_as_of
-    // after computing EUR values; this proves applyRateToHolding leaves the
-    // original object untouched.
+  it('does not mutate the holding (all fields preserved)', () => {
+    // Regression guard: callers still access every original PricedHolding
+    // field after computing EUR values; a full snapshot check catches any
+    // accidental mutation, not just the two provenance fields.
     const withProvenance: PricedHolding = {
       ...holding,
       price_source: 'last_known',
       price_as_of: '2026-04-10T00:00:00Z',
     };
+    const before = JSON.parse(JSON.stringify(withProvenance));
     applyRateToHolding(withProvenance, 0.92);
-    expect(withProvenance.price_source).toBe('last_known');
-    expect(withProvenance.price_as_of).toBe('2026-04-10T00:00:00Z');
+    expect(withProvenance).toEqual(before);
   });
 
   it('returns null for optional fields when source is null', () => {

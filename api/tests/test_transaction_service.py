@@ -1064,5 +1064,7 @@ class TestDecimalFloatInterop:
             total_amount=Decimal("1000.00"),
             fx_rate=Decimal("1.087"),
         )
+        assert isinstance(tx.total_amount, Decimal)
+        assert tx.total_amount == Decimal("1000.00")
         assert isinstance(tx.fx_rate, Decimal)
         assert tx.fx_rate == Decimal("1.087")
