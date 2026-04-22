@@ -264,6 +264,19 @@ class TransactionService:
             val_fee,
         )
 
+        # Numeric fields must be coerced to Decimal before setattr — SQLModel
+        # table=True models don't run Pydantic validation on assignment, so a
+        # raw float would stay a float on the in-memory instance and mix with
+        # DB-loaded Decimals on subsequent arithmetic.
+        _numeric_fields = {
+            "quantity",
+            "price_per_share",
+            "fee",
+            "total_amount",
+            "eur_amount",
+            "split_ratio",
+            "fx_rate",
+        }
         provided = {
             "date": date,
             "type": transaction_type,
@@ -278,8 +291,11 @@ class TransactionService:
             "fx_rate": fx_rate,
         }
         for field, value in provided.items():
-            if value is not None:
-                setattr(transaction, field, value)
+            if value is None:
+                continue
+            if field in _numeric_fields:
+                value = _to_decimal(value)
+            setattr(transaction, field, value)
 
         return self.transaction_repo.update(transaction)
 

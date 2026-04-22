@@ -560,8 +560,12 @@ class PriceService:
         """
         eur_usd_rates = cls.get_historical_prices("EURUSD=X", start_date, end_date)
 
+        # Values may be float (fresh Yahoo fetch) or Decimal (DB cache after S1).
+        # Normalize to float for the 1/x inversion — mixing 1.0 / Decimal raises
+        # TypeError. Downstream callers pass the result through _to_decimal, so
+        # precision-sensitive math is unaffected.
         return {
-            date_str: 1.0 / rate
+            date_str: 1.0 / float(rate)
             for date_str, rate in eur_usd_rates.items()
             if rate and rate > 0
         }

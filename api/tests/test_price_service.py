@@ -735,6 +735,23 @@ class TestGetHistoricalUsdToEurRates:
         assert "2025-01-10" not in rates
         assert "2025-01-11" in rates
 
+    def test_handles_decimal_values_from_db_cache(self):
+        """After S1, HistoricalPrice.price is Decimal. The inversion must not
+        crash with ``TypeError: unsupported operand type(s) for /: 'float' and
+        'decimal.Decimal'`` when values come back as Decimal from the cache."""
+        from datetime import datetime
+        from decimal import Decimal
+
+        eur_usd = {"2025-01-10": Decimal("1.10"), "2025-01-11": Decimal("1.05")}
+
+        with patch.object(PriceService, "get_historical_prices", return_value=eur_usd):
+            rates = PriceService.get_historical_usd_to_eur_rates(
+                datetime(2025, 1, 10), datetime(2025, 1, 11)
+            )
+
+        assert rates["2025-01-10"] == pytest.approx(1.0 / 1.10)
+        assert rates["2025-01-11"] == pytest.approx(1.0 / 1.05)
+
 
 class TestGetHistoricalPricesForMultipleTickers:
     """Tests for get_historical_prices_for_multiple_tickers"""

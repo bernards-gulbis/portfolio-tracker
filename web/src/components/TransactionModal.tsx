@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
 import i18n from '../i18n/index';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -507,12 +507,17 @@ export const TransactionModal = ({
     }
   }, [watchedQuantity, watchedPrice, watchedFee, type, isSell, form]);
 
+  // Track whether pricePerShare was auto-filled from a live price — so we only
+  // clear it on ticker change when we put the value there, not when the user did.
+  const priceWasAutoFilled = useRef(false);
+
   // Auto-fill sell price when livePrices arrives after ticker was already selected
   useEffect(() => {
     if (!isSell || !watchedTicker || !livePrices) return;
     const livePrice = livePrices.prices[watchedTicker]?.price ?? null;
     if (livePrice != null && !form.getValues('pricePerShare')) {
       form.setValue('pricePerShare', livePrice.toFixed(2));
+      priceWasAutoFilled.current = true;
     }
   }, [isSell, watchedTicker, livePrices, form]);
 
@@ -674,10 +679,14 @@ export const TransactionModal = ({
                           if (isSell) {
                             const livePrice =
                               livePrices?.prices[value]?.price ?? null;
-                            if (livePrice == null) {
-                              form.setValue('pricePerShare', '');
-                            } else {
+                            if (livePrice != null) {
                               form.setValue('pricePerShare', livePrice.toFixed(2));
+                              priceWasAutoFilled.current = true;
+                            } else if (priceWasAutoFilled.current) {
+                              // Wipe only if we put the previous value there;
+                              // user-typed values are preserved.
+                              form.setValue('pricePerShare', '');
+                              priceWasAutoFilled.current = false;
                             }
                           }
                         }}
@@ -773,6 +782,10 @@ export const TransactionModal = ({
                         placeholder="0.00"
                         autoComplete="off"
                         aria-invalid={fieldState.invalid}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          priceWasAutoFilled.current = false;
+                        }}
                         onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
                     </InputGroup>

@@ -66,22 +66,21 @@ class TestDatabaseUtilities:
             patch("alembic.command.upgrade") as mock_upgrade,
             patch("alembic.command.stamp") as mock_stamp,
             patch("alembic.config.Config") as mock_config_cls,
-            patch(
-                "app.core.database.sa_inspect"
-            ) as mock_inspect,
+            patch("app.core.database.sa_inspect") as mock_inspect,
+            patch("app.core.database.create_engine") as mock_engine,
         ):
             # Simulate empty DB: no stamping path taken.
             mock_inspector = MagicMock()
             mock_inspector.get_table_names.return_value = []
             mock_inspect.return_value = mock_inspector
+            mock_engine.return_value = MagicMock()
             mock_cfg = MagicMock()
             mock_config_cls.return_value = mock_cfg
             db_module.run_migrations()
 
         mock_config_cls.assert_called_once()
-        mock_cfg.set_main_option.assert_called_once_with(
-            "sqlalchemy.url", db_module.DATABASE_URL
-        )
+        # env.py supplies sqlalchemy.url; run_migrations no longer sets it.
+        mock_cfg.set_main_option.assert_not_called()
         mock_stamp.assert_not_called()
         mock_upgrade.assert_called_once_with(mock_cfg, "head")
 
@@ -112,19 +111,18 @@ class TestDatabaseUtilities:
 
         import sqlite3
 
-        conn = sqlite3.connect(str(db_path))
-        tables = {
-            r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
-        }
-        assert "alembic_version" in tables
-        version = conn.execute(
-            "SELECT version_num FROM alembic_version"
-        ).fetchone()[0]
-        assert version is not None and len(version) > 0
-        conn.close()
+        with sqlite3.connect(str(db_path)) as conn:
+            tables = {
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            assert "alembic_version" in tables
+            version = conn.execute(
+                "SELECT version_num FROM alembic_version"
+            ).fetchone()[0]
+            assert version is not None and len(version) > 0
 
     def test_run_migrations_raises_when_ini_missing(self, tmp_path, monkeypatch):
         from app.core import database as db_module

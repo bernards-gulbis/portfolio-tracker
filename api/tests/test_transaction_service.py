@@ -1029,7 +1029,10 @@ class TestDecimalFloatInterop:
         updated = svc.update_transaction(
             transaction_id=buy.id, user_id=user_id, fee=2.0
         )
-        assert updated.fee == Decimal("2.0000")
+        # Compare via str() — Decimal("2") == Decimal("2.0000") is True despite
+        # different scale, so this tighter check asserts the stored scale
+        # (NUMERIC(20,4)) is actually preserved on read-back.
+        assert str(updated.fee) == "2.0000"
 
     def test_create_transaction_coerces_float_to_decimal(
         self, svc, user_id, portfolio_id
@@ -1045,5 +1048,21 @@ class TestDecimalFloatInterop:
             fx_rate=1.087,  # non-representable float
         )
         assert isinstance(tx.total_amount, Decimal)
+        assert isinstance(tx.fx_rate, Decimal)
+        assert tx.fx_rate == Decimal("1.087")
+
+    def test_create_transaction_decimal_input_is_idempotent(
+        self, svc, user_id, portfolio_id
+    ):
+        """Decimal-typed input must pass through cleanly (no surprise precision
+        loss from an unwanted str-roundtrip)."""
+        tx = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2025, 1, 1),
+            transaction_type=TransactionType.DEPOSIT,
+            total_amount=Decimal("1000.00"),
+            fx_rate=Decimal("1.087"),
+        )
         assert isinstance(tx.fx_rate, Decimal)
         assert tx.fx_rate == Decimal("1.087")

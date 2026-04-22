@@ -99,23 +99,35 @@ def run_migrations() -> None:
     if not alembic_ini.exists():
         raise RuntimeError(f"alembic.ini not found at {alembic_ini}")
 
+    # env.py reads DATABASE_URL from app.core.config and sets it on the config,
+    # so we don't need to set sqlalchemy.url here.
     cfg = Config(str(alembic_ini))
-    # env.py reads DATABASE_URL from app.core.config, but make it explicit
-    # here too in case env.py is ever changed.
-    cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
 
-    existing_tables = set(sa_inspect(engine).get_table_names())
+    # Inspect the DB alembic will actually target via env.py (same source:
+    # app.core.config.DATABASE_URL). A dedicated short-lived engine avoids
+    # divergence with the module-level engine if a caller patches DATABASE_URL
+    # for tests.
+    inspect_engine = create_engine(DATABASE_URL)
+    try:
+        existing_tables = set(sa_inspect(inspect_engine).get_table_names())
+    finally:
+        inspect_engine.dispose()
+
     if existing_tables and "alembic_version" not in existing_tables:
         bases = ScriptDirectory.from_config(cfg).get_bases()
-        if bases:
-            baseline = bases[0]
-            logger.info(
-                "Pre-Alembic DB detected (%d tables, no alembic_version) — "
-                "stamping baseline %s",
-                len(existing_tables),
-                baseline,
+        if len(bases) != 1:
+            raise RuntimeError(
+                f"Expected exactly one base revision for auto-stamp, got {len(bases)}: "
+                f"{bases}. Refusing to guess which root to stamp."
             )
-            command.stamp(cfg, baseline)
+        baseline = bases[0]
+        logger.info(
+            "Pre-Alembic DB detected (%d tables, no alembic_version) — "
+            "stamping baseline %s",
+            len(existing_tables),
+            baseline,
+        )
+        command.stamp(cfg, baseline)
 
     logger.info("Applying database migrations...")
     command.upgrade(cfg, "head")

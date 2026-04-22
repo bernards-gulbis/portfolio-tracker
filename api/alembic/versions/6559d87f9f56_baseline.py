@@ -143,3 +143,10 @@ def downgrade() -> None:
 
     op.drop_table('fx_rates')
     # ### end Alembic commands ###
+
+    # PostgreSQL creates a standalone enum type for sa.Enum(..., name='transactiontype');
+    # it is NOT dropped with the transaction table and blocks re-running upgrade().
+    # SQLite treats the enum as VARCHAR, so the drop is a no-op there.
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        sa.Enum(name="transactiontype").drop(bind, checkfirst=True)

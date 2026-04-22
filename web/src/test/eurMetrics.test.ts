@@ -189,6 +189,20 @@ describe('applyRateToHolding', () => {
     expect(result.unrealizedGainLossEur).toBeCloseTo(500 * 0.92);
   });
 
+  it('does not mutate the holding or strip provenance fields', () => {
+    // Regression guard: callers still access holding.price_source / price_as_of
+    // after computing EUR values; this proves applyRateToHolding leaves the
+    // original object untouched.
+    const withProvenance: PricedHolding = {
+      ...holding,
+      price_source: 'last_known',
+      price_as_of: '2026-04-10T00:00:00Z',
+    };
+    applyRateToHolding(withProvenance, 0.92);
+    expect(withProvenance.price_source).toBe('last_known');
+    expect(withProvenance.price_as_of).toBe('2026-04-10T00:00:00Z');
+  });
+
   it('returns null for optional fields when source is null', () => {
     const holdingNoPrice: PricedHolding = {
       ...holding,

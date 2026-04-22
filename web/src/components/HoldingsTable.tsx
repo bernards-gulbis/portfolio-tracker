@@ -153,6 +153,12 @@ export const HoldingsTable = memo(({
     [holdings],
   );
 
+  const formatAsOf = (iso: string | null): string => {
+    if (!iso) return t('status.priceAsOfUnknown');
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(locale);
+  };
+
   return (
     <div>
       {missingPrices.length > 0 && (
@@ -216,7 +222,7 @@ export const HoldingsTable = memo(({
                         <ClockIcon
                           className="h-3 w-3 text-muted-foreground"
                           aria-label={t('status.priceStaleBadge', {
-                            asOf: holding.price_as_of ?? '',
+                            asOf: formatAsOf(holding.price_as_of),
                           })}
                         />
                       )}
