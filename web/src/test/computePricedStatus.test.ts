@@ -26,8 +26,11 @@ const makeStatus = (overrides: Partial<PortfolioStatus> = {}): PortfolioStatus =
   ...overrides,
 });
 
+const live = (price: number | null, source: 'live' | 'last_known' | 'missing' = 'live') =>
+  ({ price, source, as_of: price == null ? null : '2026-03-03T12:00:00Z' });
+
 const makeLivePrices = (overrides: Partial<LivePrices> = {}): LivePrices => ({
-  prices: { AAPL: 210, MSFT: 420 },
+  prices: { AAPL: live(210), MSFT: live(420) },
   usd_to_eur_rate: 0.91,
   timestamp: '2026-03-03T12:00:00Z',
   ...overrides,
@@ -69,14 +72,14 @@ describe('computePricedStatus', () => {
   });
 
   it('falls back to status FX rate when live rate is null', () => {
-    const live = makeLivePrices({ usd_to_eur_rate: null });
-    const result = computePricedStatus(makeStatus(), live);
+    const livePrices = makeLivePrices({ usd_to_eur_rate: null });
+    const result = computePricedStatus(makeStatus(), livePrices);
     expect(result.usd_to_eur_rate).toBe(0.90);
   });
 
   it('returns null price fields when live prices map is empty (not yet loaded)', () => {
-    const live: LivePrices = { prices: {}, usd_to_eur_rate: null, timestamp: '' };
-    const result = computePricedStatus(makeStatus(), live);
+    const livePrices: LivePrices = { prices: {}, usd_to_eur_rate: null, timestamp: '' };
+    const result = computePricedStatus(makeStatus(), livePrices);
 
     expect(result.current_value).toBeNull();
     expect(result.holdings_value).toBeNull();
@@ -93,8 +96,10 @@ describe('computePricedStatus', () => {
   });
 
   it('adds ticker to missing_prices when live price is explicitly null', () => {
-    const live = makeLivePrices({ prices: { AAPL: 210, MSFT: null } });
-    const result = computePricedStatus(makeStatus(), live);
+    const livePrices = makeLivePrices({
+      prices: { AAPL: live(210), MSFT: live(null, 'missing') },
+    });
+    const result = computePricedStatus(makeStatus(), livePrices);
 
     expect(result.missing_prices).toEqual(['MSFT']);
 
@@ -120,7 +125,7 @@ describe('computePricedStatus', () => {
       holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0, first_buy_date: '2024-01-01' }],
       holdings_cost: 0,
     });
-    const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: 10 } }));
+    const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: live(10) } }));
 
     const free = result.holdings.find((h) => h.ticker === 'FREE')!;
     expect(free.current_value).toBe(50);
@@ -133,7 +138,7 @@ describe('computePricedStatus', () => {
       holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0, first_buy_date: '2024-01-01' }],
       holdings_cost: 0,
     });
-    const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: 10 } }));
+    const result = computePricedStatus(status, makeLivePrices({ prices: { FREE: live(10) } }));
 
     expect(result.unrealized_gains_pct).toBeNull();
     expect(result.unrealized_gains).toBe(50); // 50 - 0

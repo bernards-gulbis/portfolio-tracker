@@ -39,6 +39,18 @@ const mockHoldings: Holding[] = [
   },
 ];
 
+/** Default live-prices mock — realistic ISO timestamps so new Date(as_of) is valid. */
+const buildLivePricesMock = () => ({
+  data: {
+    prices: {
+      AAPL: { price: 175.5, source: 'live' as const, as_of: '2024-01-01T00:00:00Z' },
+      MSFT: { price: 420.0, source: 'live' as const, as_of: '2024-01-01T00:00:00Z' },
+    },
+    usd_to_eur_rate: 0.92,
+    timestamp: '2024-01-01T00:00:00Z',
+  },
+});
+
 const createTestQueryClient = () =>
   new QueryClient({
     defaultOptions: {
@@ -91,9 +103,9 @@ describe('TransactionModal — sell suggestions', () => {
       data: { holdings: mockHoldings, usd_to_eur_rate: 0.92 },
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    vi.mocked(useLivePrices).mockReturnValue({
-      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
-    } as unknown as ReturnType<typeof useLivePrices>);
+    vi.mocked(useLivePrices).mockReturnValue(
+      buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
+    );
   });
 
   it('renders Select dropdown for ticker when type is SELL', async () => {
@@ -330,9 +342,9 @@ describe('TransactionModal — edit mode', () => {
       data: { holdings: mockHoldings, usd_to_eur_rate: 0.92 },
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    vi.mocked(useLivePrices).mockReturnValue({
-      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
-    } as unknown as ReturnType<typeof useLivePrices>);
+    vi.mocked(useLivePrices).mockReturnValue(
+      buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
+    );
   });
 
   it('shows edit title when transaction is provided', () => {
@@ -435,9 +447,9 @@ describe('TransactionModal — validation & create', () => {
       data: { holdings: mockHoldings, usd_to_eur_rate: 0.92 },
     } as unknown as ReturnType<typeof usePortfolioStatus>);
 
-    vi.mocked(useLivePrices).mockReturnValue({
-      data: { prices: { AAPL: 175.50, MSFT: 420.00 }, usd_to_eur_rate: 0.92, timestamp: '' },
-    } as unknown as ReturnType<typeof useLivePrices>);
+    vi.mocked(useLivePrices).mockReturnValue(
+      buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
+    );
   });
 
   it('shows ticker required error for BUY with empty ticker', async () => {

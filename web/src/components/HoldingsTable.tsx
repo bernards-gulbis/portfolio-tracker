@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AlertTriangleIcon } from 'lucide-react';
+import { AlertTriangleIcon, ClockIcon } from 'lucide-react';
 
 function computeDaysHeld(holdings: PricedHolding[]): Record<string, number> {
   const now = Date.now();
@@ -148,6 +148,17 @@ export const HoldingsTable = memo(({
     ? null
     : (totalUnrealizedGL / totalCost) * 100;
 
+  const stalePrices = useMemo(
+    () => holdings.filter((h) => h.price_source === 'last_known').map((h) => h.ticker),
+    [holdings],
+  );
+
+  const formatAsOf = (iso: string | null): string => {
+    if (!iso) return t('status.priceAsOfUnknown');
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(locale);
+  };
+
   return (
     <div>
       {missingPrices.length > 0 && (
@@ -155,6 +166,14 @@ export const HoldingsTable = memo(({
           <AlertTriangleIcon className="h-4 w-4" />
           <AlertDescription>
             {t('status.missingPrices', { tickers: missingPrices.join(', ') })}
+          </AlertDescription>
+        </Alert>
+      )}
+      {stalePrices.length > 0 && (
+        <Alert className="mb-4">
+          <ClockIcon className="h-4 w-4" />
+          <AlertDescription>
+            {t('status.stalePrices', { tickers: stalePrices.join(', ') })}
           </AlertDescription>
         </Alert>
       )}
@@ -196,7 +215,19 @@ export const HoldingsTable = memo(({
             </TableRow>
             {holdingsWithEur.map(({ holding, eurVals }) => (
                 <TableRow key={holding.ticker}>
-                  <TableCell className="font-semibold">{holding.ticker}</TableCell>
+                  <TableCell className="font-semibold">
+                    <span className="inline-flex items-center gap-1">
+                      {holding.ticker}
+                      {holding.price_source === 'last_known' && (
+                        <ClockIcon
+                          className="h-3 w-3 text-muted-foreground"
+                          aria-label={t('status.priceStaleBadge', {
+                            asOf: formatAsOf(holding.price_as_of),
+                          })}
+                        />
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {daysHeldMap[holding.ticker] == null ? '-' : formatDaysHeld(daysHeldMap[holding.ticker], daysLabels)}
                   </TableCell>

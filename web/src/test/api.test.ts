@@ -223,7 +223,7 @@ const mockPerformance: PortfolioPerformance = {
 };
 
 const mockLivePrices: LivePrices = {
-  prices: { AAPL: 200 },
+  prices: { AAPL: { price: 200, source: 'live', as_of: '2026-01-01T12:00:00Z' } },
   usd_to_eur_rate: 0.92,
   timestamp: '2026-01-01T12:00:00Z',
 };
@@ -283,7 +283,8 @@ describe('Portfolio API functions', () => {
       '/portfolios/prices/live',
       expect.objectContaining({ params: expect.any(URLSearchParams) }),
     );
-    expect(result.prices['AAPL']).toBe(200);
+    expect(result.prices['AAPL'].price).toBe(200);
+    expect(result.prices['AAPL'].source).toBe('live');
   });
 
   it('getPortfolioPerformance fetches performance data without optional params', async () => {

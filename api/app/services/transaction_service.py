@@ -7,6 +7,7 @@ import math
 import uuid
 from collections import Counter
 from datetime import datetime
+from decimal import Decimal
 from io import StringIO
 
 from sqlmodel import Session
@@ -20,6 +21,7 @@ from app.core.exceptions import (
 from app.models import Transaction, TransactionType
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.repositories.transaction_repository import TransactionRepository
+from app.services.portfolio_types import _to_decimal
 
 
 def _dedup_key(t: Transaction) -> tuple:
@@ -103,19 +105,24 @@ class TransactionService:
             transaction_type, ticker, quantity, price_per_share, total_amount, fee
         )
 
-        transaction = Transaction(
-            portfolio_id=portfolio_id,
-            date=date,
-            type=transaction_type,
-            ticker=ticker,
-            quantity=quantity,
-            price_per_share=price_per_share,
-            fee=fee,
-            total_amount=total_amount,
-            eur_amount=eur_amount,
-            split_ratio=split_ratio,
-            currency=currency,
-            fx_rate=fx_rate,
+        # model_validate runs Pydantic coercion (unlike the __init__ path for
+        # table=True models), so float inputs become Decimals via str-roundtrip.
+        # This keeps attribute types consistent with DB-loaded rows.
+        transaction = Transaction.model_validate(
+            {
+                "portfolio_id": portfolio_id,
+                "date": date,
+                "type": transaction_type,
+                "ticker": ticker,
+                "quantity": quantity,
+                "price_per_share": price_per_share,
+                "fee": fee,
+                "total_amount": total_amount,
+                "eur_amount": eur_amount,
+                "split_ratio": split_ratio,
+                "currency": currency,
+                "fx_rate": fx_rate,
+            }
         )
 
         return self.transaction_repo.create(transaction)
@@ -257,6 +264,19 @@ class TransactionService:
             val_fee,
         )
 
+        # Numeric fields must be coerced to Decimal before setattr — SQLModel
+        # table=True models don't run Pydantic validation on assignment, so a
+        # raw float would stay a float on the in-memory instance and mix with
+        # DB-loaded Decimals on subsequent arithmetic.
+        _numeric_fields = {
+            "quantity",
+            "price_per_share",
+            "fee",
+            "total_amount",
+            "eur_amount",
+            "split_ratio",
+            "fx_rate",
+        }
         provided = {
             "date": date,
             "type": transaction_type,
@@ -271,8 +291,11 @@ class TransactionService:
             "fx_rate": fx_rate,
         }
         for field, value in provided.items():
-            if value is not None:
-                setattr(transaction, field, value)
+            if value is None:
+                continue
+            if field in _numeric_fields:
+                value = _to_decimal(value)
+            setattr(transaction, field, value)
 
         return self.transaction_repo.update(transaction)
 
@@ -356,12 +379,18 @@ class TransactionService:
     def _validate_buy_sell(
         transaction_type: TransactionType,
         ticker: str | None,
-        quantity: float | None,
-        price_per_share: float | None,
-        total_amount: float,
-        fee: float | None,
+        quantity: float | Decimal | None,
+        price_per_share: float | Decimal | None,
+        total_amount: float | Decimal,
+        fee: float | Decimal | None,
     ) -> None:
-        """Validate fields specific to BUY/SELL transactions."""
+        """Validate fields specific to BUY/SELL transactions.
+
+        Inputs may arrive as ``float`` (newly-submitted update args) or
+        ``Decimal`` (DB-loaded values). Coerce through ``Decimal(str(...))``
+        before arithmetic so we never mix the two (Python raises ``TypeError``
+        on ``Decimal + float``).
+        """
         if not ticker:
             raise InvalidTransactionDataException(
                 f"{transaction_type.value} transactions require a ticker symbol"
@@ -375,15 +404,17 @@ class TransactionService:
                 f"{transaction_type.value} transactions require a price"
             )
 
-        if transaction_type == TransactionType.BUY:
-            expected_value = -(quantity * price_per_share + (fee or 0))
-        else:
-            expected_value = quantity * price_per_share - (fee or 0)
+        q = _to_decimal(quantity)
+        p = _to_decimal(price_per_share)
+        f = _to_decimal(fee) if fee is not None else Decimal("0")
+        t = _to_decimal(total_amount)
 
-        if abs(total_amount - expected_value) > abs(expected_value) * 0.01:
+        expected_value = -(q * p + f) if transaction_type == TransactionType.BUY else q * p - f
+
+        if abs(t - expected_value) > abs(expected_value) * Decimal("0.01"):
             raise InvalidTransactionDataException(
-                f"Value inconsistency: expected ~{expected_value:.2f} based on quantity * price_per_share "
-                f"{'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {total_amount}"
+                f"Value inconsistency: expected ~{float(expected_value):.2f} based on quantity * price_per_share "
+                f"{'+ fee' if transaction_type == TransactionType.BUY else '- fee'}, got {float(t)}"
             )
 
     def _parse_csv(self, csv_content: str, portfolio_id: int) -> list[Transaction]:
@@ -474,19 +505,22 @@ class TransactionService:
         if fx_rate is not None and fx_rate <= 0:
             raise ValueError(f"fx_rate must be positive, got: {fx_rate}")
 
-        return Transaction(
-            portfolio_id=portfolio_id,
-            date=date,
-            type=transaction_type,
-            ticker=ticker,
-            quantity=quantity,
-            price_per_share=price_per_share,
-            fee=fee,
-            total_amount=total_amount,
-            eur_amount=eur_amount,
-            split_ratio=split_ratio,
-            currency=currency,
-            fx_rate=fx_rate,
+        # See create_transaction: model_validate coerces float → Decimal.
+        return Transaction.model_validate(
+            {
+                "portfolio_id": portfolio_id,
+                "date": date,
+                "type": transaction_type,
+                "ticker": ticker,
+                "quantity": quantity,
+                "price_per_share": price_per_share,
+                "fee": fee,
+                "total_amount": total_amount,
+                "eur_amount": eur_amount,
+                "split_ratio": split_ratio,
+                "currency": currency,
+                "fx_rate": fx_rate,
+            }
         )
 
     @staticmethod

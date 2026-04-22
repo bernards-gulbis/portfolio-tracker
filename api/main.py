@@ -24,7 +24,6 @@ from app.core import (
     InvalidTransactionDataException,
     PortfolioNotFoundException,
     TransactionNotFoundException,
-    create_db_and_tables,
 )
 from app.core.auth import (
     UserManager,
@@ -43,7 +42,7 @@ from app.core.config import (
     LOG_LEVEL,
     OAUTH_STATE_SECRET,
 )
-from app.core.database import engine, get_session
+from app.core.database import engine, get_session, run_migrations
 from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 from app.routers import portfolios_router, transaction_router, transactions_router
@@ -71,7 +70,7 @@ async def lifespan(app: FastAPI):
         logger.error("Failed to connect to database")
         raise RuntimeError("Database connection failed")
 
-    create_db_and_tables()
+    run_migrations()
     logger.info("Database initialized successfully")
     yield
     # Shutdown (cleanup if needed)

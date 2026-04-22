@@ -1,7 +1,9 @@
 import logging
 from collections.abc import Generator
+from pathlib import Path
 
 from sqlalchemy import event, text
+from sqlalchemy import inspect as sa_inspect
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.core.config import DATABASE_ECHO, DATABASE_URL, DB_MAX_OVERFLOW, DB_POOL_SIZE
@@ -57,13 +59,79 @@ except Exception as e:
 
 
 def create_db_and_tables():
-    """Create database tables"""
+    """Create tables directly from SQLModel metadata.
+
+    Kept for tests that use ephemeral in-memory SQLite engines where running
+    the full Alembic migration chain would be overkill. Production and dev
+    paths should use :func:`run_migrations` instead.
+    """
     try:
         SQLModel.metadata.create_all(engine)
         logger.info("Database tables created successfully")
     except Exception as e:
         logger.error("Failed to create database tables: %s", e)
         raise
+
+
+def run_migrations() -> None:
+    """Apply Alembic migrations up to head against the configured DATABASE_URL.
+
+    Locates alembic.ini next to the api/ package root. Idempotent — if the
+    DB is already at head, this is a fast no-op.
+
+    One-time migration path: if the DB has tables but no ``alembic_version``
+    table (the legacy ``create_db_and_tables()`` path left it that way), we
+    stamp the baseline revision first. Without this, ``upgrade head`` would
+    try to ``CREATE TABLE`` on tables that already exist and crash at boot.
+    """
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        from alembic import command
+    except ImportError as exc:  # pragma: no cover - hard dependency
+        raise RuntimeError(
+            "Alembic is not installed; cannot run migrations"
+        ) from exc
+
+    # api/app/core/database.py -> parents[2] == api/
+    alembic_ini = Path(__file__).resolve().parents[2] / "alembic.ini"
+    if not alembic_ini.exists():
+        raise RuntimeError(f"alembic.ini not found at {alembic_ini}")
+
+    # env.py reads DATABASE_URL from app.core.config and sets it on the config,
+    # so we don't need to set sqlalchemy.url here.
+    cfg = Config(str(alembic_ini))
+
+    # Inspect the DB alembic will actually target via env.py (same source:
+    # app.core.config.DATABASE_URL). A dedicated short-lived engine avoids
+    # divergence with the module-level engine if a caller patches DATABASE_URL
+    # for tests.
+    inspect_engine = create_engine(DATABASE_URL)
+    try:
+        existing_tables = set(sa_inspect(inspect_engine).get_table_names())
+    finally:
+        inspect_engine.dispose()
+
+    if existing_tables and "alembic_version" not in existing_tables:
+        bases = ScriptDirectory.from_config(cfg).get_bases()
+        if len(bases) != 1:
+            raise RuntimeError(
+                f"Expected exactly one base revision for auto-stamp, got {len(bases)}: "
+                f"{bases}. Refusing to guess which root to stamp."
+            )
+        baseline = bases[0]
+        logger.info(
+            "Pre-Alembic DB detected (%d tables, no alembic_version) — "
+            "stamping baseline %s",
+            len(existing_tables),
+            baseline,
+        )
+        command.stamp(cfg, baseline)
+
+    logger.info("Applying database migrations...")
+    command.upgrade(cfg, "head")
+    logger.info("Database migrations applied")
 
 
 def verify_connection():

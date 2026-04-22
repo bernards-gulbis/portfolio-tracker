@@ -130,11 +130,15 @@ export interface Holding {
   first_buy_date: string;
 }
 
+export type PriceSource = 'live' | 'last_known' | 'missing';
+
 export interface PricedHolding extends Holding {
   current_price: number | null;
   current_value: number | null;
   unrealized_gain_loss: number | null;
   unrealized_gain_loss_pct: number | null;
+  price_source: PriceSource;
+  price_as_of: string | null;
 }
 
 export interface RealizedSale {
@@ -214,8 +218,14 @@ export interface PortfolioPerformance {
   data_points: PerformanceDataPoint[];
 }
 
+export interface LivePriceInfo {
+  price: number | null;
+  source: PriceSource;
+  as_of: string | null;
+}
+
 export interface LivePrices {
-  prices: Record<string, number | null>;
+  prices: Record<string, LivePriceInfo>;
   usd_to_eur_rate: number | null;
   timestamp: string;
 }

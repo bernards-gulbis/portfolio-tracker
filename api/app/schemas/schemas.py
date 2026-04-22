@@ -1,10 +1,13 @@
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from fastapi_users import schemas as fu_schemas
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models import TransactionType
+
+PriceSource = Literal["live", "last_known", "missing"]
 
 # ================== User Schemas ==================
 
@@ -323,10 +326,51 @@ class PortfolioStatusResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LivePriceInfo(BaseModel):
+    """Per-ticker live-price result with provenance.
+
+    ``source`` distinguishes a fresh Yahoo Finance fetch (``live``) from a
+    stale fallback pulled from the HistoricalPrice cache (``last_known``) and
+    from the "no data at all" case (``missing``). ``as_of`` is the timestamp
+    of the price — now for live, the cached date for last_known, None for missing.
+
+    Invariants:
+      * ``price is None`` iff ``source == 'missing'``.
+      * ``as_of is None`` iff ``source == 'missing'``. A priced result always
+        carries a timestamp; "missing" carries neither.
+    """
+
+    price: float | None = None
+    source: PriceSource = "missing"
+    as_of: datetime | None = None
+
+    @model_validator(mode="after")
+    def _source_invariants(self) -> "LivePriceInfo":
+        if self.source == "missing":
+            if self.price is not None:
+                raise ValueError(
+                    "LivePriceInfo with source='missing' must have price=None"
+                )
+            if self.as_of is not None:
+                raise ValueError(
+                    "LivePriceInfo with source='missing' must have as_of=None"
+                )
+        else:
+            if self.price is None:
+                raise ValueError(
+                    f"LivePriceInfo with source='{self.source}' must have a non-None price"
+                )
+            if self.as_of is None:
+                raise ValueError(
+                    f"LivePriceInfo with source='{self.source}' must have a non-None as_of timestamp"
+                )
+        return self
+
+
 class LivePricesResponse(BaseModel):
     """Schema for live price polling (no transaction replay)"""
 
-    prices: dict[str, float | None]
+    prices: dict[str, LivePriceInfo]
     usd_to_eur_rate: float | None = None
     timestamp: datetime
 

@@ -176,6 +176,8 @@ describe('applyRateToHolding', () => {
     current_value: 2000,
     unrealized_gain_loss: 500,
     unrealized_gain_loss_pct: 33.33,
+    price_source: 'live',
+    price_as_of: null,
   };
 
   it('converts all fields correctly', () => {
@@ -185,6 +187,20 @@ describe('applyRateToHolding', () => {
     expect(result.currentPriceEur).toBeCloseTo(200 * 0.92);
     expect(result.currentValueEur).toBeCloseTo(2000 * 0.92);
     expect(result.unrealizedGainLossEur).toBeCloseTo(500 * 0.92);
+  });
+
+  it('does not mutate the holding (all fields preserved)', () => {
+    // Regression guard: callers still access every original PricedHolding
+    // field after computing EUR values; a full snapshot check catches any
+    // accidental mutation, not just the two provenance fields.
+    const withProvenance: PricedHolding = {
+      ...holding,
+      price_source: 'last_known',
+      price_as_of: '2026-04-10T00:00:00Z',
+    };
+    const before = JSON.parse(JSON.stringify(withProvenance));
+    applyRateToHolding(withProvenance, 0.92);
+    expect(withProvenance).toEqual(before);
   });
 
   it('returns null for optional fields when source is null', () => {

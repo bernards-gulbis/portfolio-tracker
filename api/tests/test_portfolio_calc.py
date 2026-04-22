@@ -685,3 +685,163 @@ class TestResolveUsdToEurRate:
             rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
         mock_live.assert_not_called()
         assert rate == pytest.approx(0.91)
+
+
+# ==================== Decimal precision regression ====================
+
+
+class TestDecimalPrecision:
+    """Guard against float binary-drift creeping back into the ledger."""
+
+    def test_ten_buys_at_point_one_sum_exactly(self):
+        """0.1 + 0.1 + ... (10x) must be exactly 1.00 in Decimal, never 0.99999..."""
+        state = _TxState()
+        for _ in range(10):
+            tx = _make_tx(
+                type=TransactionType.BUY,
+                ticker="AAPL",
+                quantity=0.01,
+                price_per_share=10.0,
+                total_amount=-0.1,
+            )
+            _apply_transaction(state, tx)
+        assert state.cash == Decimal("-1.00")
+        assert state.holdings["AAPL"].total_cost == Decimal("1.00")
+
+    def test_historical_fx_used_when_tx_missing_eur_and_fx_rate(self):
+        """Deposit at 2024 rate 1.10, withdraw at 2025 rate 1.05.
+
+        Both transactions lack eur_amount and fx_rate. Without the S3 fix, the
+        withdrawal would be valued at today's rate (usd_to_eur_rate arg).
+        With the fix, each transaction uses the historical rate for its date,
+        and the resulting realized FX gain is exact.
+        """
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2024, 6, 1),
+                total_amount=1000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.WITHDRAW,
+                date=datetime(2025, 6, 1),
+                total_amount=-500.0,
+            ),
+        ]
+        historical = {"2024-06-01": 1.10, "2025-06-01": 1.05}
+        with patch(
+            "app.services.portfolio_calc."
+            "PriceService.get_historical_usd_to_eur_rates",
+            return_value=historical,
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.50,  # deliberately "wrong" current rate
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="FX test",
+            )
+        # Deposit: 1000 * 1.10 = 1100 EUR. Withdraw valued historically:
+        # -500 * 1.05 = -525 EUR. Net principal_eur = 1100 - 525 = 575 EUR.
+        # Crucially, the live 0.50 rate should never show up.
+        assert result.principal_eur == pytest.approx(575.0)
+        # realized_fx_gain = eur_historical - eur_avg_cost
+        # avg_rate = 1100 / 1000 = 1.10; eur_avg_cost = 500 * 1.10 = 550
+        # eur_historical of withdrawal = 525; realized_fx_gain = 525 - 550 = -25
+        assert result.realized_withdrawals[0].realized_fx_gain == pytest.approx(
+            -25.0
+        )
+
+    def test_prefetch_fx_fallback_on_provider_error(self):
+        """If PriceService raises, calculate_status must still produce a result
+        using the current-rate fallback (not crash)."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2024, 6, 1),
+                total_amount=1000.0,
+            ),
+        ]
+        with patch(
+            "app.services.portfolio_calc."
+            "PriceService.get_historical_usd_to_eur_rates",
+            side_effect=RuntimeError("yahoo down"),
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.90,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="FX fallback",
+            )
+        # Fallback to current rate: 1000 * 0.90 = 900
+        assert result.principal_eur == pytest.approx(900.0)
+
+    def test_prefetch_skipped_when_no_fx_blind_transactions(self):
+        """Deposit with eur_amount set → no PriceService call at all."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2024, 6, 1),
+                total_amount=1000.0,
+                eur_amount=900.0,  # explicit EUR → skip historical lookup
+            ),
+        ]
+        with patch(
+            "app.services.portfolio_calc."
+            "PriceService.get_historical_usd_to_eur_rates",
+        ) as mock_fetch:
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.50,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="skip fetch",
+            )
+        mock_fetch.assert_not_called()
+        assert result.principal_eur == pytest.approx(900.0)
+
+    def test_db_roundtrip_preserves_displayed_precision(self):
+        """A value saved to the DB must read back at its displayed precision.
+
+        This guards the end-to-end path: float API input → NUMERIC column →
+        Decimal on read. The invariant is "what the user typed is what is
+        stored and retrieved", not the binary float representation.
+        """
+        from sqlmodel import Session, SQLModel, create_engine
+
+        from app.models import Portfolio, User
+
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            user = User(email="x@y.z", hashed_password="x")
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            portfolio = Portfolio(name="P", user_id=user.id)
+            session.add(portfolio)
+            session.commit()
+            session.refresh(portfolio)
+            session.add(
+                Transaction(
+                    portfolio_id=portfolio.id,
+                    date=datetime(2025, 1, 1),
+                    type=TransactionType.DEPOSIT,
+                    total_amount=Decimal("1000.00"),
+                    fx_rate=Decimal("1.087"),
+                )
+            )
+            session.commit()
+            session.expunge_all()
+            from sqlmodel import select
+
+            tx = session.exec(select(Transaction)).one()
+            assert tx.total_amount == Decimal("1000.0000")
+            assert tx.fx_rate == Decimal("1.087000")

@@ -110,17 +110,53 @@ class _TxState:
     realized_withdrawals: list[_WithdrawalFx] = dc_field(default_factory=list)
     warnings: list[_Warning] = dc_field(default_factory=list)
     usd_to_eur_fallback: float | None = None
+    # Per-date historical USD→EUR rates, pre-fetched once per status calculation.
+    # Used when a transaction carries neither eur_amount nor fx_rate — the
+    # fallback (current rate) is only used if no historical rate is available
+    # for the transaction's date.
+    historical_usd_to_eur_rates: dict[str, float] = dc_field(default_factory=dict)
+
+
+def _lookup_historical_rate(
+    historical_rates: dict[str, float], target_date_str: str
+) -> float | None:
+    """Return the rate for *target_date_str* or the nearest earlier date."""
+    if not historical_rates:
+        return None
+    rate = historical_rates.get(target_date_str)
+    if rate is not None:
+        return rate
+    earlier = sorted(
+        (d for d in historical_rates if d <= target_date_str), reverse=True
+    )
+    if earlier:
+        return historical_rates[earlier[0]]
+    return None
 
 
 def _eur_from_tx(
-    tx: object, total_amount: Decimal, usd_to_eur_fallback: float | None = None
+    tx: object,
+    total_amount: Decimal,
+    usd_to_eur_fallback: float | None = None,
+    historical_rates: dict[str, float] | None = None,
 ) -> Decimal:
-    """Return the EUR equivalent of a transaction, or 0 if no rate is available."""
+    """Return the EUR equivalent of a transaction.
+
+    Priority:
+      1. ``tx.eur_amount`` — authoritative value the user (or importer) stored.
+      2. ``tx.fx_rate`` — rate recorded at transaction time.
+      3. ``historical_rates[tx.date]`` — market rate on the transaction's date.
+      4. ``usd_to_eur_fallback`` — current live rate, last-resort only.
+    """
     if tx.eur_amount is not None:
         return _to_decimal(tx.eur_amount)
     if tx.fx_rate is not None and tx.fx_rate > 0:
         return total_amount / _to_decimal(tx.fx_rate)
-    # Fallback: use pre-fetched USD→EUR rate
+    if historical_rates and getattr(tx, "date", None) is not None:
+        date_str = tx.date.strftime("%Y-%m-%d")
+        rate = _lookup_historical_rate(historical_rates, date_str)
+        if rate is not None:
+            return total_amount * _to_decimal(rate)
     if usd_to_eur_fallback is not None:
         return total_amount * _to_decimal(usd_to_eur_fallback)
     return _ZERO

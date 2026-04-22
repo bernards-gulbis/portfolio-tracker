@@ -1733,8 +1733,18 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
         },
     )
 
-    with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=0.92
+    # When no historical rate is available AND the transaction lacks fx_rate,
+    # the current rate is the last-resort fallback.
+    with (
+        patch(
+            "app.services.price_service.PriceService.get_usd_to_eur_rate",
+            return_value=0.92,
+        ),
+        patch(
+            "app.services.portfolio_calc."
+            "PriceService.get_historical_usd_to_eur_rates",
+            return_value={},
+        ),
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -1796,9 +1806,17 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
         },
     )
 
-    # USD→EUR rate returns None (unavailable)
-    with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=None
+    # USD→EUR rate returns None (unavailable) and no historical rates either.
+    with (
+        patch(
+            "app.services.price_service.PriceService.get_usd_to_eur_rate",
+            return_value=None,
+        ),
+        patch(
+            "app.services.portfolio_calc."
+            "PriceService.get_historical_usd_to_eur_rates",
+            return_value={},
+        ),
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -3705,7 +3723,11 @@ def test_live_prices_with_tickers(client: TestClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["prices"] == {"AAPL": 192.5, "MSFT": 410.0}
+    assert data["prices"]["AAPL"]["price"] == 192.5
+    assert data["prices"]["AAPL"]["source"] == "live"
+    assert data["prices"]["AAPL"]["as_of"] is not None
+    assert data["prices"]["MSFT"]["price"] == 410.0
+    assert data["prices"]["MSFT"]["source"] == "live"
     assert data["usd_to_eur_rate"] == 0.91
     assert "timestamp" in data
     mock_ps.get_current_prices.assert_called_once_with(["AAPL", "MSFT"])
@@ -3735,7 +3757,8 @@ def test_live_prices_fx_rate_failure(client: TestClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["prices"] == {"AAPL": 192.5}
+    assert data["prices"]["AAPL"]["price"] == 192.5
+    assert data["prices"]["AAPL"]["source"] == "live"
     assert data["usd_to_eur_rate"] is None
 
 
@@ -3748,18 +3771,20 @@ def test_live_prices_too_many_tickers(client: TestClient):
 
 
 def test_live_prices_price_fetch_error_returns_none_prices(client: TestClient):
-    """Test /prices/live falls back to None prices when price service raises"""
+    """Test /prices/live falls back to DB last-known or missing when live raises"""
     with patch("app.routers.portfolios.PriceService") as mock_ps:
         mock_ps.get_current_prices.side_effect = RuntimeError("yfinance down")
+        mock_ps.get_last_known_price_with_date.return_value = None
         mock_ps.get_usd_to_eur_rate_safe.return_value = 0.91
 
         response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
 
     assert response.status_code == 200
     data = response.json()
-    # prices should be {ticker: null} when service raised
-    assert "AAPL" in data["prices"]
-    assert data["prices"]["AAPL"] is None
+    # With no DB fallback, we report source=missing + price=None
+    assert data["prices"]["AAPL"]["price"] is None
+    assert data["prices"]["AAPL"]["source"] == "missing"
+    assert data["prices"]["AAPL"]["as_of"] is None
 
 
 def test_csv_upload_file_too_large(client: TestClient):
@@ -3980,13 +4005,42 @@ class TestLivePricesEndpoint:
                 side_effect=RuntimeError("yahoo down"),
             ),
             patch(
+                "app.routers.portfolios.PriceService.get_last_known_price_with_date",
+                return_value=None,
+            ),
+            patch(
                 "app.routers.portfolios.PriceService.get_usd_to_eur_rate_safe",
                 return_value=1.0,
             ),
         ):
             r = client.get("/portfolios/prices/live", params=[("tickers", "AAPL")])
         assert r.status_code == 200
-        assert r.json()["prices"]["AAPL"] is None
+        info = r.json()["prices"]["AAPL"]
+        assert info["price"] is None
+        assert info["source"] == "missing"
+
+    def test_price_fetch_error_falls_back_to_last_known(self, client: TestClient):
+        """When live fails, serve last-known from DB with source=last_known."""
+        with (
+            patch(
+                "app.routers.portfolios.PriceService.get_current_prices",
+                side_effect=RuntimeError("yahoo down"),
+            ),
+            patch(
+                "app.routers.portfolios.PriceService.get_last_known_price_with_date",
+                return_value=(150.25, "2026-04-10"),
+            ),
+            patch(
+                "app.routers.portfolios.PriceService.get_usd_to_eur_rate_safe",
+                return_value=1.0,
+            ),
+        ):
+            r = client.get("/portfolios/prices/live", params=[("tickers", "AAPL")])
+        assert r.status_code == 200
+        info = r.json()["prices"]["AAPL"]
+        assert info["price"] == 150.25
+        assert info["source"] == "last_known"
+        assert info["as_of"].startswith("2026-04-10")
 
 
 class TestTransactionUpdateTickerValidator:
