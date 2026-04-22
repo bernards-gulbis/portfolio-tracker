@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react';
 import { useLocale } from '../hooks/useLocale';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
-import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
-import { useLivePrices } from '../hooks/useLivePrices';
-import { Transaction, TransactionType, Holding, getErrorMessage } from '../api';
+import { Transaction, TransactionType } from '../api';
 import {
   Dialog,
   DialogContent,
@@ -41,21 +36,8 @@ import {
 } from '@/components/ui/input-group';
 import { DatePickerField } from './transaction-form/DatePickerField';
 import { TickerCombobox } from './transaction-form/TickerCombobox';
-import {
-  BUY_SELL_TYPES,
-  EUR_TYPES,
-  FEE_TYPES,
-  TICKER_TYPES,
-  schema,
-  type FormValues,
-} from './transaction-form/schema';
-import {
-  buildTransactionData,
-  getDefaultValues,
-  roundCurrencyOnBlur,
-} from './transaction-form/helpers';
-
-// ─── Component ─────────────────────────────────────────────────────────────
+import { roundCurrencyOnBlur } from './transaction-form/helpers';
+import { useTransactionForm } from './transaction-form/useTransactionForm';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -72,120 +54,30 @@ export const TransactionModal = ({
 }: TransactionModalProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
-  const isEdit = !!transaction;
-  const createTransaction = useCreateTransaction();
-  const updateTransaction = useUpdateTransaction();
-  const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
-  const holdings = useMemo<Holding[]>(() => portfolioStatus?.holdings ?? [], [portfolioStatus?.holdings]);
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: getDefaultValues(transaction),
-  });
+  const {
+    form,
+    holdings,
+    selectedHolding,
+    isEdit,
+    isSell,
+    isPending,
+    showTicker,
+    showTickerCombobox,
+    showQuantity,
+    showPricePerShare,
+    showFee,
+    showTotalAmount,
+    showValueEur,
+    showSplitRatio,
+    showFxRate,
+    onSubmit,
+    handleClose,
+    applyTickerSideEffects,
+    markPriceAsUserEdited,
+  } = useTransactionForm({ isOpen, portfolioId, transaction, onClose });
 
-  const { reset, clearErrors } = form;
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const type = form.watch('type');
-  const watchedTicker = form.watch('ticker');
-  const watchedQuantity = form.watch('quantity');
-  const watchedPrice = form.watch('pricePerShare');
-  const watchedFee = form.watch('fee');
-  const watchedTotal = form.watch('totalAmount');
-
-  const isSell = type === TransactionType.SELL;
-  const isDividend = type === TransactionType.DIVIDEND;
-
-  const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
-  const { data: livePrices } = useLivePrices(tickers, tickers.length > 0 && isOpen && isSell);
-  const showTickerCombobox = isSell || isDividend;
-  const selectedHolding = isSell ? holdings.find(h => h.ticker === watchedTicker) : undefined;
-
-  useEffect(() => {
-    if (isOpen) reset(getDefaultValues(transaction));
-  }, [isOpen, transaction, reset]);
-
-  // Auto-calculate totalAmount for BUY/SELL
-  useEffect(() => {
-    if (!BUY_SELL_TYPES.has(type)) return;
-    const qty = Number.parseFloat(watchedQuantity || '0');
-    const price = Number.parseFloat(watchedPrice || '0');
-    const fee = Math.abs(Number.parseFloat(watchedFee || '0'));
-    if (qty > 0 && price > 0) {
-      const total = isSell ? qty * price - fee : qty * price + fee;
-      form.setValue('totalAmount', total.toFixed(2));
-    }
-  }, [watchedQuantity, watchedPrice, watchedFee, type, isSell, form]);
-
-  // Track the provenance of pricePerShare so we can decide what to do on
-  // ticker change:
-  //   - priceWasAutoFilled: did WE fill this (via livePrices), or did the user?
-  //   - priceOwnerTicker: which ticker was this price entered/filled for?
-  // On ticker change, we clear the price iff it was auto-filled OR belongs to
-  // a different ticker (so user-typed values for the *same* ticker survive).
-  const priceWasAutoFilled = useRef(false);
-  const priceOwnerTicker = useRef<string | null>(
-    isEdit ? transaction?.ticker ?? null : null,
-  );
-
-  // Auto-fill sell price when livePrices arrives after ticker was already selected
-  useEffect(() => {
-    if (!isSell || !watchedTicker || !livePrices) return;
-    const livePrice = livePrices.prices[watchedTicker]?.price ?? null;
-    if (livePrice != null && !form.getValues('pricePerShare')) {
-      form.setValue('pricePerShare', livePrice.toFixed(2));
-      priceWasAutoFilled.current = true;
-      priceOwnerTicker.current = watchedTicker;
-    }
-  }, [isSell, watchedTicker, livePrices, form]);
-
-  // Auto-fill FX rate for DIVIDEND when empty
-  const eurRate = portfolioStatus?.usd_to_eur_rate;
-  useEffect(() => {
-    if (isDividend && !form.getValues('fxRate') && eurRate != null) {
-      form.setValue('fxRate', eurRate.toFixed(4));
-    }
-  }, [isDividend, eurRate, form]);
-
-  // Auto-calculate EUR amount for DEPOSIT/WITHDRAW when totalAmount changes
-  const showValueEur = EUR_TYPES.has(type);
-  useEffect(() => {
-    if (!showValueEur || eurRate == null) return;
-    const total = Number.parseFloat(watchedTotal || '0');
-    if (total > 0) {
-      form.setValue('valueEur', (total * eurRate).toFixed(2));
-    } else {
-      form.setValue('valueEur', '');
-    }
-  }, [watchedTotal, eurRate, showValueEur, form]);
-
-  const onSubmit = async (values: FormValues) => {
-    try {
-      const data = buildTransactionData(values);
-      if (isEdit && transaction) {
-        await updateTransaction.mutateAsync({ transactionId: transaction.id, data, portfolioId });
-      } else {
-        await createTransaction.mutateAsync({ portfolioId, data });
-      }
-      onClose();
-    } catch (err) {
-      form.setError('root', { message: getErrorMessage(err) });
-    }
-  };
-
-  const handleClose = () => {
-    reset();
-    onClose();
-  };
-
-  const isPending = createTransaction.isPending || updateTransaction.isPending;
-
-  const showTicker = TICKER_TYPES.has(type);
-  const showQuantity = BUY_SELL_TYPES.has(type);
-  const showPricePerShare = BUY_SELL_TYPES.has(type);
-  const showFee = FEE_TYPES.has(type);
-  const showTotalAmount = type !== TransactionType.SPLIT;
-  const showSplitRatio = type === TransactionType.SPLIT;
-  const showFxRate = type === TransactionType.DIVIDEND;
+  const { clearErrors } = form;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -293,30 +185,7 @@ export const TransactionModal = ({
                         noHoldingsText={t('transaction.modal.fields.noHoldings')}
                         onChange={(value) => {
                           field.onChange(value);
-                          if (isSell) {
-                            const livePrice =
-                              livePrices?.prices[value]?.price ?? null;
-                            if (livePrice == null) {
-                              // Clear iff the existing price belongs to us
-                              // (auto-fill) or to a different ticker. A
-                              // user-typed value for the SAME ticker survives.
-                              const belongsToOtherTicker =
-                                priceOwnerTicker.current !== null &&
-                                priceOwnerTicker.current !== value;
-                              if (
-                                priceWasAutoFilled.current ||
-                                belongsToOtherTicker
-                              ) {
-                                form.setValue('pricePerShare', '');
-                                priceWasAutoFilled.current = false;
-                              }
-                              priceOwnerTicker.current = value;
-                            } else {
-                              form.setValue('pricePerShare', livePrice.toFixed(2));
-                              priceWasAutoFilled.current = true;
-                              priceOwnerTicker.current = value;
-                            }
-                          }
+                          applyTickerSideEffects(value);
                         }}
                       />
                     ) : (
@@ -412,9 +281,7 @@ export const TransactionModal = ({
                         aria-invalid={fieldState.invalid}
                         onChange={(e) => {
                           field.onChange(e);
-                          priceWasAutoFilled.current = false;
-                          // User-typed value belongs to the currently selected ticker.
-                          priceOwnerTicker.current = watchedTicker || null;
+                          markPriceAsUserEdited();
                         }}
                         onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
                       />
@@ -586,4 +453,3 @@ export const TransactionModal = ({
     </Dialog>
   );
 };
-
