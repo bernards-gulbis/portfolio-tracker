@@ -1,18 +1,18 @@
-"""Transaction handlers, holdings builder, and portfolio status calculation."""
+"""Per-type transaction handlers and the dispatch function.
 
-import dataclasses
-import logging
-from datetime import datetime, timedelta
+Each handler mutates a ``_TxState`` in place for one transaction. The state
+is the single source of truth for running balances (cash, principal, holdings,
+realized gains, warnings). Handlers never fetch prices or FX rates directly —
+they read whatever is already on the transaction or on the state.
+
+Also includes ``_compute_forward_split_factors``, a pure transactions-list
+helper used by historical valuation to back out Yahoo's split-adjusted prices.
+"""
+
+from datetime import datetime
 from decimal import Decimal
 
 from app.models import Transaction, TransactionType
-from app.schemas import HoldingResponse, PortfolioStatusResponse
-from app.schemas.schemas import (
-    DividendReceivedResponse,
-    RealizedSaleResponse,
-    TransactionWarning,
-    WithdrawalFxResponse,
-)
 from app.services.portfolio_types import (
     _ISO_DATETIME_FMT,
     _ONE,
@@ -21,18 +21,12 @@ from app.services.portfolio_types import (
     _DividendReceived,
     _eur_from_tx,
     _Holding,
-    _normalize_zero,
-    _opt_normalize,
     _RealizedSale,
     _to_decimal,
     _TxState,
     _Warning,
     _WithdrawalFx,
 )
-from app.services.price_service import PriceService
-
-logger = logging.getLogger(__name__)
-
 
 # ================== Transaction handlers ==================
 
@@ -278,209 +272,3 @@ def _compute_forward_split_factors(
             continue
         factors[tx.ticker] = factors.get(tx.ticker, _ONE) * ratio
     return factors
-
-
-# ================== Date / price resolution helpers ==================
-
-
-def _resolve_nearest_date_value(
-    date_prices: dict[str, float], target_date_str: str
-) -> float | None:
-    """Return the value for *target_date_str* or the nearest earlier date, else None."""
-    if not date_prices:
-        return None
-    if target_date_str in date_prices:
-        return date_prices[target_date_str]
-    available = sorted((d for d in date_prices if d <= target_date_str), reverse=True)
-    if available:
-        return date_prices[available[0]]
-    return None
-
-
-def _fetch_historical_prices(
-    tickers: list[str], target_date: datetime
-) -> dict[str, float]:
-    """Fetch historical prices for *tickers* at (or near) *target_date*."""
-    if not tickers:
-        return {}
-    start_date = target_date - timedelta(days=5)
-    end_date = target_date + timedelta(days=1)
-    all_prices = PriceService.get_historical_prices_for_multiple_tickers(
-        tickers, start_date, end_date
-    )
-    target_date_str = target_date.strftime("%Y-%m-%d")
-    result: dict[str, float] = {}
-    for ticker, date_prices in all_prices.items():
-        if not date_prices:
-            continue
-        price = _resolve_nearest_date_value(date_prices, target_date_str)
-        if price is not None:
-            result[ticker] = price
-        else:
-            # All dates are after target; use earliest as best guess
-            result[ticker] = date_prices[min(date_prices.keys())]
-    return result
-
-
-def _value_holdings_at_date(
-    state: _TxState,
-    historical_prices: dict[str, float] | None,
-    forward_split_factors: dict[str, Decimal],
-    target_date_str: str,
-) -> Decimal:
-    """Compute total holdings value at a historical date using price → DB cache → cost basis fallback."""
-    holdings_value = _ZERO
-    for ticker, h in state.holdings.items():
-        price = historical_prices.get(ticker) if historical_prices else None
-        if price is not None and price > 0:
-            split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += h.quantity * _to_decimal(price) * split_factor
-            continue
-        # Try last known price from DB cache before falling back to cost basis
-        db_price = PriceService.get_last_known_price(ticker)
-        if db_price is not None and db_price > 0:
-            split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += h.quantity * _to_decimal(db_price) * split_factor
-            logger.debug(
-                "Status at %s: using last known price %.4f for %s",
-                target_date_str,
-                db_price,
-                ticker,
-            )
-        else:
-            holdings_value += h.total_cost
-            logger.warning(
-                "Status at %s: no price data for %s (using cost basis)",
-                target_date_str,
-                ticker,
-            )
-    return holdings_value
-
-
-def _resolve_usd_to_eur_rate(target_date: datetime) -> float | None:
-    """Resolve USD→EUR rate at *target_date*, falling back to nearest earlier date or current rate."""
-    start_date = target_date - timedelta(days=5)
-    end_date = target_date + timedelta(days=1)
-    fx_rates = PriceService.get_historical_usd_to_eur_rates(start_date, end_date)
-    target_date_str = target_date.strftime("%Y-%m-%d")
-    rate = _resolve_nearest_date_value(fx_rates, target_date_str)
-    if rate is not None:
-        return rate
-    return PriceService.get_usd_to_eur_rate_safe()
-
-
-# ================== Holdings builder ==================
-
-
-def _build_holdings_list(
-    state: _TxState,
-) -> tuple[list[HoldingResponse], Decimal]:
-    """Build the sorted holdings list and total cost basis (transaction-derived only)."""
-    holdings_list: list[HoldingResponse] = []
-    holdings_cost = _ZERO
-
-    for ticker, h in state.holdings.items():
-        avg_cost = h.total_cost / h.quantity if h.quantity > 0 else _ZERO
-
-        holdings_list.append(
-            HoldingResponse(
-                ticker=ticker,
-                quantity=float(h.quantity),
-                average_cost=float(avg_cost),
-                total_cost=float(h.total_cost),
-                first_buy_date=h.first_buy_date.date()
-                if hasattr(h.first_buy_date, "date")
-                else h.first_buy_date,
-            )
-        )
-        holdings_cost += h.total_cost
-
-    holdings_list.sort(key=lambda hr: hr.ticker)
-    return holdings_list, holdings_cost
-
-
-# ================== Status calculation ==================
-
-
-_FX_AWARE_TX_TYPES = {
-    TransactionType.DEPOSIT,
-    TransactionType.WITHDRAW,
-    TransactionType.DIVIDEND,
-}
-
-
-def _prefetch_historical_fx_rates(
-    transactions: list[Transaction],
-) -> dict[str, float]:
-    """Fetch historical USD→EUR rates spanning the dates of transactions that
-    lack both ``eur_amount`` and ``fx_rate``.
-
-    Returns an empty dict if nothing needs historical lookup, or if the price
-    provider is unavailable — the caller then falls back to the current rate.
-    """
-    fx_blind = [
-        tx
-        for tx in transactions
-        if tx.type in _FX_AWARE_TX_TYPES
-        and tx.eur_amount is None
-        and tx.fx_rate is None
-    ]
-    if not fx_blind:
-        return {}
-    start = min(tx.date for tx in fx_blind) - timedelta(days=5)
-    end = max(tx.date for tx in fx_blind) + timedelta(days=1)
-    try:
-        return PriceService.get_historical_usd_to_eur_rates(start, end)
-    except Exception as exc:
-        logger.warning("Historical USD/EUR rate fetch failed: %s", exc)
-        return {}
-
-
-def calculate_status(
-    transactions: list[Transaction],
-    usd_to_eur_rate: float | None,
-    tax_rate: Decimal,
-    portfolio_id: int,
-    portfolio_name: str,
-) -> PortfolioStatusResponse:
-    """Calculate comprehensive portfolio status from transactions."""
-    transactions = sorted(transactions, key=lambda t: t.date)
-    state = _TxState()
-    state.usd_to_eur_fallback = usd_to_eur_rate
-    state.historical_usd_to_eur_rates = _prefetch_historical_fx_rates(transactions)
-    for tx in transactions:
-        _apply_transaction(state, tx, strict=True)
-
-    holdings_list, holdings_cost = _build_holdings_list(state)
-
-    # Normalize dividends_eur (historical per-transaction rates)
-    has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
-    dividends_eur: Decimal | None = state.dividends_eur if has_valid_eur else None
-
-    return PortfolioStatusResponse(
-        portfolio_id=portfolio_id,
-        portfolio_name=portfolio_name,
-        principal=_normalize_zero(state.principal),
-        principal_eur=_normalize_zero(state.principal_eur),
-        principal_eur_avg=_normalize_zero(state.principal_eur_avg),
-        dividends=_normalize_zero(state.dividends),
-        dividends_eur=_opt_normalize(dividends_eur),
-        cash=_normalize_zero(state.cash),
-        holdings=holdings_list,
-        holdings_cost=_normalize_zero(holdings_cost),
-        realized_gains=_normalize_zero(state.realized_gains),
-        capital_gains_tax_rate=float(tax_rate),
-        realized_sales=[
-            RealizedSaleResponse(**dataclasses.asdict(s)) for s in state.realized_sales
-        ],
-        dividends_received=[
-            DividendReceivedResponse(**dataclasses.asdict(d))
-            for d in state.dividends_received
-        ],
-        realized_withdrawals=[
-            WithdrawalFxResponse(**dataclasses.asdict(w))
-            for w in state.realized_withdrawals
-        ],
-        warnings=[TransactionWarning(**dataclasses.asdict(w)) for w in state.warnings],
-        usd_to_eur_rate=usd_to_eur_rate,
-    )

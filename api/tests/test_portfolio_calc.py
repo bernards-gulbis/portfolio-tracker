@@ -1,24 +1,30 @@
-"""Tests for portfolio_calc.py and portfolio_perf.py — transaction handlers, helpers, and edge cases."""
+"""Tests for the portfolio calculation subsystem — handlers, valuation,
+status — and for portfolio_perf.py."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from app.models import Transaction, TransactionType
-from app.services.portfolio_calc import (
+from app.services import portfolio_perf
+from app.services.portfolio_handlers import (
     _apply_transaction,
-    _build_holdings_list,
     _compute_forward_split_factors,
+)
+from app.services.portfolio_perf import _generate_date_points, calculate_performance
+from app.services.portfolio_status import (
+    _build_holdings_list,
+    calculate_status,
+)
+from app.services.portfolio_types import _ZERO, _Holding, _TxState
+from app.services.portfolio_valuation import (
     _fetch_historical_prices,
     _resolve_nearest_date_value,
     _resolve_usd_to_eur_rate,
     _value_holdings_at_date,
-    calculate_status,
 )
-from app.services.portfolio_perf import _generate_date_points, calculate_performance
-from app.services.portfolio_types import _ZERO, _Holding, _TxState
 
 
 def _make_tx(**kwargs) -> Transaction:
@@ -149,13 +155,13 @@ class TestFetchHistoricalPrices:
         result = _fetch_historical_prices([], datetime(2025, 6, 15))
         assert result == {}
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_returns_empty_dict_when_no_prices_available(self, mock_ps):
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {}
         result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
         assert result == {}
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_returns_price_for_nearest_earlier_date(self, mock_ps):
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
             "AAPL": {"2025-06-13": 190.0, "2025-06-14": 195.0}
@@ -163,16 +169,19 @@ class TestFetchHistoricalPrices:
         result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
         assert result["AAPL"] == 195.0
 
-    @patch("app.services.portfolio_calc.PriceService")
-    def test_uses_earliest_available_when_all_dates_after_target(self, mock_ps):
-        """If all available dates are after the target date, use the earliest one."""
+    @patch("app.services.portfolio_valuation.PriceService")
+    def test_omits_ticker_when_all_dates_after_target(self, mock_ps):
+        """If every available date is AFTER target_date, omit the ticker so
+        the caller falls back to DB last-known or cost basis. Using a
+        future price to value a historical date is a silent correctness
+        bug — not a "best guess"."""
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
             "AAPL": {"2025-06-17": 200.0, "2025-06-18": 205.0}
         }
         result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert result["AAPL"] == 200.0
+        assert "AAPL" not in result
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_skips_ticker_with_empty_date_prices(self, mock_ps):
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
             "AAPL": {},
@@ -217,7 +226,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("10") * Decimal("50") * Decimal("4")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_falls_back_to_db_price(self, mock_price_service):
         mock_price_service.get_last_known_price.return_value = 180.0
         state = _TxState()
@@ -234,7 +243,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("10") * Decimal("180")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_falls_back_to_cost_basis(self, mock_price_service):
         mock_price_service.get_last_known_price.return_value = None
         state = _TxState()
@@ -251,7 +260,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("1500")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_handles_none_historical_prices(self, mock_price_service):
         mock_price_service.get_last_known_price.return_value = 150.0
         state = _TxState()
@@ -268,7 +277,7 @@ class TestValueHoldingsAtDate:
         )
         assert result == Decimal("5") * Decimal("150")
 
-    @patch("app.services.portfolio_calc.PriceService")
+    @patch("app.services.portfolio_valuation.PriceService")
     def test_skips_zero_price(self, mock_price_service):
         """Price of 0 should not be used; fall back to DB cache."""
         mock_price_service.get_last_known_price.return_value = 100.0
@@ -653,18 +662,18 @@ class TestCalculatePerformanceEdgeCases:
             )
 
 
-# ── portfolio_calc.py: _resolve_usd_to_eur_rate ─────────────────────
+# ── portfolio_valuation: _resolve_usd_to_eur_rate ─────────────────────
 
 
 class TestResolveUsdToEurRate:
     def test_fallback_to_live_rate_when_no_historical(self):
         with (
             patch(
-                "app.services.portfolio_calc.PriceService.get_historical_usd_to_eur_rates",
+                "app.services.portfolio_valuation.PriceService.get_historical_usd_to_eur_rates",
                 return_value={},
             ),
             patch(
-                "app.services.portfolio_calc.PriceService.get_usd_to_eur_rate_safe",
+                "app.services.portfolio_valuation.PriceService.get_usd_to_eur_rate_safe",
                 return_value=0.92,
             ) as mock_live,
         ):
@@ -675,11 +684,11 @@ class TestResolveUsdToEurRate:
     def test_returns_historical_rate_when_available(self):
         with (
             patch(
-                "app.services.portfolio_calc.PriceService.get_historical_usd_to_eur_rates",
+                "app.services.portfolio_valuation.PriceService.get_historical_usd_to_eur_rates",
                 return_value={"2024-06-15": 0.91},
             ),
             patch(
-                "app.services.portfolio_calc.PriceService.get_usd_to_eur_rate_safe",
+                "app.services.portfolio_valuation.PriceService.get_usd_to_eur_rate_safe",
             ) as mock_live,
         ):
             rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
@@ -732,7 +741,7 @@ class TestDecimalPrecision:
         ]
         historical = {"2024-06-01": 1.10, "2025-06-01": 1.05}
         with patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
             return_value=historical,
         ):
@@ -766,7 +775,7 @@ class TestDecimalPrecision:
             ),
         ]
         with patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
             side_effect=RuntimeError("yahoo down"),
         ):
@@ -792,7 +801,7 @@ class TestDecimalPrecision:
             ),
         ]
         with patch(
-            "app.services.portfolio_calc."
+            "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
         ) as mock_fetch:
             result = calculate_status(
@@ -845,3 +854,82 @@ class TestDecimalPrecision:
             tx = session.exec(select(Transaction)).one()
             assert tx.total_amount == Decimal("1000.0000")
             assert tx.fx_rate == Decimal("1.087000")
+
+
+# ==================== calculate_performance complexity ====================
+
+
+class TestCalculatePerformanceComplexity:
+    """Regression guard for :func:`calculate_performance`'s amortized-linear
+    complexity. The current implementation uses a monotonic ``tx_index``
+    cursor (``portfolio_perf.py::_replay_transactions_up_to``), so each
+    transaction is replayed exactly once across the entire data-point
+    loop — total work is O(n_transactions), not O(n × points).
+
+    We verify this property structurally by spying on ``_apply_transaction``
+    and asserting the total call count equals ``len(transactions)``.
+    A refactor that accidentally reintroduces per-point full replay would
+    multiply the call count by ``num_points`` and immediately trip this.
+    Wall-clock timing is not used: it's flaky on CI and tests the wrong
+    thing (performance, not the invariant that causes it).
+    """
+
+    @patch("app.services.portfolio_perf.PriceService")
+    @patch(
+        "app.services.portfolio_perf._resolve_usd_to_eur_rate",
+        return_value=0.92,
+    )
+    def test_each_transaction_applied_exactly_once(
+        self, _mock_eur, mock_price_service
+    ):
+        mock_price_service.get_historical_prices_for_multiple_tickers.return_value = {}
+        mock_price_service.get_last_known_price.return_value = None
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2025, 1, 1)
+        span_days = (end - start).days
+
+        # 500 mixed transactions over 5 years, cycling through 10 tickers.
+        # Every 5th is a DEPOSIT; the rest are BUYs, giving a steady
+        # holdings count the replay loop can exercise.
+        transactions: list[Transaction] = []
+        for i in range(500):
+            day = start + timedelta(days=int(i * span_days / 500))
+            if i % 5 == 0:
+                transactions.append(
+                    _make_tx(
+                        id=i + 1,
+                        type=TransactionType.DEPOSIT,
+                        date=day,
+                        total_amount=1000.0,
+                    )
+                )
+            else:
+                transactions.append(
+                    _make_tx(
+                        id=i + 1,
+                        type=TransactionType.BUY,
+                        ticker=f"TICK{i % 10}",
+                        quantity=1.0,
+                        price_per_share=100.0,
+                        total_amount=-100.0,
+                        date=day,
+                    )
+                )
+
+        with patch.object(
+            portfolio_perf,
+            "_apply_transaction",
+            wraps=portfolio_perf._apply_transaction,
+        ) as spy:
+            result = calculate_performance(
+                transactions, start, end, num_points=365
+            )
+
+        assert len(result) == 365
+        assert spy.call_count == len(transactions), (
+            f"Expected {len(transactions)} total replays across the "
+            f"365-point loop (each transaction applied exactly once via "
+            f"the monotonic tx_index cursor), got {spy.call_count}. "
+            f"Likely a complexity regression — per-point full replay?"
+        )

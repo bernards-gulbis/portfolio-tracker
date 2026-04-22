@@ -1,16 +1,12 @@
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useMemo, useState, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
-import { usePortfolioPerformance } from '../hooks/usePortfolioPerformance';
-import { useLivePrices } from '../hooks/useLivePrices';
+import { usePortfolioStatusView } from '../hooks/usePortfolioStatusView';
 import { useNavigation } from '../context/NavigationContext';
-import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
-import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, LivePrices, RealizedSale, DividendReceived } from '../api';
+import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, RealizedSale, DividendReceived } from '../api';
 import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPreference';
 import { computeEurMetrics } from '../utils/eurMetrics';
-import { computePricedStatus } from '../utils/computePricedStatus';
 import { HoldingsTable } from './HoldingsTable';
 import { RealizedGainsTable, DividendsReceivedTable } from './RealizedGainsTable';
 import { WithdrawalsTable } from './WithdrawalsTable';
@@ -30,7 +26,6 @@ import { AlertTriangleIcon, BriefcaseIcon, ChevronRightIcon, InboxIcon, InfoIcon
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const EMPTY_DATA_POINTS: PerformanceDataPoint[] = [];
-const EMPTY_LIVE: LivePrices = { prices: {}, usd_to_eur_rate: null, timestamp: '' };
 
 const formatCurrencyWithPercent = (
   currencyValue: number | null | undefined,
@@ -442,43 +437,22 @@ export const PortfolioStatusView = () => {
   const { t } = useTranslation();
   const locale = useLocale();
 
-  const queryClient = useQueryClient();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
+  const {
+    effectiveStatus,
+    performance,
+    isLoading,
+    isPerformanceLoading,
+    isLivePricesFetching,
+    livePrices,
+    livePricesError,
+    error,
+    latestUpdateAt,
+    isEmptyPortfolio,
+    isRefreshing,
+    handleRefresh,
+  } = usePortfolioStatusView(portfolioId);
 
-  // Live price polling — computes priced status from transaction-derived status + live prices
-  const tickers = useMemo(() => Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])).sort((a, b) => a.localeCompare(b)), [status?.holdings]);
-  const { data: livePrices, isFetching: isLivePricesFetching, dataUpdatedAt: livePricesUpdatedAt, error: livePricesError } = useLivePrices(
-    tickers,
-    !!status && tickers.length > 0,
-  );
-  const effectiveStatus = useMemo(() => {
-    if (!status) return undefined;
-    return computePricedStatus(status, livePrices ?? EMPTY_LIVE);
-  }, [status, livePrices]);
-
-  // Fetch full history — period filtering happens client-side in PerformanceChart
-  const { data: performance, isLoading: isPerformanceLoading } = usePortfolioPerformance(
-    portfolioId,
-    undefined,
-    undefined,
-    365
-  );
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] }),
-        queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', portfolioId] }),
-        queryClient.invalidateQueries({ queryKey: ['livePrices'] }),
-      ]);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  if (!portfolioId) {
+  if (portfolioId == null) {
     return (
       <Empty>
         <EmptyHeader>
@@ -504,7 +478,7 @@ export const PortfolioStatusView = () => {
     );
   }
 
-  if (!effectiveStatus) {
+  if (effectiveStatus == null) {
     return (
       <Empty>
         <EmptyHeader>
@@ -516,16 +490,6 @@ export const PortfolioStatusView = () => {
       </Empty>
     );
   }
-
-  const isEmptyPortfolio = effectiveStatus.holdings.length === 0
-    && effectiveStatus.principal === 0
-    && effectiveStatus.cash === 0
-    && effectiveStatus.dividends === 0
-    && effectiveStatus.realized_gains === 0
-    && effectiveStatus.realized_sales.length === 0
-    && effectiveStatus.dividends_received.length === 0
-    && effectiveStatus.realized_withdrawals.length === 0;
-  const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return (
     <div className="space-y-4">

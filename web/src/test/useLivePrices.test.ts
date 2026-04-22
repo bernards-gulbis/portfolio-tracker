@@ -25,9 +25,20 @@ describe('useLivePrices', () => {
     vi.clearAllMocks();
   });
 
-  it('does not fetch when tickers is empty', () => {
-    renderHook(() => useLivePrices([], true), { wrapper: createWrapper() });
-    expect(getLivePrices).not.toHaveBeenCalled();
+  it('fetches with empty tickers when enabled (FX-only polling for cash-only portfolios)', async () => {
+    vi.mocked(getLivePrices).mockResolvedValue({
+      prices: {},
+      usd_to_eur_rate: 0.91,
+      timestamp: '2026-03-03T12:00:00Z',
+    });
+
+    const { result } = renderHook(() => useLivePrices([], true), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getLivePrices).toHaveBeenCalledWith([]);
+    expect(result.current.data?.usd_to_eur_rate).toBe(0.91);
   });
 
   it('does not fetch when enabled is false', () => {

@@ -14,8 +14,8 @@ from app.models import Portfolio
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.repositories.transaction_repository import TransactionRepository
 from app.schemas import PortfolioStatusResponse
-from app.services.portfolio_calc import calculate_status
 from app.services.portfolio_perf import calculate_performance
+from app.services.portfolio_status import calculate_status
 from app.services.price_service import PriceService
 
 _DEFAULT_TAX_RATE = Decimal("0.255")
