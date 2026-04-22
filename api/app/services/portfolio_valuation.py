@@ -47,11 +47,11 @@ def _fetch_historical_prices(
         if not date_prices:
             continue
         price = _resolve_nearest_date_value(date_prices, target_date_str)
+        # If every available date is strictly AFTER target_date, omit the
+        # ticker so the caller falls back to DB last-known or cost basis.
+        # Using a future price to value a historical date is just wrong.
         if price is not None:
             result[ticker] = price
-        else:
-            # All dates are after target; use earliest as best guess
-            result[ticker] = date_prices[min(date_prices.keys())]
     return result
 
 

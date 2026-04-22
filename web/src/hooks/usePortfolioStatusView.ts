@@ -66,12 +66,16 @@ export function usePortfolioStatusView(
     [status?.holdings],
   );
 
+  // Poll live prices even when the portfolio has no holdings: a
+  // cash-only portfolio still needs fresh USD→EUR rate for display.
+  // Gating on tickers.length would leave it indefinitely stale under
+  // usePortfolioStatus's staleTime: Infinity.
   const {
     data: livePrices,
     isFetching: isLivePricesFetching,
     dataUpdatedAt: livePricesUpdatedAt,
     error: livePricesError,
-  } = useLivePrices(tickers, !!status && tickers.length > 0);
+  } = useLivePrices(tickers, !!status);
 
   const effectiveStatus = useMemo(() => {
     if (status == null) return undefined;

@@ -26,6 +26,16 @@ export const EUR_TYPES = new Set<TransactionType>([
   TransactionType.WITHDRAW,
 ]);
 
+/** Return the parsed value when it is a strictly positive finite number,
+ *  null otherwise. Rejects NaN ("abc"), ±Infinity, empty/undefined, zero,
+ *  and negative inputs — the bare ``parseFloat(x) <= 0`` check would let
+ *  NaN and +Infinity slip through because both comparisons with <= 0 are
+ *  false, silently admitting garbage into ``buildTransactionData``. */
+const parsePositive = (value: string | undefined): number | null => {
+  const n = Number.parseFloat(value ?? '');
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
 export const schema = z
   .object({
     date: z.string().superRefine((val, ctx) => {
@@ -66,14 +76,14 @@ export const schema = z
     }
 
     if (BUY_SELL_TYPES.has(type)) {
-      if (Number.parseFloat(data.quantity || '0') <= 0) {
+      if (parsePositive(data.quantity) == null) {
         ctx.addIssue({
           code: 'custom',
           path: ['quantity'],
           message: i18n.t('transaction.validation.quantityPositive'),
         });
       }
-      if (Number.parseFloat(data.pricePerShare || '0') <= 0) {
+      if (parsePositive(data.pricePerShare) == null) {
         ctx.addIssue({
           code: 'custom',
           path: ['pricePerShare'],
@@ -83,7 +93,7 @@ export const schema = z
     }
 
     if (type === TransactionType.SPLIT) {
-      if (Number.parseFloat(data.splitRatio || '0') <= 0) {
+      if (parsePositive(data.splitRatio) == null) {
         ctx.addIssue({
           code: 'custom',
           path: ['splitRatio'],
@@ -93,7 +103,7 @@ export const schema = z
     }
 
     if (type !== TransactionType.SPLIT) {
-      if (Number.parseFloat(data.totalAmount || '0') <= 0) {
+      if (parsePositive(data.totalAmount) == null) {
         ctx.addIssue({
           code: 'custom',
           path: ['totalAmount'],

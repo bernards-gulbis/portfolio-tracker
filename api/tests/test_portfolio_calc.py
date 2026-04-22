@@ -1,7 +1,6 @@
 """Tests for the portfolio calculation subsystem — handlers, valuation,
 status — and for portfolio_perf.py."""
 
-import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -9,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.models import Transaction, TransactionType
+from app.services import portfolio_perf
 from app.services.portfolio_handlers import (
     _apply_transaction,
     _compute_forward_split_factors,
@@ -170,13 +170,16 @@ class TestFetchHistoricalPrices:
         assert result["AAPL"] == 195.0
 
     @patch("app.services.portfolio_valuation.PriceService")
-    def test_uses_earliest_available_when_all_dates_after_target(self, mock_ps):
-        """If all available dates are after the target date, use the earliest one."""
+    def test_omits_ticker_when_all_dates_after_target(self, mock_ps):
+        """If every available date is AFTER target_date, omit the ticker so
+        the caller falls back to DB last-known or cost basis. Using a
+        future price to value a historical date is a silent correctness
+        bug — not a "best guess"."""
         mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
             "AAPL": {"2025-06-17": 200.0, "2025-06-18": 205.0}
         }
         result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert result["AAPL"] == 200.0
+        assert "AAPL" not in result
 
     @patch("app.services.portfolio_valuation.PriceService")
     def test_skips_ticker_with_empty_date_prices(self, mock_ps):
@@ -853,16 +856,22 @@ class TestDecimalPrecision:
             assert tx.fx_rate == Decimal("1.087000")
 
 
-# ==================== calculate_performance benchmark ====================
+# ==================== calculate_performance complexity ====================
 
 
-class TestCalculatePerformanceBenchmark:
+class TestCalculatePerformanceComplexity:
     """Regression guard for :func:`calculate_performance`'s amortized-linear
     complexity. The current implementation uses a monotonic ``tx_index``
-    cursor (``portfolio_perf.py::_replay_transactions_up_to``), so total
-    replay work is O(n_transactions) across the whole data-point loop,
-    not O(n × points). A refactor that accidentally reintroduces the
-    per-point full replay would blow past the wall-clock budget below.
+    cursor (``portfolio_perf.py::_replay_transactions_up_to``), so each
+    transaction is replayed exactly once across the entire data-point
+    loop — total work is O(n_transactions), not O(n × points).
+
+    We verify this property structurally by spying on ``_apply_transaction``
+    and asserting the total call count equals ``len(transactions)``.
+    A refactor that accidentally reintroduces per-point full replay would
+    multiply the call count by ``num_points`` and immediately trip this.
+    Wall-clock timing is not used: it's flaky on CI and tests the wrong
+    thing (performance, not the invariant that causes it).
     """
 
     @patch("app.services.portfolio_perf.PriceService")
@@ -870,7 +879,7 @@ class TestCalculatePerformanceBenchmark:
         "app.services.portfolio_perf._resolve_usd_to_eur_rate",
         return_value=0.92,
     )
-    def test_linear_scaling_under_synthetic_load(
+    def test_each_transaction_applied_exactly_once(
         self, _mock_eur, mock_price_service
     ):
         mock_price_service.get_historical_prices_for_multiple_tickers.return_value = {}
@@ -881,8 +890,8 @@ class TestCalculatePerformanceBenchmark:
         span_days = (end - start).days
 
         # 500 mixed transactions over 5 years, cycling through 10 tickers.
-        # Every 5th is a DEPOSIT; the rest are BUYs, giving us a steady
-        # holdings count the valuation loop can exercise.
+        # Every 5th is a DEPOSIT; the rest are BUYs, giving a steady
+        # holdings count the replay loop can exercise.
         transactions: list[Transaction] = []
         for i in range(500):
             day = start + timedelta(days=int(i * span_days / 500))
@@ -908,22 +917,19 @@ class TestCalculatePerformanceBenchmark:
                     )
                 )
 
-        # Warm-up run (amortizes import / method-lookup costs).
-        calculate_performance(transactions, start, end, num_points=365)
-
-        t0 = time.perf_counter()
-        result = calculate_performance(transactions, start, end, num_points=365)
-        elapsed = time.perf_counter() - t0
+        with patch.object(
+            portfolio_perf,
+            "_apply_transaction",
+            wraps=portfolio_perf._apply_transaction,
+        ) as spy:
+            result = calculate_performance(
+                transactions, start, end, num_points=365
+            )
 
         assert len(result) == 365
-        # Current amortized-linear implementation runs in a few hundred
-        # milliseconds on modest hardware. A quadratic regression would
-        # be orders of magnitude slower. 3.0 s gives comfortable
-        # headroom for slow CI runners while still catching real
-        # regressions.
-        assert elapsed < 3.0, (
-            f"calculate_performance took {elapsed:.2f}s on 500 tx x 365 "
-            f"points (budget 3.0 s). Likely a complexity regression -- "
-            f"see portfolio_perf._replay_transactions_up_to's monotonic "
-            f"cursor."
+        assert spy.call_count == len(transactions), (
+            f"Expected {len(transactions)} total replays across the "
+            f"365-point loop (each transaction applied exactly once via "
+            f"the monotonic tx_index cursor), got {spy.call_count}. "
+            f"Likely a complexity regression — per-point full replay?"
         )

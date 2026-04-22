@@ -27,11 +27,28 @@ export const toLocalTime = (date: Date): string => {
   return `${h}:${min}:${sec}`;
 };
 
-/** Parses "YYYY-MM-DD" as a local Date without UTC shift */
+/** Parses "YYYY-MM-DD" as a local Date without UTC shift.
+ *
+ * Rejects silently-normalized calendar dates: ``new Date(2025, 1, 31)``
+ * rolls over to March 3, so we verify the constructed Date's parts
+ * round-trip to the input values. Invalid calendar inputs like
+ * "2025-02-31", "2025-13-01", "2025-00-15" return undefined instead of
+ * resolving to a different valid day. */
 export const parseLocalDate = (str: string): Date | undefined => {
   if (!str || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return undefined;
   const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+    return undefined;
+  }
+  const date = new Date(y, m - 1, d);
+  if (
+    date.getFullYear() !== y ||
+    date.getMonth() !== m - 1 ||
+    date.getDate() !== d
+  ) {
+    return undefined;
+  }
+  return date;
 };
 
 export const getDefaultValues = (transaction?: Transaction): FormValues => {
