@@ -687,11 +687,7 @@ export const TransactionModal = ({
                           if (isSell) {
                             const livePrice =
                               livePrices?.prices[value]?.price ?? null;
-                            if (livePrice != null) {
-                              form.setValue('pricePerShare', livePrice.toFixed(2));
-                              priceWasAutoFilled.current = true;
-                              priceOwnerTicker.current = value;
-                            } else {
+                            if (livePrice == null) {
                               // Clear iff the existing price belongs to us
                               // (auto-fill) or to a different ticker. A
                               // user-typed value for the SAME ticker survives.
@@ -705,6 +701,10 @@ export const TransactionModal = ({
                                 form.setValue('pricePerShare', '');
                                 priceWasAutoFilled.current = false;
                               }
+                              priceOwnerTicker.current = value;
+                            } else {
+                              form.setValue('pricePerShare', livePrice.toFixed(2));
+                              priceWasAutoFilled.current = true;
                               priceOwnerTicker.current = value;
                             }
                           }
