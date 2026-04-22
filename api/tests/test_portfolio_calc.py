@@ -1,7 +1,8 @@
 """Tests for the portfolio calculation subsystem — handlers, valuation,
 status — and for portfolio_perf.py."""
 
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -850,3 +851,79 @@ class TestDecimalPrecision:
             tx = session.exec(select(Transaction)).one()
             assert tx.total_amount == Decimal("1000.0000")
             assert tx.fx_rate == Decimal("1.087000")
+
+
+# ==================== calculate_performance benchmark ====================
+
+
+class TestCalculatePerformanceBenchmark:
+    """Regression guard for :func:`calculate_performance`'s amortized-linear
+    complexity. The current implementation uses a monotonic ``tx_index``
+    cursor (``portfolio_perf.py::_replay_transactions_up_to``), so total
+    replay work is O(n_transactions) across the whole data-point loop,
+    not O(n × points). A refactor that accidentally reintroduces the
+    per-point full replay would blow past the wall-clock budget below.
+    """
+
+    @patch("app.services.portfolio_perf.PriceService")
+    @patch(
+        "app.services.portfolio_perf._resolve_usd_to_eur_rate",
+        return_value=0.92,
+    )
+    def test_linear_scaling_under_synthetic_load(
+        self, _mock_eur, mock_price_service
+    ):
+        mock_price_service.get_historical_prices_for_multiple_tickers.return_value = {}
+        mock_price_service.get_last_known_price.return_value = None
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2025, 1, 1)
+        span_days = (end - start).days
+
+        # 500 mixed transactions over 5 years, cycling through 10 tickers.
+        # Every 5th is a DEPOSIT; the rest are BUYs, giving us a steady
+        # holdings count the valuation loop can exercise.
+        transactions: list[Transaction] = []
+        for i in range(500):
+            day = start + timedelta(days=int(i * span_days / 500))
+            if i % 5 == 0:
+                transactions.append(
+                    _make_tx(
+                        id=i + 1,
+                        type=TransactionType.DEPOSIT,
+                        date=day,
+                        total_amount=1000.0,
+                    )
+                )
+            else:
+                transactions.append(
+                    _make_tx(
+                        id=i + 1,
+                        type=TransactionType.BUY,
+                        ticker=f"TICK{i % 10}",
+                        quantity=1.0,
+                        price_per_share=100.0,
+                        total_amount=-100.0,
+                        date=day,
+                    )
+                )
+
+        # Warm-up run (amortizes import / method-lookup costs).
+        calculate_performance(transactions, start, end, num_points=365)
+
+        t0 = time.perf_counter()
+        result = calculate_performance(transactions, start, end, num_points=365)
+        elapsed = time.perf_counter() - t0
+
+        assert len(result) == 365
+        # Current amortized-linear implementation runs in a few hundred
+        # milliseconds on modest hardware. A quadratic regression would
+        # be orders of magnitude slower. 3.0 s gives comfortable
+        # headroom for slow CI runners while still catching real
+        # regressions.
+        assert elapsed < 3.0, (
+            f"calculate_performance took {elapsed:.2f}s on 500 tx x 365 "
+            f"points (budget 3.0 s). Likely a complexity regression -- "
+            f"see portfolio_perf._replay_transactions_up_to's monotonic "
+            f"cursor."
+        )
