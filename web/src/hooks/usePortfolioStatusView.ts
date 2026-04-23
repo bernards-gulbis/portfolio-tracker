@@ -26,6 +26,9 @@ export interface PortfolioStatusViewResult {
   isLivePricesFetching: boolean;
   livePrices: LivePrices | undefined;
   livePricesError: Error | null;
+  /** Surfaced so the chart card can show a real error instead of the
+   *  "no data" empty state when the backend throws. */
+  performanceError: Error | null;
   error: Error | null;
   /** Newest of (status, livePrices) fetched-at; 0 when neither has loaded. */
   latestUpdateAt: number;
@@ -83,8 +86,11 @@ export function usePortfolioStatusView(
   }, [status, livePrices]);
 
   // Fetch full history — period filtering happens client-side in PerformanceChart
-  const { data: performance, isLoading: isPerformanceLoading } =
-    usePortfolioPerformance(portfolioId, undefined, undefined, 365);
+  const {
+    data: performance,
+    isLoading: isPerformanceLoading,
+    error: performanceError,
+  } = usePortfolioPerformance(portfolioId, undefined, undefined, 365);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -123,6 +129,7 @@ export function usePortfolioStatusView(
     isLivePricesFetching,
     livePrices,
     livePricesError,
+    performanceError,
     error,
     latestUpdateAt,
     isEmptyPortfolio,

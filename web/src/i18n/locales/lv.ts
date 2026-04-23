@@ -368,6 +368,7 @@ const lv: Translation = {
       noData: 'Nav pieejami snieguma dati',
       insufficientData: 'Nepietiekami datu punkti, lai attēlotu snieguma grafiku.',
       insufficientDataForPeriod: 'Nepietiekami datu punkti šim laika periodam. Izmēģiniet garāku periodu vai "Visi".',
+      loadError: 'Neizdevās ielādēt snieguma datus: {{message}}',
       principal: 'Pamatsumma',
       currentValue: 'Pašreizējā vērtība',
       returnPct: 'Ienesīgums (%)',

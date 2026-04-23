@@ -105,7 +105,9 @@ class TestEurFromTx:
             tx,
             total_amount=Decimal("100"),
             usd_to_eur_fallback=0.9,
-            historical_rates={"2020-01-01": 0.8},  # all dates earlier than target → no match
+            historical_rates={
+                "2020-01-01": 0.8
+            },  # all dates earlier than target → no match
         )
         # _lookup_historical_rate finds nearest-earlier (0.8), so that wins over
         # the current fallback. This pins the documented precedence order.

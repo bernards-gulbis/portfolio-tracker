@@ -275,6 +275,33 @@ describe('PortfolioStatusView', () => {
     expect(screen.getByText('No status data available')).toBeInTheDocument();
   });
 
+  it('shows inline error in place of the chart when the performance query fails', () => {
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: mockStatus,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    vi.mocked(usePortfolioPerformance).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('boom'),
+    } as unknown as ReturnType<typeof usePortfolioPerformance>);
+
+    renderComponent(1);
+
+    expect(screen.getByText(/Failed to load performance data.*boom/i)).toBeInTheDocument();
+    expect(screen.queryByText('No performance data available')).not.toBeInTheDocument();
+  });
+
   it('shows live price error banner when live prices fail', () => {
     const livePriceError = new Error('Price fetch failed');
 

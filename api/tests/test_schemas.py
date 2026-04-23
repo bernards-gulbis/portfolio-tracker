@@ -21,9 +21,7 @@ class TestLivePriceInfoInvariants:
         assert info.source == "live"
 
     def test_last_known_with_price_and_as_of_is_valid(self):
-        info = LivePriceInfo(
-            price=148.5, source="last_known", as_of=self.NOW
-        )
+        info = LivePriceInfo(price=148.5, source="last_known", as_of=self.NOW)
         assert info.source == "last_known"
 
     def test_missing_with_nulls_is_valid(self):

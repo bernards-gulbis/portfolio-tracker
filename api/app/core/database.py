@@ -90,9 +90,7 @@ def run_migrations() -> None:
 
         from alembic import command
     except ImportError as exc:  # pragma: no cover - hard dependency
-        raise RuntimeError(
-            "Alembic is not installed; cannot run migrations"
-        ) from exc
+        raise RuntimeError("Alembic is not installed; cannot run migrations") from exc
 
     # api/app/core/database.py -> parents[2] == api/
     alembic_ini = Path(__file__).resolve().parents[2] / "alembic.ini"

@@ -759,9 +759,7 @@ class TestDecimalPrecision:
         # realized_fx_gain = eur_historical - eur_avg_cost
         # avg_rate = 1100 / 1000 = 1.10; eur_avg_cost = 500 * 1.10 = 550
         # eur_historical of withdrawal = 525; realized_fx_gain = 525 - 550 = -25
-        assert result.realized_withdrawals[0].realized_fx_gain == pytest.approx(
-            -25.0
-        )
+        assert result.realized_withdrawals[0].realized_fx_gain == pytest.approx(-25.0)
 
     def test_prefetch_fx_fallback_on_provider_error(self):
         """If PriceService raises, calculate_status must still produce a result
@@ -879,9 +877,7 @@ class TestCalculatePerformanceComplexity:
         "app.services.portfolio_perf._resolve_usd_to_eur_rate",
         return_value=0.92,
     )
-    def test_each_transaction_applied_exactly_once(
-        self, _mock_eur, mock_price_service
-    ):
+    def test_each_transaction_applied_exactly_once(self, _mock_eur, mock_price_service):
         mock_price_service.get_historical_prices_for_multiple_tickers.return_value = {}
         mock_price_service.get_last_known_price.return_value = None
 
@@ -922,9 +918,7 @@ class TestCalculatePerformanceComplexity:
             "_apply_transaction",
             wraps=portfolio_perf._apply_transaction,
         ) as spy:
-            result = calculate_performance(
-                transactions, start, end, num_points=365
-            )
+            result = calculate_performance(transactions, start, end, num_points=365)
 
         assert len(result) == 365
         assert spy.call_count == len(transactions), (

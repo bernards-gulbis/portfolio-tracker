@@ -995,8 +995,7 @@ class TestDecimalFloatInterop:
             fx_rate=1.087,
         )
         csv = (
-            "date,type,total_amount,fx_rate\n"
-            "01/01/2025 00:00:00,Deposit,1000.0,1.087\n"
+            "date,type,total_amount,fx_rate\n01/01/2025 00:00:00,Deposit,1000.0,1.087\n"
         )
         created, skipped = svc.import_from_csv(csv, portfolio_id, user_id)
         assert len(created) == 0
