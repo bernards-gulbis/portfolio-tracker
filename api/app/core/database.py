@@ -2,7 +2,8 @@ import logging
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import event, text
+import sqlalchemy as sa
+from sqlalchemy import Engine, event, text
 from sqlalchemy import inspect as sa_inspect
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -142,6 +143,65 @@ def verify_connection():
     except Exception as e:
         logger.error("Database connection failed: %s", e)
         return False
+
+
+# Money columns that must never be stored as Float. The baseline migration
+# created these as Float; migration 31e82415610a converts them to Numeric.
+# Keeping the list in one place makes it obvious what to update if the
+# schema grows new ledger columns.
+_MONEY_COLUMNS: dict[str, tuple[str, ...]] = {
+    "transaction": (
+        "quantity",
+        "price_per_share",
+        "fee",
+        "total_amount",
+        "eur_amount",
+        "split_ratio",
+        "fx_rate",
+    ),
+    "historical_prices": ("price",),
+    "fx_rates": ("usd_to_eur_rate",),
+}
+
+
+def verify_money_columns_are_decimal(target_engine: Engine | None = None) -> None:
+    """Raise ``RuntimeError`` if any money column is still declared as Float.
+
+    Defense-in-depth startup guard. Under normal operation ``run_migrations``
+    upgrades the schema to Numeric before this runs, so the check is a fast
+    no-op. It only fires when someone bypasses migrations — e.g., by using
+    ``create_db_and_tables`` against an old model revision or restoring a
+    pre-migration database backup — and catches the condition before the app
+    starts accepting writes that would otherwise drift in IEEE-754.
+
+    Missing tables are ignored (an empty DB will be populated by migrations).
+    """
+    inspector = sa_inspect(target_engine if target_engine is not None else engine)
+    existing_tables = set(inspector.get_table_names())
+
+    violations: list[str] = []
+    for table, money_columns in _MONEY_COLUMNS.items():
+        if table not in existing_tables:
+            continue
+        columns_by_name = {c["name"]: c for c in inspector.get_columns(table)}
+        for col_name in money_columns:
+            col = columns_by_name.get(col_name)
+            if col is None:
+                continue
+            if isinstance(col["type"], sa.Float):
+                violations.append(f"{table}.{col_name}")
+
+    if not violations:
+        return
+
+    raise RuntimeError(
+        "Money columns are still declared as Float: "
+        f"{', '.join(violations)}. This indicates the database has not been "
+        "migrated to the Decimal schema. Run `alembic upgrade head` (or "
+        "restart the app, which runs migrations automatically) before "
+        "accepting any writes — otherwise monetary values will accumulate "
+        "IEEE-754 drift."
+    )
 
 
 def get_session() -> Generator[Session, None, None]:

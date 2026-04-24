@@ -998,16 +998,16 @@ class TestCachedHistoricalPricesFloatCoercion:
                 return_value=[],
             ),
         ):
-            result = calculate_performance(
+            data_points, _ = calculate_performance(
                 tx,
                 _dt(2026, 4, 2),
                 _dt(2026, 4, 15),
                 num_points=5,
             )
 
-        assert len(result) == 5
-        assert result[-1]["current_value"] is not None
-        assert result[-1]["fx_rate"] == pytest.approx(1.0 / 1.10)
+        assert len(data_points) == 5
+        assert data_points[-1]["current_value"] is not None
+        assert data_points[-1]["fx_rate"] == pytest.approx(1.0 / 1.10)
 
 
 class TestGetLastKnownPriceWithDate:

@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatQuantity, formatDaysHeld, getValueClass, daysSinceLocalDate } from '../utils/formatters';
 import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
 import { applyRateToHolding, type EurMetrics } from '../utils/eurMetrics';
 import type { PricedHolding } from '../api';
@@ -23,9 +23,7 @@ function computeDaysHeld(holdings: PricedHolding[]): Record<string, number> {
   const now = Date.now();
   const map: Record<string, number> = {};
   for (const h of holdings) {
-    // Append 'T00:00:00Z' to date-only strings to ensure UTC parsing
-    const dateStr = h.first_buy_date.length === 10 ? `${h.first_buy_date}T00:00:00Z` : h.first_buy_date;
-    map[h.ticker] = Math.floor((now - new Date(dateStr).getTime()) / 86_400_000);
+    map[h.ticker] = daysSinceLocalDate(h.first_buy_date, now);
   }
   return map;
 }

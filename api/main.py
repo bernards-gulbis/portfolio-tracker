@@ -42,7 +42,12 @@ from app.core.config import (
     LOG_LEVEL,
     OAUTH_STATE_SECRET,
 )
-from app.core.database import engine, get_session, run_migrations
+from app.core.database import (
+    engine,
+    get_session,
+    run_migrations,
+    verify_money_columns_are_decimal,
+)
 from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 from app.routers import portfolios_router, transaction_router, transactions_router
@@ -71,6 +76,9 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Database connection failed")
 
     run_migrations()
+    # Defense-in-depth: after migrations, assert money columns are Decimal,
+    # not Float. Catches bypassed-migration paths before any write happens.
+    verify_money_columns_are_decimal()
     logger.info("Database initialized successfully")
     yield
     # Shutdown (cleanup if needed)

@@ -267,14 +267,23 @@ def calculate_performance(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     num_points: int = 60,
-) -> list[dict]:
+) -> tuple[list[dict], list[str]]:
     """Calculate portfolio performance time-series from transactions.
 
-    Returns list of data-point dicts with keys:
-    date, principal, principal_eur, current_value, fx_rate, return_pct, sp500_return_pct.
+    Returns ``(data_points, cost_basis_fallback_tickers)``:
+
+    * ``data_points`` — list of dicts with keys ``date``, ``principal``,
+      ``principal_eur``, ``current_value``, ``fx_rate``, ``return_pct``,
+      ``sp500_return_pct``.
+    * ``cost_basis_fallback_tickers`` — sorted deduped list of tickers that
+      had neither a historical price nor a DB-cached last-known price at any
+      point in the series and were therefore valued at cost basis (flat).
+      Surfacing this lets the UI warn the user that the chart is
+      cost-basis-only for those symbols rather than silently drawing a flat
+      line the user might read as "no change".
     """
     if not transactions:
-        return []
+        return [], []
 
     transactions = sorted(transactions, key=lambda t: t.date)
 
@@ -310,6 +319,7 @@ def calculate_performance(
     twr = _TwrState()
     tx_index = 0
     sp500_base_price: float | None = None
+    cost_basis_fallback_tickers: set[str] = set()
 
     for date_point in date_points:
         date_str = date_point.strftime("%Y-%m-%d")
@@ -328,6 +338,7 @@ def calculate_performance(
             forward_split_factors,
             date_str,
         )
+        cost_basis_fallback_tickers.update(cost_basis)
         data_point_dict, sp500_base_price = _compute_perf_data_point(
             state,
             twr,
@@ -343,4 +354,4 @@ def calculate_performance(
         )
         performance_data.append(data_point_dict)
 
-    return performance_data
+    return performance_data, sorted(cost_basis_fallback_tickers)

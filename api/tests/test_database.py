@@ -135,6 +135,83 @@ class TestDatabaseUtilities:
         with pytest.raises(RuntimeError, match=r"alembic\.ini not found"):
             db_module.run_migrations()
 
+    def test_money_columns_guardrail_passes_on_current_schema(self, tmp_path):
+        """SQLModel.metadata.create_all declares Decimal for money columns;
+        the guardrail must accept such a schema."""
+        from sqlalchemy import create_engine
+        from sqlmodel import SQLModel
+
+        import app.models  # noqa: F401 — register tables on metadata
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'numeric.db'}")
+        SQLModel.metadata.create_all(engine)
+
+        from app.core import database as db_module
+
+        # Should not raise — all money columns are NUMERIC/Decimal.
+        db_module.verify_money_columns_are_decimal(target_engine=engine)
+
+    def test_money_columns_guardrail_raises_on_float_schema(self, tmp_path):
+        """A DB that was created from the old baseline (Float money columns)
+        and then NOT upgraded to the Decimal revision must fail the guardrail
+        with a message pointing the operator at the fix."""
+        from sqlalchemy import (
+            Column,
+            Float,
+            Integer,
+            MetaData,
+            String,
+            Table,
+            create_engine,
+        )
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
+        md = MetaData()
+        # Minimal legacy-shape tables — only the money columns matter here.
+        Table(
+            "transaction",
+            md,
+            Column("id", Integer, primary_key=True),
+            Column("total_amount", Float, nullable=False),
+            Column("fx_rate", Float, nullable=True),
+        )
+        Table(
+            "historical_prices",
+            md,
+            Column("ticker", String, primary_key=True),
+            Column("date", String, primary_key=True),
+            Column("price", Float, nullable=False),
+        )
+        Table(
+            "fx_rates",
+            md,
+            Column("date", String, primary_key=True),
+            Column("usd_to_eur_rate", Float, nullable=False),
+        )
+        md.create_all(engine)
+
+        from app.core import database as db_module
+
+        with pytest.raises(RuntimeError) as exc:
+            db_module.verify_money_columns_are_decimal(target_engine=engine)
+        msg = str(exc.value)
+        assert "transaction.total_amount" in msg
+        assert "historical_prices.price" in msg
+        assert "fx_rates.usd_to_eur_rate" in msg
+        assert "alembic upgrade head" in msg
+
+    def test_money_columns_guardrail_skips_missing_tables(self, tmp_path):
+        """A completely empty DB (no tables) must not fail the guardrail —
+        migrations will create the tables. The check is only meaningful
+        when tables exist."""
+        from sqlalchemy import create_engine
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'empty.db'}")
+        from app.core import database as db_module
+
+        # No tables at all → nothing to check → no raise.
+        db_module.verify_money_columns_are_decimal(target_engine=engine)
+
     def test_run_migrations_refuses_to_stamp_when_multiple_bases(self):
         """Defensive check: if the migration tree has >1 root revision we
         refuse to guess which one to stamp on a pre-Alembic DB."""

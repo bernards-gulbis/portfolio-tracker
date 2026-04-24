@@ -8,9 +8,7 @@ unavailable. No transaction state is mutated.
 
 import logging
 from datetime import datetime, timedelta
-from decimal import Decimal
 
-from app.services.portfolio_types import _ONE, _ZERO, _to_decimal, _TxState
 from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
@@ -53,41 +51,6 @@ def _fetch_historical_prices(
         if price is not None:
             result[ticker] = price
     return result
-
-
-def _value_holdings_at_date(
-    state: _TxState,
-    historical_prices: dict[str, float] | None,
-    forward_split_factors: dict[str, Decimal],
-    target_date_str: str,
-) -> Decimal:
-    """Compute total holdings value at a historical date using price → DB cache → cost basis fallback."""
-    holdings_value = _ZERO
-    for ticker, h in state.holdings.items():
-        price = historical_prices.get(ticker) if historical_prices else None
-        if price is not None and price > 0:
-            split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += h.quantity * _to_decimal(price) * split_factor
-            continue
-        # Try last known price from DB cache before falling back to cost basis
-        db_price = PriceService.get_last_known_price(ticker)
-        if db_price is not None and db_price > 0:
-            split_factor = forward_split_factors.get(ticker, _ONE)
-            holdings_value += h.quantity * _to_decimal(db_price) * split_factor
-            logger.debug(
-                "Status at %s: using last known price %.4f for %s",
-                target_date_str,
-                db_price,
-                ticker,
-            )
-        else:
-            holdings_value += h.total_cost
-            logger.warning(
-                "Status at %s: no price data for %s (using cost basis)",
-                target_date_str,
-                ticker,
-            )
-    return holdings_value
 
 
 def _resolve_usd_to_eur_rate(target_date: datetime) -> float | None:

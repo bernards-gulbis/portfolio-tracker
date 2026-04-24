@@ -312,6 +312,7 @@ const en = {
     afterTaxValue: 'After-tax Value',
     positions: 'Positions',
     realizedGains: 'Realized Gains',
+    realizedGainsMethod: 'weighted-average cost',
     dividendsReceived: 'Dividends Received',
     noRealizedGains: 'No realized gains yet',
     noDividends: 'No dividend payments yet',

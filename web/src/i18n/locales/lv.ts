@@ -314,6 +314,7 @@ const lv: Translation = {
     afterTaxValue: 'Vērtība pēc nodokļa',
     positions: 'Pozīcijas',
     realizedGains: 'Realizētā peļņa',
+    realizedGainsMethod: 'vidējās svērtās izmaksas',
     dividendsReceived: 'Saņemtās dividendes',
     noRealizedGains: 'Nav realizētās peļņas',
     noDividends: 'Nav dividenžu maksājumu',

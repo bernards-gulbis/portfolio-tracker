@@ -397,5 +397,9 @@ class PortfolioPerformanceResponse(BaseModel):
     portfolio_id: int
     portfolio_name: str
     data_points: list[PerformanceDataPoint]
+    # Tickers whose historical prices were unavailable and which were
+    # therefore valued at cost basis for some or all of the series.
+    # Non-empty means the chart is lying flat for those symbols.
+    cost_basis_fallback_tickers: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
