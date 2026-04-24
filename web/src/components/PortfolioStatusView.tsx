@@ -164,6 +164,7 @@ const CollapsibleWithdrawalsSection = ({ status, locale }: CollapsibleWithdrawal
 interface PortfolioStatusContentProps {
   status: PricedPortfolioStatus;
   performance?: PortfolioPerformance;
+  performanceError?: Error | null;
   isPerformanceLoading: boolean;
   isAllocationLoading?: boolean;
   isEmptyPortfolio?: boolean;
@@ -173,6 +174,7 @@ interface PortfolioStatusContentProps {
 const PortfolioStatusContent = ({
   status,
   performance,
+  performanceError,
   isPerformanceLoading,
   isAllocationLoading = false,
   isEmptyPortfolio = false,
@@ -330,21 +332,29 @@ const PortfolioStatusContent = ({
       </div>
 
       {/* Charts Section */}
-      <Suspense
-        fallback={
-          <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
-            <Skeleton className="h-[340px] w-full rounded-lg" />
-            <Skeleton className="h-[340px] w-full rounded-lg" />
-          </div>
-        }
-      >
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
-          <PerformanceChart
-            data={performance?.data_points ?? EMPTY_DATA_POINTS}
-            isLoading={isPerformanceLoading}
-            currency={currency}
-            liveLastPoint={liveLastPoint}
-          />
+      <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
+        {performanceError == null ? (
+          <Suspense fallback={<Skeleton className="h-[340px] w-full rounded-lg" />}>
+            <PerformanceChart
+              data={performance?.data_points ?? EMPTY_DATA_POINTS}
+              isLoading={isPerformanceLoading}
+              currency={currency}
+              liveLastPoint={liveLastPoint}
+            />
+          </Suspense>
+        ) : (
+          <Card>
+            <CardContent>
+              <Alert variant="destructive">
+                <AlertTriangleIcon className="h-4 w-4" />
+                <AlertDescription>
+                  {t('chart.performance.loadError', { message: getErrorMessage(performanceError) })}
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        )}
+        <Suspense fallback={<Skeleton className="h-[340px] w-full rounded-lg" />}>
           <HoldingsAllocationChart
             holdings={status.holdings}
             cash={status.cash}
@@ -352,8 +362,8 @@ const PortfolioStatusContent = ({
             displayCurrency={currency}
             isLoading={isAllocationLoading}
           />
-        </div>
-      </Suspense>
+        </Suspense>
+      </div>
 
       {/* Holdings Table */}
       <CollapsiblePositions>
@@ -445,6 +455,7 @@ export const PortfolioStatusView = () => {
     isLivePricesFetching,
     livePrices,
     livePricesError,
+    performanceError,
     error,
     latestUpdateAt,
     isEmptyPortfolio,
@@ -496,6 +507,7 @@ export const PortfolioStatusView = () => {
       <PortfolioStatusContent
         status={effectiveStatus}
         performance={performance}
+        performanceError={performanceError}
         isPerformanceLoading={isPerformanceLoading}
         isAllocationLoading={isLivePricesFetching && !livePrices}
         isEmptyPortfolio={isEmptyPortfolio}

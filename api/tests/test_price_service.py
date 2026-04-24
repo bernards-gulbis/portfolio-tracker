@@ -853,6 +853,163 @@ class TestBulkUpsert:
         mock_session.assert_not_called()
 
 
+class TestCachedHistoricalPricesFloatCoercion:
+    """Regression guard for the ``1.0 / Decimal`` TypeError that broke the
+    performance chart: ``HistoricalPrice.price`` and ``FxRate.usd_to_eur_rate``
+    are ``Decimal`` columns, but the service's public return type is
+    ``dict[str, float]``. The cache-read helpers must coerce at the boundary
+    so downstream ``float / rate`` and ``1.0 / rate`` arithmetic doesn't
+    blow up. A second request after the cache populates would otherwise 500.
+    """
+
+    def test_get_cached_historical_prices_returns_float(self):
+        from datetime import datetime as _dt
+        from decimal import Decimal
+
+        from sqlmodel import Session, SQLModel, create_engine
+        from sqlmodel.pool import StaticPool
+
+        from app.models import HistoricalPrice
+
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            session.add(
+                HistoricalPrice(
+                    ticker="AAPL",
+                    date="2026-04-10",
+                    price=Decimal("150.25"),
+                    created_at=_dt.now(UTC),
+                )
+            )
+            session.commit()
+            result = PriceService._get_cached_historical_prices(
+                "AAPL", _dt(2026, 4, 1), _dt(2026, 4, 30), session=session
+            )
+
+        assert "2026-04-10" in result
+        assert isinstance(result["2026-04-10"], float)
+        assert result["2026-04-10"] == pytest.approx(150.25)
+
+    def test_get_cached_fx_rates_returns_float(self):
+        from datetime import datetime as _dt
+        from decimal import Decimal
+
+        from sqlmodel import Session, SQLModel, create_engine
+        from sqlmodel.pool import StaticPool
+
+        from app.models.historical_price import FxRate
+
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            session.add(
+                FxRate(
+                    date="2026-04-10",
+                    usd_to_eur_rate=Decimal("0.920000"),
+                    created_at=_dt.now(UTC),
+                )
+            )
+            session.commit()
+            result = PriceService._get_cached_fx_rates(
+                _dt(2026, 4, 1), _dt(2026, 4, 30), session=session
+            )
+
+        assert "2026-04-10" in result
+        assert isinstance(result["2026-04-10"], float)
+        assert result["2026-04-10"] == pytest.approx(0.92)
+
+    def test_calculate_performance_survives_decimal_db_cache(self):
+        """End-to-end guard: with only the DB cache populated (no fresh Yahoo
+        fetch), ``calculate_performance`` must not raise on the EURUSD=X
+        inversion at ``portfolio_perf.py::_prepare_perf_data``."""
+        from datetime import datetime as _dt
+        from decimal import Decimal
+
+        from sqlmodel import Session, SQLModel, create_engine
+        from sqlmodel.pool import StaticPool
+
+        from app.models import HistoricalPrice, Transaction, TransactionType
+        from app.services import price_service as ps_mod
+        from app.services.portfolio_perf import calculate_performance
+
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            # Seed enough history to cover the window without any Yahoo fetch.
+            for day in range(1, 20):
+                session.add(
+                    HistoricalPrice(
+                        ticker="AAPL",
+                        date=f"2026-04-{day:02d}",
+                        price=Decimal("150.00"),
+                        created_at=_dt.now(UTC),
+                    )
+                )
+                session.add(
+                    HistoricalPrice(
+                        ticker="EURUSD=X",
+                        date=f"2026-04-{day:02d}",
+                        price=Decimal("1.100000"),
+                        created_at=_dt.now(UTC),
+                    )
+                )
+            session.commit()
+
+        tx = [
+            Transaction(
+                id=1,
+                portfolio_id=1,
+                date=_dt(2026, 4, 2, 10, 0, 0),
+                type=TransactionType.DEPOSIT,
+                total_amount=Decimal("1000"),
+            ),
+            Transaction(
+                id=2,
+                portfolio_id=1,
+                date=_dt(2026, 4, 3, 10, 0, 0),
+                type=TransactionType.BUY,
+                ticker="AAPL",
+                quantity=Decimal("5"),
+                price_per_share=Decimal("150"),
+                total_amount=Decimal("-750"),
+            ),
+        ]
+
+        PriceService.clear_session_cache()
+        # Avoid any outgoing network call; the seeded cache covers the range.
+        with (
+            patch.object(ps_mod, "engine", engine),
+            patch.object(
+                PriceService,
+                "_determine_fetch_ranges",
+                return_value=[],
+            ),
+        ):
+            result = calculate_performance(
+                tx,
+                _dt(2026, 4, 2),
+                _dt(2026, 4, 15),
+                num_points=5,
+            )
+
+        assert len(result) == 5
+        assert result[-1]["current_value"] is not None
+        assert result[-1]["fx_rate"] == pytest.approx(1.0 / 1.10)
+
+
 class TestGetLastKnownPriceWithDate:
     """Direct tests for get_last_known_price_with_date.
 
@@ -913,4 +1070,3 @@ class TestGetLastKnownPriceWithDate:
         price, date_str = result
         assert price == pytest.approx(152.00)
         assert date_str == "2026-04-11"
-

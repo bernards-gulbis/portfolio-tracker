@@ -409,7 +409,9 @@ class TransactionService:
         f = _to_decimal(fee) if fee is not None else Decimal("0")
         t = _to_decimal(total_amount)
 
-        expected_value = -(q * p + f) if transaction_type == TransactionType.BUY else q * p - f
+        expected_value = (
+            -(q * p + f) if transaction_type == TransactionType.BUY else q * p - f
+        )
 
         if abs(t - expected_value) > abs(expected_value) * Decimal("0.01"):
             raise InvalidTransactionDataException(

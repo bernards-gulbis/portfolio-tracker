@@ -85,9 +85,7 @@ def get_live_prices(
     for ticker in tickers:
         live = live_prices.get(ticker)
         if live is not None and live > 0:
-            prices[ticker] = LivePriceInfo(
-                price=float(live), source="live", as_of=now
-            )
+            prices[ticker] = LivePriceInfo(price=float(live), source="live", as_of=now)
             continue
         fallback = PriceService.get_last_known_price_with_date(ticker)
         if fallback is not None:

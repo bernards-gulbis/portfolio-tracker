@@ -366,6 +366,7 @@ const en = {
       noData: 'No performance data available',
       insufficientData: 'Not enough data points to display performance chart.',
       insufficientDataForPeriod: 'Not enough data points for this time period. Try a longer period or "All".',
+      loadError: 'Failed to load performance data: {{message}}',
       principal: 'Principal',
       currentValue: 'Current Value',
       returnPct: 'Return (%)',

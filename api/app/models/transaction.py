@@ -35,9 +35,7 @@ class Transaction(SQLModel, table=True):
         default=None, max_digits=20, decimal_places=4
     )
     fee: Decimal | None = Field(default=None, max_digits=20, decimal_places=4)
-    total_amount: Decimal = Field(
-        default=Decimal("0"), max_digits=20, decimal_places=4
-    )
+    total_amount: Decimal = Field(default=Decimal("0"), max_digits=20, decimal_places=4)
     eur_amount: Decimal | None = Field(default=None, max_digits=20, decimal_places=4)
     split_ratio: Decimal | None = Field(default=None, max_digits=20, decimal_places=8)
     currency: str | None = Field(default=None, max_length=3)

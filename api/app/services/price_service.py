@@ -73,7 +73,11 @@ class PriceService:
                 HistoricalPrice.date <= end_str,
             )
             results = s.exec(statement).all()
-            return {price.date: price.price for price in results}
+            # Cast Decimal → float at the boundary: the column is Decimal
+            # for ledger-grade precision, but every caller expects float per
+            # this method's return type. Leaking Decimal through breaks
+            # plain arithmetic like ``1.0 / rate`` downstream.
+            return {price.date: float(price.price) for price in results}
 
         if session is not None:
             return _query(session)
@@ -148,7 +152,7 @@ class PriceService:
                 FxRate.date >= start_str, FxRate.date <= end_str
             )
             results = s.exec(statement).all()
-            return {rate.date: rate.usd_to_eur_rate for rate in results}
+            return {rate.date: float(rate.usd_to_eur_rate) for rate in results}
 
         if session is not None:
             return _query(session)
@@ -560,10 +564,10 @@ class PriceService:
         """
         eur_usd_rates = cls.get_historical_prices("EURUSD=X", start_date, end_date)
 
-        # Values may be float (fresh Yahoo fetch) or Decimal (DB cache after S1).
-        # Normalize to float for the 1/x inversion — mixing 1.0 / Decimal raises
-        # TypeError. Downstream callers pass the result through _to_decimal, so
-        # precision-sensitive math is unaffected.
+        # `_get_cached_historical_prices` already coerces Decimal → float at
+        # the DB boundary, but keep the cast as a belt-and-suspenders guard:
+        # mixing ``1.0 / Decimal`` raises TypeError, and a future cache-path
+        # change could reintroduce that.
         return {
             date_str: 1.0 / float(rate)
             for date_str, rate in eur_usd_rates.items()
