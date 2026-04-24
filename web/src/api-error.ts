@@ -1,4 +1,4 @@
-import type { ZodIssue, ZodType } from 'zod';
+import type { ZodType } from 'zod';
 
 /**
  * Thrown when a backend response doesn't match the Zod schema we expect.
@@ -44,7 +44,7 @@ export const parseOrThrow = <T>(
 ): T => {
   const result = schema.safeParse(data);
   if (result.success) return result.data;
-  const issues = result.error.issues.map((i: ZodIssue) => ({
+  const issues = result.error.issues.map((i) => ({
     path: i.path.join('.'),
     message: i.message,
   }));

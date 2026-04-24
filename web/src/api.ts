@@ -14,7 +14,7 @@ export enum TransactionType {
   DIVIDEND = 'Dividend',
 }
 
-const TransactionTypeSchema = z.nativeEnum(TransactionType);
+const TransactionTypeSchema = z.enum(TransactionType);
 
 const PriceSourceSchema = z.enum(['live', 'last_known', 'missing']);
 export type PriceSource = z.infer<typeof PriceSourceSchema>;
