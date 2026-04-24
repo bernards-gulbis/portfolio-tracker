@@ -296,6 +296,8 @@ const lv: Translation = {
       withdrawNegativeCash: '[{{date}}] Izņemšana {{amount}} radīja negatīvu naudas atlikumu ({{balance}})',
       invalidSplitRatio: '[{{date}}] Nederīgs sadalīšanas koeficients {{ratio}} priekš {{ticker}}: jābūt pozitīvam (izlaists)',
       unknownType: '[{{date}}] Nezināms darījuma veids: {{type}} (izlaists)',
+      fxFallbackToCurrent: '[{{date}}] Nav pieejams vēsturiskais USD/EUR kurss — EUR vērtība šim {{ticker}} darījumam aplēsta pēc šodienas kursa.',
+      fxRatesUnavailable: 'Vēsturiskie USD/EUR kursi nav pieejami; {{count}} darījumi novērtēti pēc šodienas kursa. EUR skaitļi ir aptuveni.',
     },
     marketValue: 'Tirgus vērtība',
     unrealized: 'nerealizēta',

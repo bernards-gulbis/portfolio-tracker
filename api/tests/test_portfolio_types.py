@@ -81,54 +81,79 @@ class TestLookupHistoricalRate:
 
 
 class TestEurFromTx:
-    """Covers the historical-rate fallback branch and the zero-fallback path.
-
-    The ``tx.eur_amount`` and ``tx.fx_rate`` branches (priorities 1 and 2) are
-    exercised by the broader status-endpoint tests — this class focuses on the
-    S3-introduced historical-rate lookup + current-rate fallback behavior.
+    """Covers the EUR-conversion cascade and the ``FxSource`` tag each branch
+    returns. Callers rely on the tag to emit warnings for the silent-fallback
+    path, so the tag is part of the contract.
     """
+
+    def test_explicit_eur_amount_preferred(self):
+        tx = _StubTx(datetime(2025, 1, 15), eur_amount=Decimal("42.0"))
+        value, source = _eur_from_tx(
+            tx,
+            total_amount=Decimal("100"),
+            usd_to_eur_fallback=2.0,
+            historical_rates={"2025-01-15": 1.1},
+        )
+        assert value == Decimal("42.0")
+        assert source == "explicit_eur"
+
+    def test_explicit_fx_rate_used_when_no_eur_amount(self):
+        tx = _StubTx(datetime(2025, 1, 15), fx_rate=Decimal("1.25"))
+        value, source = _eur_from_tx(
+            tx,
+            total_amount=Decimal("100"),
+            usd_to_eur_fallback=2.0,
+            historical_rates={"2025-01-15": 1.1},
+        )
+        # 100 / 1.25 = 80 (USD→EUR via fx_rate)
+        assert value == Decimal("80")
+        assert source == "explicit_fx_rate"
 
     def test_historical_rate_preferred_over_current_fallback(self):
         tx = _StubTx(datetime(2025, 1, 15))
-        result = _eur_from_tx(
+        value, source = _eur_from_tx(
             tx,
             total_amount=Decimal("100"),
             usd_to_eur_fallback=2.0,
             historical_rates={"2025-01-15": 1.1},
         )
         # 100 * 1.1 (historical) not 100 * 2.0 (current)
-        assert result == Decimal("110.0")
+        assert value == Decimal("110.0")
+        assert source == "historical"
 
-    def test_current_fallback_when_no_historical_rate_for_date(self):
+    def test_historical_nearest_earlier_still_counts_as_historical(self):
         tx = _StubTx(datetime(2025, 1, 15))
-        result = _eur_from_tx(
+        value, source = _eur_from_tx(
             tx,
             total_amount=Decimal("100"),
             usd_to_eur_fallback=0.9,
             historical_rates={
                 "2020-01-01": 0.8
-            },  # all dates earlier than target → no match
+            },  # all dates earlier than target → nearest-earlier match
         )
-        # _lookup_historical_rate finds nearest-earlier (0.8), so that wins over
-        # the current fallback. This pins the documented precedence order.
-        assert result == Decimal("80.0")
+        # _lookup_historical_rate finds nearest-earlier (0.8), so that wins
+        # over the current fallback. This pins the documented precedence.
+        assert value == Decimal("80.0")
+        assert source == "historical"
 
-    def test_current_fallback_when_historical_dict_empty(self):
+    def test_fallback_current_when_historical_dict_empty(self):
         tx = _StubTx(datetime(2025, 1, 15))
-        result = _eur_from_tx(
+        value, source = _eur_from_tx(
             tx,
             total_amount=Decimal("100"),
             usd_to_eur_fallback=0.9,
             historical_rates={},
         )
-        assert result == Decimal("90.0")
+        assert value == Decimal("90.0")
+        assert source == "fallback_current"
 
-    def test_zero_when_no_rates_at_all(self):
+    def test_none_source_when_no_rates_at_all(self):
         tx = _StubTx(datetime(2025, 1, 15))
-        result = _eur_from_tx(
+        value, source = _eur_from_tx(
             tx,
             total_amount=Decimal("100"),
             usd_to_eur_fallback=None,
             historical_rates=None,
         )
-        assert result == Decimal("0")
+        assert value == Decimal("0")
+        assert source == "none"

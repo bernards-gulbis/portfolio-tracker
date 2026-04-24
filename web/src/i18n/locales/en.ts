@@ -294,6 +294,8 @@ const en = {
       withdrawNegativeCash: '[{{date}}] Withdrawal of {{amount}} caused negative cash balance ({{balance}})',
       invalidSplitRatio: '[{{date}}] Invalid split ratio {{ratio}} for {{ticker}}: must be positive (skipped)',
       unknownType: '[{{date}}] Unknown transaction type: {{type}} (skipped)',
+      fxFallbackToCurrent: "[{{date}}] No historical USD/EUR rate available — EUR value for this {{ticker}} transaction was estimated using today's rate.",
+      fxRatesUnavailable: "Historical USD/EUR rates are unavailable; {{count}} transaction(s) have been valued using today's rate. EUR figures are approximate.",
     },
     marketValue: 'Market Value',
     unrealized: 'unrealized',

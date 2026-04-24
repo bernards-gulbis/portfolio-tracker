@@ -854,6 +854,110 @@ class TestDecimalPrecision:
             assert tx.fx_rate == Decimal("1.087000")
 
 
+class TestFxFallbackWarnings:
+    """Package A: silent FX fallbacks must surface as UI-visible warnings.
+
+    The numerical behaviour (fall back to current rate when nothing else is
+    available) is preserved — but every path that used to be silent now
+    emits a structured warning so the user knows their EUR numbers are an
+    approximation.
+    """
+
+    def test_prefetch_failure_emits_bulk_warning(self):
+        """PriceService raising → one aggregate ``fxRatesUnavailable``
+        warning carrying the number of affected transactions."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2024, 6, 1),
+                total_amount=1000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2023, 3, 15),
+                total_amount=500.0,
+            ),
+        ]
+        with patch(
+            "app.services.portfolio_status."
+            "PriceService.get_historical_usd_to_eur_rates",
+            side_effect=RuntimeError("yahoo down"),
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.90,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="FX bulk warning",
+            )
+        # Numerical behaviour unchanged — still falls back to current rate.
+        assert result.principal_eur == pytest.approx(1350.0)
+        # One aggregate warning with a count of affected transactions.
+        bulk = [w for w in result.warnings if w.code == "fxRatesUnavailable"]
+        assert len(bulk) == 1
+        assert bulk[0].params.get("count") == "2"
+        # And no per-tx warnings (the bulk one covers them).
+        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrent"]
+        assert per_tx == []
+
+    def test_per_tx_warning_when_date_missing_from_rates(self):
+        """PriceService succeeds but returns no rate on-or-before the tx date
+        → per-tx ``fxFallbackToCurrent`` warning, no bulk warning."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2020, 1, 1),
+                total_amount=1000.0,
+            ),
+        ]
+        # Rates exist but none on-or-before 2020-01-01 → lookup returns None.
+        with patch(
+            "app.services.portfolio_status."
+            "PriceService.get_historical_usd_to_eur_rates",
+            return_value={"2025-06-01": 1.05},
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.90,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="Per-tx fallback",
+            )
+        # Falls back to current rate numerically.
+        assert result.principal_eur == pytest.approx(900.0)
+        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrent"]
+        assert len(per_tx) == 1
+        assert per_tx[0].params.get("ticker") == ""  # deposit has no ticker
+        assert "2020-01-01" in per_tx[0].date
+        # Bulk warning should NOT fire when prefetch succeeded.
+        assert [w for w in result.warnings if w.code == "fxRatesUnavailable"] == []
+
+    def test_no_warning_when_every_tx_has_explicit_eur_amount(self):
+        """Explicit eur_amount means no fallback path was taken — no warnings."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2020, 1, 1),
+                total_amount=1000.0,
+                eur_amount=900.0,
+            ),
+        ]
+        result = calculate_status(
+            txs,
+            usd_to_eur_rate=0.90,
+            tax_rate=Decimal("0.20"),
+            portfolio_id=1,
+            portfolio_name="Explicit EUR",
+        )
+        codes = {w.code for w in result.warnings}
+        assert "fxFallbackToCurrent" not in codes
+        assert "fxRatesUnavailable" not in codes
+
+
 # ==================== calculate_performance complexity ====================
 
 

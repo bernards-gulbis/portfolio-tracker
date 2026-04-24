@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from dataclasses import field as dc_field
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 # Precision threshold for holdings quantity (allowing for accumulated floating-point errors)
 HOLDINGS_EPSILON = Decimal("1e-6")
@@ -115,6 +116,10 @@ class _TxState:
     # fallback (current rate) is only used if no historical rate is available
     # for the transaction's date.
     historical_usd_to_eur_rates: dict[str, float] = dc_field(default_factory=dict)
+    # Set when the historical FX prefetch raised. Per-transaction fallback
+    # warnings are suppressed in this case — the bulk ``fxRatesUnavailable``
+    # warning already covers every affected transaction.
+    fx_rates_unavailable: bool = False
 
 
 def _lookup_historical_rate(
@@ -134,29 +139,41 @@ def _lookup_historical_rate(
     return None
 
 
+FxSource = Literal[
+    "explicit_eur",
+    "explicit_fx_rate",
+    "historical",
+    "fallback_current",
+    "none",
+]
+
+
 def _eur_from_tx(
     tx: object,
     total_amount: Decimal,
     usd_to_eur_fallback: float | None = None,
     historical_rates: dict[str, float] | None = None,
-) -> Decimal:
-    """Return the EUR equivalent of a transaction.
+) -> tuple[Decimal, FxSource]:
+    """Return ``(eur_equivalent, source)`` for a transaction.
 
-    Priority:
-      1. ``tx.eur_amount`` — authoritative value the user (or importer) stored.
-      2. ``tx.fx_rate`` — rate recorded at transaction time.
-      3. ``historical_rates[tx.date]`` — market rate on the transaction's date.
-      4. ``usd_to_eur_fallback`` — current live rate, last-resort only.
+    The returned ``source`` tag tells the caller which branch of the cascade
+    produced the value, so it can decide whether to emit a warning:
+
+      * ``explicit_eur`` / ``explicit_fx_rate`` — user-supplied, trusted.
+      * ``historical`` — market rate on the transaction's date.
+      * ``fallback_current`` — today's live rate used as a last resort. This
+        is the silent-wrong-number path that Package A makes loud.
+      * ``none`` — no rate available at all (returns ``Decimal('0')``).
     """
     if tx.eur_amount is not None:
-        return _to_decimal(tx.eur_amount)
+        return _to_decimal(tx.eur_amount), "explicit_eur"
     if tx.fx_rate is not None and tx.fx_rate > 0:
-        return total_amount / _to_decimal(tx.fx_rate)
+        return total_amount / _to_decimal(tx.fx_rate), "explicit_fx_rate"
     if historical_rates and getattr(tx, "date", None) is not None:
         date_str = tx.date.strftime("%Y-%m-%d")
         rate = _lookup_historical_rate(historical_rates, date_str)
         if rate is not None:
-            return total_amount * _to_decimal(rate)
+            return total_amount * _to_decimal(rate), "historical"
     if usd_to_eur_fallback is not None:
-        return total_amount * _to_decimal(usd_to_eur_fallback)
-    return _ZERO
+        return total_amount * _to_decimal(usd_to_eur_fallback), "fallback_current"
+    return _ZERO, "none"
