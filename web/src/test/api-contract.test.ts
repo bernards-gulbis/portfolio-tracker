@@ -37,6 +37,9 @@ describe('parseOrThrow', () => {
     const schema = z.object({ a: z.number(), b: z.string() });
     try {
       parseOrThrow(schema, { a: 'not-a-number', b: 42 }, 'POST /thing');
+      // Guard: if parseOrThrow ever stops throwing, the catch block below
+      // would silently skip and the test would pass vacuously.
+      expect.fail('parseOrThrow should have thrown ApiContractError');
     } catch (e) {
       if (!isApiContractError(e)) throw e;
       const paths = e.issues.map((i) => i.path).sort();

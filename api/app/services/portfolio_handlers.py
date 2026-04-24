@@ -32,8 +32,17 @@ from app.services.portfolio_types import (
 
 
 def _maybe_warn_fx_fallback(state: _TxState, tx: Transaction, source: str) -> None:
-    """Emit a per-transaction ``fxFallbackToCurrent`` warning when the EUR
-    conversion silently used today's live rate for this transaction.
+    """Emit a per-transaction FX-fallback warning when the EUR conversion
+    silently used today's live rate for this transaction.
+
+    Uses two warning codes so the UI can render a clean sentence regardless
+    of whether the transaction has a ticker:
+
+      * ``fxFallbackToCurrentTicker`` — ticker is present (dividend);
+        ``params`` carries ``ticker`` for interpolation.
+      * ``fxFallbackToCurrent``      — no ticker (deposit/withdraw);
+        ``params`` is empty so the translated message does not have an
+        awkward placeholder gap.
 
     Suppressed when the bulk ``fxRatesUnavailable`` warning is already on the
     state — that warning covers every fx-blind transaction in one summary.
@@ -42,13 +51,23 @@ def _maybe_warn_fx_fallback(state: _TxState, tx: Transaction, source: str) -> No
         return
     if state.fx_rates_unavailable:
         return
-    state.warnings.append(
-        _Warning(
-            code="fxFallbackToCurrent",
-            date=tx.date.strftime(_ISO_DATETIME_FMT),
-            params={"ticker": tx.ticker or ""},
+    date_str = tx.date.strftime(_ISO_DATETIME_FMT)
+    if tx.ticker:
+        state.warnings.append(
+            _Warning(
+                code="fxFallbackToCurrentTicker",
+                date=date_str,
+                params={"ticker": tx.ticker},
+            )
         )
-    )
+    else:
+        state.warnings.append(
+            _Warning(
+                code="fxFallbackToCurrent",
+                date=date_str,
+                params={},
+            )
+        )
 
 
 def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:

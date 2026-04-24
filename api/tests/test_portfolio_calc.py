@@ -856,12 +856,17 @@ class TestFxFallbackWarnings:
         assert len(bulk) == 1
         assert bulk[0].params.get("count") == "2"
         # And no per-tx warnings (the bulk one covers them).
-        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrent"]
+        per_tx = [
+            w
+            for w in result.warnings
+            if w.code in ("fxFallbackToCurrent", "fxFallbackToCurrentTicker")
+        ]
         assert per_tx == []
 
     def test_per_tx_warning_when_date_missing_from_rates(self):
         """PriceService succeeds but returns no rate on-or-before the tx date
-        → per-tx ``fxFallbackToCurrent`` warning, no bulk warning."""
+        → per-tx ``fxFallbackToCurrent`` warning (no ticker in params, since
+        deposits don't carry one), no bulk warning."""
         txs = [
             _make_tx(
                 id=1,
@@ -887,8 +892,14 @@ class TestFxFallbackWarnings:
         assert result.principal_eur == pytest.approx(900.0)
         per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrent"]
         assert len(per_tx) == 1
-        assert per_tx[0].params.get("ticker") == ""  # deposit has no ticker
+        # Deposit has no ticker, so params is empty — prevents an awkward
+        # empty-ticker placeholder in the translated message.
+        assert per_tx[0].params == {}
         assert "2020-01-01" in per_tx[0].date
+        # Ticker-specific variant must not fire when there is no ticker.
+        assert [
+            w for w in result.warnings if w.code == "fxFallbackToCurrentTicker"
+        ] == []
         # Bulk warning should NOT fire when prefetch succeeded.
         assert [w for w in result.warnings if w.code == "fxRatesUnavailable"] == []
 
@@ -912,13 +923,14 @@ class TestFxFallbackWarnings:
         )
         codes = {w.code for w in result.warnings}
         assert "fxFallbackToCurrent" not in codes
+        assert "fxFallbackToCurrentTicker" not in codes
         assert "fxRatesUnavailable" not in codes
 
     def test_dividend_with_fallback_emits_warning_with_ticker(self):
-        """Dividends go through the same ``_maybe_warn_fx_fallback`` helper.
-        When the dividend's date has no historical rate and the fallback is
-        used, the per-tx warning carries the ticker so the user can identify
-        which holding's dividend was estimated."""
+        """Dividends carry a ticker, so the fallback warning uses the
+        ``fxFallbackToCurrentTicker`` variant with the ticker in params —
+        letting the UI render a clean "EUR value for this AAPL transaction"
+        sentence instead of an empty-placeholder gap."""
         txs = [
             _make_tx(
                 id=1,
@@ -948,9 +960,11 @@ class TestFxFallbackWarnings:
                 portfolio_id=1,
                 portfolio_name="Dividend fallback",
             )
-        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrent"]
+        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrentTicker"]
         assert len(per_tx) == 1
-        assert per_tx[0].params.get("ticker") == "AAPL"
+        assert per_tx[0].params == {"ticker": "AAPL"}
+        # No-ticker variant must not fire when a ticker is present.
+        assert [w for w in result.warnings if w.code == "fxFallbackToCurrent"] == []
         # The explicit-EUR deposit must not produce a warning.
         assert [w for w in result.warnings if w.date.startswith("2020-01-01")] == []
 
