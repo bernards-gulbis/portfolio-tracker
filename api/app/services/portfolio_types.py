@@ -161,8 +161,9 @@ def _eur_from_tx(
 
       * ``explicit_eur`` / ``explicit_fx_rate`` — user-supplied, trusted.
       * ``historical`` — market rate on the transaction's date.
-      * ``fallback_current`` — today's live rate used as a last resort. This
-        is the silent-wrong-number path that Package A makes loud.
+      * ``fallback_current`` — today's live rate used as a last resort.
+        Callers should surface this to the user; otherwise a multi-year
+        portfolio can silently re-price old transactions at today's FX rate.
       * ``none`` — no rate available at all (returns ``Decimal('0')``).
     """
     if tx.eur_amount is not None:

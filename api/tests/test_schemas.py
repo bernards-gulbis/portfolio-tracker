@@ -92,16 +92,24 @@ class TestTransactionCreateTimezoneAware:
         )
         assert tx.date.utcoffset() == timedelta(hours=5)
 
-    def test_transaction_update_also_coerces_naive_to_utc(self):
-        """PUT /transactions/{id} uses ``TransactionUpdate``, which does not
-        inherit from ``TransactionBase``. The validator is mirrored so CREATE
-        and UPDATE have symmetric tz semantics — otherwise a naive PUT would
-        silently store tz-ambiguous data while a fresh POST would coerce."""
+
+class TestTransactionUpdateTimezoneAware:
+    """``TransactionUpdate`` is a separate class from ``TransactionBase``
+    (partial-update semantics — every field optional), so its ``date``
+    validator lives on the class itself. The coercion must mirror
+    ``TransactionCreate`` so PUT and POST have symmetric tz semantics; a
+    naive PUT would otherwise silently store tz-ambiguous data while a
+    fresh POST would coerce.
+    """
+
+    def test_naive_datetime_is_coerced_to_utc(self):
+        """Mirror of ``TransactionCreate`` coercion so PUT /transactions/{id}
+        has the same tz semantics as POST."""
         tx = TransactionUpdate(date=datetime(2025, 1, 1, 10, 30))
         assert tx.date is not None
         assert tx.date.tzinfo is UTC
 
-    def test_transaction_update_none_date_passes_through(self):
+    def test_none_date_passes_through(self):
         """Most partial updates don't touch ``date``; the validator must
         tolerate ``None`` (field omitted)."""
         tx = TransactionUpdate(total_amount=100.0)

@@ -99,6 +99,9 @@ def _prefetch_historical_fx_rates(
     ]
     if not fx_blind:
         return {}
+    # Back-pad the fetch window by 5 days so a transaction dated on a
+    # Sunday/holiday can still resolve to the nearest prior trading day's
+    # rate (FX markets don't publish on weekends/holidays).
     start = min(tx.date for tx in fx_blind) - timedelta(days=5)
     end = max(tx.date for tx in fx_blind) + timedelta(days=1)
     try:
@@ -106,6 +109,9 @@ def _prefetch_historical_fx_rates(
     except Exception as exc:
         logger.warning("Historical USD/EUR rate fetch failed: %s", exc)
         state.fx_rates_unavailable = True
+        # The bulk warning carries the earliest affected transaction date
+        # (not a specific "failed" tx — the whole fetch failed). The UI uses
+        # this date as the React key and to anchor the banner in time.
         earliest = min(fx_blind, key=lambda tx: tx.date)
         state.warnings.append(
             _Warning(

@@ -283,14 +283,26 @@ const PortfolioStatusContent = ({
           <AlertDescription>
             <p className="font-medium">{t('status.transactionWarnings')}</p>
             <ul className="list-disc pl-4 mt-1 text-sm">
-              {status.warnings.map((w: TransactionWarning) => (
-                <li key={`${w.code}-${w.date}`}>
-                  {(t as (key: string, options?: Record<string, unknown>) => string)(`status.warnings.${w.code}`, {
-                    ...w.params,
-                    date: formatDateTime(w.date, locale),
-                  })}
-                </li>
-              ))}
+              {status.warnings.map((w: TransactionWarning) => {
+                // Backend sends params as Record<string, string>, but i18next's
+                // plural resolver needs ``count`` as a number to pick _one / _other.
+                const interpolation: Record<string, unknown> = {
+                  ...w.params,
+                  date: formatDateTime(w.date, locale),
+                };
+                if (typeof interpolation.count === 'string') {
+                  const n = Number(interpolation.count);
+                  if (Number.isFinite(n)) interpolation.count = n;
+                }
+                return (
+                  <li key={`${w.code}-${w.date}`}>
+                    {(t as (key: string, options?: Record<string, unknown>) => string)(
+                      `status.warnings.${w.code}`,
+                      interpolation,
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </AlertDescription>
         </Alert>
