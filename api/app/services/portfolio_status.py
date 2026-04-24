@@ -111,7 +111,8 @@ def _prefetch_historical_fx_rates(
         state.fx_rates_unavailable = True
         # The bulk warning carries the earliest affected transaction date
         # (not a specific "failed" tx — the whole fetch failed). The UI uses
-        # this date as the React key and to anchor the banner in time.
+        # this date only as the React key; the translated text omits it
+        # because the warning is portfolio-wide, not transaction-specific.
         earliest = min(fx_blind, key=lambda tx: tx.date)
         state.warnings.append(
             _Warning(
