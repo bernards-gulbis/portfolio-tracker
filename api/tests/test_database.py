@@ -212,6 +212,71 @@ class TestDatabaseUtilities:
         # No tables at all → nothing to check → no raise.
         db_module.verify_money_columns_are_decimal(target_engine=engine)
 
+    def test_transaction_sign_check_constraint_rejects_violations(self, tmp_path):
+        """The ``ck_transaction_sign`` CHECK constraint enforces the ledger's
+        sign semantics at the DB level. A DEPOSIT with a negative amount (or
+        any other sign mismatch) must raise ``IntegrityError`` — turning a
+        silent ledger-corrupting write into an immediate failure even when
+        the Pydantic schema is bypassed (direct SQL, mis-imports, hand-rolled
+        scripts)."""
+        from datetime import datetime
+        from decimal import Decimal
+
+        from sqlalchemy.exc import IntegrityError
+        from sqlmodel import Session, SQLModel, create_engine
+
+        from app.models import Portfolio, Transaction, TransactionType, User
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'check.db'}")
+        SQLModel.metadata.create_all(engine)
+
+        # Seed a user + portfolio so we can attempt transaction inserts.
+        with Session(engine) as session:
+            user = User(email="t@t.t", hashed_password="x")
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            portfolio = Portfolio(name="P", user_id=user.id)
+            session.add(portfolio)
+            session.commit()
+            session.refresh(portfolio)
+            pid = portfolio.id
+
+        # Valid row must insert fine (baseline — guards against a false-positive
+        # constraint that rejects everything).
+        with Session(engine) as session:
+            session.add(
+                Transaction(
+                    portfolio_id=pid,
+                    date=datetime(2025, 1, 1),
+                    type=TransactionType.DEPOSIT,
+                    total_amount=Decimal("100.00"),
+                )
+            )
+            session.commit()
+
+        # Now exercise every sign-violation class.
+        violations: list[tuple[TransactionType, Decimal]] = [
+            (TransactionType.DEPOSIT, Decimal("-1.00")),  # deposit must be > 0
+            (TransactionType.WITHDRAW, Decimal("1.00")),  # withdraw must be < 0
+            (TransactionType.BUY, Decimal("1.00")),  # buy must be < 0
+            (TransactionType.SELL, Decimal("-1.00")),  # sell must be > 0
+            (TransactionType.DIVIDEND, Decimal("-1.00")),  # dividend must be > 0
+            (TransactionType.FEE, Decimal("1.00")),  # fee must be < 0
+            (TransactionType.SPLIT, Decimal("1.00")),  # split must be exactly 0
+        ]
+        for tx_type, bad_amount in violations:
+            with Session(engine) as session, pytest.raises(IntegrityError):
+                session.add(
+                    Transaction(
+                        portfolio_id=pid,
+                        date=datetime(2025, 1, 2),
+                        type=tx_type,
+                        total_amount=bad_amount,
+                    )
+                )
+                session.commit()
+
     def test_run_migrations_refuses_to_stamp_when_multiple_bases(self):
         """Defensive check: if the migration tree has >1 root revision we
         refuse to guess which one to stamp on a pre-Alembic DB."""
