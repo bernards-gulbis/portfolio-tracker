@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
 import { useDebounce } from '../hooks/useDebounce';
@@ -30,7 +30,28 @@ export const TransactionView = () => {
   const [tickerSearch, setTickerSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Track previous portfolio id as state so React can reset filters synchronously
+  const [prevPortfolioId, setPrevPortfolioId] = useState(activePortfolioId);
+  if (prevPortfolioId !== activePortfolioId) {
+    setPrevPortfolioId(activePortfolioId);
+    setCurrentPage(1);
+    setTickerSearch('');
+    setTypeFilter([]);
+    setSortOrder('desc');
+  }
+
   const debouncedTicker = useDebounce(tickerSearch, 150);
+  const typeFilterKey = typeFilter.join(',');
+
+  // Track previous filter key as state to reset page when filters change
+  const filterToken = `${debouncedTicker}|${typeFilterKey}|${sortOrder}`;
+  const [prevFilterToken, setPrevFilterToken] = useState(filterToken);
+  if (prevFilterToken !== filterToken) {
+    setPrevFilterToken(filterToken);
+    setCurrentPage(1);
+  }
+
   const { data: paginatedData, isLoading, error } = useTransactions(
     activePortfolioId, currentPage, DEFAULT_PAGE_SIZE,
     debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
@@ -47,20 +68,6 @@ export const TransactionView = () => {
   const total = paginatedData?.total || 0;
   const responsePage = paginatedData?.page || 1;
   const responsePageSize = paginatedData?.page_size || DEFAULT_PAGE_SIZE;
-
-  // Reset filters and page when portfolio changes
-  useEffect(() => {
-    setCurrentPage(1);
-    setTickerSearch('');
-    setTypeFilter([]);
-    setSortOrder('desc');
-  }, [activePortfolioId]);
-
-  // Reset to page 1 when filters change
-  const typeFilterKey = typeFilter.join(',');
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedTicker, typeFilterKey, sortOrder]);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);

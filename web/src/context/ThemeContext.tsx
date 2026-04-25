@@ -30,13 +30,13 @@ function readPreference(): ThemePreference {
   return 'system';
 }
 
-function resolve(pref: ThemePreference): ResolvedTheme {
-  return pref === 'system' ? getSystemTheme() : pref;
-}
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [preference, setPreference] = useState<ThemePreference>(readPreference);
-  const [resolved, setResolved] = useState<ResolvedTheme>(() => resolve(preference));
+  // Track OS-level system theme separately so it can update reactively
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme);
+  // resolved is derived purely — no setState-in-effect needed
+  const resolved: ResolvedTheme = preference === 'system' ? systemTheme : preference;
 
   const persistAndSetPreference = useCallback((p: ThemePreference) => {
     setPreference(p);
@@ -47,16 +47,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [setPreference]);
 
-  // Re-resolve when preference changes
-  useEffect(() => {
-    setResolved(resolve(preference));
-  }, [preference]);
-
   // Listen for OS theme changes when preference is "system"
+  // setSystemTheme is stable (from useState) so it can be captured directly
   useEffect(() => {
     if (globalThis.window === undefined || preference !== 'system') return;
     const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => setResolved(mq.matches ? 'dark' : 'light');
+    const handler = () => setSystemTheme(mq.matches ? 'dark' : 'light');
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [preference]);
