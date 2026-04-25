@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
 
 type ResolvedTheme = 'light' | 'dark';
 type ThemePreference = 'light' | 'dark' | 'system';
@@ -19,6 +19,17 @@ function getSystemTheme(): ResolvedTheme {
   return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function subscribeSystemTheme(callback: () => void): () => void {
+  if (globalThis.window === undefined) return () => {};
+  const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
+  mq.addEventListener('change', callback);
+  return () => mq.removeEventListener('change', callback);
+}
+
+function getSystemThemeServer(): ResolvedTheme {
+  return 'dark';
+}
+
 function readPreference(): ThemePreference {
   if (globalThis.window === undefined) return 'system';
   try {
@@ -30,13 +41,14 @@ function readPreference(): ThemePreference {
   return 'system';
 }
 
-function resolve(pref: ThemePreference): ResolvedTheme {
-  return pref === 'system' ? getSystemTheme() : pref;
-}
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [preference, setPreference] = useState<ThemePreference>(readPreference);
-  const [resolved, setResolved] = useState<ResolvedTheme>(() => resolve(preference));
+  // useSyncExternalStore handles subscription, snapshot, and tearing-safety in one
+  // call — and resyncs on mount automatically if the OS scheme shifted between
+  // initial render and the listener attaching.
+  const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemTheme, getSystemThemeServer);
+  const resolved: ResolvedTheme = preference === 'system' ? systemTheme : preference;
 
   const persistAndSetPreference = useCallback((p: ThemePreference) => {
     setPreference(p);
@@ -46,20 +58,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // localStorage unavailable
     }
   }, [setPreference]);
-
-  // Re-resolve when preference changes
-  useEffect(() => {
-    setResolved(resolve(preference));
-  }, [preference]);
-
-  // Listen for OS theme changes when preference is "system"
-  useEffect(() => {
-    if (globalThis.window === undefined || preference !== 'system') return;
-    const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => setResolved(mq.matches ? 'dark' : 'light');
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [preference]);
 
   // Apply to document
   useEffect(() => {
