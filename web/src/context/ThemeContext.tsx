@@ -49,12 +49,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Always listen for OS theme changes so systemTheme stays current even when
   // preference !== 'system' — otherwise switching back to 'system' would briefly
-  // show a stale value until the next OS change event. Also resync once on
-  // mount in case the OS scheme shifted between render and effect commit.
+  // show a stale value until the next OS change event.
   useEffect(() => {
     if (globalThis.window === undefined) return;
     const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
-    setSystemTheme(mq.matches ? 'dark' : 'light');
     const handler = () => setSystemTheme(mq.matches ? 'dark' : 'light');
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
