@@ -283,7 +283,7 @@ const PortfolioStatusContent = ({
           <AlertDescription>
             <p className="font-medium">{t('status.transactionWarnings')}</p>
             <ul className="list-disc pl-4 mt-1 text-sm">
-              {status.warnings.map((w: TransactionWarning) => {
+              {status.warnings.map((w: TransactionWarning, i: number) => {
                 // Backend sends params as Record<string, string>, but i18next's
                 // plural resolver needs ``count`` as a number to pick _one / _other.
                 const interpolation: Record<string, unknown> = {
@@ -294,8 +294,10 @@ const PortfolioStatusContent = ({
                   const n = Number(interpolation.count);
                   if (Number.isFinite(n)) interpolation.count = n;
                 }
+                // Index disambiguates warnings sharing the same (code, date) —
+                // e.g., two fx-fallback warnings on the same midnight timestamp.
                 return (
-                  <li key={`${w.code}-${w.date}`}>
+                  <li key={`${w.code}-${w.date}-${i}`}>
                     {(t as (key: string, options?: Record<string, unknown>) => string)(
                       `status.warnings.${w.code}`,
                       interpolation,

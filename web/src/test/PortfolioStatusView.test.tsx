@@ -243,6 +243,38 @@ describe('PortfolioStatusView', () => {
     expect(screen.getByText(/negative cash balance/)).toBeInTheDocument();
   });
 
+  it('renders multiple warnings sharing the same code and date without duplicate-key errors', () => {
+    // Two dividends paid the same midnight timestamp for different tickers,
+    // both fx-blind, would collide on `${code}-${date}` alone.
+    const warningStatus: PortfolioStatus = {
+      ...mockStatus,
+      warnings: [
+        { code: 'fxFallbackToCurrentTicker', date: '2024-01-02T00:00:00', params: { ticker: 'AAPL' } },
+        { code: 'fxFallbackToCurrentTicker', date: '2024-01-02T00:00:00', params: { ticker: 'MSFT' } },
+      ],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: warningStatus,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      renderComponent(1);
+
+      expect(screen.getByText(/AAPL transaction/)).toBeInTheDocument();
+      expect(screen.getByText(/MSFT transaction/)).toBeInTheDocument();
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringMatching(/two children with the same key/i),
+        expect.anything(),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('does not render warnings alert when warnings array is empty', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: mockStatus,
