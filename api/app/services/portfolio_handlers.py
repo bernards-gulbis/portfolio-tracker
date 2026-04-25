@@ -31,31 +31,35 @@ from app.services.portfolio_types import (
 # ================== Transaction handlers ==================
 
 
-def _maybe_warn_fx_fallback(state: _TxState, tx: Transaction, source: str) -> None:
-    """Emit a per-transaction FX-fallback warning when the EUR conversion
-    silently used today's live rate for this transaction.
+def _maybe_warn_fx_missing(state: _TxState, tx: Transaction, source: str) -> None:
+    """Emit a per-transaction "FX rate missing" warning when the EUR conversion
+    could not be resolved (no historical rate, no user-supplied amount).
 
-    Uses two warning codes so the UI can render a clean sentence regardless
-    of whether the transaction has a ticker:
+    Two warning codes let the UI render a clean sentence with or without a
+    ticker:
 
-      * ``fxFallbackToCurrentTicker`` — ticker is present (dividend);
+      * ``fxRateMissingTicker`` — ticker is present (dividend);
         ``params`` carries ``ticker`` for interpolation.
-      * ``fxFallbackToCurrent``      — no ticker (deposit/withdraw);
-        ``params`` is empty so the translated message does not have an
-        awkward placeholder gap.
+      * ``fxRateMissing``       — no ticker (deposit/withdraw);
+        ``params`` is empty so the translated message has no awkward placeholder.
 
     Suppressed when the bulk ``fxRatesUnavailable`` warning is already on the
-    state — that warning covers every fx-blind transaction in one summary.
+    state — that warning covers every affected transaction in one summary.
+
+    Also records the transaction id for the UI's deep-link to the
+    "fix transactions" flow.
     """
-    if source != "fallback_current":
+    if source != "missing":
         return
+    if tx.id is not None:
+        state.fx_missing_tx_ids.append(tx.id)
     if state.fx_rates_unavailable:
         return
     date_str = tx.date.strftime(_ISO_DATETIME_FMT)
     if tx.ticker:
         state.warnings.append(
             _Warning(
-                code="fxFallbackToCurrentTicker",
+                code="fxRateMissingTicker",
                 date=date_str,
                 params={"ticker": tx.ticker},
             )
@@ -63,7 +67,7 @@ def _maybe_warn_fx_fallback(state: _TxState, tx: Transaction, source: str) -> No
     else:
         state.warnings.append(
             _Warning(
-                code="fxFallbackToCurrent",
+                code="fxRateMissing",
                 date=date_str,
                 params={},
             )
@@ -77,12 +81,11 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     eur, source = _eur_from_tx(
         tx,
         total,
-        state.usd_to_eur_fallback,
         state.historical_usd_to_eur_rates,
     )
-    _maybe_warn_fx_fallback(state, tx, source)
-    state.principal_eur += eur
-    state.principal_eur_avg += eur
+    _maybe_warn_fx_missing(state, tx, source)
+    state.principal_eur.add(eur)
+    state.principal_eur_avg.add(eur)
 
 
 def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -91,29 +94,50 @@ def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     eur_historical, source = _eur_from_tx(
         tx,
         total,
-        state.usd_to_eur_fallback,
         state.historical_usd_to_eur_rates,
     )
-    _maybe_warn_fx_fallback(state, tx, source)
-    # Average cost: withdraw at weighted-average rate (before updating principal)
-    if state.principal > 0:
-        avg_rate = state.principal_eur_avg / state.principal
+    _maybe_warn_fx_missing(state, tx, source)
+
+    # Average-cost EUR withdrawal: derive avg rate from running aggregates.
+    # When the avg accumulator is already incomplete, the avg rate is
+    # unreliable, so we propagate "unknown" rather than divide partial totals.
+    eur_avg_cost: Decimal | None
+    avg_delta: Decimal | None
+    if state.principal > 0 and not state.principal_eur_avg.is_incomplete:
+        avg_rate = state.principal_eur_avg.total / state.principal
         eur_avg_cost = -total * avg_rate  # positive
-        state.principal_eur_avg += total * avg_rate  # total is negative
+        avg_delta = total * avg_rate  # negative (withdraw at avg rate)
+    elif state.principal > 0:
+        # Avg accumulator already incomplete — the avg rate would be wrong.
+        eur_avg_cost = None
+        avg_delta = None
     else:
-        eur_avg_cost = -eur_historical  # positive
-        state.principal_eur_avg += eur_historical
+        # No prior principal to derive an avg from; fall through to historical.
+        # If historical is also missing, both stay None and propagate.
+        eur_avg_cost = -eur_historical if eur_historical is not None else None
+        avg_delta = eur_historical
+
+    state.principal_eur_avg.add(avg_delta)
+
+    realized_fx_gain: Decimal | None
+    if eur_historical is None or eur_avg_cost is None:
+        realized_fx_gain = None
+    else:
+        realized_fx_gain = -eur_historical - eur_avg_cost
+
     state.realized_withdrawals.append(
         _WithdrawalFx(
             date=tx.date.strftime(_ISO_DATETIME_FMT),
             amount=float(-total),
-            amount_eur_avg=float(eur_avg_cost),
-            amount_eur=float(-eur_historical),
-            realized_fx_gain=float(-eur_historical - eur_avg_cost),
+            amount_eur_avg=float(eur_avg_cost) if eur_avg_cost is not None else None,
+            amount_eur=float(-eur_historical) if eur_historical is not None else None,
+            realized_fx_gain=float(realized_fx_gain)
+            if realized_fx_gain is not None
+            else None,
         )
     )
     state.principal += total
-    state.principal_eur += eur_historical
+    state.principal_eur.add(eur_historical)
     if strict and state.cash < 0:
         state.warnings.append(
             _Warning(
@@ -218,17 +242,16 @@ def _apply_dividend(state: _TxState, tx: Transaction, strict: bool) -> None:
     eur, source = _eur_from_tx(
         tx,
         total,
-        state.usd_to_eur_fallback,
         state.historical_usd_to_eur_rates,
     )
-    _maybe_warn_fx_fallback(state, tx, source)
-    state.dividends_eur += eur
+    _maybe_warn_fx_missing(state, tx, source)
+    state.dividends_eur.add(eur)
     state.dividends_received.append(
         _DividendReceived(
             ticker=tx.ticker or "",
             date=tx.date.strftime(_ISO_DATETIME_FMT),
             amount=float(total),
-            amount_eur=float(eur) if eur != _ZERO else None,
+            amount_eur=float(eur) if eur is not None and eur != _ZERO else None,
         )
     )
 

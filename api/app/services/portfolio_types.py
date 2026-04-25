@@ -44,6 +44,38 @@ def _opt_normalize(value: Decimal | None) -> float | None:
     return _normalize_zero(value) if value is not None else None
 
 
+# ================== EUR aggregate accumulator ==================
+
+
+@dataclass
+class EurAccumulator:
+    """Sum of EUR-converted amounts that records when conversion was unknown.
+
+    A single ``add(None)`` permanently flips ``value`` to ``None``: once any
+    contributing transaction lacked a usable historical FX rate, the aggregate
+    is no longer trustworthy and the system must surface that to the user
+    rather than silently substitute a wrong number. The raw ``total`` is kept
+    only for diagnostics — handlers should read ``value``.
+    """
+
+    total: Decimal = _ZERO
+    incomplete_count: int = 0
+
+    @property
+    def value(self) -> Decimal | None:
+        return None if self.incomplete_count > 0 else self.total
+
+    @property
+    def is_incomplete(self) -> bool:
+        return self.incomplete_count > 0
+
+    def add(self, eur: Decimal | None) -> None:
+        if eur is None:
+            self.incomplete_count += 1
+        else:
+            self.total += eur
+
+
 # ================== Typed internal state ==================
 
 
@@ -78,9 +110,9 @@ class _DividendReceived:
 class _WithdrawalFx:
     date: str
     amount: float
-    amount_eur_avg: float
-    amount_eur: float
-    realized_fx_gain: float
+    amount_eur_avg: float | None
+    amount_eur: float | None
+    realized_fx_gain: float | None
 
 
 @dataclass
@@ -96,30 +128,34 @@ class _TxState:
 
     cash: Decimal = _ZERO
     principal: Decimal = _ZERO  # Net deposits - withdrawals in native currency
-    principal_eur: Decimal = (
-        _ZERO  # Net deposits - withdrawals in EUR (historical rates)
-    )
-    principal_eur_avg: Decimal = (
-        _ZERO  # EUR principal using average cost for withdrawals
-    )
+    # EUR aggregates use ``EurAccumulator`` so a missing historical FX rate
+    # propagates as ``value is None`` rather than silently substituting today's
+    # rate. The raw ``.total`` is kept for diagnostics but handlers should
+    # read ``.value``.
+    principal_eur: EurAccumulator = dc_field(default_factory=EurAccumulator)
+    principal_eur_avg: EurAccumulator = dc_field(default_factory=EurAccumulator)
     dividends: Decimal = _ZERO
-    dividends_eur: Decimal = _ZERO
+    dividends_eur: EurAccumulator = dc_field(default_factory=EurAccumulator)
     realized_gains: Decimal = _ZERO
     holdings: dict[str, _Holding] = dc_field(default_factory=dict)
     realized_sales: list[_RealizedSale] = dc_field(default_factory=list)
     dividends_received: list[_DividendReceived] = dc_field(default_factory=list)
     realized_withdrawals: list[_WithdrawalFx] = dc_field(default_factory=list)
     warnings: list[_Warning] = dc_field(default_factory=list)
-    usd_to_eur_fallback: float | None = None
     # Per-date historical USD→EUR rates, pre-fetched once per status calculation.
-    # Used when a transaction carries neither eur_amount nor fx_rate — the
-    # fallback (current rate) is only used if no historical rate is available
-    # for the transaction's date.
+    # When a transaction carries neither eur_amount nor fx_rate, the converter
+    # consults this dict; if no rate is available for the transaction's date,
+    # the conversion is reported as "missing" — never silently substituted
+    # with today's live rate.
     historical_usd_to_eur_rates: dict[str, float] = dc_field(default_factory=dict)
-    # Set when the historical FX prefetch raised. Per-transaction fallback
+    # Set when the historical FX prefetch raised. Per-transaction "missing"
     # warnings are suppressed in this case — the bulk ``fxRatesUnavailable``
     # warning already covers every affected transaction.
     fx_rates_unavailable: bool = False
+    # Transaction ids whose EUR conversion failed (no eur_amount, no fx_rate,
+    # no historical rate available). Surfaced to the UI so the user can deep-link
+    # into the transaction list and supply a value.
+    fx_missing_tx_ids: list[int] = dc_field(default_factory=list)
 
 
 def _lookup_historical_rate(
@@ -143,28 +179,29 @@ FxSource = Literal[
     "explicit_eur",
     "explicit_fx_rate",
     "historical",
-    "fallback_current",
-    "none",
+    "missing",
 ]
 
 
 def _eur_from_tx(
     tx: object,
     total_amount: Decimal,
-    usd_to_eur_fallback: float | None = None,
     historical_rates: dict[str, float] | None = None,
-) -> tuple[Decimal, FxSource]:
+) -> tuple[Decimal | None, FxSource]:
     """Return ``(eur_equivalent, source)`` for a transaction.
 
-    The returned ``source`` tag tells the caller which branch of the cascade
-    produced the value, so it can decide whether to emit a warning:
+    The cascade is strict: once we exhaust the trusted sources (explicit
+    user-supplied amount, explicit user-supplied rate, historical market rate),
+    we report ``(None, "missing")`` rather than silently substitute today's
+    live rate. Today's rate is *display* data; using it for historical
+    valuation would let a 2-year-old deposit be repriced at a present-day FX
+    level, distorting principal_eur and tax computations.
+
+    Source tags:
 
       * ``explicit_eur`` / ``explicit_fx_rate`` — user-supplied, trusted.
-      * ``historical`` — market rate on the transaction's date.
-      * ``fallback_current`` — today's live rate used as a last resort.
-        Callers should surface this to the user; otherwise a multi-year
-        portfolio can silently re-price old transactions at today's FX rate.
-      * ``none`` — no rate available at all (returns ``Decimal('0')``).
+      * ``historical`` — market rate on (or just before) the transaction's date.
+      * ``missing`` — no rate available; aggregate must be marked incomplete.
     """
     if tx.eur_amount is not None:
         return _to_decimal(tx.eur_amount), "explicit_eur"
@@ -175,6 +212,4 @@ def _eur_from_tx(
         rate = _lookup_historical_rate(historical_rates, date_str)
         if rate is not None:
             return total_amount * _to_decimal(rate), "historical"
-    if usd_to_eur_fallback is not None:
-        return total_amount * _to_decimal(usd_to_eur_fallback), "fallback_current"
-    return _ZERO, "none"
+    return None, "missing"

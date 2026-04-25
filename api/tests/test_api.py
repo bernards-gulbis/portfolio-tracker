@@ -1688,14 +1688,18 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     assert data["usd_to_eur_rate"] == pytest.approx(1.0)
 
 
-def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClient):
-    """Test that dividends without fx_rate fall back to current USD→EUR rate"""
+def test_portfolio_status_dividend_eur_marked_missing_when_no_historical_rate(
+    client: TestClient,
+):
+    """When a dividend has no fx_rate and the historical rate fetch is empty,
+    dividends_eur must be reported as None (and the affected tx surfaced in
+    fx_missing_tx_ids) — never silently substituted with today's live rate."""
     portfolio_response = client.post(
-        "/portfolios/", json={"name": "Dividend EUR Fallback Test"}
+        "/portfolios/", json={"name": "Dividend EUR Missing Test"}
     )
     portfolio_id = portfolio_response.json()["id"]
 
-    # Deposit $10,000
+    # Deposit $10,000 with explicit fx_rate so principal_eur stays valid.
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
@@ -1721,8 +1725,9 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
         },
     )
 
-    # Receive dividend WITHOUT fx_rate — should fall back to current rate
-    client.post(
+    # Receive dividend WITHOUT fx_rate — historical fetch returns empty,
+    # so the dividend's EUR conversion is "missing".
+    dividend_response = client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
             "date": "2024-06-01T10:00:00",
@@ -1732,9 +1737,8 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
             "fee": 0.0,
         },
     )
+    dividend_id = dividend_response.json()["id"]
 
-    # When no historical rate is available AND the transaction lacks fx_rate,
-    # the current rate is the last-resort fallback.
     with (
         patch(
             "app.services.price_service.PriceService.get_usd_to_eur_rate",
@@ -1754,10 +1758,13 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
     # Dividends exist in USD
     assert data["dividends"] == pytest.approx(1000.0)
 
-    # dividends_eur computed via fallback rate (1000 * 0.92 = 920)
-    assert data["dividends_eur"] == pytest.approx(920.0)
+    # dividends_eur is None — not silently filled with today's live rate.
+    assert data["dividends_eur"] is None
+    assert data["eur_incomplete"] is True
+    assert dividend_id in data["fx_missing_tx_ids"]
 
-    # Live rate available for frontend tax computation
+    # Live rate is still surfaced separately (used for live valuation, not
+    # historical reconstruction).
     assert data["usd_to_eur_rate"] == pytest.approx(0.92)
 
 
@@ -3669,6 +3676,10 @@ def test_warning_withdraw_negative_cash():
         date=datetime(2024, 1, 2),
         type=TransactionType.WITHDRAW,
         total_amount=-500.0,
+        # Explicit eur_amount so the FX cascade resolves cleanly and only the
+        # negative-cash warning fires (the fix isolates this test from FX
+        # missing-rate noise).
+        eur_amount=-460.0,
     )
     _apply_transaction(state, tx, strict=True)
 

@@ -311,23 +311,36 @@ class DividendReceivedResponse(BaseModel):
 
 
 class WithdrawalFxResponse(BaseModel):
-    """Schema for a single withdrawal with realized FX gain/loss."""
+    """Schema for a single withdrawal with realized FX gain/loss.
+
+    EUR fields are nullable: when the historical FX rate for the withdrawal
+    date — or the running EUR principal — is unavailable, the EUR figures are
+    reported as ``None`` rather than silently filled with today's live rate.
+    """
 
     date: str
     amount: float  # USD withdrawal amount (positive)
-    amount_eur_avg: float  # EUR cost basis at average rate
-    amount_eur: float  # EUR at historical withdrawal rate
-    realized_fx_gain: float  # amount_eur - amount_eur_avg
+    amount_eur_avg: float | None = None  # EUR cost basis at average rate
+    amount_eur: float | None = None  # EUR at historical withdrawal rate
+    realized_fx_gain: float | None = None  # amount_eur - amount_eur_avg
 
 
 class PortfolioStatusResponse(BaseModel):
-    """Schema for portfolio status (transaction-derived metrics only)"""
+    """Schema for portfolio status (transaction-derived metrics only).
+
+    EUR aggregates are nullable: when any contributing transaction lacks a
+    usable historical FX rate (and no explicit ``eur_amount``/``fx_rate``),
+    the corresponding aggregate is reported as ``None`` instead of being
+    silently distorted by today's rate. ``eur_incomplete`` is the ergonomic
+    OR-of-the-three for the UI; ``fx_missing_tx_ids`` lists the offending
+    transactions so the UI can deep-link the user to the fix.
+    """
 
     portfolio_id: int
     portfolio_name: str
     principal: float  # Deposits - Withdrawals
-    principal_eur: float  # Sum of all eur_amount fields (historical rates)
-    principal_eur_avg: float  # EUR principal (average cost method for withdrawals)
+    principal_eur: float | None = None  # Sum of all eur_amount (historical rates)
+    principal_eur_avg: float | None = None  # EUR principal (avg-cost for withdrawals)
     dividends: float
     dividends_eur: float | None = None  # Dividends in EUR (historical rates)
     cash: float
@@ -344,6 +357,10 @@ class PortfolioStatusResponse(BaseModel):
         default_factory=list
     )  # Transaction processing warnings
     usd_to_eur_rate: float | None = None  # Live USD→EUR rate; None when unavailable
+    eur_incomplete: bool = False  # True when any EUR aggregate is None
+    fx_missing_tx_ids: list[int] = Field(
+        default_factory=list
+    )  # Transaction ids needing an FX rate / EUR amount
 
     model_config = ConfigDict(from_attributes=True)
 

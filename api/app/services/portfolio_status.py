@@ -85,10 +85,10 @@ def _prefetch_historical_fx_rates(
 
     On provider failure, records a bulk ``fxRatesUnavailable`` warning on
     *state* listing how many transactions are affected and flips the
-    ``fx_rates_unavailable`` flag so per-transaction fallback warnings are
+    ``fx_rates_unavailable`` flag so per-transaction "missing" warnings are
     suppressed (the bulk warning already covers them). Returns ``{}`` when
-    nothing needs historical lookup or the fetch failed — the caller then
-    falls back to the current rate for each affected transaction.
+    nothing needs historical lookup or the fetch failed — affected transactions
+    are then reported as ``missing`` with no silent today-rate substitution.
     """
     fx_blind = [
         tx
@@ -110,9 +110,8 @@ def _prefetch_historical_fx_rates(
         logger.warning("Historical USD/EUR rate fetch failed: %s", exc)
         state.fx_rates_unavailable = True
         # The bulk warning carries the earliest affected transaction date
-        # (not a specific "failed" tx — the whole fetch failed). The UI uses
-        # this date only as the React key; the translated text omits it
-        # because the warning is portfolio-wide, not transaction-specific.
+        # (used only as the React key) and the count of affected transactions.
+        # The translated text frames this as incomplete — not approximate.
         earliest = min(fx_blind, key=lambda tx: tx.date)
         state.warnings.append(
             _Warning(
@@ -134,7 +133,6 @@ def calculate_status(
     """Calculate comprehensive portfolio status from transactions."""
     transactions = sorted(transactions, key=lambda t: t.date)
     state = _TxState()
-    state.usd_to_eur_fallback = usd_to_eur_rate
     state.historical_usd_to_eur_rates = _prefetch_historical_fx_rates(
         transactions, state
     )
@@ -143,18 +141,24 @@ def calculate_status(
 
     holdings_list, holdings_cost = _build_holdings_list(state)
 
-    # Normalize dividends_eur (historical per-transaction rates)
-    has_valid_eur = state.dividends > 0 and state.dividends_eur > 0
-    dividends_eur: Decimal | None = state.dividends_eur if has_valid_eur else None
+    # Surface partial-conversion failures cleanly: any incomplete EUR aggregate
+    # flips the response-level ``eur_incomplete`` flag, and the affected tx ids
+    # are deduped + sorted for stable UI deep-linking.
+    eur_incomplete = (
+        state.principal_eur.is_incomplete
+        or state.principal_eur_avg.is_incomplete
+        or state.dividends_eur.is_incomplete
+    )
+    fx_missing_tx_ids = sorted(set(state.fx_missing_tx_ids))
 
     return PortfolioStatusResponse(
         portfolio_id=portfolio_id,
         portfolio_name=portfolio_name,
         principal=_normalize_zero(state.principal),
-        principal_eur=_normalize_zero(state.principal_eur),
-        principal_eur_avg=_normalize_zero(state.principal_eur_avg),
+        principal_eur=_opt_normalize(state.principal_eur.value),
+        principal_eur_avg=_opt_normalize(state.principal_eur_avg.value),
         dividends=_normalize_zero(state.dividends),
-        dividends_eur=_opt_normalize(dividends_eur),
+        dividends_eur=_opt_normalize(state.dividends_eur.value),
         cash=_normalize_zero(state.cash),
         holdings=holdings_list,
         holdings_cost=_normalize_zero(holdings_cost),
@@ -173,4 +177,6 @@ def calculate_status(
         ],
         warnings=[TransactionWarning(**dataclasses.asdict(w)) for w in state.warnings],
         usd_to_eur_rate=usd_to_eur_rate,
+        eur_incomplete=eur_incomplete,
+        fx_missing_tx_ids=fx_missing_tx_ids,
     )

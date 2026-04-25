@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
 import { useDebounce } from '../hooks/useDebounce';
 import { useNavigation } from '../context/NavigationContext';
+import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
 import { TransactionTable } from './TransactionTable';
 import { ImportCSVModal } from './ImportCSVModal';
@@ -57,6 +58,11 @@ export const TransactionView = () => {
     debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
     sortOrder
   );
+  // Status carries the list of transactions the backend could not convert
+  // to EUR (no eur_amount, no fx_rate, no historical rate). Surfacing them
+  // here lets the user fix the offending row directly from the table.
+  const { data: portfolioStatus } = usePortfolioStatus(activePortfolioId);
+  const fxMissingTxIds = portfolioStatus?.fx_missing_tx_ids ?? [];
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
@@ -218,6 +224,7 @@ export const TransactionView = () => {
           onTypeFilterChange={setTypeFilter}
           sortOrder={sortOrder}
           onSortOrderChange={setSortOrder}
+          fxMissingTxIds={fxMissingTxIds}
         />
       </CardContent>
 

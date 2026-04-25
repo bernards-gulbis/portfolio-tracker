@@ -180,6 +180,8 @@ const mockStatus: PortfolioStatus = {
   capital_gains_tax_rate: 0.255,
   warnings: [],
   usd_to_eur_rate: 0.92,
+  eur_incomplete: false,
+  fx_missing_tx_ids: [],
 };
 
 const mockTransaction: Transaction = {

@@ -127,9 +127,11 @@ export type DividendReceived = z.infer<typeof DividendReceivedSchema>;
 const WithdrawalFxSchema = z.object({
   date: z.string(),
   amount: z.number(),
-  amount_eur_avg: z.number(),
-  amount_eur: z.number(),
-  realized_fx_gain: z.number(),
+  // Nullable when the historical FX rate or running EUR principal was
+  // unavailable — the backend never silently substitutes today's rate.
+  amount_eur_avg: z.number().nullable(),
+  amount_eur: z.number().nullable(),
+  realized_fx_gain: z.number().nullable(),
 });
 export type WithdrawalFx = z.infer<typeof WithdrawalFxSchema>;
 
@@ -144,8 +146,12 @@ const PortfolioStatusSchema = z.object({
   portfolio_id: z.number(),
   portfolio_name: z.string(),
   principal: z.number(),
-  principal_eur: z.number(),
-  principal_eur_avg: z.number(),
+  // EUR aggregates are nullable: when any contributing transaction lacks a
+  // usable historical FX rate, the aggregate is reported as null instead of
+  // silently distorted by today's live rate. ``eur_incomplete`` is the
+  // ergonomic OR-flag; ``fx_missing_tx_ids`` lists the offenders.
+  principal_eur: z.number().nullable(),
+  principal_eur_avg: z.number().nullable(),
   dividends: z.number(),
   dividends_eur: z.number().nullable(),
   cash: z.number(),
@@ -158,6 +164,8 @@ const PortfolioStatusSchema = z.object({
   capital_gains_tax_rate: z.number(),
   warnings: z.array(TransactionWarningSchema),
   usd_to_eur_rate: z.number().nullable(),
+  eur_incomplete: z.boolean().default(false),
+  fx_missing_tx_ids: z.array(z.number()).default([]),
 });
 export type PortfolioStatus = z.infer<typeof PortfolioStatusSchema>;
 

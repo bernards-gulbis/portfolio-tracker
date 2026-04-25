@@ -117,6 +117,8 @@ const mockBrandNewStatus: PortfolioStatus = {
   capital_gains_tax_rate: 0,
   warnings: [],
   usd_to_eur_rate: null,
+  eur_incomplete: false,
+  fx_missing_tx_ids: [],
 };
 
 const mockStatusWithHoldings: PortfolioStatus = {

@@ -25,6 +25,8 @@ const baseStatus: PricedPortfolioStatus = {
   missing_prices: [],
   warnings: [],
   usd_to_eur_rate: 0.85,
+  eur_incomplete: false,
+  fx_missing_tx_ids: [],
 };
 
 describe('computeEurMetrics', () => {

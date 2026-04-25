@@ -264,8 +264,12 @@ class TestTransactionHandlers:
         state = _TxState()
         state.cash = Decimal("100")
         state.principal = Decimal("1000")
-        state.principal_eur = Decimal("900")
-        state.principal_eur_avg = Decimal("900")
+        # Seed the EUR accumulators so the avg-rate path inside _apply_withdraw
+        # has real numbers to work with (otherwise the avg accumulator is
+        # complete-but-zero, which the new logic correctly handles but isn't
+        # the scenario this test exercises).
+        state.principal_eur.add(Decimal("900"))
+        state.principal_eur_avg.add(Decimal("900"))
         tx = _make_tx(
             type=TransactionType.WITHDRAW, total_amount=-500.0, eur_amount=-460.0
         )
@@ -457,9 +461,12 @@ class TestCalculateStatus:
 
 
 class TestCalculatePerformance:
+    @patch(
+        "app.services.portfolio_status.PriceService.get_historical_usd_to_eur_rates",
+        return_value={},
+    )
     @patch("app.services.portfolio_perf.PriceService")
-    @patch("app.services.portfolio_perf._resolve_usd_to_eur_rate", return_value=0.92)
-    def test_out_of_order_transactions(self, _mock_eur, mock_price_service):
+    def test_out_of_order_transactions(self, mock_price_service, _mock_fx):
         """Out-of-order transactions should produce the same performance as sorted ones."""
         mock_price_service.get_historical_prices_for_multiple_tickers.return_value = {}
         mock_price_service.get_last_known_price.return_value = None
@@ -718,9 +725,10 @@ class TestDecimalPrecision:
         # eur_historical of withdrawal = 525; realized_fx_gain = 525 - 550 = -25
         assert result.realized_withdrawals[0].realized_fx_gain == pytest.approx(-25.0)
 
-    def test_prefetch_fx_fallback_on_provider_error(self):
-        """If PriceService raises, calculate_status must still produce a result
-        using the current-rate fallback (not crash)."""
+    def test_prefetch_fx_failure_marks_aggregates_incomplete(self):
+        """If PriceService raises, calculate_status must produce a result
+        without silently falling back to today's live rate. EUR aggregates
+        are reported as None and ``eur_incomplete`` is True."""
         txs = [
             _make_tx(
                 id=1,
@@ -736,13 +744,17 @@ class TestDecimalPrecision:
         ):
             result = calculate_status(
                 txs,
-                usd_to_eur_rate=0.90,
+                usd_to_eur_rate=0.90,  # live rate present but must NOT be substituted
                 tax_rate=Decimal("0.20"),
                 portfolio_id=1,
-                portfolio_name="FX fallback",
+                portfolio_name="FX missing",
             )
-        # Fallback to current rate: 1000 * 0.90 = 900
-        assert result.principal_eur == pytest.approx(900.0)
+        # The deposit had no historical rate available — aggregate is None,
+        # not 1000 * today's-rate. The live rate is exposed separately.
+        assert result.principal_eur is None
+        assert result.eur_incomplete is True
+        assert result.fx_missing_tx_ids == [1]
+        assert result.usd_to_eur_rate == pytest.approx(0.90)
 
     def test_prefetch_skipped_when_no_fx_blind_transactions(self):
         """Deposit with eur_amount set → no PriceService call at all."""
@@ -811,18 +823,16 @@ class TestDecimalPrecision:
             assert tx.fx_rate == Decimal("1.087000")
 
 
-class TestFxFallbackWarnings:
-    """Package A: silent FX fallbacks must surface as UI-visible warnings.
-
-    The numerical behaviour (fall back to current rate when nothing else is
-    available) is preserved — but every path that used to be silent now
-    emits a structured warning so the user knows their EUR numbers are an
-    approximation.
+class TestFxRateMissingWarnings:
+    """When historical FX rates are unavailable for a transaction, the EUR
+    aggregate is reported as incomplete and a structured warning is emitted —
+    today's live rate is never silently substituted for a historical date.
     """
 
-    def test_prefetch_failure_emits_bulk_warning(self):
-        """PriceService raising → one aggregate ``fxRatesUnavailable``
-        warning carrying the number of affected transactions."""
+    def test_prefetch_failure_emits_bulk_warning_and_marks_incomplete(self):
+        """PriceService raising → one aggregate ``fxRatesUnavailable`` warning
+        carrying the count of affected transactions, EUR aggregates None,
+        ``eur_incomplete`` True, all affected ids surfaced."""
         txs = [
             _make_tx(
                 id=1,
@@ -847,10 +857,13 @@ class TestFxFallbackWarnings:
                 usd_to_eur_rate=0.90,
                 tax_rate=Decimal("0.20"),
                 portfolio_id=1,
-                portfolio_name="FX bulk warning",
+                portfolio_name="FX bulk missing",
             )
-        # Numerical behaviour unchanged — still falls back to current rate.
-        assert result.principal_eur == pytest.approx(1350.0)
+        # No silent today-rate substitution — aggregates are None.
+        assert result.principal_eur is None
+        assert result.principal_eur_avg is None
+        assert result.eur_incomplete is True
+        assert result.fx_missing_tx_ids == [1, 2]
         # One aggregate warning with a count of affected transactions.
         bulk = [w for w in result.warnings if w.code == "fxRatesUnavailable"]
         assert len(bulk) == 1
@@ -859,13 +872,21 @@ class TestFxFallbackWarnings:
         per_tx = [
             w
             for w in result.warnings
-            if w.code in ("fxFallbackToCurrent", "fxFallbackToCurrentTicker")
+            if w.code in ("fxRateMissing", "fxRateMissingTicker")
         ]
         assert per_tx == []
+        # The legacy ``fxFallback*`` codes must never appear — they were
+        # renamed precisely because their semantics changed.
+        legacy = [
+            w
+            for w in result.warnings
+            if w.code in ("fxFallbackToCurrent", "fxFallbackToCurrentTicker")
+        ]
+        assert legacy == []
 
     def test_per_tx_warning_when_date_missing_from_rates(self):
         """PriceService succeeds but returns no rate on-or-before the tx date
-        → per-tx ``fxFallbackToCurrent`` warning (no ticker in params, since
+        → per-tx ``fxRateMissing`` warning (no ticker in params, since
         deposits don't carry one), no bulk warning."""
         txs = [
             _make_tx(
@@ -883,28 +904,27 @@ class TestFxFallbackWarnings:
         ):
             result = calculate_status(
                 txs,
-                usd_to_eur_rate=0.90,
+                usd_to_eur_rate=0.90,  # live rate must NOT seep into principal_eur
                 tax_rate=Decimal("0.20"),
                 portfolio_id=1,
-                portfolio_name="Per-tx fallback",
+                portfolio_name="Per-tx missing",
             )
-        # Falls back to current rate numerically.
-        assert result.principal_eur == pytest.approx(900.0)
-        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrent"]
+        # No today-rate substitution — aggregate is None.
+        assert result.principal_eur is None
+        assert result.eur_incomplete is True
+        assert result.fx_missing_tx_ids == [1]
+        per_tx = [w for w in result.warnings if w.code == "fxRateMissing"]
         assert len(per_tx) == 1
-        # Deposit has no ticker, so params is empty — prevents an awkward
-        # empty-ticker placeholder in the translated message.
+        # Deposit has no ticker, so params is empty.
         assert per_tx[0].params == {}
         assert "2020-01-01" in per_tx[0].date
         # Ticker-specific variant must not fire when there is no ticker.
-        assert [
-            w for w in result.warnings if w.code == "fxFallbackToCurrentTicker"
-        ] == []
+        assert [w for w in result.warnings if w.code == "fxRateMissingTicker"] == []
         # Bulk warning should NOT fire when prefetch succeeded.
         assert [w for w in result.warnings if w.code == "fxRatesUnavailable"] == []
 
     def test_no_warning_when_every_tx_has_explicit_eur_amount(self):
-        """Explicit eur_amount means no fallback path was taken — no warnings."""
+        """Explicit eur_amount means no missing-rate path was taken — no warnings."""
         txs = [
             _make_tx(
                 id=1,
@@ -922,14 +942,17 @@ class TestFxFallbackWarnings:
             portfolio_name="Explicit EUR",
         )
         codes = {w.code for w in result.warnings}
-        assert "fxFallbackToCurrent" not in codes
-        assert "fxFallbackToCurrentTicker" not in codes
+        assert "fxRateMissing" not in codes
+        assert "fxRateMissingTicker" not in codes
         assert "fxRatesUnavailable" not in codes
+        assert result.principal_eur == pytest.approx(900.0)
+        assert result.eur_incomplete is False
+        assert result.fx_missing_tx_ids == []
 
-    def test_dividend_with_fallback_emits_warning_with_ticker(self):
-        """Dividends carry a ticker, so the fallback warning uses the
-        ``fxFallbackToCurrentTicker`` variant with the ticker in params —
-        letting the UI render a clean "EUR value for this AAPL transaction"
+    def test_dividend_with_missing_rate_emits_warning_with_ticker(self):
+        """Dividends carry a ticker, so the missing-rate warning uses the
+        ``fxRateMissingTicker`` variant with the ticker in params — letting
+        the UI render a clean "EUR value for this AAPL transaction"
         sentence instead of an empty-placeholder gap."""
         txs = [
             _make_tx(
@@ -951,22 +974,72 @@ class TestFxFallbackWarnings:
         with patch(
             "app.services.portfolio_status."
             "PriceService.get_historical_usd_to_eur_rates",
-            return_value={},  # empty rates → fallback_current for dividend
+            return_value={},  # empty rates → missing for dividend
         ):
             result = calculate_status(
                 txs,
                 usd_to_eur_rate=0.90,
                 tax_rate=Decimal("0.20"),
                 portfolio_id=1,
-                portfolio_name="Dividend fallback",
+                portfolio_name="Dividend missing",
             )
-        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrentTicker"]
+        per_tx = [w for w in result.warnings if w.code == "fxRateMissingTicker"]
         assert len(per_tx) == 1
         assert per_tx[0].params == {"ticker": "AAPL"}
         # No-ticker variant must not fire when a ticker is present.
-        assert [w for w in result.warnings if w.code == "fxFallbackToCurrent"] == []
+        assert [w for w in result.warnings if w.code == "fxRateMissing"] == []
         # The explicit-EUR deposit must not produce a warning.
         assert [w for w in result.warnings if w.date.startswith("2020-01-01")] == []
+        # principal_eur stays valid (deposit had explicit EUR), but
+        # dividends_eur is None because the dividend was unconvertible.
+        assert result.principal_eur == pytest.approx(9000.0)
+        assert result.dividends_eur is None
+        assert result.eur_incomplete is True
+        assert result.fx_missing_tx_ids == [2]
+
+    def test_partial_coverage_does_not_silently_contaminate(self):
+        """Two deposits with no explicit EUR. Historical prefetch returns a
+        rate only late in the timeline; the earlier deposit has no rate
+        on-or-before its date and falls into the ``missing`` branch. The
+        old silent-fallback cascade would have used today's live rate for
+        that deposit and produced a finite-but-wrong principal_eur. With
+        the fix, the aggregate is None — incomplete is visible, not hidden.
+        """
+        deposit_old = _make_tx(
+            id=11,
+            type=TransactionType.DEPOSIT,
+            date=datetime(2020, 1, 1),
+            total_amount=1000.0,
+        )
+        deposit_new = _make_tx(
+            id=22,
+            type=TransactionType.DEPOSIT,
+            date=datetime(2024, 6, 1),
+            total_amount=2000.0,
+        )
+        # Rate only available on 2024-06-01. The 2020-01-01 deposit has no
+        # rate on-or-before its date, so the nearest-earlier lookup misses.
+        with patch(
+            "app.services.portfolio_status."
+            "PriceService.get_historical_usd_to_eur_rates",
+            return_value={"2024-06-01": 0.95},
+        ):
+            result = calculate_status(
+                [deposit_old, deposit_new],
+                usd_to_eur_rate=1.10,  # deliberately different from historical
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="Partial coverage",
+            )
+        # The aggregate is incomplete — not a contaminated finite number.
+        assert result.principal_eur is None
+        assert result.eur_incomplete is True
+        # Only the older deposit needs a fix.
+        assert result.fx_missing_tx_ids == [11]
+        # Per-tx warning identifies the offending transaction.
+        per_tx = [w for w in result.warnings if w.code == "fxRateMissing"]
+        assert len(per_tx) == 1
+        assert "2020-01-01" in per_tx[0].date
 
 
 # ==================== calculate_performance complexity ====================
@@ -987,12 +1060,12 @@ class TestCalculatePerformanceComplexity:
     thing (performance, not the invariant that causes it).
     """
 
-    @patch("app.services.portfolio_perf.PriceService")
     @patch(
-        "app.services.portfolio_perf._resolve_usd_to_eur_rate",
-        return_value=0.92,
+        "app.services.portfolio_status.PriceService.get_historical_usd_to_eur_rates",
+        return_value={},
     )
-    def test_each_transaction_applied_exactly_once(self, _mock_eur, mock_price_service):
+    @patch("app.services.portfolio_perf.PriceService")
+    def test_each_transaction_applied_exactly_once(self, mock_price_service, _mock_fx):
         mock_price_service.get_historical_prices_for_multiple_tickers.return_value = {}
         mock_price_service.get_last_known_price.return_value = None
 
