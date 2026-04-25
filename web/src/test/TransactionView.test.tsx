@@ -297,4 +297,59 @@ describe('TransactionView', () => {
       expect(screen.getByText(/Export failed/)).toBeInTheDocument();
     });
   });
+
+  it('resets to page 1 when ticker search changes', async () => {
+    const transaction = {
+      id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
+      type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+      price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+    };
+    mockNavigation.activePortfolioId = 1;
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { transactions: [transaction], total: 1, page: 1, page_size: 20, total_pages: 1 },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderView();
+
+    const searchInput = screen.getByPlaceholderText('Search asset...');
+    vi.mocked(useTransactions).mockClear();
+
+    await userEvent.type(searchInput, 'AAPL');
+    // useDebounce delays by 150ms; wait for debounced value to flow through.
+    await waitFor(
+      () => {
+        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc');
+      },
+      { timeout: 1000 }
+    );
+  });
+
+  it('resets pagination and filters to defaults when active portfolio changes', () => {
+    const emptyResult = {
+      data: { transactions: [], total: 0, page: 1, page_size: 20, total_pages: 1 },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>;
+    vi.mocked(useTransactions).mockReturnValue(emptyResult);
+
+    mockNavigation.activePortfolioId = 1;
+    const queryClient = createTestQueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionView />
+      </QueryClientProvider>
+    );
+    expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, undefined, undefined, 'desc');
+
+    // Switch to a different portfolio — the prev-id reset block should fire.
+    vi.mocked(useTransactions).mockClear();
+    mockNavigation.activePortfolioId = 2;
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <TransactionView />
+      </QueryClientProvider>
+    );
+
+    expect(useTransactions).toHaveBeenLastCalledWith(2, 1, 20, undefined, undefined, 'desc');
+  });
 });
