@@ -927,24 +927,30 @@ class TestCachedHistoricalPricesFloatCoercion:
         assert isinstance(result["2026-04-10"], float)
         assert result["2026-04-10"] == pytest.approx(0.92)
 
-    def test_calculate_performance_survives_decimal_db_cache(self):
+    def test_calculate_performance_survives_decimal_db_cache(self, tmp_path):
         """End-to-end guard: with only the DB cache populated (no fresh Yahoo
         fetch), ``calculate_performance`` must not raise on the EURUSD=X
-        inversion at ``portfolio_perf.py::_prepare_perf_data``."""
+        inversion at ``portfolio_perf.py::_prepare_perf_data``.
+
+        Uses a file-backed SQLite DB (not ``:memory:`` + StaticPool) because
+        ``_prepare_perf_data`` fans the per-ticker cache lookups out across
+        a ``ThreadPoolExecutor``; a single shared in-memory connection
+        under Python 3.14's stricter sqlite3 thread-safety raises
+        ``sqlite3.InterfaceError: bad parameter or other API misuse`` when
+        multiple threads read concurrently.
+        """
         from datetime import datetime as _dt
         from decimal import Decimal
 
         from sqlmodel import Session, SQLModel, create_engine
-        from sqlmodel.pool import StaticPool
 
         from app.models import HistoricalPrice, Transaction, TransactionType
         from app.services import price_service as ps_mod
         from app.services.portfolio_perf import calculate_performance
 
         engine = create_engine(
-            "sqlite:///:memory:",
+            f"sqlite:///{tmp_path / 'perf_decimal_cache.db'}",
             connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
         )
         SQLModel.metadata.create_all(engine)
         with Session(engine) as session:
@@ -998,16 +1004,16 @@ class TestCachedHistoricalPricesFloatCoercion:
                 return_value=[],
             ),
         ):
-            result = calculate_performance(
+            data_points, _ = calculate_performance(
                 tx,
                 _dt(2026, 4, 2),
                 _dt(2026, 4, 15),
                 num_points=5,
             )
 
-        assert len(result) == 5
-        assert result[-1]["current_value"] is not None
-        assert result[-1]["fx_rate"] == pytest.approx(1.0 / 1.10)
+        assert len(data_points) == 5
+        assert data_points[-1]["current_value"] is not None
+        assert data_points[-1]["fx_rate"] == pytest.approx(1.0 / 1.10)
 
 
 class TestGetLastKnownPriceWithDate:

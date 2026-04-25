@@ -135,6 +135,148 @@ class TestDatabaseUtilities:
         with pytest.raises(RuntimeError, match=r"alembic\.ini not found"):
             db_module.run_migrations()
 
+    def test_money_columns_guardrail_passes_on_current_schema(self, tmp_path):
+        """SQLModel.metadata.create_all declares Decimal for money columns;
+        the guardrail must accept such a schema."""
+        from sqlalchemy import create_engine
+        from sqlmodel import SQLModel
+
+        import app.models  # noqa: F401 — register tables on metadata
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'numeric.db'}")
+        SQLModel.metadata.create_all(engine)
+
+        from app.core import database as db_module
+
+        # Should not raise — all money columns are NUMERIC/Decimal.
+        db_module.verify_money_columns_are_decimal(target_engine=engine)
+
+    def test_money_columns_guardrail_raises_on_float_schema(self, tmp_path):
+        """A DB that was created from the old baseline (Float money columns)
+        and then NOT upgraded to the Decimal revision must fail the guardrail
+        with a message pointing the operator at the fix."""
+        from sqlalchemy import (
+            Column,
+            Float,
+            Integer,
+            MetaData,
+            String,
+            Table,
+            create_engine,
+        )
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
+        md = MetaData()
+        # Minimal legacy-shape tables — only the money columns matter here.
+        Table(
+            "transaction",
+            md,
+            Column("id", Integer, primary_key=True),
+            Column("total_amount", Float, nullable=False),
+            Column("fx_rate", Float, nullable=True),
+        )
+        Table(
+            "historical_prices",
+            md,
+            Column("ticker", String, primary_key=True),
+            Column("date", String, primary_key=True),
+            Column("price", Float, nullable=False),
+        )
+        Table(
+            "fx_rates",
+            md,
+            Column("date", String, primary_key=True),
+            Column("usd_to_eur_rate", Float, nullable=False),
+        )
+        md.create_all(engine)
+
+        from app.core import database as db_module
+
+        with pytest.raises(RuntimeError) as exc:
+            db_module.verify_money_columns_are_decimal(target_engine=engine)
+        msg = str(exc.value)
+        assert "transaction.total_amount" in msg
+        assert "historical_prices.price" in msg
+        assert "fx_rates.usd_to_eur_rate" in msg
+        assert "alembic upgrade head" in msg
+
+    def test_money_columns_guardrail_skips_missing_tables(self, tmp_path):
+        """A completely empty DB (no tables) must not fail the guardrail —
+        migrations will create the tables. The check is only meaningful
+        when tables exist."""
+        from sqlalchemy import create_engine
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'empty.db'}")
+        from app.core import database as db_module
+
+        # No tables at all → nothing to check → no raise.
+        db_module.verify_money_columns_are_decimal(target_engine=engine)
+
+    def test_transaction_sign_check_constraint_rejects_violations(self, tmp_path):
+        """The ``ck_transaction_sign`` CHECK constraint enforces the ledger's
+        sign semantics at the DB level. A DEPOSIT with a negative amount (or
+        any other sign mismatch) must raise ``IntegrityError`` — turning a
+        silent ledger-corrupting write into an immediate failure even when
+        the Pydantic schema is bypassed (direct SQL, mis-imports, hand-rolled
+        scripts)."""
+        from datetime import datetime
+        from decimal import Decimal
+
+        from sqlalchemy.exc import IntegrityError
+        from sqlmodel import Session, SQLModel, create_engine
+
+        from app.models import Portfolio, Transaction, TransactionType, User
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'check.db'}")
+        SQLModel.metadata.create_all(engine)
+
+        # Seed a user + portfolio so we can attempt transaction inserts.
+        with Session(engine) as session:
+            user = User(email="t@t.t", hashed_password="x")
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            portfolio = Portfolio(name="P", user_id=user.id)
+            session.add(portfolio)
+            session.commit()
+            session.refresh(portfolio)
+            pid = portfolio.id
+
+        # Valid row must insert fine (baseline — guards against a false-positive
+        # constraint that rejects everything).
+        with Session(engine) as session:
+            session.add(
+                Transaction(
+                    portfolio_id=pid,
+                    date=datetime(2025, 1, 1),
+                    type=TransactionType.DEPOSIT,
+                    total_amount=Decimal("100.00"),
+                )
+            )
+            session.commit()
+
+        # Now exercise every sign-violation class.
+        violations: list[tuple[TransactionType, Decimal]] = [
+            (TransactionType.DEPOSIT, Decimal("-1.00")),  # deposit must be > 0
+            (TransactionType.WITHDRAW, Decimal("1.00")),  # withdraw must be < 0
+            (TransactionType.BUY, Decimal("1.00")),  # buy must be < 0
+            (TransactionType.SELL, Decimal("-1.00")),  # sell must be > 0
+            (TransactionType.DIVIDEND, Decimal("-1.00")),  # dividend must be > 0
+            (TransactionType.FEE, Decimal("1.00")),  # fee must be < 0
+            (TransactionType.SPLIT, Decimal("1.00")),  # split must be exactly 0
+        ]
+        for tx_type, bad_amount in violations:
+            with Session(engine) as session, pytest.raises(IntegrityError):
+                session.add(
+                    Transaction(
+                        portfolio_id=pid,
+                        date=datetime(2025, 1, 2),
+                        type=tx_type,
+                        total_amount=bad_amount,
+                    )
+                )
+                session.commit()
+
     def test_run_migrations_refuses_to_stamp_when_multiple_bases(self):
         """Defensive check: if the migration tree has >1 root revision we
         refuse to guess which one to stamp on a pre-Alembic DB."""

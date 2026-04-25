@@ -24,10 +24,12 @@ from app.schemas.schemas import (
 )
 from app.services.portfolio_handlers import _apply_transaction
 from app.services.portfolio_types import (
+    _ISO_DATETIME_FMT,
     _ZERO,
     _normalize_zero,
     _opt_normalize,
     _TxState,
+    _Warning,
 )
 from app.services.price_service import PriceService
 
@@ -76,12 +78,17 @@ _FX_AWARE_TX_TYPES = {
 
 def _prefetch_historical_fx_rates(
     transactions: list[Transaction],
+    state: _TxState,
 ) -> dict[str, float]:
     """Fetch historical USD→EUR rates spanning the dates of transactions that
     lack both ``eur_amount`` and ``fx_rate``.
 
-    Returns an empty dict if nothing needs historical lookup, or if the price
-    provider is unavailable — the caller then falls back to the current rate.
+    On provider failure, records a bulk ``fxRatesUnavailable`` warning on
+    *state* listing how many transactions are affected and flips the
+    ``fx_rates_unavailable`` flag so per-transaction fallback warnings are
+    suppressed (the bulk warning already covers them). Returns ``{}`` when
+    nothing needs historical lookup or the fetch failed — the caller then
+    falls back to the current rate for each affected transaction.
     """
     fx_blind = [
         tx
@@ -92,12 +99,28 @@ def _prefetch_historical_fx_rates(
     ]
     if not fx_blind:
         return {}
+    # Back-pad the fetch window by 5 days so a transaction dated on a
+    # Sunday/holiday can still resolve to the nearest prior trading day's
+    # rate (FX markets don't publish on weekends/holidays).
     start = min(tx.date for tx in fx_blind) - timedelta(days=5)
     end = max(tx.date for tx in fx_blind) + timedelta(days=1)
     try:
         return PriceService.get_historical_usd_to_eur_rates(start, end)
     except Exception as exc:
         logger.warning("Historical USD/EUR rate fetch failed: %s", exc)
+        state.fx_rates_unavailable = True
+        # The bulk warning carries the earliest affected transaction date
+        # (not a specific "failed" tx — the whole fetch failed). The UI uses
+        # this date only as the React key; the translated text omits it
+        # because the warning is portfolio-wide, not transaction-specific.
+        earliest = min(fx_blind, key=lambda tx: tx.date)
+        state.warnings.append(
+            _Warning(
+                code="fxRatesUnavailable",
+                date=earliest.date.strftime(_ISO_DATETIME_FMT),
+                params={"count": str(len(fx_blind))},
+            )
+        )
         return {}
 
 
@@ -112,7 +135,9 @@ def calculate_status(
     transactions = sorted(transactions, key=lambda t: t.date)
     state = _TxState()
     state.usd_to_eur_fallback = usd_to_eur_rate
-    state.historical_usd_to_eur_rates = _prefetch_historical_fx_rates(transactions)
+    state.historical_usd_to_eur_rates = _prefetch_historical_fx_rates(
+        transactions, state
+    )
     for tx in transactions:
         _apply_transaction(state, tx, strict=True)
 

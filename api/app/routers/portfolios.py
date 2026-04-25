@@ -215,8 +215,13 @@ def get_portfolio_performance(
 
     try:
         PriceService.clear_session_cache()
-        # get_portfolio_performance verifies ownership and returns (name, data_points)
-        portfolio_name, performance_data = service.get_portfolio_performance(
+        # get_portfolio_performance verifies ownership and returns
+        # (name, data_points, cost_basis_fallback_tickers)
+        (
+            portfolio_name,
+            performance_data,
+            cost_basis_fallback_tickers,
+        ) = service.get_portfolio_performance(
             portfolio_id,
             user_id=user.id,
             start_date=start_dt,
@@ -241,6 +246,7 @@ def get_portfolio_performance(
             portfolio_id=portfolio_id,
             portfolio_name=portfolio_name,
             data_points=data_points,
+            cost_basis_fallback_tickers=cost_basis_fallback_tickers,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

@@ -115,3 +115,37 @@ export const toLocalDateStr = (d: Date): string => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
+/**
+ * Format a tax rate (a fraction in [0, 1]) as a percent string with up to
+ * two decimal places, trimming trailing zeros. 0.215 → "21.5", 0.25 → "25".
+ */
+export const formatTaxRatePercent = (rate: number): string => {
+  const pct = rate * 100;
+  return pct.toFixed(2).replace(/\.?0+$/, '');
+};
+
+/**
+ * Whole-day count from a YYYY-MM-DD-prefixed date string to a reference
+ * millisecond timestamp, using local-calendar semantics. Any time suffix on
+ * the input is ignored.
+ *
+ * Local-calendar semantics avoid two bugs: parsing "YYYY-MM-DD" as UTC
+ * (browser default) would shift by one day in negative-UTC timezones, and
+ * simple millisecond arithmetic would be off across DST transitions.
+ */
+export const daysSinceLocalDate = (dateStr: string, now: number): number => {
+  const [yStr, mStr, dStr] = dateStr.slice(0, 10).split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const d = Number(dStr);
+  if (!y || !m || !d) return 0;
+  const todayLocal = new Date(now);
+  const thenUtc = Date.UTC(y, m - 1, d);
+  const todayUtc = Date.UTC(
+    todayLocal.getFullYear(),
+    todayLocal.getMonth(),
+    todayLocal.getDate(),
+  );
+  return Math.floor((todayUtc - thenUtc) / 86_400_000);
+};

@@ -21,7 +21,49 @@ logger = logging.getLogger(__name__)
 
 
 class PriceService:
-    """Service for fetching current stock prices from Yahoo Finance"""
+    """Service for fetching current stock prices from Yahoo Finance.
+
+    Concurrency model
+    -----------------
+    All mutable class-level state is guarded by one of two locks:
+
+    * ``_cache_lock`` — covers the live-price cache ``_price_cache``
+      (ticker → (price, fetched_at)). Reads and writes go through the lock;
+      the TTL check happens inside the critical section.
+    * ``_historical_cache_lock`` — covers the in-request historical-price
+      cache ``_historical_cache`` (key → {date: price}). ``clear_session_cache``,
+      ``_store_in_historical_cache``, and the cache-read branch in
+      ``get_historical_prices_for_ticker`` all take this lock; readers return
+      a ``.copy()`` so callers cannot mutate the cached dict.
+
+    Guaranteed properties:
+
+    * **No corruption.** Every read and every write touches the dict only
+      inside the lock. Copies are returned from reads.
+    * **Bounded staleness.** Live prices obey ``PRICE_CACHE_TTL_SECONDS``;
+      historical data for dates older than ``_HISTORICAL_DATA_CUTOFF_DAYS``
+      is treated as immutable and safely reused.
+
+    Known non-guarantees (accepted):
+
+    * **Double-fetch under contention.** Two threads that both miss the
+      in-memory cache for the same ``(ticker, range)`` key will each run
+      the DB query + Yahoo fetch. The second write simply overwrites the
+      first with identical data — inefficient but safe. A per-key
+      compute-if-absent lock would eliminate this but is unnecessary at
+      current load.
+    * **Cross-request cache leakage.** ``clear_session_cache`` is called
+      at the start of every status/perf request. If request B clears while
+      request A is mid-fetch, A's subsequent store can re-populate the
+      cache with A's data, which B may then read. The data is still
+      within TTL, so this manifests as slightly stale prices, never as
+      wrong-portfolio prices (keys include ticker + dates, which are not
+      user-scoped).
+
+    If either non-guarantee becomes material, the right fix is a
+    request-scoped cache passed via FastAPI ``Depends`` rather than the
+    current process-global cache.
+    """
 
     # Class-level cache: ticker -> (price, timestamp)
     _price_cache: ClassVar[dict[str, tuple[float | None, datetime]]] = {}

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from fastapi_users import schemas as fu_schemas
@@ -103,6 +103,17 @@ class TransactionBase(BaseModel):
     currency: str | None = Field(None, max_length=3)
     fx_rate: float | None = None
 
+    @field_validator("date", mode="after")
+    @classmethod
+    def coerce_naive_to_utc(cls, v: datetime) -> datetime:
+        """Naive datetimes get explicit UTC tzinfo so downstream comparisons
+        with timezone-aware values don't silently reinterpret against the
+        server's local clock. Aware inputs are preserved verbatim — their
+        offset is semantic data the user supplied."""
+        if v.tzinfo is None:
+            return v.replace(tzinfo=UTC)
+        return v
+
     @field_validator("ticker")
     @classmethod
     def validate_ticker(cls, v: str | None) -> str | None:
@@ -187,6 +198,17 @@ class TransactionUpdate(BaseModel):
     split_ratio: float | None = None
     currency: str | None = None
     fx_rate: float | None = None
+
+    @field_validator("date", mode="after")
+    @classmethod
+    def coerce_naive_to_utc(cls, v: datetime | None) -> datetime | None:
+        """Mirror ``TransactionBase.coerce_naive_to_utc`` so PUT /transactions/{id}
+        has the same tz semantics as POST. Without this, updating a date with
+        a naive input would store tz-ambiguous data while a fresh create
+        coerces to UTC — silent asymmetry."""
+        if v is None or v.tzinfo is not None:
+            return v
+        return v.replace(tzinfo=UTC)
 
     @field_validator("ticker")
     @classmethod
@@ -397,5 +419,9 @@ class PortfolioPerformanceResponse(BaseModel):
     portfolio_id: int
     portfolio_name: str
     data_points: list[PerformanceDataPoint]
+    # Tickers whose historical prices were unavailable and which were
+    # therefore valued at cost basis for some or all of the series.
+    # Non-empty means the chart is lying flat for those symbols.
+    cost_basis_fallback_tickers: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatSignedCurrency, formatDateTime, formatSignedPercent, formatDaysHeld, getValueClass, toLocalDateStr } from '../utils/formatters';
+import {
+  formatCurrency,
+  formatSignedCurrency,
+  formatDateTime,
+  formatSignedPercent,
+  formatDaysHeld,
+  getValueClass,
+  toLocalDateStr,
+  formatTaxRatePercent,
+  daysSinceLocalDate,
+} from '../utils/formatters';
 
 describe('Formatters', () => {
   describe('formatCurrency', () => {
@@ -136,6 +146,55 @@ describe('Formatters', () => {
     it('pads single-digit month and day', () => {
       const d = new Date(2024, 2, 5); // Mar 5 2024
       expect(toLocalDateStr(d)).toBe('2024-03-05');
+    });
+  });
+
+  describe('formatTaxRatePercent', () => {
+    it('returns whole numbers without trailing zeros', () => {
+      expect(formatTaxRatePercent(0.25)).toBe('25');
+      expect(formatTaxRatePercent(0.2)).toBe('20');
+      expect(formatTaxRatePercent(1)).toBe('100');
+      expect(formatTaxRatePercent(0)).toBe('0');
+    });
+
+    it('preserves fractional percents', () => {
+      // Regression: 0.215 used to render as "21" (toFixed(1).replace(/\.0$/,''))
+      expect(formatTaxRatePercent(0.215)).toBe('21.5');
+      expect(formatTaxRatePercent(0.2755)).toBe('27.55');
+      expect(formatTaxRatePercent(0.9999)).toBe('99.99');
+    });
+
+    it('rounds to two decimal places max', () => {
+      expect(formatTaxRatePercent(0.255123)).toBe('25.51');
+      expect(formatTaxRatePercent(0.001)).toBe('0.1');
+    });
+  });
+
+  describe('daysSinceLocalDate', () => {
+    it('returns whole days from a YYYY-MM-DD string to a reference date', () => {
+      // Reference: 2026-04-24 local midnight
+      const now = new Date(2026, 3, 24).getTime();
+      expect(daysSinceLocalDate('2026-04-24', now)).toBe(0);
+      expect(daysSinceLocalDate('2026-04-23', now)).toBe(1);
+      expect(daysSinceLocalDate('2026-01-01', now)).toBe(113);
+    });
+
+    it('does not shift by one day in negative-UTC timezones', () => {
+      // Regression: the old implementation appended 'T00:00:00Z' which
+      // parses as UTC. In a US-Eastern browser, "2024-01-01" UTC is
+      // "2023-12-31 19:00" local, shifting "days since" by one.
+      // The new implementation must parse as local time so the same
+      // input string produces the same result regardless of the browser's
+      // offset.
+      const now = new Date(2024, 5, 1).getTime(); // 2024-06-01 local
+      expect(daysSinceLocalDate('2024-06-01', now)).toBe(0);
+      expect(daysSinceLocalDate('2024-05-01', now)).toBe(31);
+    });
+
+    it('ignores a time suffix and uses the date-only portion', () => {
+      const now = new Date(2024, 0, 15).getTime();
+      expect(daysSinceLocalDate('2024-01-10T14:30:00Z', now)).toBe(5);
+      expect(daysSinceLocalDate('2024-01-10T14:30:00', now)).toBe(5);
     });
   });
 

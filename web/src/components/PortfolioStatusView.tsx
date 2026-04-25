@@ -2,7 +2,7 @@ import React, { useMemo, useState, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePortfolioStatusView } from '../hooks/usePortfolioStatusView';
 import { useNavigation } from '../context/NavigationContext';
-import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass } from '../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass, formatTaxRatePercent } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, RealizedSale, DividendReceived } from '../api';
 import { useCurrencyPreference, type Currency } from '../hooks/useCurrencyPreference';
@@ -95,7 +95,10 @@ const CollapsibleRealizedGains = ({ realizedSales, locale }: CollapsibleRealized
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
-        {t('status.realizedGains')}
+        <span>{t('status.realizedGains')}</span>
+        <span className="text-xs font-normal text-muted-foreground">
+          ({t('status.realizedGainsMethod')})
+        </span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <RealizedGainsTable realizedSales={realizedSales} locale={locale} />
@@ -262,7 +265,7 @@ const PortfolioStatusContent = ({
   const afterTaxValue = totalValue != null && estimatedTax != null
     ? totalValue - estimatedTax
     : null;
-  const taxRatePct = (status.capital_gains_tax_rate * 100).toFixed(1).replace(/\.0$/, '');
+  const taxRatePct = formatTaxRatePercent(status.capital_gains_tax_rate);
 
   // FX impact caption for Net Invested (EUR mode)
   const fxImpact = showEur ? (eur?.currencyGainsEur ?? null) : null;
@@ -280,14 +283,28 @@ const PortfolioStatusContent = ({
           <AlertDescription>
             <p className="font-medium">{t('status.transactionWarnings')}</p>
             <ul className="list-disc pl-4 mt-1 text-sm">
-              {status.warnings.map((w: TransactionWarning) => (
-                <li key={`${w.code}-${w.date}`}>
-                  {(t as (key: string, options?: Record<string, unknown>) => string)(`status.warnings.${w.code}`, {
-                    ...w.params,
-                    date: formatDateTime(w.date, locale),
-                  })}
-                </li>
-              ))}
+              {status.warnings.map((w: TransactionWarning, i: number) => {
+                // Backend sends params as Record<string, string>, but i18next's
+                // plural resolver needs ``count`` as a number to pick _one / _other.
+                const interpolation: Record<string, unknown> = {
+                  ...w.params,
+                  date: formatDateTime(w.date, locale),
+                };
+                if (typeof interpolation.count === 'string') {
+                  const n = Number(interpolation.count);
+                  if (Number.isFinite(n)) interpolation.count = n;
+                }
+                // Index disambiguates warnings sharing the same (code, date) —
+                // e.g., two fx-fallback warnings on the same midnight timestamp.
+                return (
+                  <li key={`${w.code}-${w.date}-${i}`}>
+                    {(t as (key: string, options?: Record<string, unknown>) => string)(
+                      `status.warnings.${w.code}`,
+                      interpolation,
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </AlertDescription>
         </Alert>

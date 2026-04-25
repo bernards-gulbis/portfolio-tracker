@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { z } from 'zod';
+import { parseOrThrow } from './api-error';
 
-// ================== Types/Interfaces ==================
+// ================== Enums / literals ==================
 
 export enum TransactionType {
   DEPOSIT = 'Deposit',
@@ -12,17 +14,207 @@ export enum TransactionType {
   DIVIDEND = 'Dividend',
 }
 
-export interface UserRead {
-  id: string;
-  email: string;
-  is_active: boolean;
-  is_superuser: boolean;
-  is_verified: boolean;
-  name: string | null;
-  picture: string | null;
-  oauth_providers: string[];
-  tax_rate: number;
+const TransactionTypeSchema = z.enum(TransactionType);
+
+const PriceSourceSchema = z.enum(['live', 'last_known', 'missing']);
+export type PriceSource = z.infer<typeof PriceSourceSchema>;
+
+// ================== Response schemas (backend → client) ==================
+//
+// These schemas are the runtime contract. Every API function that returns
+// a typed response parses through one of these at the fetch boundary — a
+// backend drift (renamed or re-typed field) becomes an ``ApiContractError``
+// at the edge rather than an ``undefined`` surprise deep in a render.
+//
+// The exported types are derived via ``z.infer`` so type and runtime shape
+// cannot drift apart client-side. Request-side types (form payloads) are
+// kept as plain interfaces — they're validated by the backend, not here.
+
+const UserReadSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  is_active: z.boolean(),
+  is_superuser: z.boolean(),
+  is_verified: z.boolean(),
+  name: z.string().nullable(),
+  picture: z.string().nullable(),
+  oauth_providers: z.array(z.string()),
+  tax_rate: z.number(),
+});
+export type UserRead = z.infer<typeof UserReadSchema>;
+
+const PortfolioSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  created_at: z.string(),
+});
+export type Portfolio = z.infer<typeof PortfolioSchema>;
+
+const TransactionSchema = z.object({
+  id: z.number(),
+  portfolio_id: z.number(),
+  date: z.string(),
+  type: TransactionTypeSchema,
+  ticker: z.string().nullish(),
+  quantity: z.number().nullish(),
+  price_per_share: z.number().nullish(),
+  fee: z.number().nullish(),
+  total_amount: z.number(),
+  eur_amount: z.number().nullish(),
+  split_ratio: z.number().nullish(),
+  currency: z.string().nullish(),
+  fx_rate: z.number().nullish(),
+});
+export type Transaction = z.infer<typeof TransactionSchema>;
+
+const BulkImportResponseSchema = z.object({
+  imported_count: z.number(),
+  skipped_count: z.number(),
+  transactions: z.array(TransactionSchema),
+});
+export type BulkImportResponse = z.infer<typeof BulkImportResponseSchema>;
+
+const PaginatedTransactionResponseSchema = z.object({
+  transactions: z.array(TransactionSchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+  total_pages: z.number(),
+});
+export type PaginatedTransactionResponse = z.infer<
+  typeof PaginatedTransactionResponseSchema
+>;
+
+const HoldingSchema = z.object({
+  ticker: z.string(),
+  quantity: z.number(),
+  average_cost: z.number(),
+  total_cost: z.number(),
+  first_buy_date: z.string(),
+});
+export type Holding = z.infer<typeof HoldingSchema>;
+
+export const PricedHoldingSchema = HoldingSchema.extend({
+  current_price: z.number().nullable(),
+  current_value: z.number().nullable(),
+  unrealized_gain_loss: z.number().nullable(),
+  unrealized_gain_loss_pct: z.number().nullable(),
+  price_source: PriceSourceSchema,
+  price_as_of: z.string().nullable(),
+});
+export type PricedHolding = z.infer<typeof PricedHoldingSchema>;
+
+const RealizedSaleSchema = z.object({
+  ticker: z.string(),
+  date: z.string(),
+  quantity: z.number(),
+  quantity_before: z.number(),
+  proceeds: z.number(),
+  cost_basis: z.number(),
+  realized_gain: z.number(),
+  first_buy_date: z.string(),
+});
+export type RealizedSale = z.infer<typeof RealizedSaleSchema>;
+
+const DividendReceivedSchema = z.object({
+  ticker: z.string(),
+  date: z.string(),
+  amount: z.number(),
+  amount_eur: z.number().nullable(),
+});
+export type DividendReceived = z.infer<typeof DividendReceivedSchema>;
+
+const WithdrawalFxSchema = z.object({
+  date: z.string(),
+  amount: z.number(),
+  amount_eur_avg: z.number(),
+  amount_eur: z.number(),
+  realized_fx_gain: z.number(),
+});
+export type WithdrawalFx = z.infer<typeof WithdrawalFxSchema>;
+
+const TransactionWarningSchema = z.object({
+  code: z.string(),
+  date: z.string(),
+  params: z.record(z.string(), z.string()),
+});
+export type TransactionWarning = z.infer<typeof TransactionWarningSchema>;
+
+const PortfolioStatusSchema = z.object({
+  portfolio_id: z.number(),
+  portfolio_name: z.string(),
+  principal: z.number(),
+  principal_eur: z.number(),
+  principal_eur_avg: z.number(),
+  dividends: z.number(),
+  dividends_eur: z.number().nullable(),
+  cash: z.number(),
+  holdings: z.array(HoldingSchema),
+  holdings_cost: z.number(),
+  realized_gains: z.number(),
+  realized_sales: z.array(RealizedSaleSchema),
+  dividends_received: z.array(DividendReceivedSchema),
+  realized_withdrawals: z.array(WithdrawalFxSchema),
+  capital_gains_tax_rate: z.number(),
+  warnings: z.array(TransactionWarningSchema),
+  usd_to_eur_rate: z.number().nullable(),
+});
+export type PortfolioStatus = z.infer<typeof PortfolioStatusSchema>;
+
+// PricedPortfolioStatus is client-computed (not a server response), so it
+// stays as a plain type derived from PortfolioStatus + live-price overlays.
+export interface PricedPortfolioStatus extends Omit<PortfolioStatus, 'holdings'> {
+  holdings: PricedHolding[];
+  current_value: number | null;
+  holdings_value: number | null;
+  unrealized_gains: number | null;
+  unrealized_gains_pct: number | null;
+  missing_prices: string[];
 }
+
+const PerformanceDataPointSchema = z.object({
+  date: z.string(),
+  principal: z.number(),
+  principal_eur: z.number().nullable(),
+  current_value: z.number().nullable(),
+  fx_rate: z.number().nullable(),
+  return_pct: z.number().nullable(),
+  sp500_return_pct: z.number().nullable(),
+});
+export type PerformanceDataPoint = z.infer<typeof PerformanceDataPointSchema>;
+
+const PortfolioPerformanceSchema = z.object({
+  portfolio_id: z.number(),
+  portfolio_name: z.string(),
+  data_points: z.array(PerformanceDataPointSchema),
+  // Added in Package B.1 — tickers whose historical prices were unavailable
+  // and which were therefore valued at cost basis. Default-empty so old
+  // fixtures without the field still parse.
+  cost_basis_fallback_tickers: z.array(z.string()).default([]),
+});
+export type PortfolioPerformance = z.infer<typeof PortfolioPerformanceSchema>;
+
+const LivePriceInfoSchema = z.object({
+  price: z.number().nullable(),
+  source: PriceSourceSchema,
+  as_of: z.string().nullable(),
+});
+export type LivePriceInfo = z.infer<typeof LivePriceInfoSchema>;
+
+const LivePricesSchema = z.object({
+  prices: z.record(z.string(), LivePriceInfoSchema),
+  usd_to_eur_rate: z.number().nullable(),
+  timestamp: z.string(),
+});
+export type LivePrices = z.infer<typeof LivePricesSchema>;
+
+const GoogleAuthorizeUrlSchema = z.object({
+  authorization_url: z.string(),
+});
+
+// ================== Request-side types (client → backend) ==================
+// Kept as plain interfaces — these are outbound payloads, validated by the
+// backend. Client-side runtime validation would just duplicate that.
 
 export interface UserUpdate {
   name?: string;
@@ -44,28 +236,6 @@ export interface RegisterCredentials {
   email: string;
   password: string;
   name: string;
-}
-
-export interface Portfolio {
-  id: number;
-  name: string;
-  created_at: string;
-}
-
-export interface Transaction {
-  id: number;
-  portfolio_id: number;
-  date: string;
-  type: TransactionType;
-  ticker?: string | null;
-  quantity?: number | null;
-  price_per_share?: number | null;
-  fee?: number | null;
-  total_amount: number;
-  eur_amount?: number | null;
-  split_ratio?: number | null;
-  currency?: string | null;
-  fx_rate?: number | null;
 }
 
 export interface PortfolioCreate {
@@ -106,128 +276,6 @@ export interface TransactionUpdate {
   split_ratio?: number | null;
   currency?: string | null;
   fx_rate?: number | null;
-}
-
-export interface BulkImportResponse {
-  imported_count: number;
-  skipped_count: number;
-  transactions: Transaction[];
-}
-
-export interface PaginatedTransactionResponse {
-  transactions: Transaction[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
-
-export interface Holding {
-  ticker: string;
-  quantity: number;
-  average_cost: number;
-  total_cost: number;
-  first_buy_date: string;
-}
-
-export type PriceSource = 'live' | 'last_known' | 'missing';
-
-export interface PricedHolding extends Holding {
-  current_price: number | null;
-  current_value: number | null;
-  unrealized_gain_loss: number | null;
-  unrealized_gain_loss_pct: number | null;
-  price_source: PriceSource;
-  price_as_of: string | null;
-}
-
-export interface RealizedSale {
-  ticker: string;
-  date: string;
-  quantity: number;
-  quantity_before: number;
-  proceeds: number;
-  cost_basis: number;
-  realized_gain: number;
-  first_buy_date: string;
-}
-
-export interface DividendReceived {
-  ticker: string;
-  date: string;
-  amount: number;
-  amount_eur: number | null;
-}
-
-export interface WithdrawalFx {
-  date: string;
-  amount: number;
-  amount_eur_avg: number;
-  amount_eur: number;
-  realized_fx_gain: number;
-}
-
-export interface TransactionWarning {
-  code: string;
-  date: string;
-  params: Record<string, string>;
-}
-
-export interface PortfolioStatus {
-  portfolio_id: number;
-  portfolio_name: string;
-  principal: number;
-  principal_eur: number;
-  principal_eur_avg: number;
-  dividends: number;
-  dividends_eur: number | null;
-  cash: number;
-  holdings: Holding[];
-  holdings_cost: number;
-  realized_gains: number;
-  realized_sales: RealizedSale[];
-  dividends_received: DividendReceived[];
-  realized_withdrawals: WithdrawalFx[];
-  capital_gains_tax_rate: number;
-  warnings: TransactionWarning[];
-  usd_to_eur_rate: number | null;
-}
-
-export interface PricedPortfolioStatus extends Omit<PortfolioStatus, 'holdings'> {
-  holdings: PricedHolding[];
-  current_value: number | null;
-  holdings_value: number | null;
-  unrealized_gains: number | null;
-  unrealized_gains_pct: number | null;
-  missing_prices: string[];
-}
-
-export interface PerformanceDataPoint {
-  date: string;
-  principal: number;
-  principal_eur: number | null;
-  current_value: number | null;
-  fx_rate: number | null;
-  return_pct: number | null;
-  sp500_return_pct: number | null;
-}
-
-export interface PortfolioPerformance {
-  portfolio_id: number;
-  portfolio_name: string;
-  data_points: PerformanceDataPoint[];
-}
-
-export interface LivePriceInfo {
-  price: number | null;
-  source: PriceSource;
-  as_of: string | null;
-}
-
-export interface LivePrices {
-  prices: Record<string, LivePriceInfo>;
-  usd_to_eur_rate: number | null;
-  timestamp: string;
 }
 
 // ================== API Configuration ==================
@@ -272,8 +320,8 @@ export const login = async (credentials: LoginCredentials): Promise<void> => {
 };
 
 export const register = async (credentials: RegisterCredentials): Promise<UserRead> => {
-  const response = await api.post<UserRead>('/auth/register', credentials);
-  return response.data;
+  const response = await api.post('/auth/register', credentials);
+  return parseOrThrow(UserReadSchema, response.data, 'POST /auth/register');
 };
 
 export const logoutApi = async (): Promise<void> => {
@@ -282,19 +330,25 @@ export const logoutApi = async (): Promise<void> => {
 };
 
 export const getCurrentUser = async (): Promise<UserRead> => {
-  const response = await api.get<UserRead>('/users/me');
+  const response = await api.get('/users/me');
+  const user = parseOrThrow(UserReadSchema, response.data, 'GET /users/me');
   sessionActive = true; // Session confirmed
-  return response.data;
+  return user;
 };
 
 export const getGoogleAuthorizeUrl = async (): Promise<string> => {
-  const response = await api.get<{ authorization_url: string }>('/auth/google/authorize');
-  return response.data.authorization_url;
+  const response = await api.get('/auth/google/authorize');
+  const parsed = parseOrThrow(
+    GoogleAuthorizeUrlSchema,
+    response.data,
+    'GET /auth/google/authorize',
+  );
+  return parsed.authorization_url;
 };
 
 export const updateUser = async (data: UserUpdate): Promise<UserRead> => {
-  const response = await api.patch<UserRead>('/users/me', data);
-  return response.data;
+  const response = await api.patch('/users/me', data);
+  return parseOrThrow(UserReadSchema, response.data, 'PATCH /users/me');
 };
 
 export const closeAccount = async (data: CloseAccountRequest): Promise<void> => {
@@ -307,16 +361,16 @@ export const closeAccount = async (data: CloseAccountRequest): Promise<void> => 
  * Get all portfolios
  */
 export const getPortfolios = async (): Promise<Portfolio[]> => {
-  const response = await api.get<Portfolio[]>('/portfolios/');
-  return response.data;
+  const response = await api.get('/portfolios/');
+  return parseOrThrow(z.array(PortfolioSchema), response.data, 'GET /portfolios/');
 };
 
 /**
  * Create a new portfolio
  */
 export const createPortfolio = async (portfolio: PortfolioCreate): Promise<Portfolio> => {
-  const response = await api.post<Portfolio>('/portfolios/', portfolio);
-  return response.data;
+  const response = await api.post('/portfolios/', portfolio);
+  return parseOrThrow(PortfolioSchema, response.data, 'POST /portfolios/');
 };
 
 /**
@@ -326,8 +380,12 @@ export const updatePortfolio = async (
   portfolioId: number,
   portfolio: PortfolioUpdate
 ): Promise<Portfolio> => {
-  const response = await api.put<Portfolio>(`/portfolios/${portfolioId}`, portfolio);
-  return response.data;
+  const response = await api.put(`/portfolios/${portfolioId}`, portfolio);
+  return parseOrThrow(
+    PortfolioSchema,
+    response.data,
+    `PUT /portfolios/${portfolioId}`,
+  );
 };
 
 /**
@@ -344,19 +402,24 @@ export const copyPortfolio = async (
   portfolioId: number,
   data: PortfolioCopy
 ): Promise<Portfolio> => {
-  const response = await api.post<Portfolio>(
-    `/portfolios/${portfolioId}/copy`,
-    data
+  const response = await api.post(`/portfolios/${portfolioId}/copy`, data);
+  return parseOrThrow(
+    PortfolioSchema,
+    response.data,
+    `POST /portfolios/${portfolioId}/copy`,
   );
-  return response.data;
 };
 
 /**
  * Get portfolio status with holdings, cash balance, and performance metrics
  */
 export const getPortfolioStatus = async (portfolioId: number): Promise<PortfolioStatus> => {
-  const response = await api.get<PortfolioStatus>(`/portfolios/${portfolioId}/status`);
-  return response.data;
+  const response = await api.get(`/portfolios/${portfolioId}/status`);
+  return parseOrThrow(
+    PortfolioStatusSchema,
+    response.data,
+    `GET /portfolios/${portfolioId}/status`,
+  );
 };
 
 /**
@@ -365,8 +428,8 @@ export const getPortfolioStatus = async (portfolioId: number): Promise<Portfolio
 export const getLivePrices = async (tickers: string[]): Promise<LivePrices> => {
   const params = new URLSearchParams();
   tickers.forEach((t) => params.append('tickers', t));
-  const response = await api.get<LivePrices>('/portfolios/prices/live', { params });
-  return response.data;
+  const response = await api.get('/portfolios/prices/live', { params });
+  return parseOrThrow(LivePricesSchema, response.data, 'GET /portfolios/prices/live');
 };
 
 interface PerformanceParams {
@@ -389,11 +452,12 @@ export const getPortfolioPerformance = async (
   if (endDate) params.end_date = endDate;
   if (numPoints) params.num_points = numPoints;
 
-  const response = await api.get<PortfolioPerformance>(
-    `/portfolios/${portfolioId}/performance`,
-    { params }
+  const response = await api.get(`/portfolios/${portfolioId}/performance`, { params });
+  return parseOrThrow(
+    PortfolioPerformanceSchema,
+    response.data,
+    `GET /portfolios/${portfolioId}/performance`,
   );
-  return response.data;
 };
 
 // ================== Transaction API Functions ==================
@@ -416,11 +480,12 @@ export const getTransactions = async (
   if (types) types.forEach((t) => params.append('type', t));
   if (sortOrder !== 'desc') params.append('sort_order', sortOrder);
 
-  const response = await api.get<PaginatedTransactionResponse>(
-    `/portfolios/${portfolioId}/transactions`,
-    { params }
+  const response = await api.get(`/portfolios/${portfolioId}/transactions`, { params });
+  return parseOrThrow(
+    PaginatedTransactionResponseSchema,
+    response.data,
+    `GET /portfolios/${portfolioId}/transactions`,
   );
-  return response.data;
 };
 
 /**
@@ -430,11 +495,15 @@ export const createTransaction = async (
   portfolioId: number,
   transaction: TransactionCreate
 ): Promise<Transaction> => {
-  const response = await api.post<Transaction>(
+  const response = await api.post(
     `/portfolios/${portfolioId}/transactions/`,
     transaction
   );
-  return response.data;
+  return parseOrThrow(
+    TransactionSchema,
+    response.data,
+    `POST /portfolios/${portfolioId}/transactions/`,
+  );
 };
 
 /**
@@ -444,8 +513,12 @@ export const updateTransaction = async (
   transactionId: number,
   transaction: TransactionUpdate
 ): Promise<Transaction> => {
-  const response = await api.put<Transaction>(`/transactions/${transactionId}`, transaction);
-  return response.data;
+  const response = await api.put(`/transactions/${transactionId}`, transaction);
+  return parseOrThrow(
+    TransactionSchema,
+    response.data,
+    `PUT /transactions/${transactionId}`,
+  );
 };
 
 /**
@@ -477,7 +550,7 @@ export const importTransactionsCSV = async (
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await api.post<BulkImportResponse>(
+  const response = await api.post(
     `/portfolios/${portfolioId}/transactions/import`,
     formData,
     {
@@ -486,13 +559,17 @@ export const importTransactionsCSV = async (
       },
     }
   );
-  return response.data;
+  return parseOrThrow(
+    BulkImportResponseSchema,
+    response.data,
+    `POST /portfolios/${portfolioId}/transactions/import`,
+  );
 };
 
 // ================== Error Handling ==================
 
 /**
- * API Error type
+ * API Error type — matches FastAPI's 4xx/5xx error body shape.
  */
 export interface ApiError {
   detail: string;

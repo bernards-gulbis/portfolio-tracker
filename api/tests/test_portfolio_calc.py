@@ -23,7 +23,6 @@ from app.services.portfolio_valuation import (
     _fetch_historical_prices,
     _resolve_nearest_date_value,
     _resolve_usd_to_eur_rate,
-    _value_holdings_at_date,
 )
 
 
@@ -190,110 +189,6 @@ class TestFetchHistoricalPrices:
         result = _fetch_historical_prices(["AAPL", "MSFT"], datetime(2025, 6, 15))
         assert "AAPL" not in result
         assert result["MSFT"] == 410.0
-
-
-# ==================== _value_holdings_at_date ====================
-
-
-class TestValueHoldingsAtDate:
-    def test_uses_historical_price(self):
-        state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1500"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
-        result = _value_holdings_at_date(
-            state,
-            {"AAPL": 200.0},
-            {},
-            "2025-06-15",
-        )
-        assert result == Decimal("10") * Decimal("200")
-
-    def test_applies_split_factor(self):
-        state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1500"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
-        result = _value_holdings_at_date(
-            state,
-            {"AAPL": 50.0},
-            {"AAPL": Decimal("4")},
-            "2025-06-15",
-        )
-        assert result == Decimal("10") * Decimal("50") * Decimal("4")
-
-    @patch("app.services.portfolio_valuation.PriceService")
-    def test_falls_back_to_db_price(self, mock_price_service):
-        mock_price_service.get_last_known_price.return_value = 180.0
-        state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1500"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
-        result = _value_holdings_at_date(
-            state,
-            {},  # No historical prices
-            {},
-            "2025-06-15",
-        )
-        assert result == Decimal("10") * Decimal("180")
-
-    @patch("app.services.portfolio_valuation.PriceService")
-    def test_falls_back_to_cost_basis(self, mock_price_service):
-        mock_price_service.get_last_known_price.return_value = None
-        state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1500"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
-        result = _value_holdings_at_date(
-            state,
-            {},  # No historical prices
-            {},
-            "2025-06-15",
-        )
-        assert result == Decimal("1500")
-
-    @patch("app.services.portfolio_valuation.PriceService")
-    def test_handles_none_historical_prices(self, mock_price_service):
-        mock_price_service.get_last_known_price.return_value = 150.0
-        state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("5"),
-            total_cost=Decimal("700"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
-        result = _value_holdings_at_date(
-            state,
-            None,
-            {},
-            "2025-06-15",
-        )
-        assert result == Decimal("5") * Decimal("150")
-
-    @patch("app.services.portfolio_valuation.PriceService")
-    def test_skips_zero_price(self, mock_price_service):
-        """Price of 0 should not be used; fall back to DB cache."""
-        mock_price_service.get_last_known_price.return_value = 100.0
-        state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1000"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
-        result = _value_holdings_at_date(
-            state,
-            {"AAPL": 0.0},
-            {},
-            "2025-06-15",
-        )
-        assert result == Decimal("10") * Decimal("100")
 
 
 # ==================== Transaction handlers edge cases ====================
@@ -585,12 +480,14 @@ class TestCalculatePerformance:
         ]
         txs_reversed = list(reversed(txs_ordered))
         end = datetime(2025, 2, 1)
-        result_ordered = calculate_performance(txs_ordered, end_date=end, num_points=5)
-        result_reversed = calculate_performance(
+        points_ordered, _ = calculate_performance(
+            txs_ordered, end_date=end, num_points=5
+        )
+        points_reversed, _ = calculate_performance(
             txs_reversed, end_date=end, num_points=5
         )
-        assert len(result_ordered) == len(result_reversed)
-        for a, b in zip(result_ordered, result_reversed, strict=True):
+        assert len(points_ordered) == len(points_reversed)
+        for a, b in zip(points_ordered, points_reversed, strict=True):
             assert a["principal"] == b["principal"]
             assert a["current_value"] == b["current_value"]
 
@@ -634,9 +531,10 @@ class TestGenerateDatePoints:
 
 
 class TestCalculatePerformanceEdgeCases:
-    def test_empty_transactions_returns_empty_list(self):
-        result = calculate_performance([])
-        assert result == []
+    def test_empty_transactions_returns_empty_result(self):
+        data_points, fallback = calculate_performance([])
+        assert data_points == []
+        assert fallback == []
 
     def test_start_date_equal_to_end_raises(self):
         tx = MagicMock()
@@ -660,6 +558,65 @@ class TestCalculatePerformanceEdgeCases:
                 end_date=datetime(2025, 1, 1),
                 num_points=1,
             )
+
+    def test_cost_basis_fallback_tickers_surfaced_when_price_missing(self):
+        """When no historical price is available for a held ticker — and no
+        DB last-known price either — the performance series falls back to
+        cost basis (flat-line) for that ticker. The returned fallback-ticker
+        list must surface the affected symbols so the UI can warn the user
+        that the chart is lying about those positions."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2025, 1, 1),
+                total_amount=10000.0,
+                eur_amount=9000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 2),
+                ticker="UNKNOWN",
+                quantity=10,
+                total_amount=-1000.0,
+            ),
+        ]
+        # Make every price path miss so cost-basis fallback kicks in.
+        with (
+            patch(
+                "app.services.portfolio_perf.PriceService."
+                "get_historical_prices_for_multiple_tickers",
+                return_value={},
+            ),
+            patch(
+                "app.services.portfolio_perf.PriceService."
+                "get_historical_usd_to_eur_rates",
+                return_value={},
+            ),
+            patch(
+                "app.services.portfolio_perf.PriceService.get_last_known_price",
+                return_value=None,
+            ),
+            patch(
+                "app.services.portfolio_valuation.PriceService."
+                "get_historical_usd_to_eur_rates",
+                return_value={},
+            ),
+            patch(
+                "app.services.portfolio_valuation.PriceService."
+                "get_usd_to_eur_rate_safe",
+                return_value=0.9,
+            ),
+        ):
+            data_points, fallback = calculate_performance(
+                txs,
+                start_date=datetime(2025, 1, 1),
+                end_date=datetime(2025, 2, 1),
+                num_points=5,
+            )
+        assert len(data_points) == 5
+        assert "UNKNOWN" in fallback
 
 
 # ── portfolio_valuation: _resolve_usd_to_eur_rate ─────────────────────
@@ -854,6 +811,164 @@ class TestDecimalPrecision:
             assert tx.fx_rate == Decimal("1.087000")
 
 
+class TestFxFallbackWarnings:
+    """Package A: silent FX fallbacks must surface as UI-visible warnings.
+
+    The numerical behaviour (fall back to current rate when nothing else is
+    available) is preserved — but every path that used to be silent now
+    emits a structured warning so the user knows their EUR numbers are an
+    approximation.
+    """
+
+    def test_prefetch_failure_emits_bulk_warning(self):
+        """PriceService raising → one aggregate ``fxRatesUnavailable``
+        warning carrying the number of affected transactions."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2024, 6, 1),
+                total_amount=1000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2023, 3, 15),
+                total_amount=500.0,
+            ),
+        ]
+        with patch(
+            "app.services.portfolio_status."
+            "PriceService.get_historical_usd_to_eur_rates",
+            side_effect=RuntimeError("yahoo down"),
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.90,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="FX bulk warning",
+            )
+        # Numerical behaviour unchanged — still falls back to current rate.
+        assert result.principal_eur == pytest.approx(1350.0)
+        # One aggregate warning with a count of affected transactions.
+        bulk = [w for w in result.warnings if w.code == "fxRatesUnavailable"]
+        assert len(bulk) == 1
+        assert bulk[0].params.get("count") == "2"
+        # And no per-tx warnings (the bulk one covers them).
+        per_tx = [
+            w
+            for w in result.warnings
+            if w.code in ("fxFallbackToCurrent", "fxFallbackToCurrentTicker")
+        ]
+        assert per_tx == []
+
+    def test_per_tx_warning_when_date_missing_from_rates(self):
+        """PriceService succeeds but returns no rate on-or-before the tx date
+        → per-tx ``fxFallbackToCurrent`` warning (no ticker in params, since
+        deposits don't carry one), no bulk warning."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2020, 1, 1),
+                total_amount=1000.0,
+            ),
+        ]
+        # Rates exist but none on-or-before 2020-01-01 → lookup returns None.
+        with patch(
+            "app.services.portfolio_status."
+            "PriceService.get_historical_usd_to_eur_rates",
+            return_value={"2025-06-01": 1.05},
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.90,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="Per-tx fallback",
+            )
+        # Falls back to current rate numerically.
+        assert result.principal_eur == pytest.approx(900.0)
+        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrent"]
+        assert len(per_tx) == 1
+        # Deposit has no ticker, so params is empty — prevents an awkward
+        # empty-ticker placeholder in the translated message.
+        assert per_tx[0].params == {}
+        assert "2020-01-01" in per_tx[0].date
+        # Ticker-specific variant must not fire when there is no ticker.
+        assert [
+            w for w in result.warnings if w.code == "fxFallbackToCurrentTicker"
+        ] == []
+        # Bulk warning should NOT fire when prefetch succeeded.
+        assert [w for w in result.warnings if w.code == "fxRatesUnavailable"] == []
+
+    def test_no_warning_when_every_tx_has_explicit_eur_amount(self):
+        """Explicit eur_amount means no fallback path was taken — no warnings."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2020, 1, 1),
+                total_amount=1000.0,
+                eur_amount=900.0,
+            ),
+        ]
+        result = calculate_status(
+            txs,
+            usd_to_eur_rate=0.90,
+            tax_rate=Decimal("0.20"),
+            portfolio_id=1,
+            portfolio_name="Explicit EUR",
+        )
+        codes = {w.code for w in result.warnings}
+        assert "fxFallbackToCurrent" not in codes
+        assert "fxFallbackToCurrentTicker" not in codes
+        assert "fxRatesUnavailable" not in codes
+
+    def test_dividend_with_fallback_emits_warning_with_ticker(self):
+        """Dividends carry a ticker, so the fallback warning uses the
+        ``fxFallbackToCurrentTicker`` variant with the ticker in params —
+        letting the UI render a clean "EUR value for this AAPL transaction"
+        sentence instead of an empty-placeholder gap."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2020, 1, 1),
+                total_amount=10000.0,
+                eur_amount=9000.0,  # explicit — not fx-blind, no warning
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.DIVIDEND,
+                date=datetime(2020, 6, 15),
+                ticker="AAPL",
+                total_amount=50.0,
+                # no eur_amount, no fx_rate → fx-blind
+            ),
+        ]
+        with patch(
+            "app.services.portfolio_status."
+            "PriceService.get_historical_usd_to_eur_rates",
+            return_value={},  # empty rates → fallback_current for dividend
+        ):
+            result = calculate_status(
+                txs,
+                usd_to_eur_rate=0.90,
+                tax_rate=Decimal("0.20"),
+                portfolio_id=1,
+                portfolio_name="Dividend fallback",
+            )
+        per_tx = [w for w in result.warnings if w.code == "fxFallbackToCurrentTicker"]
+        assert len(per_tx) == 1
+        assert per_tx[0].params == {"ticker": "AAPL"}
+        # No-ticker variant must not fire when a ticker is present.
+        assert [w for w in result.warnings if w.code == "fxFallbackToCurrent"] == []
+        # The explicit-EUR deposit must not produce a warning.
+        assert [w for w in result.warnings if w.date.startswith("2020-01-01")] == []
+
+
 # ==================== calculate_performance complexity ====================
 
 
@@ -918,9 +1033,11 @@ class TestCalculatePerformanceComplexity:
             "_apply_transaction",
             wraps=portfolio_perf._apply_transaction,
         ) as spy:
-            result = calculate_performance(transactions, start, end, num_points=365)
+            data_points, _ = calculate_performance(
+                transactions, start, end, num_points=365
+            )
 
-        assert len(result) == 365
+        assert len(data_points) == 365
         assert spy.call_count == len(transactions), (
             f"Expected {len(transactions)} total replays across the "
             f"365-point loop (each transaction applied exactly once via "

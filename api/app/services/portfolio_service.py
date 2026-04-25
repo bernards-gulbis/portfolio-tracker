@@ -113,17 +113,19 @@ class PortfolioService:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         num_points: int = 60,
-    ) -> tuple[str, list[dict]]:
-        """Get portfolio performance over time as a time series."""
+    ) -> tuple[str, list[dict], list[str]]:
+        """Get portfolio performance over time. Returns
+        ``(portfolio_name, data_points, cost_basis_fallback_tickers)``."""
         portfolio = self.portfolio_repo.get_by_id_and_user(portfolio_id, user_id)
         if not portfolio:
             raise PortfolioNotFoundException(portfolio_id)
 
         transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
 
-        return portfolio.name, calculate_performance(
+        data_points, cost_basis_fallback_tickers = calculate_performance(
             transactions=transactions,
             start_date=start_date,
             end_date=end_date,
             num_points=num_points,
         )
+        return portfolio.name, data_points, cost_basis_fallback_tickers

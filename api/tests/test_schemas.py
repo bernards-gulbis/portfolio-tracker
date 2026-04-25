@@ -1,11 +1,13 @@
 """Tests for Pydantic schemas with non-trivial validation logic."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 
 import pytest
 from pydantic import ValidationError
 
+from app.models import TransactionType
 from app.schemas import LivePriceInfo
+from app.schemas.schemas import TransactionCreate, TransactionUpdate
 
 
 class TestLivePriceInfoInvariants:
@@ -51,3 +53,64 @@ class TestLivePriceInfoInvariants:
             ValidationError, match="must have a non-None as_of timestamp"
         ):
             LivePriceInfo(price=150.0, source="last_known", as_of=None)
+
+
+class TestTransactionCreateTimezoneAware:
+    """``TransactionCreate.date`` must carry explicit timezone info so
+    downstream date arithmetic isn't silently reinterpreted against the
+    server's local clock. Naive inputs are coerced to UTC (non-breaking for
+    existing callers); aware inputs pass through unchanged.
+    """
+
+    def test_naive_datetime_is_coerced_to_utc(self):
+        tx = TransactionCreate(
+            date=datetime(2025, 1, 1, 10, 30),  # naive
+            type=TransactionType.DEPOSIT,
+            total_amount=100.0,
+        )
+        assert tx.date.tzinfo is UTC
+        assert tx.date == datetime(2025, 1, 1, 10, 30, tzinfo=UTC)
+
+    def test_utc_aware_datetime_preserved(self):
+        tx = TransactionCreate(
+            date=datetime(2025, 1, 1, 10, 30, tzinfo=UTC),
+            type=TransactionType.DEPOSIT,
+            total_amount=100.0,
+        )
+        assert tx.date == datetime(2025, 1, 1, 10, 30, tzinfo=UTC)
+
+    def test_non_utc_aware_datetime_preserved(self):
+        """A non-UTC aware input must not be silently converted to UTC —
+        the user's offset is semantic information we must respect."""
+        from datetime import timedelta
+
+        offset_plus_5 = timezone(timedelta(hours=5))
+        tx = TransactionCreate(
+            date=datetime(2025, 1, 1, 10, 30, tzinfo=offset_plus_5),
+            type=TransactionType.DEPOSIT,
+            total_amount=100.0,
+        )
+        assert tx.date.utcoffset() == timedelta(hours=5)
+
+
+class TestTransactionUpdateTimezoneAware:
+    """``TransactionUpdate`` is a separate class from ``TransactionBase``
+    (partial-update semantics — every field optional), so its ``date``
+    validator lives on the class itself. The coercion must mirror
+    ``TransactionCreate`` so PUT and POST have symmetric tz semantics; a
+    naive PUT would otherwise silently store tz-ambiguous data while a
+    fresh POST would coerce.
+    """
+
+    def test_naive_datetime_is_coerced_to_utc(self):
+        """Mirror of ``TransactionCreate`` coercion so PUT /transactions/{id}
+        has the same tz semantics as POST."""
+        tx = TransactionUpdate(date=datetime(2025, 1, 1, 10, 30))
+        assert tx.date is not None
+        assert tx.date.tzinfo is UTC
+
+    def test_none_date_passes_through(self):
+        """Most partial updates don't touch ``date``; the validator must
+        tolerate ``None`` (field omitted)."""
+        tx = TransactionUpdate(total_amount=100.0)
+        assert tx.date is None

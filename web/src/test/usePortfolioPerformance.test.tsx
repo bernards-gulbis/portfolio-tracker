@@ -35,6 +35,7 @@ const createWrapper = () => {
 const mockPerformanceData: PortfolioPerformance = {
   portfolio_id: 1,
   portfolio_name: 'Test Portfolio',
+  cost_basis_fallback_tickers: [],
   data_points: [
     {
       date: '2024-01-01',
@@ -210,6 +211,7 @@ describe('usePortfolioPerformance', () => {
       expect(result.current.data).toEqual({
         portfolio_id: 1,
         portfolio_name: 'Test Portfolio',
+        cost_basis_fallback_tickers: [],
         data_points: [
           {
             date: '2024-01-01',
@@ -237,6 +239,7 @@ describe('usePortfolioPerformance', () => {
       const emptyData: PortfolioPerformance = {
         portfolio_id: 1,
         portfolio_name: 'Empty Portfolio',
+        cost_basis_fallback_tickers: [],
         data_points: [],
       };
 
@@ -258,6 +261,7 @@ describe('usePortfolioPerformance', () => {
       const dataWithNulls: PortfolioPerformance = {
         portfolio_id: 1,
         portfolio_name: 'Test Portfolio',
+        cost_basis_fallback_tickers: [],
         data_points: [
           {
             date: '2024-01-01',

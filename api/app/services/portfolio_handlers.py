@@ -31,16 +31,56 @@ from app.services.portfolio_types import (
 # ================== Transaction handlers ==================
 
 
+def _maybe_warn_fx_fallback(state: _TxState, tx: Transaction, source: str) -> None:
+    """Emit a per-transaction FX-fallback warning when the EUR conversion
+    silently used today's live rate for this transaction.
+
+    Uses two warning codes so the UI can render a clean sentence regardless
+    of whether the transaction has a ticker:
+
+      * ``fxFallbackToCurrentTicker`` — ticker is present (dividend);
+        ``params`` carries ``ticker`` for interpolation.
+      * ``fxFallbackToCurrent``      — no ticker (deposit/withdraw);
+        ``params`` is empty so the translated message does not have an
+        awkward placeholder gap.
+
+    Suppressed when the bulk ``fxRatesUnavailable`` warning is already on the
+    state — that warning covers every fx-blind transaction in one summary.
+    """
+    if source != "fallback_current":
+        return
+    if state.fx_rates_unavailable:
+        return
+    date_str = tx.date.strftime(_ISO_DATETIME_FMT)
+    if tx.ticker:
+        state.warnings.append(
+            _Warning(
+                code="fxFallbackToCurrentTicker",
+                date=date_str,
+                params={"ticker": tx.ticker},
+            )
+        )
+    else:
+        state.warnings.append(
+            _Warning(
+                code="fxFallbackToCurrent",
+                date=date_str,
+                params={},
+            )
+        )
+
+
 def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.principal += total
-    eur = _eur_from_tx(
+    eur, source = _eur_from_tx(
         tx,
         total,
         state.usd_to_eur_fallback,
         state.historical_usd_to_eur_rates,
     )
+    _maybe_warn_fx_fallback(state, tx, source)
     state.principal_eur += eur
     state.principal_eur_avg += eur
 
@@ -48,12 +88,13 @@ def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:
 def _apply_withdraw(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)  # total is negative
     state.cash += total
-    eur_historical = _eur_from_tx(
+    eur_historical, source = _eur_from_tx(
         tx,
         total,
         state.usd_to_eur_fallback,
         state.historical_usd_to_eur_rates,
     )
+    _maybe_warn_fx_fallback(state, tx, source)
     # Average cost: withdraw at weighted-average rate (before updating principal)
     if state.principal > 0:
         avg_rate = state.principal_eur_avg / state.principal
@@ -174,12 +215,13 @@ def _apply_dividend(state: _TxState, tx: Transaction, strict: bool) -> None:
     total = _to_decimal(tx.total_amount)
     state.cash += total
     state.dividends += total
-    eur = _eur_from_tx(
+    eur, source = _eur_from_tx(
         tx,
         total,
         state.usd_to_eur_fallback,
         state.historical_usd_to_eur_rates,
     )
+    _maybe_warn_fx_fallback(state, tx, source)
     state.dividends_eur += eur
     state.dividends_received.append(
         _DividendReceived(
