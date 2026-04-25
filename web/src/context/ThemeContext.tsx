@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
 
 type ResolvedTheme = 'light' | 'dark';
 type ThemePreference = 'light' | 'dark' | 'system';
@@ -19,6 +19,17 @@ function getSystemTheme(): ResolvedTheme {
   return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function subscribeSystemTheme(callback: () => void): () => void {
+  if (globalThis.window === undefined) return () => {};
+  const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
+  mq.addEventListener('change', callback);
+  return () => mq.removeEventListener('change', callback);
+}
+
+function getSystemThemeServer(): ResolvedTheme {
+  return 'dark';
+}
+
 function readPreference(): ThemePreference {
   if (globalThis.window === undefined) return 'system';
   try {
@@ -33,9 +44,10 @@ function readPreference(): ThemePreference {
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [preference, setPreference] = useState<ThemePreference>(readPreference);
-  // Track OS-level system theme separately so it can update reactively
-  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme);
-  // resolved is derived purely — no setState-in-effect needed
+  // useSyncExternalStore handles subscription, snapshot, and tearing-safety in one
+  // call — and resyncs on mount automatically if the OS scheme shifted between
+  // initial render and the listener attaching.
+  const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemTheme, getSystemThemeServer);
   const resolved: ResolvedTheme = preference === 'system' ? systemTheme : preference;
 
   const persistAndSetPreference = useCallback((p: ThemePreference) => {
@@ -46,17 +58,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // localStorage unavailable
     }
   }, [setPreference]);
-
-  // Always listen for OS theme changes so systemTheme stays current even when
-  // preference !== 'system' — otherwise switching back to 'system' would briefly
-  // show a stale value until the next OS change event.
-  useEffect(() => {
-    if (globalThis.window === undefined) return;
-    const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => setSystemTheme(mq.matches ? 'dark' : 'light');
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
 
   // Apply to document
   useEffect(() => {
