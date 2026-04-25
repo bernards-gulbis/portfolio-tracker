@@ -42,7 +42,7 @@ export const TransactionView = () => {
   }
 
   const debouncedTicker = useDebounce(tickerSearch, 150);
-  const typeFilterKey = typeFilter.join(',');
+  const typeFilterKey = [...typeFilter].sort().join(',');
 
   // Track previous filter key as state to reset page when filters change
   const filterToken = `${debouncedTicker}|${typeFilterKey}|${sortOrder}`;

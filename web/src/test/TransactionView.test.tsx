@@ -306,17 +306,24 @@ describe('TransactionView', () => {
     };
     mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
-      data: { transactions: [transaction], total: 1, page: 1, page_size: 20, total_pages: 1 },
+      data: { transactions: [transaction], total: 40, page: 1, page_size: 20, total_pages: 2 },
       isLoading: false, isFetching: false, error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
     renderView();
+
+    // Drive the component to page 2 so the page=1 reset has something observable to undo.
+    await userEvent.click(screen.getByLabelText('Next page'));
+    await waitFor(() => {
+      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, undefined, undefined, 'desc');
+    });
 
     const searchInput = screen.getByPlaceholderText('Search asset...');
     vi.mocked(useTransactions).mockClear();
 
     await userEvent.type(searchInput, 'AAPL');
     // useDebounce delays by 150ms; wait for debounced value to flow through.
+    // Pre-reset the page was 2; assertion's page=1 proves the reset fired.
     await waitFor(
       () => {
         expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc');
@@ -325,12 +332,16 @@ describe('TransactionView', () => {
     );
   });
 
-  it('resets pagination and filters to defaults when active portfolio changes', () => {
-    const emptyResult = {
-      data: { transactions: [], total: 0, page: 1, page_size: 20, total_pages: 1 },
+  it('resets pagination and filters to defaults when active portfolio changes', async () => {
+    const transaction = {
+      id: 1, portfolio_id: 1, date: '2024-01-15T10:00:00',
+      type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+      price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+    };
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { transactions: [transaction], total: 40, page: 1, page_size: 20, total_pages: 2 },
       isLoading: false, isFetching: false, error: null,
-    } as unknown as ReturnType<typeof useTransactions>;
-    vi.mocked(useTransactions).mockReturnValue(emptyResult);
+    } as unknown as ReturnType<typeof useTransactions>);
 
     mockNavigation.activePortfolioId = 1;
     const queryClient = createTestQueryClient();
@@ -339,9 +350,23 @@ describe('TransactionView', () => {
         <TransactionView />
       </QueryClientProvider>
     );
-    expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, undefined, undefined, 'desc');
 
-    // Switch to a different portfolio — the prev-id reset block should fire.
+    // Drive into a non-default state: ticker filter first, then page 2.
+    // (If we paged first, typing would trigger the filter-reset and undo it.)
+    await userEvent.type(screen.getByPlaceholderText('Search asset...'), 'AAPL');
+    await waitFor(
+      () => {
+        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc');
+      },
+      { timeout: 1000 }
+    );
+    await userEvent.click(screen.getByLabelText('Next page'));
+    await waitFor(() => {
+      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, 'AAPL', undefined, 'desc');
+    });
+
+    // Switch to a different portfolio — the prev-id reset block should fire,
+    // clearing page back to 1 and ticker back to undefined.
     vi.mocked(useTransactions).mockClear();
     mockNavigation.activePortfolioId = 2;
     rerender(
@@ -350,6 +375,12 @@ describe('TransactionView', () => {
       </QueryClientProvider>
     );
 
-    expect(useTransactions).toHaveBeenLastCalledWith(2, 1, 20, undefined, undefined, 'desc');
+    // tickerSearch is reset synchronously, but debouncedTicker lags 150ms.
+    await waitFor(
+      () => {
+        expect(useTransactions).toHaveBeenLastCalledWith(2, 1, 20, undefined, undefined, 'desc');
+      },
+      { timeout: 1000 }
+    );
   });
 });
