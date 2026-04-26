@@ -46,11 +46,9 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
   const currencyGainsEur =
     status.principal_eur_avg == null ? null : status.principal * rate - status.principal_eur_avg;
   const currencyGainsPct =
-    status.principal_eur_avg == null || status.principal_eur_avg <= 0
-      ? null
-      : currencyGainsEur == null
-      ? null
-      : (currencyGainsEur / status.principal_eur_avg) * 100;
+    status.principal_eur_avg != null && status.principal_eur_avg > 0 && currencyGainsEur != null
+      ? (currencyGainsEur / status.principal_eur_avg) * 100
+      : null;
 
   // Skip tax when any EUR aggregate it depends on is unavailable — current
   // value, principal, or dividends-with-no-conversion. Using a partial sum

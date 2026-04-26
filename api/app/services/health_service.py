@@ -4,6 +4,7 @@ Each helper degrades to ``None`` rather than raising — a single broken probe
 must not take down the whole endpoint.
 """
 
+import contextlib
 from datetime import UTC, datetime
 
 from sqlalchemy import func, text
@@ -24,15 +25,24 @@ def _age_seconds(dt: datetime | None) -> int | None:
     return max(0, int((datetime.now(UTC) - dt).total_seconds()))
 
 
+def _safe_rollback(session: Session) -> None:
+    """Best-effort rollback. Failure here (dead connection, etc.) must never
+    propagate out of a probe — that would break the "never raise" contract.
+
+    Postgres needs an explicit rollback after a failed query so the next
+    probe doesn't hit ``InFailedSqlTransactionError``. SQLite is forgiving
+    but a no-op rollback is harmless.
+    """
+    with contextlib.suppress(Exception):
+        session.rollback()
+
+
 def get_price_cache_age_seconds(session: Session) -> int | None:
     try:
         last = session.exec(select(func.max(HistoricalPrice.created_at))).one()
         return _age_seconds(last)
     except Exception:
-        # On Postgres a failed query leaves the transaction in aborted state
-        # (InFailedSqlTransactionError on the next probe). Roll back so the
-        # other health helpers can still run on the same session.
-        session.rollback()
+        _safe_rollback(session)
         return None
 
 
@@ -41,7 +51,7 @@ def get_last_fx_rate_age_seconds(session: Session) -> int | None:
         last = session.exec(select(func.max(FxRate.created_at))).one()
         return _age_seconds(last)
     except Exception:
-        session.rollback()
+        _safe_rollback(session)
         return None
 
 
@@ -55,5 +65,5 @@ def get_migrations_head(session: Session) -> str | None:
         row = result.first()
         return row[0] if row else None
     except Exception:
-        session.rollback()
+        _safe_rollback(session)
         return None
