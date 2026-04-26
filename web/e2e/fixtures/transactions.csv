@@ -1,0 +1,3 @@
+date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
+1/15/2024 10:00:00,Deposit,,,,,1000,920,,USD,0.92
+1/16/2024 10:00:00,Buy,AAPL,5,150,0,750,690,,USD,0.92
