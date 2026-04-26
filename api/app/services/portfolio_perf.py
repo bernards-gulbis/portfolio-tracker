@@ -11,13 +11,14 @@ from app.services.portfolio_handlers import (
     _apply_transaction,
     _compute_forward_split_factors,
 )
+from app.services.portfolio_status import _prefetch_historical_fx_rates
 from app.services.portfolio_types import (
     _ONE,
     _ZERO,
+    _opt_float,
     _to_decimal,
     _TxState,
 )
-from app.services.portfolio_valuation import _resolve_usd_to_eur_rate
 from app.services.price_service import PriceService
 
 logger = logging.getLogger(__name__)
@@ -250,7 +251,9 @@ def _compute_perf_data_point(
     data_point = {
         "date": date_str,
         "principal": float(state.principal),
-        "principal_eur": float(state.principal_eur),
+        # principal_eur is nullable per data-point — propagates "missing" when
+        # any contributing deposit/withdrawal lacked a usable historical rate.
+        "principal_eur": _opt_float(state.principal_eur.value),
         "current_value": float(current_value),
         "fx_rate": fx_rate,
         "return_pct": return_pct,
@@ -315,7 +318,11 @@ def calculate_performance(
 
     performance_data = []
     state = _TxState()
-    state.usd_to_eur_fallback = _resolve_usd_to_eur_rate(end_date)
+    # Prefetch the same way calculate_status does so the perf series uses
+    # historical FX rates per transaction date — never today's live rate.
+    state.historical_usd_to_eur_rates = _prefetch_historical_fx_rates(
+        transactions, state
+    )
     twr = _TwrState()
     tx_index = 0
     sp500_base_price: float | None = None

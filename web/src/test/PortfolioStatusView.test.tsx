@@ -81,6 +81,8 @@ const mockStatus: PortfolioStatus = {
   capital_gains_tax_rate: 0.255,
   warnings: [],
   usd_to_eur_rate: 0.92,
+  eur_incomplete: false,
+  fx_missing_tx_ids: [],
 };
 
 const mockLivePrices = {
@@ -249,8 +251,8 @@ describe('PortfolioStatusView', () => {
     const warningStatus: PortfolioStatus = {
       ...mockStatus,
       warnings: [
-        { code: 'fxFallbackToCurrentTicker', date: '2024-01-02T00:00:00', params: { ticker: 'AAPL' } },
-        { code: 'fxFallbackToCurrentTicker', date: '2024-01-02T00:00:00', params: { ticker: 'MSFT' } },
+        { code: 'fxRateMissingTicker', date: '2024-01-02T00:00:00', params: { ticker: 'AAPL' } },
+        { code: 'fxRateMissingTicker', date: '2024-01-02T00:00:00', params: { ticker: 'MSFT' } },
       ],
     };
 

@@ -6,7 +6,7 @@ import contextlib
 import logging
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 from urllib.parse import urlencode
 
@@ -14,7 +14,6 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from httpx_oauth.integrations.fastapi import OAuth2AuthorizeCallbackError
-from sqlalchemy import text
 from sqlmodel import Session, select
 
 from app.core import (
@@ -43,15 +42,26 @@ from app.core.config import (
     OAUTH_STATE_SECRET,
 )
 from app.core.database import (
-    engine,
     get_session,
     run_migrations,
+    verify_connection,
     verify_money_columns_are_decimal,
 )
 from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 from app.routers import portfolios_router, transaction_router, transactions_router
-from app.schemas import CloseAccountRequest, UserCreate, UserRead, UserUpdate
+from app.schemas import (
+    CloseAccountRequest,
+    HealthResponse,
+    UserCreate,
+    UserRead,
+    UserUpdate,
+)
+from app.services.health_service import (
+    get_last_fx_rate_age_seconds,
+    get_migrations_head,
+    get_price_cache_age_seconds,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -69,8 +79,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Portfolio Tracker API...")
 
     # Verify database connection before proceeding
-    from app.core.database import verify_connection
-
     if not verify_connection():
         logger.error("Failed to connect to database")
         raise RuntimeError("Database connection failed")
@@ -297,27 +305,28 @@ def root():
     return {"message": "Portfolio Tracker API", "status": "running", "version": "1.0.0"}
 
 
-@app.get("/health", tags=["health"])
-def health_check():
-    """
-    Comprehensive health check endpoint
-    Checks database connectivity
-    """
-    health_status = {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0",
-        "database": "unknown",
-    }
+@app.get("/health", response_model=HealthResponse, tags=["health"])
+def health_check(session: Annotated[Session, Depends(get_session)]):
+    """Health check: DB liveness plus cache and migration freshness."""
+    db_ok = verify_connection()
 
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        health_status["database"] = "connected"
-    except Exception as e:
-        health_status["status"] = "unhealthy"
-        health_status["database"] = "error"
-        logger.error("Health check failed - database error: %s", e, exc_info=True)
-        return JSONResponse(status_code=503, content=health_status)
+    if db_ok:
+        body = HealthResponse(
+            status="healthy",
+            timestamp=datetime.now(UTC),
+            version="1.0.0",
+            db="ok",
+            price_cache_age=get_price_cache_age_seconds(session),
+            last_fx_rate_age=get_last_fx_rate_age_seconds(session),
+            migrations_head=get_migrations_head(session),
+        )
+        return body
 
-    return health_status
+    body = HealthResponse(
+        status="unhealthy",
+        timestamp=datetime.now(UTC),
+        version="1.0.0",
+        db="error",
+    )
+    logger.error("Health check failed - database unreachable")
+    return JSONResponse(status_code=503, content=body.model_dump(mode="json"))

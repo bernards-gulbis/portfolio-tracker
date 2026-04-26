@@ -76,6 +76,8 @@ Thumbs.db
 htmlcov/
 .tox/
 coverage/
+web/playwright-report/
+web/test-results/
 
 # MyPy
 .mypy_cache/

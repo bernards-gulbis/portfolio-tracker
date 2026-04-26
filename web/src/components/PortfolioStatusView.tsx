@@ -250,12 +250,15 @@ const PortfolioStatusContent = ({
   const totalValue = showEur ? (eur?.currentValueEur ?? null) : status.current_value;
   const netInvested = showEur ? status.principal_eur : status.principal;
   const eurRate = eur?.rate ?? null;
-  // Total return = current value - net invested (consistent with chart header)
-  const totalReturn = totalValue == null
+  // Total return = current value - net invested. In EUR mode, principal_eur
+  // can be null (incomplete FX data) — show "—" rather than NaN.
+  const totalReturn = totalValue == null || netInvested == null
     ? null
     : totalValue - netInvested;
 
-  // After-tax value: total value minus estimated capital gains tax
+  // After-tax value: total value minus estimated capital gains tax. In EUR
+  // mode this depends on the EUR aggregates being complete; ``eur.taxEur`` is
+  // null when any of them are missing.
   const estimatedTax = (() => {
     if (totalValue == null) return null;
     if (showEur) return eur?.taxEur ?? null;
@@ -275,6 +278,26 @@ const PortfolioStatusContent = ({
     <>
       {/* Toolbar */}
       {toolbar && <div className="flex justify-end">{toolbar}</div>}
+
+      {/* EUR-incomplete banner — non-destructive: data is correct, just missing
+          some FX rates the user can supply by editing transactions. */}
+      {status.eur_incomplete && (
+        <Alert>
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription>
+            <span>
+              {t('status.fxIncomplete', { count: status.fx_missing_tx_ids.length })}{' '}
+              <button
+                type="button"
+                className="underline font-medium cursor-pointer"
+                onClick={goToTransactions}
+              >
+                {t('status.fxIncompleteCta')}
+              </button>.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Transaction Warnings */}
       {status.warnings.length > 0 && (
@@ -314,7 +337,7 @@ const PortfolioStatusContent = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label={t('status.netInvested')}
-          value={formatCurrency(netInvested, currency, locale)}
+          value={netInvested == null ? '-' : formatCurrency(netInvested, currency, locale)}
           caption={
             fxImpact == null ? undefined : (
               <p className={getValueClass(fxImpact)}>

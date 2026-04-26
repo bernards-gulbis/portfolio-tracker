@@ -38,13 +38,14 @@ describe('computeWithdrawalTaxMap', () => {
     expect(map.get(2)).toBe(800);  // W3: cumulative €10,000 - €9,200 = €800
   });
 
-  it('handles null dividends (treats as 0)', () => {
-    // Deposited €5,000, no dividends → threshold = €5,000
-    // Withdrawal €6,000 → taxable = €1,000
+  it('returns empty map when dividendsEur is null (FX rate unknown)', () => {
+    // When dividendsEur is null the EUR dividend income is unknown; substituting 0
+    // would silently overstate the taxable threshold, so the function returns an
+    // empty Map so the UI can show "—" rather than a misleading number.
     const withdrawals = [makeWithdrawal('2025-01-01', 6000)];
     const principalEur = -1000; // 5000 - 6000
     const map = computeWithdrawalTaxMap(withdrawals, principalEur, null);
-    expect(map.get(0)).toBe(1000);
+    expect(map.size).toBe(0);
   });
 
   it('processes in chronological order regardless of input order', () => {

@@ -16,10 +16,16 @@ const PAGE_SIZE = 10;
 interface WithdrawalsTableProps {
   realizedWithdrawals: WithdrawalFx[];
   locale: string;
-  principalEur: number;
+  principalEur: number | null;
   dividendsEur: number | null;
   taxRate: number;
 }
+
+const formatEurOrDash = (value: number | null, locale: string): string =>
+  value == null ? '-' : formatCurrency(value, 'EUR', locale);
+
+const formatSignedEurOrDash = (value: number | null, locale: string): string =>
+  value == null ? '-' : formatSignedCurrency(value, 'EUR', locale);
 
 export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEur, dividendsEur, taxRate }: WithdrawalsTableProps) => {
   const { t } = useTranslation();
@@ -48,7 +54,10 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
     return list.sort((a, b) => {
       let diff: number;
       if (sortKey === 'amount') diff = a.w.amount - b.w.amount;
-      else if (sortKey === 'fx_gain') diff = a.w.realized_fx_gain - b.w.realized_fx_gain;
+      else if (sortKey === 'fx_gain')
+        // Treat null FX gains as 0 for sort ordering — a missing-rate withdrawal
+        // shouldn't get a magnetised position at the top or bottom of the list.
+        diff = (a.w.realized_fx_gain ?? 0) - (b.w.realized_fx_gain ?? 0);
       else diff = a.w.date.localeCompare(b.w.date);
       return sortAsc ? diff : -diff;
     });
@@ -63,6 +72,11 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
   const safePage = Math.min(page, totalPages);
   const pagedWithdrawals = sortedWithdrawals.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  // Sum nullable EUR fields, returning null if any contributing value is null.
+  // Partial sums on display would silently understate totals.
+  const sumNullable = (values: (number | null)[]): number | null =>
+    values.some((v) => v == null) ? null : values.reduce((s: number, v) => s + (v as number), 0);
+
   const withdrawalTotals = useMemo(() => {
     let totalTaxable = 0;
     for (const { origIdx } of filteredWithdrawals) {
@@ -70,9 +84,9 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
     }
     return {
       amount: sortedWithdrawals.reduce((sum, { w }) => sum + w.amount, 0),
-      eurAvg: sortedWithdrawals.reduce((sum, { w }) => sum + w.amount_eur_avg, 0),
-      eurReceived: sortedWithdrawals.reduce((sum, { w }) => sum + w.amount_eur, 0),
-      fxGain: sortedWithdrawals.reduce((sum, { w }) => sum + w.realized_fx_gain, 0),
+      eurAvg: sumNullable(sortedWithdrawals.map(({ w }) => w.amount_eur_avg)),
+      eurReceived: sumNullable(sortedWithdrawals.map(({ w }) => w.amount_eur)),
+      fxGain: sumNullable(sortedWithdrawals.map(({ w }) => w.realized_fx_gain)),
       taxable: totalTaxable,
     };
   }, [sortedWithdrawals, filteredWithdrawals, withdrawalTaxMap]);
@@ -131,14 +145,15 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
           <TableBody>
             {pagedWithdrawals.map(({ w, origIdx }, idx) => {
               const taxable = withdrawalTaxMap.get(origIdx) ?? 0;
+              const fxGainClass = w.realized_fx_gain == null ? '' : getValueClass(w.realized_fx_gain);
               return (
                 <TableRow key={`${w.date}-${idx}`}>
                   <TableCell>{formatDateCompact(w.date, locale)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatCurrency(w.amount, 'USD', locale)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatCurrency(w.amount_eur_avg, 'EUR', locale)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatCurrency(w.amount_eur, 'EUR', locale)}</TableCell>
-                  <TableCell className={`min-w-[7rem] text-right tabular-nums ${getValueClass(w.realized_fx_gain)}`}>
-                    {formatSignedCurrency(w.realized_fx_gain, 'EUR', locale)}
+                  <TableCell className="text-right tabular-nums">{formatEurOrDash(w.amount_eur_avg, locale)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatEurOrDash(w.amount_eur, locale)}</TableCell>
+                  <TableCell className={`min-w-[7rem] text-right tabular-nums ${fxGainClass}`}>
+                    {formatSignedEurOrDash(w.realized_fx_gain, locale)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {taxable > 0 ? (
@@ -157,10 +172,10 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
               <TableRow className="bg-muted/30 font-semibold">
                 <TableCell>{t('status.total')}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCurrency(withdrawalTotals.amount, 'USD', locale)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCurrency(withdrawalTotals.eurAvg, 'EUR', locale)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCurrency(withdrawalTotals.eurReceived, 'EUR', locale)}</TableCell>
-                <TableCell className={`min-w-[7rem] text-right tabular-nums ${getValueClass(withdrawalTotals.fxGain)}`}>
-                  {formatSignedCurrency(withdrawalTotals.fxGain, 'EUR', locale)}
+                <TableCell className="text-right tabular-nums">{formatEurOrDash(withdrawalTotals.eurAvg, locale)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatEurOrDash(withdrawalTotals.eurReceived, locale)}</TableCell>
+                <TableCell className={`min-w-[7rem] text-right tabular-nums ${withdrawalTotals.fxGain == null ? '' : getValueClass(withdrawalTotals.fxGain)}`}>
+                  {formatSignedEurOrDash(withdrawalTotals.fxGain, locale)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {withdrawalTotals.taxable > 0 ? (

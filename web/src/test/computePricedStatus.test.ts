@@ -23,6 +23,8 @@ const makeStatus = (overrides: Partial<PortfolioStatus> = {}): PortfolioStatus =
   capital_gains_tax_rate: 0.25,
   warnings: [],
   usd_to_eur_rate: 0.90,
+  eur_incomplete: false,
+  fx_missing_tx_ids: [],
   ...overrides,
 });
 

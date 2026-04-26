@@ -64,6 +64,7 @@ interface TransactionTableProps {
   onTypeFilterChange: (value: string[]) => void;
   sortOrder: 'asc' | 'desc';
   onSortOrderChange: (value: 'asc' | 'desc') => void;
+  fxMissingTxIds?: number[];
 }
 
 
@@ -83,6 +84,7 @@ export const TransactionTable = ({
   onTypeFilterChange,
   sortOrder,
   onSortOrderChange,
+  fxMissingTxIds = [],
 }: TransactionTableProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -157,6 +159,8 @@ export const TransactionTable = ({
       default: return '';
     }
   };
+
+  const fxMissingSet = useMemo(() => new Set(fxMissingTxIds), [fxMissingTxIds]);
 
   const hasActiveFilters = tickerSearch !== '' || typeFilter.length > 0;
 
@@ -288,7 +292,22 @@ export const TransactionTable = ({
                   {getTransactionDetails(transaction)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatCurrency(transaction.total_amount, 'USD', locale)}
+                  <div className="inline-flex items-center justify-end gap-2">
+                    {fxMissingSet.has(transaction.id) && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(transaction)}
+                        className="cursor-pointer"
+                        aria-label={t('transaction.fxNeededHelp')}
+                        title={t('transaction.fxNeededHelp')}
+                      >
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                          {t('transaction.fxNeededBadge')}
+                        </Badge>
+                      </button>
+                    )}
+                    <span>{formatCurrency(transaction.total_amount, 'USD', locale)}</span>
+                  </div>
                 </TableCell>
                 <TableCell className="text-center">
                   <DropdownMenu open={openMenuId === transaction.id} onOpenChange={(open) => setOpenMenuId(open ? transaction.id : null)}>

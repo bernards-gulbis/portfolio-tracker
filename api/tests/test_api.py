@@ -16,7 +16,7 @@ from sqlmodel.pool import StaticPool
 from app.core import get_session
 from app.core.auth import current_active_user
 from app.models import Portfolio, Transaction, TransactionType
-from app.models.historical_price import (  # noqa: F401 — ensures tables exist in test DB
+from app.models.historical_price import (
     FxRate,
     HistoricalPrice,
 )
@@ -1688,14 +1688,18 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     assert data["usd_to_eur_rate"] == pytest.approx(1.0)
 
 
-def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClient):
-    """Test that dividends without fx_rate fall back to current USD→EUR rate"""
+def test_portfolio_status_dividend_eur_marked_missing_when_no_historical_rate(
+    client: TestClient,
+):
+    """When a dividend has no fx_rate and the historical rate fetch is empty,
+    dividends_eur must be reported as None (and the affected tx surfaced in
+    fx_missing_tx_ids) — never silently substituted with today's live rate."""
     portfolio_response = client.post(
-        "/portfolios/", json={"name": "Dividend EUR Fallback Test"}
+        "/portfolios/", json={"name": "Dividend EUR Missing Test"}
     )
     portfolio_id = portfolio_response.json()["id"]
 
-    # Deposit $10,000
+    # Deposit $10,000 with explicit fx_rate so principal_eur stays valid.
     client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
@@ -1721,8 +1725,9 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
         },
     )
 
-    # Receive dividend WITHOUT fx_rate — should fall back to current rate
-    client.post(
+    # Receive dividend WITHOUT fx_rate — historical fetch returns empty,
+    # so the dividend's EUR conversion is "missing".
+    dividend_response = client.post(
         f"/portfolios/{portfolio_id}/transactions/",
         json={
             "date": "2024-06-01T10:00:00",
@@ -1732,9 +1737,8 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
             "fee": 0.0,
         },
     )
+    dividend_id = dividend_response.json()["id"]
 
-    # When no historical rate is available AND the transaction lacks fx_rate,
-    # the current rate is the last-resort fallback.
     with (
         patch(
             "app.services.price_service.PriceService.get_usd_to_eur_rate",
@@ -1754,10 +1758,13 @@ def test_portfolio_status_dividend_eur_fallback_to_current_rate(client: TestClie
     # Dividends exist in USD
     assert data["dividends"] == pytest.approx(1000.0)
 
-    # dividends_eur computed via fallback rate (1000 * 0.92 = 920)
-    assert data["dividends_eur"] == pytest.approx(920.0)
+    # dividends_eur is None — not silently filled with today's live rate.
+    assert data["dividends_eur"] is None
+    assert data["eur_incomplete"] is True
+    assert dividend_id in data["fx_missing_tx_ids"]
 
-    # Live rate available for frontend tax computation
+    # Live rate is still surfaced separately (used for live valuation, not
+    # historical reconstruction).
     assert data["usd_to_eur_rate"] == pytest.approx(0.92)
 
 
@@ -2295,6 +2302,81 @@ def test_root_endpoint(client: TestClient):
     data = response.json()
     assert data["message"] == "Portfolio Tracker API"
     assert data["status"] == "running"
+
+
+def test_health_ok_empty_caches(client: TestClient):
+    """/health returns 200 with null cache ages and migrations_head when tables are empty."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert data["db"] == "ok"
+    assert data["version"] == "1.0.0"
+    assert "timestamp" in data
+    # Test DB has no cached prices, no fx rates, no alembic_version table
+    assert data["price_cache_age"] is None
+    assert data["last_fx_rate_age"] is None
+    assert data["migrations_head"] is None
+
+
+def test_health_reports_price_cache_age(client: TestClient, session: Session):
+    """Inserting a HistoricalPrice row makes price_cache_age a small non-negative int."""
+    session.add(
+        HistoricalPrice(ticker="AAPL", date="2026-04-25", price=Decimal("100.00"))
+    )
+    session.commit()
+
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["price_cache_age"], int)
+    assert 0 <= data["price_cache_age"] < 60
+    assert data["last_fx_rate_age"] is None
+
+
+def test_health_reports_fx_rate_age(client: TestClient, session: Session):
+    """Inserting an FxRate row makes last_fx_rate_age a small non-negative int."""
+    session.add(FxRate(date="2026-04-25", usd_to_eur_rate=Decimal("0.92")))
+    session.commit()
+
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["last_fx_rate_age"], int)
+    assert 0 <= data["last_fx_rate_age"] < 60
+    assert data["price_cache_age"] is None
+
+
+def test_health_reports_migrations_head(client: TestClient, session: Session):
+    """When the alembic_version table exists, /health returns its version_num."""
+    from sqlalchemy import text
+
+    session.execute(
+        text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY)")
+    )
+    session.execute(
+        text("INSERT INTO alembic_version (version_num) VALUES ('abc123def456')")
+    )
+    session.commit()
+
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["migrations_head"] == "abc123def456"
+
+
+def test_health_db_failure_returns_503(client: TestClient):
+    """When the DB is unreachable, /health returns 503 with db=error and null caches."""
+    with patch("main.verify_connection", return_value=False):
+        response = client.get("/health")
+
+    assert response.status_code == 503
+    data = response.json()
+    assert data["status"] == "unhealthy"
+    assert data["db"] == "error"
+    assert data["price_cache_age"] is None
+    assert data["last_fx_rate_age"] is None
+    assert data["migrations_head"] is None
 
 
 # ================== Auth Tests ==================
@@ -3669,6 +3751,10 @@ def test_warning_withdraw_negative_cash():
         date=datetime(2024, 1, 2),
         type=TransactionType.WITHDRAW,
         total_amount=-500.0,
+        # Explicit eur_amount so the FX cascade resolves cleanly and only the
+        # negative-cash warning fires (the fix isolates this test from FX
+        # missing-rate noise).
+        eur_amount=-460.0,
     )
     _apply_transaction(state, tx, strict=True)
 
