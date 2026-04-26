@@ -442,3 +442,18 @@ class PortfolioPerformanceResponse(BaseModel):
     cost_basis_fallback_tickers: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ================== Health Schema ==================
+
+
+class HealthResponse(BaseModel):
+    """Health-check response: DB liveness plus cache and migration freshness."""
+
+    status: Literal["healthy", "unhealthy"]
+    timestamp: datetime
+    version: str
+    db: Literal["ok", "error"]
+    price_cache_age: int | None = None
+    last_fx_rate_age: int | None = None
+    migrations_head: str | None = None

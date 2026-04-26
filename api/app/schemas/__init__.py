@@ -3,6 +3,7 @@
 from .schemas import (
     BulkImportResponse,
     CloseAccountRequest,
+    HealthResponse,
     HoldingResponse,
     LivePriceInfo,
     LivePricesResponse,
@@ -26,6 +27,7 @@ from .schemas import (
 __all__ = [
     "BulkImportResponse",
     "CloseAccountRequest",
+    "HealthResponse",
     "HoldingResponse",
     "LivePriceInfo",
     "LivePricesResponse",
