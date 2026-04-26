@@ -33,6 +33,9 @@ test('login → create portfolio → import CSV → toggle EUR/USD → see chart
   await page.getByRole('menuitem', { name: 'Import CSV' }).click();
   await page.locator('#csv-file').setInputFiles(CSV_FIXTURE);
   await page.getByRole('button', { name: 'Import' }).click();
+  // The dialog stays open until the import API call resolves. Wait for it
+  // to close so the Summary tab click isn't racing the modal overlay.
+  await page.getByRole('dialog', { name: 'Upload Transactions CSV' }).waitFor({ state: 'hidden' });
 
   // Switch to Summary and verify the allocation chart + AAPL legend render
   await page.getByRole('tab', { name: /Summary/i }).click();

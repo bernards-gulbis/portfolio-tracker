@@ -19,7 +19,9 @@ def _age_seconds(dt: datetime | None) -> int | None:
     # so treat naive values as UTC.
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
-    return int((datetime.now(UTC) - dt).total_seconds())
+    # Clamp to zero — minor clock skew between row write and now must not
+    # surface as a negative age in the health response.
+    return max(0, int((datetime.now(UTC) - dt).total_seconds()))
 
 
 def get_price_cache_age_seconds(session: Session) -> int | None:
@@ -27,6 +29,10 @@ def get_price_cache_age_seconds(session: Session) -> int | None:
         last = session.exec(select(func.max(HistoricalPrice.created_at))).one()
         return _age_seconds(last)
     except Exception:
+        # On Postgres a failed query leaves the transaction in aborted state
+        # (InFailedSqlTransactionError on the next probe). Roll back so the
+        # other health helpers can still run on the same session.
+        session.rollback()
         return None
 
 
@@ -35,6 +41,7 @@ def get_last_fx_rate_age_seconds(session: Session) -> int | None:
         last = session.exec(select(func.max(FxRate.created_at))).one()
         return _age_seconds(last)
     except Exception:
+        session.rollback()
         return None
 
 
@@ -48,4 +55,5 @@ def get_migrations_head(session: Session) -> str | None:
         row = result.first()
         return row[0] if row else None
     except Exception:
+        session.rollback()
         return None

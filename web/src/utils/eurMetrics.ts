@@ -105,12 +105,16 @@ export const computeWithdrawalTaxMap = (
   dividendsEur: number | null,
 ): Map<number, number> => {
   if (principalEur == null) return new Map();
+  // When dividends EUR is unknown (some dividend rows lack a historical FX
+  // rate), the tax-free threshold cannot be computed accurately — substituting
+  // 0 would silently overstate taxes. Bail so callers render "—" instead.
+  if (dividendsEur == null) return new Map();
   const usableWithdrawals = withdrawals.filter(
     (w): w is WithdrawalFx & { amount_eur: number } => w.amount_eur != null,
   );
   const totalWithdrawnEur = usableWithdrawals.reduce((s, w) => s + w.amount_eur, 0);
   const totalDepositedEur = principalEur + totalWithdrawnEur;
-  const threshold = totalDepositedEur + (dividendsEur ?? 0);
+  const threshold = totalDepositedEur + dividendsEur;
 
   const indexed = withdrawals
     .map((w, i) => ({ w, i }))

@@ -12,6 +12,7 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: 'http://localhost:3000',
+    locale: 'en-US',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
@@ -22,7 +23,10 @@ export default defineConfig({
       cwd: apiDir,
       env: { DATABASE_URL: 'sqlite:///./e2e_test.db' },
       url: 'http://127.0.0.1:8000/health',
-      reuseExistingServer: !process.env.CI,
+      // Always spawn a fresh API: reusing a dev backend would silently use
+      // the developer's DATABASE_URL, polluting their dev DB with test data.
+      // Port collisions surface as a clear "address already in use" error.
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
       timeout: 60_000,

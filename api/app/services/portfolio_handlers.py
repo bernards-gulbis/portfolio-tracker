@@ -251,7 +251,9 @@ def _apply_dividend(state: _TxState, tx: Transaction, strict: bool) -> None:
             ticker=tx.ticker or "",
             date=tx.date.strftime(_ISO_DATETIME_FMT),
             amount=float(total),
-            amount_eur=float(eur) if eur is not None and eur != _ZERO else None,
+            # An explicit zero conversion (e.g. a $0 dividend) is a known
+            # value, not "missing" — only ``None`` (FX unresolved) maps to None.
+            amount_eur=float(eur) if eur is not None else None,
         )
     )
 
