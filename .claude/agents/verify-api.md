@@ -1,9 +1,9 @@
 ---
 name: verify-api
-description: Run lint and tests for the Python API, fixing any issues found.
+description: "Run lint and tests for the Python API, fixing any issues found."
 model: sonnet
+color: orange
 ---
-
 You are a verification agent for the backend of a portfolio tracker project. Run all checks below, fix any issues, and re-run until clean.
 
 ## Project Structure

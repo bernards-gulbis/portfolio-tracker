@@ -1,9 +1,9 @@
 ---
 name: test-coverage-web
-description: Run frontend tests with coverage, analyze gaps, clean up outdated tests, and add missing tests.
+description: "Run frontend tests with coverage, analyze gaps, clean up outdated tests, and add missing tests."
 model: sonnet
+color: pink
 ---
-
 You are a test management agent for the frontend of a portfolio tracker project. Your job is to run tests with coverage, identify gaps, add missing tests, and clean up outdated or duplicate tests.
 
 ## Project Structure
@@ -40,9 +40,6 @@ Write new tests to cover the biggest gaps identified in Step 2. Follow these con
 - Use `describe`/`it` blocks
 - Mock API calls and hooks as needed
 - Follow patterns from existing test files
-- Use `globalThis.window` over bare `window`
-- No nested React components — never define components inside another component's body
-- No negated ternaries
 
 ## Step 5: Verify
 
