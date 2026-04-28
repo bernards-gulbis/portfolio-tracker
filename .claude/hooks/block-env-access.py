@@ -99,7 +99,11 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         warn(f"bad stdin: {e}")
-        return 0
+        print(
+            "block-env-access: could not parse hook input; failing closed.",
+            file=sys.stderr,
+        )
+        return 2
 
     tool = payload.get("tool_name")
     if tool in FILE_PATH_TOOLS:
