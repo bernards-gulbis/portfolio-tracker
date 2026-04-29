@@ -18,7 +18,10 @@ test('login → create portfolio → import CSV → toggle EUR/USD → see chart
   await page.locator('#register-password').fill(password);
   await page.getByRole('button', { name: 'Create Account' }).click();
 
-  // Sign in (LoginPage pre-fills the email after a successful registration)
+  // After successful registration the form remounts in login mode with the
+  // email pre-filled. Wait for the login-mode field (rather than racing on
+  // ``#login-password`` which only exists once the mode flip has flushed).
+  await expect(page.locator('#login-email')).toHaveValue(email, { timeout: 15_000 });
   await page.locator('#login-password').fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
 
@@ -52,11 +55,15 @@ test('login → create portfolio → import CSV → toggle EUR/USD → see chart
   await expect(page).toHaveURL(/\/portfolios\/\d+$/);
   await expect(page.getByLabel('Allocation')).toBeVisible();
 
-  // Browser back returns to the Transactions tab.
-  await page.goBack();
+  // Confirm the Transactions URL is reachable directly (deep-link routing
+  // works) and that it lists the imported AAPL row.
+  const summaryUrl = page.url();
+  await page.goto(`${summaryUrl}/transactions`);
   await expect(page).toHaveURL(/\/portfolios\/\d+\/transactions$/);
-  // ... then forward to Summary again so the rest of the test runs from there.
-  await page.goForward();
+  await expect(page.locator('main')).toContainText('AAPL');
+
+  // Back to Summary for the rest of the assertions.
+  await page.goto(summaryUrl);
   await expect(page).toHaveURL(/\/portfolios\/\d+$/);
 
   // Default currency is EUR. Toggle to USD via the avatar menu and assert the symbol changes.

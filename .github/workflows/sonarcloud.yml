@@ -54,7 +54,7 @@ jobs:
       # in requirements.lock — supply-chain protection. The lock is committed
       # alongside requirements.txt; regenerate with ``pip-compile`` (see README).
       - name: Install backend dependencies
-        run: pip install --require-hashes -r requirements.lock && pip install pytest pytest-cov pip-audit
+        run: pip install --require-hashes -r requirements.lock && pip install pytest pytest-cov pip-audit ruff
         working-directory: api
 
       - name: Backend lint (ruff check)
