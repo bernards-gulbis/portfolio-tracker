@@ -1,20 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SettingsPage, ProfileSection, PasswordSection, TaxSection, AccountSection } from '../components/SettingsPage';
+import { renderWithRouter } from './test-utils';
 
-const mockNavigation = {
-  page: 'settings' as const,
-  activePortfolioId: 1 as number | null,
-  goToPortfolio: vi.fn(),
-  goToFirstPortfolio: vi.fn(),
-  goToTransactions: vi.fn(),
-  goToSettings: vi.fn(),
-};
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
 
-vi.mock('../context/NavigationContext', () => ({
-  useNavigation: () => mockNavigation,
+vi.mock('../hooks/useLastVisitedPortfolio', () => ({
+  useLastVisitedPortfolio: () => ({ get: () => 1, set: vi.fn() }),
 }));
 
 vi.mock('../context/AuthContext', () => ({
@@ -31,22 +28,7 @@ vi.mock('../hooks/useAuth', () => ({
 import { useAuth } from '../context/AuthContext';
 import { useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 
-const createTestQueryClient = () =>
-  new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-const renderWithProviders = (ui: React.ReactElement) => {
-  const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>
-  );
-};
+const renderWithProviders = (ui: React.ReactElement) => renderWithRouter(ui);
 
 const defaultUser = {
   id: 1,
@@ -121,12 +103,12 @@ describe('SettingsPage', () => {
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });
 
-  it('calls goToPortfolio when back button is clicked', async () => {
+  it('navigates to last-visited portfolio when back button is clicked', async () => {
     renderPage();
 
     await userEvent.click(screen.getByText('Back to portfolio'));
 
-    expect(mockNavigation.goToPortfolio).toHaveBeenCalledWith(1);
+    expect(navigateMock).toHaveBeenCalledWith('/portfolios/1');
   });
 });
 

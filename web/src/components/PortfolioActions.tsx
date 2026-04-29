@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useNavigate } from 'react-router-dom';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
-import { useNavigation } from '../context/NavigationContext';
 import { getErrorMessage } from '../api';
 import { toast } from 'sonner';
 import { EditPortfolioModal } from './EditPortfolioModal';
@@ -36,7 +36,7 @@ interface PortfolioActionsProps {
 
 export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioActionsProps) => {
   const { t } = useTranslation();
-  const { goToFirstPortfolio } = useNavigation();
+  const navigate = useNavigate();
 
   const deletePortfolio = useDeletePortfolio();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -47,7 +47,7 @@ export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioAction
     if (deletePortfolio.isPending) return;
     try {
       await deletePortfolio.mutateAsync(portfolioId);
-      goToFirstPortfolio();
+      navigate('/');
     } catch (err) {
       toast.error(t('portfolio.delete.errorToast', { message: getErrorMessage(err) }));
     } finally {

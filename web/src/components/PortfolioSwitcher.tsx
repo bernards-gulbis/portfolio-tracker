@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronsUpDown, Plus, BriefcaseBusiness } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { usePortfolios } from '../hooks/usePortfolios';
-import { useNavigation } from '../context/NavigationContext';
 import { getErrorMessage } from '../api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ interface PortfolioSwitcherProps {
 export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: PortfolioSwitcherProps) => {
   const { t } = useTranslation();
   const { data: portfolios, isLoading, error } = usePortfolios();
-  const { goToPortfolio } = useNavigation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
   const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
@@ -42,7 +42,7 @@ export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: Portfoli
           key={portfolio.id}
           className="gap-2 p-2"
           onClick={() => {
-            goToPortfolio(portfolio.id);
+            navigate(`/portfolios/${portfolio.id}`);
             setOpen(false);
           }}
         >

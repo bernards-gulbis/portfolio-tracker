@@ -1,7 +1,7 @@
 import React, { useMemo, useState, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePortfolioStatusView } from '../hooks/usePortfolioStatusView';
-import { useNavigation } from '../context/NavigationContext';
+import { useNavigate, useParams } from 'react-router-dom';
 import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatDateTime, getValueClass, formatTaxRatePercent } from '../utils/formatters';
 import { useLocale } from '../hooks/useLocale';
 import { getErrorMessage, PricedPortfolioStatus, PortfolioPerformance, PerformanceDataPoint, TransactionWarning, RealizedSale, DividendReceived } from '../api';
@@ -185,7 +185,11 @@ const PortfolioStatusContent = ({
 }: PortfolioStatusContentProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
-  const { goToTransactions } = useNavigation();
+  const navigate = useNavigate();
+  const { id: idParam } = useParams<{ id: string }>();
+  const goToTransactions = () => {
+    if (idParam) navigate(`/portfolios/${idParam}/transactions`);
+  };
   const { currency } = useCurrencyPreference();
   const showEur = currency === 'EUR';
   const eur = useMemo(() => computeEurMetrics(status), [status]);
@@ -483,7 +487,8 @@ const PortfolioStatusSkeleton = () => (
 // ================== Main view with data fetching ==================
 
 export const PortfolioStatusView = () => {
-  const { activePortfolioId: portfolioId } = useNavigation();
+  const { id } = useParams<{ id: string }>();
+  const portfolioId = id ? Number(id) : null;
   const { t } = useTranslation();
   const locale = useLocale();
 

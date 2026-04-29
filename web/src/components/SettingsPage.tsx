@@ -6,7 +6,8 @@ import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
 import { useUpdateProfile, useChangePassword, useUpdateTaxRate, useCloseAccount } from '../hooks/useAuth';
 import { useAuth } from '../context/AuthContext';
-import { useNavigation } from '../context/NavigationContext';
+import { useNavigate } from 'react-router-dom';
+import { useLastVisitedPortfolio } from '../hooks/useLastVisitedPortfolio';
 import { getErrorMessage } from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -474,14 +475,16 @@ const SectionContent = ({ section }: { section: SettingsSection }) => {
 
 export const SettingsPage = () => {
   const { t } = useTranslation();
-  const { goToPortfolio, activePortfolioId, goToFirstPortfolio } = useNavigation();
+  const navigate = useNavigate();
+  const lastVisited = useLastVisitedPortfolio();
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
 
   const handleBack = () => {
-    if (activePortfolioId === null) {
-      goToFirstPortfolio();
+    const lastId = lastVisited.get();
+    if (lastId == null) {
+      navigate('/');
     } else {
-      goToPortfolio(activePortfolioId);
+      navigate(`/portfolios/${lastId}`);
     }
   };
 

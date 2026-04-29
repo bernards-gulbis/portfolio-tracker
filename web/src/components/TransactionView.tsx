@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
 import { useDebounce } from '../hooks/useDebounce';
-import { useNavigation } from '../context/NavigationContext';
+import { useParams } from 'react-router-dom';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
 import { TransactionTable } from './TransactionTable';
@@ -26,7 +26,8 @@ import { AlertTriangleIcon, Plus, MoreVertical, UploadIcon, DownloadIcon, Receip
 
 export const TransactionView = () => {
   const { t } = useTranslation();
-  const { activePortfolioId } = useNavigation();
+  const { id } = useParams<{ id: string }>();
+  const activePortfolioId = id ? Number(id) : null;
   const [currentPage, setCurrentPage] = useState(1);
   const [tickerSearch, setTickerSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
