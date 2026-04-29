@@ -22,7 +22,10 @@ export default defineConfig({
     {
       command: 'python -m uvicorn main:app --host 127.0.0.1 --port 8000',
       cwd: apiDir,
-      env: { DATABASE_URL: 'sqlite:///./e2e_test.db' },
+      env: {
+        DATABASE_URL: 'sqlite:///./e2e_test.db',
+        CORS_ORIGINS: 'http://localhost:3000',
+      },
       url: 'http://127.0.0.1:8000/health',
       // Always spawn a fresh API: reusing a dev backend would silently use
       // the developer's DATABASE_URL, polluting their dev DB with test data.
