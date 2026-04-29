@@ -75,7 +75,7 @@ vi.mock('../components/LoginPage', () => ({
   LoginPage: () => <div data-testid="login-page" />,
 }));
 
-vi.mock('../components/PortfolioStatusView', () => ({
+vi.mock('../components/portfolio-status/PortfolioStatusView', () => ({
   PortfolioStatusView: () => <div data-testid="portfolio-status-view" />,
 }));
 

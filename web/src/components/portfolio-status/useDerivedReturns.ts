@@ -1,0 +1,63 @@
+import { useMemo } from 'react';
+import type { PortfolioPerformance, PricedPortfolioStatus } from '../../api';
+
+export interface DerivedReturns {
+  /** Annualized EUR-adjusted (when ``showEur``) TWR; null if span < 30 days
+   *  or there is insufficient data. */
+  annualizedReturn: number | null;
+}
+
+/** Compute the (optionally EUR-adjusted) trailing TWR % from a perf series.
+ *  Returns null when the series is too short or its last point is missing.
+ *  EUR adjustment formula (matches PerformanceChart):
+ *
+ *    (1 + return%) × current_fx / ((1 + first_return%) × first_fx) − 1
+ */
+const computeLastReturnPct = (
+  performance: PortfolioPerformance | undefined,
+  liveFx: number | null,
+  showEur: boolean,
+): number | null => {
+  const points = performance?.data_points;
+  if (!points || points.length < 2) return null;
+  const last = points[points.length - 1];
+  if (last.return_pct == null) return null;
+
+  if (!showEur) return last.return_pct;
+
+  const effectiveFxLast = liveFx ?? last.fx_rate;
+  const first = points.find((p) => p.return_pct != null && p.fx_rate != null);
+  if (first?.return_pct == null || first?.fx_rate == null || effectiveFxLast == null) {
+    return last.return_pct;
+  }
+  const baseFactor = (1 + first.return_pct / 100) * first.fx_rate;
+  if (baseFactor <= 0) return null;
+  const lastFactor = (1 + last.return_pct / 100) * effectiveFxLast;
+  return (lastFactor / baseFactor - 1) * 100;
+};
+
+/** Annualized EUR-adjusted TWR, extracted from PortfolioStatusContent. */
+export const useDerivedReturns = (
+  performance: PortfolioPerformance | undefined,
+  status: PricedPortfolioStatus,
+  showEur: boolean,
+): DerivedReturns => {
+  const annualizedReturn = useMemo(() => {
+    const lastReturnPct = computeLastReturnPct(performance, status.usd_to_eur_rate, showEur);
+    if (lastReturnPct == null) return null;
+    const points = performance?.data_points;
+    // Guarded by computeLastReturnPct, but narrow for TS.
+    if (!points || points.length < 2) return null;
+    const firstDate = new Date(points[0].date);
+    const lastDate = new Date(points[points.length - 1].date);
+    const days = Math.max(1, (lastDate.getTime() - firstDate.getTime()) / 86_400_000);
+    if (days < 30) return null;
+    const twr = lastReturnPct / 100;
+    return (Math.pow(1 + twr, 365 / days) - 1) * 100;
+  }, [performance, showEur, status.usd_to_eur_rate]);
+
+  return { annualizedReturn };
+};
+
+// Exported for unit testing the EUR-adjustment formula directly.
+export const _computeLastReturnPctForTests = computeLastReturnPct;

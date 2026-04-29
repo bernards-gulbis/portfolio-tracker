@@ -8,7 +8,7 @@ import { PortfolioSwitcher } from './components/PortfolioSwitcher';
 import { usePortfolios } from './hooks/usePortfolios';
 import { usePortfolioStatus } from './hooks/usePortfolioStatus';
 import { TransactionView } from './components/TransactionView';
-import { PortfolioStatusView } from './components/PortfolioStatusView';
+import { PortfolioStatusView } from './components/portfolio-status/PortfolioStatusView';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
