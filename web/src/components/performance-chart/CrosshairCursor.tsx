@@ -6,7 +6,7 @@ export const CrosshairCursor = ({
   points?: { x: number; y: number }[];
   height?: number;
 }) => {
-  if (!points || points.length === 0) return null;
+  if (points == null || points.length === 0) return null;
   const { x } = points[0];
   return (
     <line

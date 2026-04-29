@@ -27,6 +27,10 @@ export const PasswordSection = () => {
   useWarnUnsavedChanges(form.formState.isDirty);
 
   const onSubmit = async (values: PasswordFormValues) => {
+    if (isOauthUser) {
+      form.setError('root', { message: 'Password change not applicable for OAuth users' });
+      return;
+    }
     try {
       await changePassword.mutateAsync({ password: values.newPassword });
       form.reset({ newPassword: '', confirmPassword: '' });
@@ -57,6 +61,7 @@ export const PasswordSection = () => {
                   type="password"
                   autoComplete="new-password"
                   className="max-w-md"
+                  disabled={isOauthUser}
                 />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
@@ -74,6 +79,7 @@ export const PasswordSection = () => {
                   type="password"
                   autoComplete="new-password"
                   className="max-w-md"
+                  disabled={isOauthUser}
                 />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
@@ -84,7 +90,7 @@ export const PasswordSection = () => {
               <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
             </Alert>
           )}
-          <Button type="submit" disabled={changePassword.isPending}>
+          <Button type="submit" disabled={isOauthUser || changePassword.isPending}>
             {changePassword.isPending && <Spinner />}
             {isOauthUser ? t('settings.password.submitOauth') : t('settings.password.submit')}
           </Button>

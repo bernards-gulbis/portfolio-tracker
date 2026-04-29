@@ -171,7 +171,7 @@ function PortfolioStatusRoute() {
   // Auto-navigate to Transactions for brand-new portfolios (no transactions entered yet).
   // ``replace`` so the back button doesn't re-trigger this redirect.
   useEffect(() => {
-    if (portfolioId == null || !portfolioStatus) return;
+    if (portfolioId == null || portfolioStatus == null) return;
     if (emptyRedirectedRef.current === portfolioId) return;
     const isBrandNew =
       portfolioStatus.holdings.length === 0 && portfolioStatus.principal === 0;

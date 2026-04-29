@@ -66,9 +66,10 @@ jobs:
         working-directory: api
 
       # ``pip-audit`` queries the PyPI advisory DB. Strict mode fails on
-      # any unfixable vulnerability.
+      # any unfixable vulnerability. Audit the lockfile so the check
+      # matches the exact versions installed above.
       - name: Backend dependency audit
-        run: pip-audit --requirement requirements.txt --strict
+        run: pip-audit --requirement requirements.lock --strict
         working-directory: api
 
       - name: Run backend tests with coverage

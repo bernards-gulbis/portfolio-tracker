@@ -1,6 +1,6 @@
 import React, { useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -94,13 +94,12 @@ export const PortfolioStatusContent = ({
             <AlertDescription>
               <span>
                 {t('status.emptyPortfolio')}{' '}
-                <button
-                  type="button"
+                <Link
+                  to={idParam ? `/portfolios/${idParam}/transactions` : '#'}
                   className="underline font-medium cursor-pointer"
-                  onClick={goToTransactions}
                 >
                   {t('status.emptyPortfolioLink')}
-                </button>
+                </Link>
                 .
               </span>
             </AlertDescription>

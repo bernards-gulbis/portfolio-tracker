@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { InfoIcon } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 
 interface EurIncompleteBannerProps {
   missingCount: number;
@@ -15,13 +16,13 @@ export const EurIncompleteBanner = ({ missingCount, onGoToTransactions }: EurInc
       <AlertDescription>
         <span>
           {t('status.fxIncomplete', { count: missingCount })}{' '}
-          <button
-            type="button"
-            className="underline font-medium cursor-pointer"
+          <Button
+            variant="link"
+            className="h-auto p-0 underline font-medium"
             onClick={onGoToTransactions}
           >
             {t('status.fxIncompleteCta')}
-          </button>.
+          </Button>.
         </span>
       </AlertDescription>
     </Alert>

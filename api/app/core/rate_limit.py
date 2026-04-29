@@ -10,11 +10,14 @@ single process; if we move to multi-worker, swap this for a Redis-backed
 implementation (or migrate to ``slowapi`` with a Redis backend).
 """
 
+import logging
 import time
 from collections import defaultdict, deque
 from threading import Lock
 
 from fastapi import Depends, HTTPException, Request
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
@@ -54,7 +57,16 @@ def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    if request.client:
+        return request.client.host
+    logger.debug(
+        "No client IP available, falling back to 'unknown' "
+        "(x-forwarded-for=%s, method=%s, url=%s)",
+        request.headers.get("x-forwarded-for"),
+        getattr(request, "method", "?"),
+        getattr(request, "url", "?"),
+    )
+    return "unknown"
 
 
 def rate_limit(max_requests: int, window_seconds: int):

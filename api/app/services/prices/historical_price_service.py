@@ -258,7 +258,8 @@ class HistoricalPriceService:
         """
         if start_date >= end_date:
             raise ValueError(
-                f"start_date ({start_date}) must be before end_date ({end_date})"
+                f"start_date ({start_date}) must be strictly before "
+                f"end_date ({end_date}); equal dates are not allowed"
             )
 
         cache_key = f"{ticker}:{start_date.date()}:{end_date.date()}"

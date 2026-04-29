@@ -15,7 +15,7 @@ class TestGetUsdToEurRate:
     """USD/EUR live rate, derived from EURUSD=X via LivePriceService."""
 
     def setup_method(self):
-        LivePriceService._price_cache.clear()
+        LivePriceService.clear_cache()
 
     def test_get_usd_to_eur_rate_success(self):
         with patch.object(LivePriceService, "get_current_price", return_value=1.10):
@@ -67,7 +67,7 @@ class TestGetHistoricalUsdToEurRates:
     """Historical USD/EUR rates, inverted from EURUSD=X."""
 
     def setup_method(self):
-        HistoricalPriceService._historical_cache.clear()
+        HistoricalPriceService.clear_session_cache()
 
     def test_converts_eur_usd_to_usd_eur(self):
         eur_usd = {"2025-01-10": 1.10, "2025-01-11": 1.05}

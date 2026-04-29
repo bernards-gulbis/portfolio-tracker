@@ -54,8 +54,9 @@ export const useChartData = (
       const rawCurrentValue = isLast && liveOverride ? liveOverride.currentValue : point.current_value;
       const eurConvertedValue =
         rawCurrentValue == null ? null : rawCurrentValue * effectiveFxRate!;
-      const currentValue =
-        useEurMode && effectiveFxRate != null ? eurConvertedValue : rawCurrentValue;
+      const currentValue = useEurMode
+        ? (effectiveFxRate == null ? null : eurConvertedValue)
+        : rawCurrentValue;
 
       const principal = useEurMode ? point.principal_eur ?? null : point.principal;
 

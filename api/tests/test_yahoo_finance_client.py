@@ -105,6 +105,40 @@ class TestRetryOn5xx:
         assert mock_sleep.call_count == 2
 
 
+class TestRetryOnTransient4xx:
+    """Transient 4xx codes (429, 408) should be retried like 5xx."""
+
+    def test_429_then_200_succeeds(self):
+        responses = [_http_response(429), _ok_response()]
+        with (
+            patch(
+                "app.services.prices.yahoo_finance_client.requests.get",
+                side_effect=responses,
+            ) as mock_get,
+            patch("app.services.prices.yahoo_finance_client.time.sleep") as mock_sleep,
+        ):
+            resp = YahooFinanceClient.fetch_chart("AAPL", {})
+
+        assert resp.status_code == 200
+        assert mock_get.call_count == 2
+        assert mock_sleep.call_count == 1
+
+    def test_408_then_200_succeeds(self):
+        responses = [_http_response(408), _ok_response()]
+        with (
+            patch(
+                "app.services.prices.yahoo_finance_client.requests.get",
+                side_effect=responses,
+            ) as mock_get,
+            patch("app.services.prices.yahoo_finance_client.time.sleep") as mock_sleep,
+        ):
+            resp = YahooFinanceClient.fetch_chart("AAPL", {})
+
+        assert resp.status_code == 200
+        assert mock_get.call_count == 2
+        assert mock_sleep.call_count == 1
+
+
 class TestRetryOnRequestException:
     def test_connection_error_then_success(self):
         with (

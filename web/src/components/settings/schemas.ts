@@ -1,9 +1,8 @@
 import * as z from 'zod';
 import i18n from '../../i18n/index';
 
-export type SettingsSection = 'profile' | 'password' | 'tax' | 'account';
-
-export const SECTIONS: SettingsSection[] = ['profile', 'password', 'tax', 'account'];
+export const SECTIONS = ['profile', 'password', 'tax', 'account'] as const;
+export type SettingsSection = (typeof SECTIONS)[number];
 
 export const profileSchema = z.object({
   name: z.string().superRefine((val, ctx) => {

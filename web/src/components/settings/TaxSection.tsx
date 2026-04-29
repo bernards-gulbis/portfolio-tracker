@@ -53,7 +53,10 @@ export const TaxSection = () => {
                   type="number"
                   step="0.1"
                   className="max-w-md"
-                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                  onChange={(e) => {
+                    const v = e.target.valueAsNumber;
+                    field.onChange(Number.isNaN(v) ? '' : v);
+                  }}
                 />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>

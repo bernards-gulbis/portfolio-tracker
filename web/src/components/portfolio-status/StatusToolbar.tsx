@@ -20,15 +20,16 @@ export const StatusToolbar = ({
   onRefresh,
 }: StatusToolbarProps) => {
   const { t } = useTranslation();
+  const hasPortfolio = !isEmptyPortfolio;
   return (
     <div className="flex items-center gap-2">
-      {!isEmptyPortfolio && livePricesError && (
+      {hasPortfolio && livePricesError && (
         <span className="flex items-center gap-1 text-xs text-destructive">
           <AlertTriangleIcon className="h-3.5 w-3.5" />
           {t('status.livePriceError')}
         </span>
       )}
-      {!isEmptyPortfolio && latestUpdateAt > 0 && (
+      {hasPortfolio && latestUpdateAt > 0 && (
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           {t('status.fetchedAt', {
             time: new Date(latestUpdateAt).toLocaleTimeString(locale, {

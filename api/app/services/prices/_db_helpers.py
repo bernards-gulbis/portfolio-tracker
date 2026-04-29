@@ -42,13 +42,13 @@ def bulk_upsert(
                 set_={k: getattr(stmt.excluded, k) for k in update_fields},
             )
             s.execute(stmt)
-            s.commit()
 
         if session is not None:
             _execute(session)
         else:
             with Session(engine) as s:
                 _execute(s)
+                s.commit()
         logger.debug("Saved %d %s to cache", len(values), label)
     except Exception as e:
         logger.error("Failed to save %d %s: %s", len(values), label, e, exc_info=True)

@@ -32,6 +32,12 @@ class LivePriceService:
     _cache_lock = Lock()
 
     @classmethod
+    def clear_cache(cls) -> None:
+        """Clear the in-memory price cache. Used by tests."""
+        with cls._cache_lock:
+            cls._price_cache.clear()
+
+    @classmethod
     def get_current_prices(
         cls, tickers: list[str], max_workers: int = 3
     ) -> dict[str, float | None]:

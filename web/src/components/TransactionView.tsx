@@ -114,7 +114,7 @@ export const TransactionView = () => {
     }
   };
 
-  if (!activePortfolioId) {
+  if (activePortfolioId == null) {
     return (
       <Card>
         <CardContent>

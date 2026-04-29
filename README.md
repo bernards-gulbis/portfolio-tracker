@@ -29,7 +29,7 @@ All environment variables are documented in `api/.env.example`. Google OAuth is 
 
 ```bash
 cd web
-npm install
+npm ci
 npm run dev                  # http://localhost:3000 (proxies /api to :8000)
 ```
 

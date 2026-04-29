@@ -14,7 +14,7 @@ import { StatusToolbar } from './StatusToolbar';
 
 export const PortfolioStatusView = () => {
   const { id } = useParams<{ id: string }>();
-  const portfolioId = id ? Number(id) : null;
+  const portfolioId = id != null && /^\d+$/.test(id) ? Number(id) : null;
   const { t } = useTranslation();
   const locale = useLocale();
 

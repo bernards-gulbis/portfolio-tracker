@@ -67,7 +67,14 @@ describe('i18n parity (en ↔ lv)', () => {
       if (!lvPaths.has(enPath)) missingFromLv.push(enPath);
     }
 
+    // Reverse check: keys present in lv but not in en.
+    const extraInLv: string[] = [];
+    for (const lvPath of lvPaths) {
+      if (!enLeaves.has(lvPath)) extraInLv.push(lvPath);
+    }
+
     expect(collisions, `Untranslated entries (lv === en):\n  ${collisions.join('\n  ')}`).toEqual([]);
     expect(missingFromLv, `Missing keys in lv:\n  ${missingFromLv.join('\n  ')}`).toEqual([]);
+    expect(extraInLv, `Extra keys in lv (not in en):\n  ${extraInLv.join('\n  ')}`).toEqual([]);
   });
 });

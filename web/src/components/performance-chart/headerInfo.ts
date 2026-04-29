@@ -50,7 +50,7 @@ const getValueHeaderInfo = (
     displayValue: formatted,
     principalDisplay,
     changeDisplay: formatSignedCurrency(diff, currency, locale),
-    pctDisplay: formatSignedPercent(point.returnPct),
+    pctDisplay: point.returnPct == null ? '' : formatSignedPercent(point.returnPct),
     isPositive: diff >= 0,
   };
 };

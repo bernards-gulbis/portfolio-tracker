@@ -221,7 +221,7 @@ _users_router.routes = [
 ]
 
 
-@_users_router.get("/me", tags=["users"])
+@_users_router.get("/me", tags=["users"], response_model=UserRead)
 def get_current_user_me(
     user: Annotated[User, Depends(current_active_user)],
     session: Annotated[Session, Depends(get_session)],

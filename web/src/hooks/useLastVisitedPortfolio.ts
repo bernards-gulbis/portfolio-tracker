@@ -7,7 +7,7 @@ function read(): number | null {
     const raw = globalThis.localStorage.getItem(STORAGE_KEY);
     if (raw == null) return null;
     const id = Number(raw);
-    return Number.isFinite(id) && id > 0 ? id : null;
+    return Number.isInteger(id) && id > 0 ? id : null;
   } catch {
     return null;
   }
@@ -15,7 +15,7 @@ function read(): number | null {
 
 function write(id: number | null): void {
   try {
-    if (id == null) {
+    if (id == null || !Number.isInteger(id) || id <= 0) {
       globalThis.localStorage.removeItem(STORAGE_KEY);
     } else {
       globalThis.localStorage.setItem(STORAGE_KEY, String(id));

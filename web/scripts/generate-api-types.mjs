@@ -25,11 +25,16 @@ const repoRoot = path.resolve(here, '..', '..');
 const apiDir = path.join(repoRoot, 'api');
 const outFile = path.resolve(here, '..', 'src', 'api-generated.ts');
 
-// 1. Export the OpenAPI schema. Prefer the project's venv python on Windows
+// 1. Export the OpenAPI schema. Prefer the project's venv python
 // (matches what tests/lint use); fall back to ``python`` on PATH.
-const venvPython = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
+const venvPythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
+const venvPythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
 const pythonExe =
-  process.platform === 'win32' && existsSync(venvPython) ? venvPython : 'python';
+  process.platform === 'win32' && existsSync(venvPythonWin)
+    ? venvPythonWin
+    : existsSync(venvPythonUnix)
+      ? venvPythonUnix
+      : 'python';
 
 const exportResult = spawnSync(
   pythonExe,

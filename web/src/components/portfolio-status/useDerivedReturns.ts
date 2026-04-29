@@ -19,21 +19,23 @@ const computeLastReturnPct = (
   showEur: boolean,
 ): number | null => {
   const points = performance?.data_points;
-  if (!points || points.length < 2) return null;
+  if (points == null || points.length < 2) return null;
   const last = points[points.length - 1];
   if (last.return_pct == null) return null;
 
-  if (!showEur) return last.return_pct;
-
-  const effectiveFxLast = liveFx ?? last.fx_rate;
-  const first = points.find((p) => p.return_pct != null && p.fx_rate != null);
-  if (first?.return_pct == null || first?.fx_rate == null || effectiveFxLast == null) {
-    return last.return_pct;
+  if (showEur) {
+    const effectiveFxLast = liveFx ?? last.fx_rate;
+    const first = points.find((p) => p.return_pct != null && p.fx_rate != null);
+    if (first?.return_pct == null || first?.fx_rate == null || effectiveFxLast == null) {
+      return last.return_pct;
+    }
+    const baseFactor = (1 + first.return_pct / 100) * first.fx_rate;
+    if (baseFactor <= 0) return null;
+    const lastFactor = (1 + last.return_pct / 100) * effectiveFxLast;
+    return (lastFactor / baseFactor - 1) * 100;
   }
-  const baseFactor = (1 + first.return_pct / 100) * first.fx_rate;
-  if (baseFactor <= 0) return null;
-  const lastFactor = (1 + last.return_pct / 100) * effectiveFxLast;
-  return (lastFactor / baseFactor - 1) * 100;
+
+  return last.return_pct;
 };
 
 /** Annualized EUR-adjusted TWR, extracted from PortfolioStatusContent. */
@@ -47,8 +49,14 @@ export const useDerivedReturns = (
     if (lastReturnPct == null) return null;
     const points = performance?.data_points;
     // Guarded by computeLastReturnPct, but narrow for TS.
-    if (!points || points.length < 2) return null;
-    const firstDate = new Date(points[0].date);
+    if (points == null || points.length < 2) return null;
+    // Use the same start point as computeLastReturnPct so days and return
+    // are measured from the same origin.
+    const startIdx = showEur
+      ? points.findIndex((p) => p.return_pct != null && p.fx_rate != null)
+      : points.findIndex((p) => p.return_pct != null);
+    if (startIdx < 0) return null;
+    const firstDate = new Date(points[startIdx].date);
     const lastDate = new Date(points[points.length - 1].date);
     const days = Math.max(1, (lastDate.getTime() - firstDate.getTime()) / 86_400_000);
     if (days < 30) return null;

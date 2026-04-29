@@ -112,7 +112,7 @@ export const PerformanceChart = ({
     );
   }
 
-  if (!data || data.length === 0) {
+  if (data == null || data.length === 0) {
     return (
       <Card>
         <CardHeader>
