@@ -47,6 +47,7 @@ from app.core.database import (
     verify_connection,
     verify_money_columns_are_decimal,
 )
+from app.core.rate_limit import rate_limit
 from app.models.oauth_account import OAuthAccount
 from app.models.user import User
 from app.routers import portfolios_router, transaction_router, transactions_router
@@ -179,27 +180,33 @@ app.include_router(portfolios_router)
 app.include_router(transactions_router)
 app.include_router(transaction_router)
 
-# Auth routers
+# Auth routers — each gets a per-(IP, path) rate-limit dependency to throttle
+# brute-force attempts. Limits are deliberately conservative; legitimate users
+# rarely hit them, and ``/auth/cookie/login`` covers logout too in one bucket.
 AUTH_PREFIX = "/auth"
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix=f"{AUTH_PREFIX}/cookie",
     tags=["auth"],
+    dependencies=[rate_limit(10, 60)],
 )
 app.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
     prefix=AUTH_PREFIX,
     tags=["auth"],
+    dependencies=[rate_limit(3, 60)],
 )
 app.include_router(
     fastapi_users.get_reset_password_router(),
     prefix=AUTH_PREFIX,
     tags=["auth"],
+    dependencies=[rate_limit(5, 60)],
 )
 app.include_router(
     fastapi_users.get_verify_router(UserRead),
     prefix=AUTH_PREFIX,
     tags=["auth"],
+    dependencies=[rate_limit(5, 60)],
 )
 # Build the FastAPI Users users router, then replace its GET /me with our own
 # so there is exactly one handler for GET /users/me and no ordering ambiguity.

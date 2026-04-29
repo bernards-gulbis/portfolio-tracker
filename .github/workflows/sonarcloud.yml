@@ -50,8 +50,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # ``--require-hashes`` enforces that every install matches the SHA-256
+      # in requirements.lock — supply-chain protection. The lock is committed
+      # alongside requirements.txt; regenerate with ``pip-compile`` (see README).
       - name: Install backend dependencies
-        run: pip install -r requirements.txt pytest pytest-cov pip-audit
+        run: pip install --require-hashes -r requirements.lock && pip install pytest pytest-cov pip-audit
         working-directory: api
 
       - name: Backend lint (ruff check)
@@ -112,7 +115,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install backend dependencies
-        run: pip install -r requirements.txt
+        run: pip install --require-hashes -r requirements.lock
         working-directory: api
 
       - name: Install Chromium for Playwright
