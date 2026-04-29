@@ -7,6 +7,7 @@ const apiDir = path.resolve(__dirname, '..', 'api');
 
 export default defineConfig({
   testDir: './e2e',
+  globalSetup: './e2e/global-setup.ts',
   reporter: [['list'], ['html', { open: 'never' }]],
   fullyParallel: false,
   workers: 1,
