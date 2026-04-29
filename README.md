@@ -42,6 +42,16 @@ cd api && ruff check . && ruff format --check .  # Backend lint
 cd web && npm run lint                           # Frontend lint
 ```
 
+## API Type Generation
+
+`web/src/api-generated.ts` is generated from the FastAPI OpenAPI schema and committed to git. After changing any backend Pydantic schema or route, regenerate:
+
+```bash
+cd web && npm run generate:api
+```
+
+CI fails the build if `api-generated.ts` is out of date — backend changes must come with regenerated frontend types.
+
 ## CSV Import Format
 
 ```csv
