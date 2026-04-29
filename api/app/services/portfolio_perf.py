@@ -19,7 +19,7 @@ from app.services.portfolio_types import (
     _to_decimal,
     _TxState,
 )
-from app.services.price_service import PriceService
+from app.services.prices import HistoricalPriceService, LivePriceService
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def _prepare_perf_data(
             ticker_first_date[tx.ticker] = tx.date - timedelta(days=5)
 
     fetch_tickers = list(all_tickers | {"EURUSD=X", "^GSPC"})
-    historical_data = PriceService.get_historical_prices_for_multiple_tickers(
+    historical_data = HistoricalPriceService.get_historical_prices_for_multiple_tickers(
         fetch_tickers,
         start_date - timedelta(days=5),
         end_date + timedelta(days=1),
@@ -108,7 +108,7 @@ def _prepare_perf_data(
     ticker_last_price: dict[str, float] = {}
     for ticker in all_tickers:
         if not historical_data.get(ticker):
-            db_price = PriceService.get_last_known_price(ticker)
+            db_price = LivePriceService.get_last_known_price(ticker)
             if db_price is not None:
                 ticker_last_price[ticker] = db_price
                 logger.info(

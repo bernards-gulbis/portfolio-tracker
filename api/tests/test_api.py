@@ -71,11 +71,15 @@ def client_fixture(session: Session, test_user: User):
     """Create a test client with dependency overrides for session and auth"""
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[current_active_user] = lambda: test_user
-    # PriceService uses the global engine directly (not get_session),
-    # so patch it to use the test engine for historical_prices / fx_rates tables.
+    # The price services use the global engine directly (not get_session),
+    # so patch each home module to use the test engine for historical_prices / fx_rates.
     with (
-        patch("app.services.price_service.engine", session.get_bind()),
-        patch("app.services.price_service.is_postgresql", False),
+        patch("app.services.prices.live_price_service.engine", session.get_bind()),
+        patch(
+            "app.services.prices.historical_price_service.engine", session.get_bind()
+        ),
+        patch("app.services.prices._db_helpers.engine", session.get_bind()),
+        patch("app.services.prices._db_helpers.is_postgresql", False),
     ):
         client = TestClient(app)
         yield client
@@ -1554,7 +1558,8 @@ def test_portfolio_status_with_eur_conversion(client: TestClient):
 
     # Mock USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=0.85
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
+        return_value=0.85,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -1608,7 +1613,8 @@ def test_portfolio_status_with_positive_capital_gains_tax(client: TestClient):
 
     # Mock FX rate 1.0
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=1.0
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
+        return_value=1.0,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -1670,7 +1676,8 @@ def test_portfolio_status_tax_excludes_dividends(client: TestClient):
     )
 
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=1.0
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
+        return_value=1.0,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -1741,12 +1748,12 @@ def test_portfolio_status_dividend_eur_marked_missing_when_no_historical_rate(
 
     with (
         patch(
-            "app.services.price_service.PriceService.get_usd_to_eur_rate",
+            "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
             return_value=0.92,
         ),
         patch(
             "app.services.portfolio_status."
-            "PriceService.get_historical_usd_to_eur_rates",
+            "FxRateService.get_historical_usd_to_eur_rates",
             return_value={},
         ),
     ):
@@ -1816,12 +1823,12 @@ def test_portfolio_status_tax_none_when_dividend_eur_unavailable(client: TestCli
     # USD→EUR rate returns None (unavailable) and no historical rates either.
     with (
         patch(
-            "app.services.price_service.PriceService.get_usd_to_eur_rate",
+            "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
             return_value=None,
         ),
         patch(
             "app.services.portfolio_status."
-            "PriceService.get_historical_usd_to_eur_rates",
+            "FxRateService.get_historical_usd_to_eur_rates",
             return_value={},
         ),
     ):
@@ -1875,7 +1882,8 @@ def test_portfolio_status_eur_none_when_exchange_rate_unavailable(client: TestCl
 
     # No exchange rate available
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=None
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
+        return_value=None,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -1929,7 +1937,8 @@ def test_portfolio_status_eur_conversion_with_different_rates(client: TestClient
 
     # Mock current USD to EUR rate: 0.85 (meaning 1 USD = 0.85 EUR)
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=0.85
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
+        return_value=0.85,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -1984,7 +1993,8 @@ def test_principal_eur_avg_after_withdrawal(client: TestClient):
     )
 
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=0.92
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
+        return_value=0.92,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -2086,7 +2096,7 @@ def test_withdrawal_fx_gain_multiple_deposits_and_withdrawals(client: TestClient
     )
 
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
         return_value=0.92,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
@@ -2193,7 +2203,7 @@ def test_withdrawal_fx_gain_interleaved_deposits(client: TestClient):
     )
 
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
         return_value=0.92,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
@@ -2267,7 +2277,7 @@ def test_withdrawal_fx_gain_full_withdrawal(client: TestClient):
     )
 
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate",
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
         return_value=0.92,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
@@ -2618,7 +2628,7 @@ def test_performance_chart_split_adjusted_prices(client: TestClient):
         return result
 
     with patch(
-        "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+        "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
         side_effect=mock_historical_prices,
     ):
         response = client.get(
@@ -2724,7 +2734,7 @@ def test_performance_chart_multiple_splits(client: TestClient):
         return result
 
     with patch(
-        "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+        "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
         side_effect=mock_historical_prices,
     ):
         response = client.get(
@@ -2796,7 +2806,7 @@ def test_performance_chart_no_splits(client: TestClient):
         return result
 
     with patch(
-        "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+        "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
         side_effect=mock_historical_prices,
     ):
         response = client.get(
@@ -2887,11 +2897,11 @@ def test_performance_chart_missing_price_fallback(client: TestClient):
 
     with (
         patch(
-            "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+            "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
             side_effect=mock_historical_prices,
         ),
         patch(
-            "app.services.price_service.PriceService.get_last_known_price",
+            "app.services.prices.live_price_service.LivePriceService.get_last_known_price",
             return_value=None,
         ),
     ):
@@ -3071,11 +3081,11 @@ def test_performance_last_known_price_gap(client: TestClient):
 
     with (
         patch(
-            "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+            "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
             side_effect=mock_historical_prices,
         ),
         patch(
-            "app.services.price_service.PriceService.get_last_known_price",
+            "app.services.prices.live_price_service.LivePriceService.get_last_known_price",
             return_value=None,  # No DB cache either
         ),
     ):
@@ -3183,11 +3193,11 @@ def test_performance_delisted_db_fallback(client: TestClient):
 
     with (
         patch(
-            "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+            "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
             side_effect=mock_historical_prices,
         ),
         patch(
-            "app.services.price_service.PriceService.get_last_known_price",
+            "app.services.prices.live_price_service.LivePriceService.get_last_known_price",
             side_effect=lambda t: 54.20 if t == "TWTR" else None,
         ),
     ):
@@ -3284,11 +3294,11 @@ def test_performance_delisted_no_cache(client: TestClient):
 
     with (
         patch(
-            "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+            "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
             side_effect=mock_historical_prices,
         ),
         patch(
-            "app.services.price_service.PriceService.get_last_known_price",
+            "app.services.prices.live_price_service.LivePriceService.get_last_known_price",
             return_value=None,  # No DB cache
         ),
     ):
@@ -3391,7 +3401,7 @@ def test_performance_twr_mid_period_deposit(client: TestClient):
         return result
 
     with patch(
-        "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+        "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
         side_effect=mock_historical_prices,
     ):
         response = client.get(
@@ -3467,7 +3477,7 @@ def test_performance_twr_price_gain(client: TestClient):
         return result
 
     with patch(
-        "app.services.price_service.PriceService.get_historical_prices_for_multiple_tickers",
+        "app.services.prices.historical_price_service.HistoricalPriceService.get_historical_prices_for_multiple_tickers",
         side_effect=mock_historical_prices,
     ):
         response = client.get(
@@ -3567,7 +3577,8 @@ def test_portfolio_status_uses_custom_tax_rate(
 
     # Mock FX rate 1.0
     with patch(
-        "app.services.price_service.PriceService.get_usd_to_eur_rate", return_value=1.0
+        "app.services.prices.fx_rate_service.FxRateService.get_usd_to_eur_rate",
+        return_value=1.0,
     ):
         response = client.get(f"/portfolios/{portfolio_id}/status")
 
@@ -3799,9 +3810,12 @@ def test_no_warnings_in_non_strict_mode():
 
 def test_live_prices_with_tickers(client: TestClient):
     """Test /prices/live returns prices and FX rate for given tickers"""
-    with patch("app.routers.portfolios.PriceService") as mock_ps:
-        mock_ps.get_current_prices.return_value = {"AAPL": 192.5, "MSFT": 410.0}
-        mock_ps.get_usd_to_eur_rate_safe.return_value = 0.91
+    with (
+        patch("app.routers.portfolios.LivePriceService") as mock_live,
+        patch("app.routers.portfolios.FxRateService") as mock_fx,
+    ):
+        mock_live.get_current_prices.return_value = {"AAPL": 192.5, "MSFT": 410.0}
+        mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
         response = client.get(
             "/portfolios/prices/live", params={"tickers": ["AAPL", "MSFT"]}
@@ -3816,13 +3830,16 @@ def test_live_prices_with_tickers(client: TestClient):
     assert data["prices"]["MSFT"]["source"] == "live"
     assert data["usd_to_eur_rate"] == 0.91
     assert "timestamp" in data
-    mock_ps.get_current_prices.assert_called_once_with(["AAPL", "MSFT"])
+    mock_live.get_current_prices.assert_called_once_with(["AAPL", "MSFT"])
 
 
 def test_live_prices_empty_tickers(client: TestClient):
     """Test /prices/live with no tickers returns empty prices dict"""
-    with patch("app.routers.portfolios.PriceService") as mock_ps:
-        mock_ps.get_usd_to_eur_rate_safe.return_value = 0.92
+    with (
+        patch("app.routers.portfolios.LivePriceService") as mock_live,
+        patch("app.routers.portfolios.FxRateService") as mock_fx,
+    ):
+        mock_fx.get_usd_to_eur_rate_safe.return_value = 0.92
 
         response = client.get("/portfolios/prices/live")
 
@@ -3830,14 +3847,17 @@ def test_live_prices_empty_tickers(client: TestClient):
     data = response.json()
     assert data["prices"] == {}
     assert data["usd_to_eur_rate"] == 0.92
-    mock_ps.get_current_prices.assert_not_called()
+    mock_live.get_current_prices.assert_not_called()
 
 
 def test_live_prices_fx_rate_failure(client: TestClient):
     """Test /prices/live gracefully handles FX rate fetch failure"""
-    with patch("app.routers.portfolios.PriceService") as mock_ps:
-        mock_ps.get_current_prices.return_value = {"AAPL": 192.5}
-        mock_ps.get_usd_to_eur_rate_safe.return_value = None
+    with (
+        patch("app.routers.portfolios.LivePriceService") as mock_live,
+        patch("app.routers.portfolios.FxRateService") as mock_fx,
+    ):
+        mock_live.get_current_prices.return_value = {"AAPL": 192.5}
+        mock_fx.get_usd_to_eur_rate_safe.return_value = None
 
         response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
 
@@ -3858,10 +3878,13 @@ def test_live_prices_too_many_tickers(client: TestClient):
 
 def test_live_prices_price_fetch_error_returns_none_prices(client: TestClient):
     """Test /prices/live falls back to DB last-known or missing when live raises"""
-    with patch("app.routers.portfolios.PriceService") as mock_ps:
-        mock_ps.get_current_prices.side_effect = RuntimeError("yfinance down")
-        mock_ps.get_last_known_price_with_date.return_value = None
-        mock_ps.get_usd_to_eur_rate_safe.return_value = 0.91
+    with (
+        patch("app.routers.portfolios.LivePriceService") as mock_live,
+        patch("app.routers.portfolios.FxRateService") as mock_fx,
+    ):
+        mock_live.get_current_prices.side_effect = RuntimeError("yfinance down")
+        mock_live.get_last_known_price_with_date.return_value = None
+        mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
         response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
 
@@ -4087,15 +4110,15 @@ class TestLivePricesEndpoint:
     def test_price_fetch_error_falls_back_to_none(self, client: TestClient):
         with (
             patch(
-                "app.routers.portfolios.PriceService.get_current_prices",
+                "app.routers.portfolios.LivePriceService.get_current_prices",
                 side_effect=RuntimeError("yahoo down"),
             ),
             patch(
-                "app.routers.portfolios.PriceService.get_last_known_price_with_date",
+                "app.routers.portfolios.LivePriceService.get_last_known_price_with_date",
                 return_value=None,
             ),
             patch(
-                "app.routers.portfolios.PriceService.get_usd_to_eur_rate_safe",
+                "app.routers.portfolios.FxRateService.get_usd_to_eur_rate_safe",
                 return_value=1.0,
             ),
         ):
@@ -4109,15 +4132,15 @@ class TestLivePricesEndpoint:
         """When live fails, serve last-known from DB with source=last_known."""
         with (
             patch(
-                "app.routers.portfolios.PriceService.get_current_prices",
+                "app.routers.portfolios.LivePriceService.get_current_prices",
                 side_effect=RuntimeError("yahoo down"),
             ),
             patch(
-                "app.routers.portfolios.PriceService.get_last_known_price_with_date",
+                "app.routers.portfolios.LivePriceService.get_last_known_price_with_date",
                 return_value=(150.25, "2026-04-10"),
             ),
             patch(
-                "app.routers.portfolios.PriceService.get_usd_to_eur_rate_safe",
+                "app.routers.portfolios.FxRateService.get_usd_to_eur_rate_safe",
                 return_value=1.0,
             ),
         ):

@@ -1,7 +1,7 @@
 """Historical valuation helpers: date lookup, price fetch, FX resolution.
 
-All functions here are read-only — they consult ``PriceService`` to turn a
-``(ticker, date)`` pair into a price or a USD→EUR rate, and fall back to
+All functions here are read-only — they consult the price services to turn
+a ``(ticker, date)`` pair into a price or a USD→EUR rate, and fall back to
 nearest-earlier-date or DB-cached last-known values when a live value is
 unavailable. No transaction state is mutated.
 """
@@ -9,7 +9,7 @@ unavailable. No transaction state is mutated.
 import logging
 from datetime import datetime, timedelta
 
-from app.services.price_service import PriceService
+from app.services.prices import FxRateService, HistoricalPriceService
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _fetch_historical_prices(
         return {}
     start_date = target_date - timedelta(days=5)
     end_date = target_date + timedelta(days=1)
-    all_prices = PriceService.get_historical_prices_for_multiple_tickers(
+    all_prices = HistoricalPriceService.get_historical_prices_for_multiple_tickers(
         tickers, start_date, end_date
     )
     target_date_str = target_date.strftime("%Y-%m-%d")
@@ -57,9 +57,9 @@ def _resolve_usd_to_eur_rate(target_date: datetime) -> float | None:
     """Resolve USD→EUR rate at *target_date*, falling back to nearest earlier date or current rate."""
     start_date = target_date - timedelta(days=5)
     end_date = target_date + timedelta(days=1)
-    fx_rates = PriceService.get_historical_usd_to_eur_rates(start_date, end_date)
+    fx_rates = FxRateService.get_historical_usd_to_eur_rates(start_date, end_date)
     target_date_str = target_date.strftime("%Y-%m-%d")
     rate = _resolve_nearest_date_value(fx_rates, target_date_str)
     if rate is not None:
         return rate
-    return PriceService.get_usd_to_eur_rate_safe()
+    return FxRateService.get_usd_to_eur_rate_safe()

@@ -22,7 +22,11 @@ from app.schemas import (
     PortfolioUpdate,
 )
 from app.services import PortfolioService
-from app.services.price_service import PriceService
+from app.services.prices import (
+    FxRateService,
+    HistoricalPriceService,
+    LivePriceService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +79,7 @@ def get_live_prices(
             detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
         )
     try:
-        live_prices = PriceService.get_current_prices(tickers) if tickers else {}
+        live_prices = LivePriceService.get_current_prices(tickers) if tickers else {}
     except Exception as e:
         logger.error("Error fetching live prices: %s", e, exc_info=True)
         live_prices = dict.fromkeys(tickers)
@@ -87,7 +91,7 @@ def get_live_prices(
         if live is not None and live > 0:
             prices[ticker] = LivePriceInfo(price=float(live), source="live", as_of=now)
             continue
-        fallback = PriceService.get_last_known_price_with_date(ticker)
+        fallback = LivePriceService.get_last_known_price_with_date(ticker)
         if fallback is not None:
             price, date_str = fallback
             prices[ticker] = LivePriceInfo(
@@ -98,7 +102,7 @@ def get_live_prices(
         else:
             prices[ticker] = LivePriceInfo(price=None, source="missing", as_of=None)
 
-    usd_to_eur_rate = PriceService.get_usd_to_eur_rate_safe()
+    usd_to_eur_rate = FxRateService.get_usd_to_eur_rate_safe()
     return LivePricesResponse(
         prices=prices,
         usd_to_eur_rate=usd_to_eur_rate,
@@ -214,7 +218,7 @@ def get_portfolio_performance(
         ) from None
 
     try:
-        PriceService.clear_session_cache()
+        HistoricalPriceService.clear_session_cache()
         # get_portfolio_performance verifies ownership and returns
         # (name, data_points, cost_basis_fallback_tickers)
         (
