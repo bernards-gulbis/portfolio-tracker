@@ -361,6 +361,11 @@ class PortfolioStatusResponse(BaseModel):
     fx_missing_tx_ids: list[int] = Field(
         default_factory=list
     )  # Transaction ids needing an FX rate / EUR amount
+    # Total transactions on the portfolio. Lets the UI distinguish
+    # "brand-new portfolio" from "portfolio whose principal/holdings
+    # net to zero" without inferring from heuristics that misfire on
+    # deposit-then-withdraw or buy-then-sell-then-withdraw histories.
+    transaction_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

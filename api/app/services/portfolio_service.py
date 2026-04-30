@@ -16,7 +16,7 @@ from app.repositories.transaction_repository import TransactionRepository
 from app.schemas import PortfolioStatusResponse
 from app.services.portfolio_perf import calculate_performance
 from app.services.portfolio_status import calculate_status
-from app.services.price_service import PriceService
+from app.services.prices import FxRateService
 
 _DEFAULT_TAX_RATE = Decimal("0.255")
 
@@ -96,7 +96,7 @@ class PortfolioService:
             raise PortfolioNotFoundException(portfolio_id)
 
         transactions = self.transaction_repo.get_by_portfolio_id(portfolio_id)
-        usd_to_eur_rate = PriceService.get_usd_to_eur_rate_safe()
+        usd_to_eur_rate = FxRateService.get_usd_to_eur_rate_safe()
 
         return calculate_status(
             transactions=transactions,

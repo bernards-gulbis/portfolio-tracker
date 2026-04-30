@@ -31,7 +31,7 @@ from app.services.portfolio_types import (
     _TxState,
     _Warning,
 )
-from app.services.price_service import PriceService
+from app.services.prices import FxRateService
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def _prefetch_historical_fx_rates(
     start = min(tx.date for tx in fx_blind) - timedelta(days=5)
     end = max(tx.date for tx in fx_blind) + timedelta(days=1)
     try:
-        return PriceService.get_historical_usd_to_eur_rates(start, end)
+        return FxRateService.get_historical_usd_to_eur_rates(start, end)
     except Exception as exc:
         logger.warning("Historical USD/EUR rate fetch failed: %s", exc)
         state.fx_rates_unavailable = True
@@ -179,4 +179,5 @@ def calculate_status(
         usd_to_eur_rate=usd_to_eur_rate,
         eur_incomplete=eur_incomplete,
         fx_missing_tx_ids=fx_missing_tx_ids,
+        transaction_count=len(transactions),
     )

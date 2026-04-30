@@ -25,6 +25,7 @@ const makeStatus = (overrides: Partial<PortfolioStatus> = {}): PortfolioStatus =
   usd_to_eur_rate: 0.90,
   eur_incomplete: false,
   fx_missing_tx_ids: [],
+  transaction_count: 0,
   ...overrides,
 });
 

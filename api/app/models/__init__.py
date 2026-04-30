@@ -1,6 +1,6 @@
 """Database models"""
 
-from .historical_price import FxRate, HistoricalPrice
+from .historical_price import FxRate, HistoricalPrice, HistoricalPriceCoverage
 from .oauth_account import OAuthAccount
 from .portfolio import Portfolio
 from .transaction import Transaction
@@ -10,6 +10,7 @@ from .user import User
 __all__ = [
     "FxRate",
     "HistoricalPrice",
+    "HistoricalPriceCoverage",
     "OAuthAccount",
     "Portfolio",
     "Transaction",

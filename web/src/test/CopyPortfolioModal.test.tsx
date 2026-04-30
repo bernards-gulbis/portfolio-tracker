@@ -1,35 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CopyPortfolioModal } from '../components/CopyPortfolioModal';
+import { renderWithRouter } from './test-utils';
 
-const mockNavigation = {
-  page: 'portfolio' as const,
-  activePortfolioId: null as number | null,
-  goToPortfolio: vi.fn(),
-  goToFirstPortfolio: vi.fn(),
-  goToTransactions: vi.fn(),
-  goToSettings: vi.fn(),
-};
-
-vi.mock('../context/NavigationContext', () => ({
-  useNavigation: () => mockNavigation,
-}));
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
 
 vi.mock('../hooks/usePortfolios', () => ({
   useCopyPortfolio: vi.fn(),
 }));
 
 import { useCopyPortfolio } from '../hooks/usePortfolios';
-
-const createTestQueryClient = () =>
-  new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
 
 const defaultProps = {
   isOpen: true,
@@ -38,14 +23,8 @@ const defaultProps = {
   portfolioName: 'My Portfolio',
 };
 
-const renderModal = (props = defaultProps) => {
-  const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <CopyPortfolioModal {...props} />
-    </QueryClientProvider>
-  );
-};
+const renderModal = (props = defaultProps) =>
+  renderWithRouter(<CopyPortfolioModal {...props} />);
 
 describe('CopyPortfolioModal', () => {
   const mockMutateAsync = vi.fn();

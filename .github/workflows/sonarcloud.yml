@@ -1,4 +1,4 @@
-name: SonarQube Analysis
+name: CI
 
 on:
   push:
@@ -10,13 +10,14 @@ on:
 
 jobs:
   tests:
+    name: Lint, tests, audit, SonarQube
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # --- Frontend tests & coverage ---
+      # --- Frontend ---
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -28,26 +29,110 @@ jobs:
         run: npm ci
         working-directory: web
 
+      - name: Frontend lint
+        run: npm run lint
+        working-directory: web
+
+      # ``npm audit`` returns non-zero on any advisory at or above the
+      # configured level. ``--omit=dev`` keeps the gate focused on what
+      # actually ships to users.
+      - name: Frontend dependency audit
+        run: npm audit --audit-level=high --omit=dev
+        working-directory: web
+
       - name: Run frontend tests with coverage
         run: npx vitest run --coverage --reporter=default
         working-directory: web
 
-      # --- Backend tests & coverage ---
+      # --- Backend ---
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      # ``--require-hashes`` enforces that every install matches the SHA-256
+      # in requirements.lock — supply-chain protection. The lock is committed
+      # alongside requirements.txt; regenerate with ``pip-compile`` (see README).
       - name: Install backend dependencies
-        run: pip install -r requirements.txt pytest pytest-cov
+        run: pip install --require-hashes -r requirements.lock && pip install pytest pytest-cov pip-audit ruff
+        working-directory: api
+
+      - name: Backend lint (ruff check)
+        run: ruff check .
+        working-directory: api
+
+      - name: Backend format check (ruff format)
+        run: ruff format --check .
+        working-directory: api
+
+      # ``pip-audit`` queries the PyPI advisory DB. Strict mode fails on
+      # any unfixable vulnerability. Audit the lockfile so the check
+      # matches the exact versions installed above.
+      - name: Backend dependency audit
+        run: pip-audit --requirement requirements.lock --strict
         working-directory: api
 
       - name: Run backend tests with coverage
         run: pytest --cov=app --cov-report=xml:coverage.xml
         working-directory: api
 
+      # --- API contract drift gate ---
+      # Regenerate web/src/api-generated.ts from the live FastAPI OpenAPI
+      # schema. If the committed file is stale, ``git diff --exit-code``
+      # returns non-zero and CI fails. Forces backend↔frontend type sync
+      # to be a deliberate commit, not a runtime surprise.
+      - name: Regenerate OpenAPI TypeScript types
+        run: npm run generate:api
+        working-directory: web
+      - name: Fail if api-generated.ts is out of date
+        run: git diff --exit-code -- web/src/api-generated.ts
+
       # --- SonarQube scan ---
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  e2e:
+    name: Playwright e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install --require-hashes -r requirements.lock
+        working-directory: api
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+
+      # Playwright config spins up uvicorn + vite against an ephemeral
+      # SQLite database (api/e2e_test.db) — no shared state with dev.
+      - name: Run Playwright e2e
+        run: npm run e2e
+        working-directory: web
+
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: web/test-results/
+          retention-days: 7

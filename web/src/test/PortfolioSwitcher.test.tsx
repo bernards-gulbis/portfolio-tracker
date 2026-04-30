@@ -1,22 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PortfolioSwitcher } from '../components/PortfolioSwitcher';
 import type { Portfolio } from '../api';
+import { renderWithRouter } from './test-utils';
 
-const mockNavigation = {
-  page: 'portfolio' as const,
-  activePortfolioId: null as number | null,
-  goToPortfolio: vi.fn(),
-  goToFirstPortfolio: vi.fn(),
-  goToTransactions: vi.fn(),
-  goToSettings: vi.fn(),
-};
-
-vi.mock('../context/NavigationContext', () => ({
-  useNavigation: () => mockNavigation,
-}));
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
 
 vi.mock('../hooks/usePortfolios', () => ({
   usePortfolios: vi.fn(),
@@ -27,24 +20,12 @@ vi.mock('../hooks/usePortfolios', () => ({
 
 import { usePortfolios } from '../hooks/usePortfolios';
 
-const createTestQueryClient = () =>
-  new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
 const mockOnCreateClick = vi.fn();
 
-const renderComponent = (activePortfolioId: number | null = null) => {
-  const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />
-    </QueryClientProvider>
+const renderComponent = (activePortfolioId: number | null = null) =>
+  renderWithRouter(
+    <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={mockOnCreateClick} />,
   );
-};
 
 const mockPortfolios: Portfolio[] = [
   { id: 1, name: 'Growth Fund', created_at: '2024-01-01T00:00:00' },
@@ -172,7 +153,7 @@ describe('PortfolioSwitcher', () => {
     expect(mockOnCreateClick).toHaveBeenCalledOnce();
   });
 
-  it('calls goToPortfolio when portfolio item is clicked', async () => {
+  it('navigates to /portfolios/:id when portfolio item is clicked', async () => {
     vi.mocked(usePortfolios).mockReturnValue({
       data: mockPortfolios,
       isLoading: false,
@@ -186,6 +167,6 @@ describe('PortfolioSwitcher', () => {
 
     await userEvent.click(screen.getByText('Growth Fund'));
 
-    expect(mockNavigation.goToPortfolio).toHaveBeenCalledWith(1);
+    expect(navigateMock).toHaveBeenCalledWith('/portfolios/1');
   });
 });

@@ -1,22 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PortfolioStatusView } from '../components/PortfolioStatusView';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { PortfolioStatusView } from '../components/portfolio-status/PortfolioStatusView';
 import { CurrencyProvider } from '../hooks/useCurrencyPreference';
 import type { PortfolioStatus } from '../api';
 
-const mockNavigation = {
-  page: 'portfolio' as const,
-  activePortfolioId: null as number | null,
-  goToPortfolio: vi.fn(),
-  goToFirstPortfolio: vi.fn(),
-  goToTransactions: vi.fn(),
-  goToSettings: vi.fn(),
-};
-
-vi.mock('../context/NavigationContext', () => ({
-  useNavigation: () => mockNavigation,
-}));
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
 
 vi.mock('../hooks/usePortfolioStatus', () => ({
   usePortfolioStatus: vi.fn(),
@@ -50,12 +44,17 @@ const createTestQueryClient = () =>
   });
 
 const renderComponent = (portfolioId: number | null = null) => {
-  mockNavigation.activePortfolioId = portfolioId;
   const queryClient = createTestQueryClient();
+  const initialPath = portfolioId == null ? '/' : `/portfolios/${portfolioId}`;
   return render(
     <QueryClientProvider client={queryClient}>
       <CurrencyProvider>
-        <PortfolioStatusView />
+        <MemoryRouter initialEntries={[initialPath]}>
+          <Routes>
+            <Route path="/portfolios/:id" element={<PortfolioStatusView />} />
+            <Route path="/" element={<PortfolioStatusView />} />
+          </Routes>
+        </MemoryRouter>
       </CurrencyProvider>
     </QueryClientProvider>
   );
@@ -83,6 +82,7 @@ const mockStatus: PortfolioStatus = {
   usd_to_eur_rate: 0.92,
   eur_incomplete: false,
   fx_missing_tx_ids: [],
+  transaction_count: 0,
 };
 
 const mockLivePrices = {
@@ -208,7 +208,7 @@ describe('PortfolioStatusView', () => {
     renderComponent(1);
 
     expect(screen.getByText(/once you add transactions in the/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /transactions tab/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /transactions tab/i })).toBeInTheDocument();
   });
 
   it('does not show empty portfolio alert when transactions exist', () => {
@@ -377,11 +377,14 @@ describe('PortfolioStatusView', () => {
       error: null,
     } as unknown as ReturnType<typeof useLivePrices>);
 
-    mockNavigation.activePortfolioId = 1;
     render(
       <QueryClientProvider client={queryClient}>
         <CurrencyProvider>
-          <PortfolioStatusView />
+          <MemoryRouter initialEntries={['/portfolios/1']}>
+            <Routes>
+              <Route path="/portfolios/:id" element={<PortfolioStatusView />} />
+            </Routes>
+          </MemoryRouter>
         </CurrencyProvider>
       </QueryClientProvider>
     );

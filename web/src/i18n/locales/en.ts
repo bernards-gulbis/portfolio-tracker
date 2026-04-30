@@ -289,10 +289,9 @@ const en = {
     priceStaleBadge: 'Last known price as of {{asOf}}',
     priceAsOfUnknown: 'an unknown date',
     transactionWarnings: 'Transaction warnings',
-    fxIncomplete_zero: 'EUR figures are incomplete because no transactions have a usable FX rate.',
-    fxIncomplete_one: 'EUR figures are incomplete: {{count}} transaction needs an FX rate or EUR amount.',
-    fxIncomplete_other: 'EUR figures are incomplete: {{count}} transactions need an FX rate or EUR amount.',
-    fxIncompleteCta: 'Fix transactions',
+    fxIncomplete_zero: 'EUR figures are incomplete because no transactions have a usable FX rate. <cta>Fix transactions</cta>.',
+    fxIncomplete_one: 'EUR figures are incomplete: {{count}} transaction needs an FX rate or EUR amount. <cta>Fix transactions</cta>.',
+    fxIncomplete_other: 'EUR figures are incomplete: {{count}} transactions need an FX rate or EUR amount. <cta>Fix transactions</cta>.',
     warnings: {
       sellNotInHoldings: '[{{date}}] Cannot sell {{ticker}}: not in holdings (skipped)',
       sellOversell: '[{{date}}] Cannot sell {{quantity}} of {{ticker}}: only {{available}} available (partial sell applied)',
@@ -410,6 +409,7 @@ const en = {
       submit: 'Change password',
       submitOauth: 'Set password',
       oauthNote: 'You signed in with Google. Setting a password will also enable email login.',
+      oauthNotApplicable: 'Password change not applicable for OAuth users.',
     },
     account: {
       tab: 'Account',

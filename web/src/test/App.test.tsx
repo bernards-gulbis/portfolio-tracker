@@ -5,23 +5,32 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { PortfolioStatus } from '../api';
 
-const mockNavigation = {
-  page: 'portfolio' as 'portfolio' | 'transactions' | 'settings',
-  activePortfolioId: 1 as number | null,
-  goToPortfolio: vi.fn(),
-  goToFirstPortfolio: vi.fn(),
-  goToTransactions: vi.fn(),
-  goToSettings: vi.fn(),
-};
+// Hoisted state so vi.mock's factory (which runs before module init) can read it.
+const routing = vi.hoisted(() => ({
+  initialEntries: ['/portfolios/1'] as string[],
+  navigateMock: { fn: undefined as unknown as ReturnType<typeof vi.fn> },
+}));
+routing.navigateMock.fn = vi.fn();
+const navigateMock = routing.navigateMock.fn;
+
+// Substitute BrowserRouter with MemoryRouter so initialEntries drives the URL.
+// useNavigate is mocked so we can assert tab clicks etc. without observing the
+// in-memory history. All other react-router exports pass through.
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  const { MemoryRouter } = actual;
+  return {
+    ...actual,
+    BrowserRouter: ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={routing.initialEntries}>{children}</MemoryRouter>
+    ),
+    useNavigate: () => routing.navigateMock.fn,
+  };
+});
 
 const mockLogoutMutate = vi.fn();
 const mockSetThemePreference = vi.fn();
 const mockSetCurrency = vi.fn();
-
-vi.mock('../context/NavigationContext', () => ({
-  NavigationProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
-  useNavigation: () => mockNavigation,
-}));
 
 vi.mock('../context/AuthContext', () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -45,6 +54,10 @@ vi.mock('../hooks/usePortfolioStatus', () => ({
   usePortfolioStatus: vi.fn(),
 }));
 
+vi.mock('../hooks/useLastVisitedPortfolio', () => ({
+  useLastVisitedPortfolio: () => ({ get: () => null, set: vi.fn() }),
+}));
+
 vi.mock('../hooks/useCurrencyPreference', () => ({
   CurrencyProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useCurrencyPreference: () => ({ currency: 'USD', setCurrency: mockSetCurrency }),
@@ -62,7 +75,7 @@ vi.mock('../components/LoginPage', () => ({
   LoginPage: () => <div data-testid="login-page" />,
 }));
 
-vi.mock('../components/PortfolioStatusView', () => ({
+vi.mock('../components/portfolio-status/PortfolioStatusView', () => ({
   PortfolioStatusView: () => <div data-testid="portfolio-status-view" />,
 }));
 
@@ -123,11 +136,13 @@ const mockBrandNewStatus: PortfolioStatus = {
   usd_to_eur_rate: null,
   eur_incomplete: false,
   fx_missing_tx_ids: [],
+  transaction_count: 0,
 };
 
 const mockStatusWithHoldings: PortfolioStatus = {
   ...mockBrandNewStatus,
   principal: 8000,
+  transaction_count: 5,
   holdings: [
     { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1500, first_buy_date: '2024-01-01' },
   ],
@@ -144,8 +159,7 @@ const renderApp = () => {
 
 function setupDefaultMocks(): void {
   vi.clearAllMocks();
-  mockNavigation.page = 'portfolio';
-  mockNavigation.activePortfolioId = 1;
+  routing.initialEntries = ['/portfolios/1'];
 
   vi.mocked(usePortfolios).mockReturnValue({
     data: mockPortfolios,
@@ -175,25 +189,13 @@ describe('AppLayout', () => {
       renderApp();
 
       await waitFor(() => {
-        expect(mockNavigation.goToTransactions).toHaveBeenCalledOnce();
+        expect(navigateMock).toHaveBeenCalledWith('/portfolios/1/transactions', { replace: true });
       });
     });
 
     it('does not redirect when portfolio has holdings', () => {
       renderApp();
-      expect(mockNavigation.goToTransactions).not.toHaveBeenCalled();
-    });
-
-    it('does not redirect when activePortfolioId is null', () => {
-      mockNavigation.activePortfolioId = null;
-      vi.mocked(usePortfolioStatus).mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        error: null,
-      } as unknown as ReturnType<typeof usePortfolioStatus>);
-
-      renderApp();
-      expect(mockNavigation.goToTransactions).not.toHaveBeenCalled();
+      expect(navigateMock).not.toHaveBeenCalled();
     });
   });
 
@@ -205,38 +207,31 @@ describe('AppLayout', () => {
     });
 
     it('does not render tabs on settings page', () => {
-      mockNavigation.page = 'settings';
+      routing.initialEntries = ['/settings'];
       renderApp();
       expect(screen.queryByRole('tab', { name: /summary/i })).not.toBeInTheDocument();
     });
 
-    it('does not render tabs when no portfolio is selected', () => {
-      mockNavigation.activePortfolioId = null;
-      renderApp();
-      expect(screen.queryByRole('tab', { name: /summary/i })).not.toBeInTheDocument();
-    });
-
-    it('calls goToTransactions when clicking Transactions tab', async () => {
+    it('navigates to /portfolios/:id/transactions when clicking Transactions tab', async () => {
       const user = userEvent.setup();
       renderApp();
 
-      mockNavigation.goToTransactions.mockClear();
       await user.click(screen.getByRole('tab', { name: /transactions/i }));
 
       await waitFor(() => {
-        expect(mockNavigation.goToTransactions).toHaveBeenCalled();
+        expect(navigateMock).toHaveBeenCalledWith('/portfolios/1/transactions');
       });
     });
 
-    it('calls goToPortfolio when clicking Summary tab from transactions page', async () => {
-      mockNavigation.page = 'transactions';
+    it('navigates to /portfolios/:id when clicking Summary tab from transactions page', async () => {
+      routing.initialEntries = ['/portfolios/1/transactions'];
       const user = userEvent.setup();
       renderApp();
 
       await user.click(screen.getByRole('tab', { name: /summary/i }));
 
       await waitFor(() => {
-        expect(mockNavigation.goToPortfolio).toHaveBeenCalledWith(1);
+        expect(navigateMock).toHaveBeenCalledWith('/portfolios/1');
       });
     });
   });
@@ -245,26 +240,26 @@ describe('AppLayout', () => {
 describe('AppLayout content & user menu', () => {
   beforeEach(setupDefaultMocks);
 
-  it('renders the settings page when on the settings route', () => {
-    mockNavigation.page = 'settings';
+  it('renders the settings page on /settings', () => {
+    routing.initialEntries = ['/settings'];
     renderApp();
     expect(screen.getByTestId('settings-page')).toBeInTheDocument();
   });
 
-  it('renders the portfolio status view when on the portfolio tab', () => {
-    mockNavigation.page = 'portfolio';
+  it('renders the portfolio status view on /portfolios/:id', () => {
+    routing.initialEntries = ['/portfolios/1'];
     renderApp();
     expect(screen.getByTestId('portfolio-status-view')).toBeInTheDocument();
   });
 
-  it('renders the transaction view when on the transactions tab', () => {
-    mockNavigation.page = 'transactions';
+  it('renders the transaction view on /portfolios/:id/transactions', () => {
+    routing.initialEntries = ['/portfolios/1/transactions'];
     renderApp();
     expect(screen.getByTestId('transaction-view')).toBeInTheDocument();
   });
 
-  it('renders an empty state when there are no portfolios', () => {
-    mockNavigation.activePortfolioId = null;
+  it('renders an empty state on / when there are no portfolios', () => {
+    routing.initialEntries = ['/'];
     vi.mocked(usePortfolios).mockReturnValue({
       data: [],
       isLoading: false,
@@ -276,8 +271,8 @@ describe('AppLayout content & user menu', () => {
     expect(screen.getByText(/no portfolios/i)).toBeInTheDocument();
   });
 
-  it('renders a loading skeleton when portfolios are loading and none is selected', () => {
-    mockNavigation.activePortfolioId = null;
+  it('renders a loading skeleton on / while portfolios are loading', () => {
+    routing.initialEntries = ['/'];
     vi.mocked(usePortfolios).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -290,14 +285,14 @@ describe('AppLayout content & user menu', () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it('navigates to settings when the Settings menu item is clicked', async () => {
+  it('navigates to /settings when the Settings menu item is clicked', async () => {
     const user = userEvent.setup();
     renderApp();
 
     await user.click(screen.getByRole('button', { name: /user menu/i }));
     await user.click(await screen.findByRole('menuitem', { name: /settings/i }));
 
-    expect(mockNavigation.goToSettings).toHaveBeenCalled();
+    expect(navigateMock).toHaveBeenCalledWith('/settings');
   });
 
   it('triggers logout when Sign Out is clicked', async () => {

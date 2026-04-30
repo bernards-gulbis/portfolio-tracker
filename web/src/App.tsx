@@ -2,14 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { LoginPage } from './components/LoginPage';
 import { useLogout } from './hooks/useAuth';
 import { PortfolioSwitcher } from './components/PortfolioSwitcher';
 import { usePortfolios } from './hooks/usePortfolios';
 import { usePortfolioStatus } from './hooks/usePortfolioStatus';
 import { TransactionView } from './components/TransactionView';
-import { PortfolioStatusView } from './components/PortfolioStatusView';
+import { PortfolioStatusView } from './components/portfolio-status/PortfolioStatusView';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -27,17 +26,43 @@ import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sun, Moon, LogOut, Settings, Briefcase, UserIcon, Languages, Check, DollarSign, LayoutDashboard, ArrowLeftRight } from 'lucide-react';
+import {
+  Sun,
+  Moon,
+  LogOut,
+  Settings,
+  Briefcase,
+  UserIcon,
+  Languages,
+  Check,
+  DollarSign,
+  LayoutDashboard,
+  ArrowLeftRight,
+  AlertTriangleIcon,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useMatch,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
+import { useLastVisitedPortfolio } from './hooks/useLastVisitedPortfolio';
 import { CreatePortfolioModal } from './components/CreatePortfolioModal';
 import { PortfolioActions } from './components/PortfolioActions';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsPage } from './components/SettingsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AppFooter } from './components/AppFooter';
+import { getErrorMessage } from './api';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 const queryClient = new QueryClient({
@@ -94,7 +119,107 @@ function AuthGuard() {
     return <LoginPage />;
   }
 
-  return <AppLayout />;
+  return (
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/portfolios/:id" element={<PortfolioStatusRoute />} />
+        <Route path="/portfolios/:id/transactions" element={<TransactionViewRoute />} />
+        <Route path="/settings" element={<SettingsRoute />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
+function RootRedirect() {
+  const { t } = useTranslation();
+  const { data: portfolios, isLoading, error } = usePortfolios();
+  const lastVisited = useLastVisitedPortfolio();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Skeleton className="h-12 w-48" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTriangleIcon className="h-4 w-4" />
+        <AlertDescription>
+          {t('portfolio.list.error', { message: getErrorMessage(error) })}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (portfolios == null || portfolios.length === 0) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia>
+            <Briefcase />
+          </EmptyMedia>
+          <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
+          <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  const lastId = lastVisited.get();
+  const target = portfolios.find((p) => p.id === lastId)?.id ?? portfolios[0].id;
+  return <Navigate to={`/portfolios/${target}`} replace />;
+}
+
+function PortfolioStatusRoute() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const parsedId = id == null ? Number.NaN : Number(id);
+  // Portfolio ids are positive auto-increment integers; reject 0,
+  // negatives, floats, and the empty string (which Number coerces
+  // to 0). Matches the rule already enforced in
+  // useLastVisitedPortfolio and PortfolioStatusView.
+  const portfolioId =
+    Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null;
+  const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
+  const emptyRedirectedRef = useRef<number | null>(null);
+
+  // Auto-navigate to Transactions for brand-new portfolios (no transactions entered yet).
+  // ``replace`` so the back button doesn't re-trigger this redirect.
+  useEffect(() => {
+    if (portfolioId == null || portfolioStatus == null) return;
+    if (emptyRedirectedRef.current === portfolioId) return;
+    if (portfolioStatus.transaction_count === 0) {
+      emptyRedirectedRef.current = portfolioId;
+      navigate(`/portfolios/${portfolioId}/transactions`, { replace: true });
+    }
+  }, [portfolioId, portfolioStatus, navigate]);
+
+  return (
+    <ErrorBoundary fullScreen={false}>
+      <PortfolioStatusView />
+    </ErrorBoundary>
+  );
+}
+
+function TransactionViewRoute() {
+  return (
+    <ErrorBoundary fullScreen={false}>
+      <TransactionView />
+    </ErrorBoundary>
+  );
+}
+
+function SettingsRoute() {
+  return (
+    <ErrorBoundary fullScreen={false}>
+      <SettingsPage />
+    </ErrorBoundary>
+  );
 }
 
 function AppLayout() {
@@ -104,78 +229,37 @@ function AppLayout() {
   const { t, i18n } = useTranslation();
   const currentLang = getCurrentLanguage();
   const { currency, setCurrency } = useCurrencyPreference();
+  const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { data: portfolios, isLoading: isPortfoliosLoading, isFetching: isPortfoliosFetching } = usePortfolios();
-  const { page, activePortfolioId, goToPortfolio, goToTransactions, goToFirstPortfolio, goToSettings } = useNavigation();
-  const portfolioTab = page === 'transactions' ? 'transactions' : 'portfolio';
-  const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
-  const { data: portfolioStatus } = usePortfolioStatus(activePortfolioId);
-  const emptyRedirectedRef = useRef<number | null>(null);
+  const { data: portfolios } = usePortfolios();
+  const lastVisited = useLastVisitedPortfolio();
 
-  // Auto-navigate to Transactions for brand-new portfolios (no transactions entered yet)
+  const portfolioMatch = useMatch('/portfolios/:id/*');
+  const settingsMatch = useMatch('/settings');
+  const transactionsMatch = useMatch('/portfolios/:id/transactions');
+
+  const idParam = portfolioMatch?.params.id;
+  const parsedActiveId = idParam == null ? Number.NaN : Number(idParam);
+  const activePortfolioId =
+    Number.isInteger(parsedActiveId) && parsedActiveId > 0 ? parsedActiveId : null;
+  const isOnSettings = settingsMatch != null;
+  const isOnTransactions = transactionsMatch != null;
+  const portfolioTab = isOnTransactions ? 'transactions' : 'portfolio';
+  const activePortfolio =
+    activePortfolioId == null ? undefined : portfolios?.find((p) => p.id === activePortfolioId);
+
+  // Persist last-visited portfolio for the next session's `/` redirect.
   useEffect(() => {
-    if (activePortfolioId === null || !portfolioStatus) return;
-    if (emptyRedirectedRef.current === activePortfolioId) return;
-    const isBrandNew = portfolioStatus.holdings.length === 0 && portfolioStatus.principal === 0;
-    if (isBrandNew) {
-      emptyRedirectedRef.current = activePortfolioId;
-      goToTransactions();
+    if (activePortfolioId != null) lastVisited.set(activePortfolioId);
+  }, [activePortfolioId, lastVisited]);
+
+  const handleTabChange = (value: string) => {
+    if (activePortfolioId == null) return;
+    if (value === 'transactions') {
+      navigate(`/portfolios/${activePortfolioId}/transactions`);
+    } else {
+      navigate(`/portfolios/${activePortfolioId}`);
     }
-  }, [activePortfolioId, portfolioStatus, goToTransactions]);
-
-  // Auto-select first portfolio when none is selected, or when the stored ID no longer exists
-  useEffect(() => {
-    if (!portfolios || isPortfoliosFetching) return;
-    if (portfolios.length === 0) {
-      if (activePortfolioId !== null) goToFirstPortfolio();
-      return;
-    }
-    if (activePortfolioId === null || !portfolios.some((p) => p.id === activePortfolioId)) {
-      goToPortfolio(portfolios[0].id);
-    }
-  }, [activePortfolioId, portfolios, isPortfoliosFetching, goToPortfolio, goToFirstPortfolio]);
-
-  const renderMainContent = () => {
-    if (page === 'settings') {
-      return (
-        <ErrorBoundary fullScreen={false}>
-          <SettingsPage />
-        </ErrorBoundary>
-      );
-    }
-
-    // Portfolio page
-    if (activePortfolioId === null) {
-      if (isPortfoliosLoading) {
-        return (
-          <div className="flex items-center justify-center py-12">
-            <Skeleton className="h-12 w-48" />
-          </div>
-        );
-      }
-
-      if (!portfolios || portfolios.length === 0) {
-        return (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia>
-                <Briefcase />
-              </EmptyMedia>
-              <EmptyTitle>{t('portfolio.list.empty.title')}</EmptyTitle>
-              <EmptyDescription>{t('portfolio.list.empty.description')}</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        );
-      }
-
-      return null; // useEffect will auto-select first portfolio
-    }
-
-    return (
-      <ErrorBoundary fullScreen={false}>
-        {portfolioTab === 'portfolio' ? <PortfolioStatusView /> : <TransactionView />}
-      </ErrorBoundary>
-    );
   };
 
   return (
@@ -184,22 +268,16 @@ function AppLayout() {
         <header className="border-b px-6 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <PortfolioSwitcher activePortfolioId={activePortfolioId} onCreateClick={() => setIsCreateModalOpen(true)} />
+              <PortfolioSwitcher
+                activePortfolioId={activePortfolioId}
+                onCreateClick={() => setIsCreateModalOpen(true)}
+              />
               {activePortfolio == null ? null : (
                 <PortfolioActions portfolioId={activePortfolio.id} portfolioName={activePortfolio.name} />
               )}
             </div>
-            {page !== 'settings' && activePortfolioId !== null && (
-              <Tabs
-                value={portfolioTab}
-                onValueChange={(value) => {
-                  if (value === 'transactions') {
-                    goToTransactions();
-                  } else if (activePortfolioId !== null) {
-                    goToPortfolio(activePortfolioId);
-                  }
-                }}
-              >
+            {!isOnSettings && activePortfolioId !== null && (
+              <Tabs value={portfolioTab} onValueChange={handleTabChange}>
                 <TabsList variant="line">
                   <TabsTrigger value="portfolio">
                     <LayoutDashboard className="h-4 w-4" />
@@ -270,7 +348,7 @@ function AppLayout() {
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => goToSettings()}>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <Settings />
                 {t('settings.menuItem')}
               </DropdownMenuItem>
@@ -288,7 +366,7 @@ function AppLayout() {
         </header>
 
         <main className="flex-1 p-6">
-          {renderMainContent()}
+          <Outlet />
         </main>
 
         <AppFooter className="border-t" />
@@ -308,11 +386,11 @@ function App() {
       <ThemeProvider>
         <CurrencyProvider>
           <AuthProvider>
-            <NavigationProvider>
+            <BrowserRouter>
               <ErrorBoundary>
                 <AuthGuard />
               </ErrorBoundary>
-            </NavigationProvider>
+            </BrowserRouter>
           </AuthProvider>
           <Toaster position="bottom-right" />
         </CurrencyProvider>

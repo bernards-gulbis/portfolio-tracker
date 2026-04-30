@@ -4,8 +4,8 @@ import { Controller, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useCreatePortfolio } from '../hooks/usePortfolios';
-import { useNavigation } from '../context/NavigationContext';
 import { getErrorMessage } from '../api';
 import {
   Dialog,
@@ -40,7 +40,7 @@ interface CreatePortfolioModalProps {
 
 export const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalProps) => {
   const { t } = useTranslation();
-  const { goToPortfolio } = useNavigation();
+  const navigate = useNavigate();
   const createPortfolio = useCreatePortfolio();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -57,7 +57,7 @@ export const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalPr
     try {
       const portfolio = await createPortfolio.mutateAsync({ name: values.name.trim() });
       onClose();
-      goToPortfolio(portfolio.id);
+      navigate(`/portfolios/${portfolio.id}`);
     } catch (err) {
       form.setError('root', { message: getErrorMessage(err) });
     }

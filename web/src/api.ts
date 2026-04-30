@@ -1,6 +1,11 @@
 import axios from 'axios';
 import { z } from 'zod';
 import { parseOrThrow } from './api-error';
+import type { components } from './api-generated';
+
+// Backend-defined schemas, generated from FastAPI's OpenAPI document.
+// Run ``npm run generate:api`` after changing the backend Pydantic models.
+type schemas = components['schemas'];
 
 // ================== Enums / literals ==================
 
@@ -166,6 +171,9 @@ const PortfolioStatusSchema = z.object({
   usd_to_eur_rate: z.number().nullable(),
   eur_incomplete: z.boolean().default(false),
   fx_missing_tx_ids: z.array(z.number()).default([]),
+  // Default keeps fixtures and older API responses parseable while we
+  // roll out the field; the backend always populates it.
+  transaction_count: z.number().int().nonnegative().default(0),
 });
 export type PortfolioStatus = z.infer<typeof PortfolioStatusSchema>;
 
@@ -221,19 +229,17 @@ const GoogleAuthorizeUrlSchema = z.object({
 });
 
 // ================== Request-side types (client → backend) ==================
-// Kept as plain interfaces — these are outbound payloads, validated by the
-// backend. Client-side runtime validation would just duplicate that.
+// Sourced from the backend OpenAPI schema where a 1:1 generated equivalent
+// exists. Kept as plain interfaces only for FastAPI-Users form payloads
+// that don't get a named schema (login/register).
 
-export interface UserUpdate {
-  name?: string;
-  password?: string;
-  tax_rate?: number;
-}
-
-export interface CloseAccountRequest {
-  password?: string;
-  confirmation?: string;
-}
+export type UserUpdate = schemas['UserUpdate'];
+export type CloseAccountRequest = schemas['CloseAccountRequest'];
+export type PortfolioCreate = schemas['PortfolioCreate'];
+export type PortfolioUpdate = schemas['PortfolioUpdate'];
+export type PortfolioCopy = schemas['PortfolioCopy'];
+export type TransactionCreate = schemas['TransactionCreate'];
+export type TransactionUpdate = schemas['TransactionUpdate'];
 
 export interface LoginCredentials {
   username: string; // FastAPI Users uses "username" field (which is the email)
@@ -244,46 +250,6 @@ export interface RegisterCredentials {
   email: string;
   password: string;
   name: string;
-}
-
-export interface PortfolioCreate {
-  name: string;
-}
-
-export interface PortfolioUpdate {
-  name: string;
-}
-
-export interface PortfolioCopy {
-  new_name: string;
-}
-
-export interface TransactionCreate {
-  date: string;
-  type: TransactionType;
-  ticker?: string | null;
-  quantity?: number | null;
-  price_per_share?: number | null;
-  fee?: number | null;
-  total_amount: number;
-  eur_amount?: number | null;
-  split_ratio?: number | null;
-  currency?: string | null;
-  fx_rate?: number | null;
-}
-
-export interface TransactionUpdate {
-  date?: string;
-  type?: TransactionType;
-  ticker?: string | null;
-  quantity?: number | null;
-  price_per_share?: number | null;
-  fee?: number | null;
-  total_amount?: number;
-  eur_amount?: number | null;
-  split_ratio?: number | null;
-  currency?: string | null;
-  fx_rate?: number | null;
 }
 
 // ================== API Configuration ==================

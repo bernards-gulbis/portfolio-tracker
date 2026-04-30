@@ -2,29 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TransactionView } from '../components/TransactionView';
 import { useTransactions } from '../hooks/useTransactions';
 import { TransactionType, exportTransactionsCSV } from '../api';
-
-const mockNavigation: {
-  page: 'portfolio';
-  activePortfolioId: number | null;
-  goToPortfolio: ReturnType<typeof vi.fn>;
-  goToFirstPortfolio: ReturnType<typeof vi.fn>;
-  goToTransactions: ReturnType<typeof vi.fn>;
-  goToSettings: ReturnType<typeof vi.fn>;
-} = {
-  page: 'portfolio',
-  activePortfolioId: null,
-  goToPortfolio: vi.fn(),
-  goToFirstPortfolio: vi.fn(),
-  goToTransactions: vi.fn(),
-  goToSettings: vi.fn(),
-};
-
-vi.mock('../context/NavigationContext', () => ({
-  useNavigation: () => mockNavigation,
-}));
 
 vi.mock('../hooks/useTransactions', () => ({
   useTransactions: vi.fn(),
@@ -62,11 +43,18 @@ const createTestQueryClient = () =>
     },
   });
 
-const renderView = () => {
+const renderView = (portfolioId: number | null = null) => {
   const queryClient = createTestQueryClient();
+  const initialPath =
+    portfolioId == null ? '/transactions' : `/portfolios/${portfolioId}/transactions`;
   return render(
     <QueryClientProvider client={queryClient}>
-      <TransactionView />
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route path="/portfolios/:id/transactions" element={<TransactionView />} />
+          <Route path="/transactions" element={<TransactionView />} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>
   );
 };
@@ -74,11 +62,9 @@ const renderView = () => {
 describe('TransactionView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockNavigation.activePortfolioId = null;
   });
 
   it('shows no portfolio message when activePortfolioId is null', () => {
-    mockNavigation.activePortfolioId = null;
     vi.mocked(useTransactions).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -91,7 +77,6 @@ describe('TransactionView', () => {
   });
 
   it('shows loading skeleton while fetching', () => {
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -99,12 +84,11 @@ describe('TransactionView', () => {
       error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
     expect(screen.getByText('Transactions')).toBeInTheDocument();
   });
 
   it('shows error message when query fails', () => {
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -112,12 +96,11 @@ describe('TransactionView', () => {
       error: new Error('Network error'),
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
     expect(screen.getByText(/Network error/)).toBeInTheDocument();
   });
 
   it('renders transaction table when data is loaded', () => {
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: {
         transactions: [
@@ -145,14 +128,13 @@ describe('TransactionView', () => {
       error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
     screen.getAllByText('Transactions');
     expect(screen.getByText('$1,000.00')).toBeInTheDocument();
     expect(screen.getByText('Add Transaction')).toBeInTheDocument();
   });
 
   it('shows empty state when no transactions', () => {
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: {
         transactions: [],
@@ -166,12 +148,11 @@ describe('TransactionView', () => {
       error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
     expect(screen.getByText('No Transactions Yet')).toBeInTheDocument();
   });
 
   it('opens add transaction modal when Add Transaction is clicked', async () => {
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: {
         transactions: [
@@ -186,14 +167,13 @@ describe('TransactionView', () => {
       isLoading: false, isFetching: false, error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
 
     await userEvent.click(screen.getByText('Add Transaction'));
     expect(screen.getByRole('heading', { name: 'Add Transaction' })).toBeInTheDocument();
   });
 
   it('opens import CSV modal via actions menu', async () => {
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: {
         transactions: [
@@ -208,7 +188,7 @@ describe('TransactionView', () => {
       isLoading: false, isFetching: false, error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
 
     // Open actions menu
     const actionsBtn = screen.getByLabelText('Transaction table actions menu');
@@ -232,7 +212,6 @@ describe('TransactionView', () => {
     globalThis.URL.revokeObjectURL = mockRevokeObjectURL;
 
     try {
-      mockNavigation.activePortfolioId = 1;
       vi.mocked(useTransactions).mockReturnValue({
         data: {
           transactions: [
@@ -247,7 +226,7 @@ describe('TransactionView', () => {
         isLoading: false, isFetching: false, error: null,
       } as unknown as ReturnType<typeof useTransactions>);
 
-      renderView();
+      renderView(1);
 
       // Open actions menu
       const actionsBtn = screen.getByLabelText('Transaction table actions menu');
@@ -269,7 +248,6 @@ describe('TransactionView', () => {
   it('shows error when export CSV fails', async () => {
     vi.mocked(exportTransactionsCSV).mockRejectedValueOnce(new Error('Export failed'));
 
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: {
         transactions: [
@@ -284,7 +262,7 @@ describe('TransactionView', () => {
       isLoading: false, isFetching: false, error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
 
     // Open actions menu
     const actionsBtn = screen.getByLabelText('Transaction table actions menu');
@@ -304,13 +282,12 @@ describe('TransactionView', () => {
       type: TransactionType.DEPOSIT, ticker: null, quantity: null,
       price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
     };
-    mockNavigation.activePortfolioId = 1;
     vi.mocked(useTransactions).mockReturnValue({
       data: { transactions: [transaction], total: 40, page: 1, page_size: 20, total_pages: 2 },
       isLoading: false, isFetching: false, error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    renderView();
+    renderView(1);
 
     // Drive the component to page 2 so the page=1 reset has something observable to undo.
     await userEvent.click(screen.getByLabelText('Next page'));
@@ -343,16 +320,34 @@ describe('TransactionView', () => {
       isLoading: false, isFetching: false, error: null,
     } as unknown as ReturnType<typeof useTransactions>);
 
-    mockNavigation.activePortfolioId = 1;
+    // Capture useNavigate so we can switch portfolios imperatively.
+    const { useNavigate } = await import('react-router-dom');
+    let navigateFn: ((path: string) => void) | null = null;
+    const NavigationCapture = () => {
+      navigateFn = useNavigate();
+      return null;
+    };
+
     const queryClient = createTestQueryClient();
-    const { rerender } = render(
+    render(
       <QueryClientProvider client={queryClient}>
-        <TransactionView />
+        <MemoryRouter initialEntries={['/portfolios/1/transactions']}>
+          <Routes>
+            <Route
+              path="/portfolios/:id/transactions"
+              element={
+                <>
+                  <NavigationCapture />
+                  <TransactionView />
+                </>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
       </QueryClientProvider>
     );
 
     // Drive into a non-default state: ticker filter first, then page 2.
-    // (If we paged first, typing would trigger the filter-reset and undo it.)
     await userEvent.type(screen.getByPlaceholderText('Search asset...'), 'AAPL');
     await waitFor(
       () => {
@@ -368,14 +363,9 @@ describe('TransactionView', () => {
     // Switch to a different portfolio — the prev-id reset block should fire,
     // clearing page back to 1 and ticker back to undefined.
     vi.mocked(useTransactions).mockClear();
-    mockNavigation.activePortfolioId = 2;
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <TransactionView />
-      </QueryClientProvider>
-    );
+    expect(navigateFn).not.toBeNull();
+    navigateFn!('/portfolios/2/transactions');
 
-    // tickerSearch is reset synchronously, but debouncedTicker lags 150ms.
     await waitFor(
       () => {
         expect(useTransactions).toHaveBeenLastCalledWith(2, 1, 20, undefined, undefined, 'desc');
