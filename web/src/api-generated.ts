@@ -822,6 +822,11 @@ export interface components {
             realized_sales?: components["schemas"]["RealizedSaleResponse"][];
             /** Realized Withdrawals */
             realized_withdrawals?: components["schemas"]["WithdrawalFxResponse"][];
+            /**
+             * Transaction Count
+             * @default 0
+             */
+            transaction_count: number;
             /** Usd To Eur Rate */
             usd_to_eur_rate?: number | null;
             /** Warnings */

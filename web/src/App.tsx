@@ -38,6 +38,7 @@ import {
   DollarSign,
   LayoutDashboard,
   ArrowLeftRight,
+  AlertTriangleIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -59,7 +60,9 @@ import { PortfolioActions } from './components/PortfolioActions';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsPage } from './components/SettingsPage';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AppFooter } from './components/AppFooter';
+import { getErrorMessage } from './api';
 
 // Module-scoped so AuthContext can call queryClient.clear() on logout
 const queryClient = new QueryClient({
@@ -131,7 +134,7 @@ function AuthGuard() {
 
 function RootRedirect() {
   const { t } = useTranslation();
-  const { data: portfolios, isLoading } = usePortfolios();
+  const { data: portfolios, isLoading, error } = usePortfolios();
   const lastVisited = useLastVisitedPortfolio();
 
   if (isLoading) {
@@ -139,6 +142,17 @@ function RootRedirect() {
       <div className="flex items-center justify-center py-12">
         <Skeleton className="h-12 w-48" />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTriangleIcon className="h-4 w-4" />
+        <AlertDescription>
+          {t('portfolio.list.error', { message: getErrorMessage(error) })}
+        </AlertDescription>
+      </Alert>
     );
   }
 
@@ -165,7 +179,12 @@ function PortfolioStatusRoute() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const parsedId = id == null ? Number.NaN : Number(id);
-  const portfolioId = Number.isFinite(parsedId) ? parsedId : null;
+  // Portfolio ids are positive auto-increment integers; reject 0,
+  // negatives, floats, and the empty string (which Number coerces
+  // to 0). Matches the rule already enforced in
+  // useLastVisitedPortfolio and PortfolioStatusView.
+  const portfolioId =
+    Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null;
   const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
   const emptyRedirectedRef = useRef<number | null>(null);
 
@@ -174,9 +193,7 @@ function PortfolioStatusRoute() {
   useEffect(() => {
     if (portfolioId == null || portfolioStatus == null) return;
     if (emptyRedirectedRef.current === portfolioId) return;
-    const isBrandNew =
-      portfolioStatus.holdings.length === 0 && portfolioStatus.principal === 0;
-    if (isBrandNew) {
+    if (portfolioStatus.transaction_count === 0) {
       emptyRedirectedRef.current = portfolioId;
       navigate(`/portfolios/${portfolioId}/transactions`, { replace: true });
     }
@@ -223,7 +240,8 @@ function AppLayout() {
 
   const idParam = portfolioMatch?.params.id;
   const parsedActiveId = idParam == null ? Number.NaN : Number(idParam);
-  const activePortfolioId = Number.isFinite(parsedActiveId) ? parsedActiveId : null;
+  const activePortfolioId =
+    Number.isInteger(parsedActiveId) && parsedActiveId > 0 ? parsedActiveId : null;
   const isOnSettings = settingsMatch != null;
   const isOnTransactions = transactionsMatch != null;
   const portfolioTab = isOnTransactions ? 'transactions' : 'portfolio';

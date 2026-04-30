@@ -171,6 +171,9 @@ const PortfolioStatusSchema = z.object({
   usd_to_eur_rate: z.number().nullable(),
   eur_incomplete: z.boolean().default(false),
   fx_missing_tx_ids: z.array(z.number()).default([]),
+  // Default keeps fixtures and older API responses parseable while we
+  // roll out the field; the backend always populates it.
+  transaction_count: z.number().int().nonnegative().default(0),
 });
 export type PortfolioStatus = z.infer<typeof PortfolioStatusSchema>;
 

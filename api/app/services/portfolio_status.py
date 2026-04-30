@@ -179,4 +179,5 @@ def calculate_status(
         usd_to_eur_rate=usd_to_eur_rate,
         eur_incomplete=eur_incomplete,
         fx_missing_tx_ids=fx_missing_tx_ids,
+        transaction_count=len(transactions),
     )

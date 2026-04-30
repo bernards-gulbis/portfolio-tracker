@@ -136,11 +136,13 @@ const mockBrandNewStatus: PortfolioStatus = {
   usd_to_eur_rate: null,
   eur_incomplete: false,
   fx_missing_tx_ids: [],
+  transaction_count: 0,
 };
 
 const mockStatusWithHoldings: PortfolioStatus = {
   ...mockBrandNewStatus,
   principal: 8000,
+  transaction_count: 5,
   holdings: [
     { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1500, first_buy_date: '2024-01-01' },
   ],

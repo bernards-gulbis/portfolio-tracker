@@ -1,9 +1,9 @@
 """Shared DB-cache helpers for the price services.
 
-Both ``HistoricalPriceService`` and ``FxRateService`` use the same
-``ON CONFLICT DO UPDATE`` upsert pattern against their respective tables.
-Keeping the helper here avoids duplicating the dialect-aware upsert and
-the silent-on-error cache-write behavior.
+``HistoricalPriceService`` uses ``ON CONFLICT DO UPDATE`` against its
+price and coverage tables. Keeping the dialect-aware upsert and
+silent-on-error cache-write behavior in one place avoids duplication
+and keeps the failure semantics consistent.
 """
 
 import logging
@@ -24,14 +24,18 @@ def bulk_upsert(
     update_fields: list[str],
     label: str,
     session: Session | None = None,
-) -> None:
+) -> bool:
     """Bulk upsert rows using ON CONFLICT DO UPDATE.
 
     Errors are logged and swallowed: cache writes must never break the
-    request that produced the data.
+    request that produced the data. Returns ``True`` on success (or for
+    an empty ``values`` no-op) and ``False`` when the inner write
+    raised — so callers that record dependent state (e.g. coverage
+    rows whose validity depends on a price write) can gate on the
+    result.
     """
     if not values:
-        return
+        return True
     try:
 
         def _execute(s: Session) -> None:
@@ -50,5 +54,7 @@ def bulk_upsert(
                 _execute(s)
                 s.commit()
         logger.debug("Saved %d %s to cache", len(values), label)
+        return True
     except Exception as e:
         logger.error("Failed to save %d %s: %s", len(values), label, e, exc_info=True)
+        return False

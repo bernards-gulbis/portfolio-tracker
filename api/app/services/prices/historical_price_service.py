@@ -87,14 +87,19 @@ class HistoricalPriceService:
             return _query(s)
 
     @classmethod
-    def _save_historical_prices(cls, ticker: str, prices: dict[str, float]) -> None:
-        """Save historical prices to database using bulk upsert."""
+    def _save_historical_prices(cls, ticker: str, prices: dict[str, float]) -> bool:
+        """Save historical prices to database using bulk upsert.
+
+        Returns ``True`` on success so the caller can gate the
+        coverage write — coverage must only be recorded when the
+        price rows were actually persisted.
+        """
         now = datetime.now(UTC)
         values = [
             {"ticker": ticker, "date": date_str, "price": price, "created_at": now}
             for date_str, price in prices.items()
         ]
-        bulk_upsert(
+        return bulk_upsert(
             HistoricalPrice,
             values,
             index_elements=["ticker", "date"],
@@ -267,6 +272,11 @@ class HistoricalPriceService:
             )
             return {}
 
+        # Coverage may only be recorded if the price write actually
+        # succeeded — otherwise a transient DB error here would let
+        # the coverage row claim a range is cached, suppressing all
+        # future Yahoo refetches even though no prices were persisted.
+        prices_persisted = True
         if new_prices:
             historical = {
                 k: v
@@ -274,17 +284,20 @@ class HistoricalPriceService:
                 if datetime.strptime(k, "%Y-%m-%d").date() < today
             }
             if historical:
-                cls._save_historical_prices(ticker, historical)
-                logger.debug(
-                    "Cached %d historical prices for %s", len(historical), ticker
-                )
+                prices_persisted = cls._save_historical_prices(ticker, historical)
+                if prices_persisted:
+                    logger.debug(
+                        "Cached %d historical prices for %s", len(historical), ticker
+                    )
 
         # Record coverage for the successfully-fetched interval (capped at
         # yesterday — today's price isn't final). A successful fetch with no
         # rows still proves coverage (e.g. a weekend-only range), so record
-        # regardless of new_prices being empty.
-        coverage_end = min(fetch_end.date(), today - timedelta(days=1))
-        cls._record_coverage(ticker, fetch_start.date(), coverage_end)
+        # regardless of new_prices being empty — but skip when the price
+        # write was attempted and failed.
+        if prices_persisted:
+            coverage_end = min(fetch_end.date(), today - timedelta(days=1))
+            cls._record_coverage(ticker, fetch_start.date(), coverage_end)
         return new_prices
 
     @staticmethod

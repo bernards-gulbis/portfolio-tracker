@@ -1,7 +1,7 @@
 """Unit tests for HistoricalPriceService."""
 
 from datetime import UTC, date, datetime
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import requests
@@ -326,7 +326,9 @@ class TestFetchSingleRange:
                 HistoricalPriceService, "_fetch_yahoo_range", return_value=fetched
             ),
             patch.object(
-                HistoricalPriceService, "_save_historical_prices"
+                HistoricalPriceService,
+                "_save_historical_prices",
+                return_value=True,
             ) as mock_save,
             patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
         ):
@@ -341,6 +343,30 @@ class TestFetchSingleRange:
         assert "2025-01-20" not in saved
         # Coverage is recorded for the fetch range, capped at yesterday.
         mock_cov.assert_called_once_with("AAPL", _d("2025-01-10"), _d("2025-01-15"))
+
+    def test_skips_coverage_when_save_fails(self):
+        # If the price upsert silently fails, we must NOT record coverage —
+        # otherwise the next request trusts a "covered" range that has no
+        # rows and never refetches.
+        today = _d("2025-01-20")
+        fetched = {"2025-01-10": 100.0}
+
+        with (
+            patch.object(
+                HistoricalPriceService, "_fetch_yahoo_range", return_value=fetched
+            ),
+            patch.object(
+                HistoricalPriceService,
+                "_save_historical_prices",
+                return_value=False,
+            ),
+            patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
+        ):
+            HistoricalPriceService._fetch_single_range(
+                "AAPL", datetime(2025, 1, 10), datetime(2025, 1, 15), today
+            )
+
+        mock_cov.assert_not_called()
 
     def test_records_coverage_even_when_yahoo_returns_empty(self):
         # A successful fetch with zero rows (e.g. a weekend-only range) is
@@ -368,7 +394,11 @@ class TestFetchSingleRange:
             patch.object(
                 HistoricalPriceService, "_fetch_yahoo_range", return_value=fetched
             ),
-            patch.object(HistoricalPriceService, "_save_historical_prices"),
+            patch.object(
+                HistoricalPriceService,
+                "_save_historical_prices",
+                return_value=True,
+            ),
             patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
         ):
             HistoricalPriceService._fetch_single_range(
@@ -695,8 +725,47 @@ class TestBulkUpsertNoOp:
         from app.services.prices import _db_helpers
 
         with patch.object(_db_helpers, "Session") as mock_session:
-            _db_helpers.bulk_upsert(Mock(), [], ["id"], ["value"], "test")
+            result = _db_helpers.bulk_upsert(Mock(), [], ["id"], ["value"], "test")
         mock_session.assert_not_called()
+        # No-op is "success" — callers should treat an empty write as
+        # safe to follow with dependent state writes.
+        assert result is True
+
+
+class TestBulkUpsertReturnValue:
+    """``bulk_upsert`` must signal success/failure so callers can gate
+    dependent writes (e.g. coverage rows that follow a price upsert)."""
+
+    def test_returns_true_on_success(self):
+        from app.services.prices import _db_helpers
+
+        with (
+            patch.object(_db_helpers, "Session") as mock_session_cls,
+            patch.object(_db_helpers, "sqlite_insert"),
+            patch.object(_db_helpers, "pg_insert"),
+        ):
+            mock_session = MagicMock()
+            mock_session_cls.return_value.__enter__.return_value = mock_session
+            result = _db_helpers.bulk_upsert(
+                Mock(), [{"id": 1, "value": "x"}], ["id"], ["value"], "test"
+            )
+        assert result is True
+
+    def test_returns_false_on_error(self):
+        from app.services.prices import _db_helpers
+
+        with (
+            patch.object(_db_helpers, "Session") as mock_session_cls,
+            patch.object(_db_helpers, "sqlite_insert"),
+            patch.object(_db_helpers, "pg_insert"),
+        ):
+            mock_session = MagicMock()
+            mock_session.execute.side_effect = RuntimeError("db down")
+            mock_session_cls.return_value.__enter__.return_value = mock_session
+            result = _db_helpers.bulk_upsert(
+                Mock(), [{"id": 1, "value": "x"}], ["id"], ["value"], "test"
+            )
+        assert result is False
 
 
 class TestCachedHistoricalPricesFloatCoercion:

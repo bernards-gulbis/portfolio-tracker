@@ -182,6 +182,7 @@ const mockStatus: PortfolioStatus = {
   usd_to_eur_rate: 0.92,
   eur_incomplete: false,
   fx_missing_tx_ids: [],
+  transaction_count: 0,
 };
 
 const mockTransaction: Transaction = {
