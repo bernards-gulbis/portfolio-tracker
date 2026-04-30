@@ -32,3 +32,21 @@ class FxRate(SQLModel, table=True):
     date: str = Field(primary_key=True)  # YYYY-MM-DD format
     usd_to_eur_rate: Decimal = Field(max_digits=12, decimal_places=6)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class HistoricalPriceCoverage(SQLModel, table=True):
+    """Tracks date ranges that were successfully fetched from upstream.
+
+    The ``historical_prices`` table only stores point rows for trading days, so
+    min/max of cached dates cannot prove that the inner range is contiguous —
+    two earlier disjoint fetches would falsely look like full coverage. This
+    table records each successful fetch interval so coverage can be computed
+    as the union of recorded intervals.
+    """
+
+    __tablename__ = "historical_price_coverage"
+
+    ticker: str = Field(primary_key=True)
+    period_start: str = Field(primary_key=True)  # YYYY-MM-DD inclusive
+    period_end: str = Field(primary_key=True)  # YYYY-MM-DD inclusive
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

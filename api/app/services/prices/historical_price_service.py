@@ -23,7 +23,7 @@ import requests
 from sqlmodel import Session, select
 
 from app.core.database import engine
-from app.models.historical_price import HistoricalPrice
+from app.models.historical_price import HistoricalPrice, HistoricalPriceCoverage
 
 from ._db_helpers import bulk_upsert
 from .yahoo_finance_client import YahooFinanceClient
@@ -103,48 +103,104 @@ class HistoricalPriceService:
         )
 
     @classmethod
+    def _load_coverage(
+        cls, ticker: str, start: date, end: date
+    ) -> list[tuple[date, date]]:
+        """Load coverage intervals for *ticker* that overlap ``[start, end]``."""
+        start_str = start.isoformat()
+        end_str = end.isoformat()
+        with Session(engine) as s:
+            rows = s.exec(
+                select(HistoricalPriceCoverage).where(
+                    HistoricalPriceCoverage.ticker == ticker,
+                    HistoricalPriceCoverage.period_start <= end_str,
+                    HistoricalPriceCoverage.period_end >= start_str,
+                )
+            ).all()
+        return [
+            (date.fromisoformat(r.period_start), date.fromisoformat(r.period_end))
+            for r in rows
+        ]
+
+    @staticmethod
+    def _subtract_intervals(
+        target: tuple[date, date], covered: list[tuple[date, date]]
+    ) -> list[tuple[date, date]]:
+        """Return ``target`` minus the union of ``covered`` intervals.
+
+        Adjacent intervals (``end + 1 == next.start``) are treated as
+        contiguous coverage; the returned gaps are sorted and disjoint.
+        """
+        start, end = target
+        if start > end:
+            return []
+        merged: list[list[date]] = []
+        for cs, ce in sorted(covered):
+            cs_clip = max(cs, start)
+            ce_clip = min(ce, end)
+            if cs_clip > ce_clip:
+                continue
+            if merged and cs_clip <= merged[-1][1] + timedelta(days=1):
+                merged[-1][1] = max(merged[-1][1], ce_clip)
+            else:
+                merged.append([cs_clip, ce_clip])
+        gaps: list[tuple[date, date]] = []
+        cursor = start
+        for cs, ce in merged:
+            if cursor < cs:
+                gaps.append((cursor, cs - timedelta(days=1)))
+            if ce + timedelta(days=1) > cursor:
+                cursor = ce + timedelta(days=1)
+        if cursor <= end:
+            gaps.append((cursor, end))
+        return gaps
+
+    @classmethod
     def _determine_fetch_ranges(
         cls,
-        cached_prices: dict[str, float],
+        ticker: str,
         start_date: datetime,
         end_date: datetime,
         yesterday: date,
     ) -> list[tuple[datetime, datetime]]:
-        """Compute date ranges that need to be fetched given cached data."""
-        if not cached_prices:
-            return [(start_date, end_date)]
+        """Compute date ranges to fetch from upstream.
 
-        earliest_cached_date = datetime.strptime(
-            min(cached_prices.keys()), "%Y-%m-%d"
-        ).date()
-        latest_cached_date = datetime.strptime(
-            max(cached_prices.keys()), "%Y-%m-%d"
-        ).date()
-
-        ranges: list[tuple[datetime, datetime]] = []
-
-        if start_date.date() < earliest_cached_date:
-            fetch_end = datetime.combine(
-                earliest_cached_date, datetime.min.time()
-            ) - timedelta(days=1)
-            ranges.append((start_date, fetch_end))
-
-        if end_date.date() <= latest_cached_date:
-            return ranges
-
-        fetch_start = datetime.combine(
-            latest_cached_date, datetime.min.time()
-        ) + timedelta(days=1)
-        if end_date.date() <= yesterday:
-            ranges.append((fetch_start, end_date))
-        elif latest_cached_date >= yesterday:
-            pass  # already have yesterday; don't fetch today
-        else:
-            ranges.append(
-                (fetch_start, datetime.combine(yesterday, datetime.max.time()))
+        Coverage is read from ``HistoricalPriceCoverage``. Today's data is
+        excluded from coverage tracking because today's price isn't final
+        yet, so the effective end is capped at ``yesterday``.
+        """
+        effective_end = min(end_date.date(), yesterday)
+        if start_date.date() > effective_end:
+            return []
+        coverage = cls._load_coverage(ticker, start_date.date(), effective_end)
+        gaps = cls._subtract_intervals((start_date.date(), effective_end), coverage)
+        return [
+            (
+                datetime.combine(s, datetime.min.time()),
+                datetime.combine(e, datetime.max.time()),
             )
+            for s, e in gaps
+        ]
 
-        return ranges
+    @classmethod
+    def _record_coverage(cls, ticker: str, start: date, end: date) -> None:
+        """Persist a successful-fetch coverage interval for *ticker*."""
+        if start > end:
+            return
+        bulk_upsert(
+            HistoricalPriceCoverage,
+            [
+                {
+                    "ticker": ticker,
+                    "period_start": start.isoformat(),
+                    "period_end": end.isoformat(),
+                    "created_at": datetime.now(UTC),
+                }
+            ],
+            index_elements=["ticker", "period_start", "period_end"],
+            update_fields=["created_at"],
+            label=f"coverage for {ticker}",
+        )
 
     @classmethod
     def _fetch_yahoo_range(
@@ -222,6 +278,13 @@ class HistoricalPriceService:
                 logger.debug(
                     "Cached %d historical prices for %s", len(historical), ticker
                 )
+
+        # Record coverage for the successfully-fetched interval (capped at
+        # yesterday — today's price isn't final). A successful fetch with no
+        # rows still proves coverage (e.g. a weekend-only range), so record
+        # regardless of new_prices being empty.
+        coverage_end = min(fetch_end.date(), today - timedelta(days=1))
+        cls._record_coverage(ticker, fetch_start.date(), coverage_end)
         return new_prices
 
     @staticmethod
@@ -274,14 +337,14 @@ class HistoricalPriceService:
         today = datetime.now(UTC).date()
         yesterday = today - timedelta(days=1)
 
-        cached_prices = cls._get_cached_historical_prices(ticker, start_date, end_date)
-
         ranges_to_fetch = cls._determine_fetch_ranges(
-            cached_prices,
+            ticker,
             start_date,
             end_date,
             yesterday,
         )
+
+        cached_prices = cls._get_cached_historical_prices(ticker, start_date, end_date)
 
         if not ranges_to_fetch:
             cls._store_in_historical_cache(cache_key, cached_prices)

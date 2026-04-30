@@ -1,6 +1,6 @@
 """Unit tests for HistoricalPriceService."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,86 +9,185 @@ import requests
 from app.services.prices.historical_price_service import HistoricalPriceService
 
 
+def _dt(date_str: str) -> datetime:
+    return datetime.strptime(date_str, "%Y-%m-%d")
+
+
+def _d(date_str: str) -> date:
+    return date.fromisoformat(date_str)
+
+
+class TestSubtractIntervals:
+    """Pure interval-math: target minus union(covered)."""
+
+    def test_no_coverage_returns_full_target(self):
+        target = (_d("2025-01-01"), _d("2025-01-15"))
+        assert HistoricalPriceService._subtract_intervals(target, []) == [target]
+
+    def test_full_coverage_returns_empty(self):
+        target = (_d("2025-01-10"), _d("2025-01-20"))
+        covered = [(_d("2025-01-01"), _d("2025-01-31"))]
+        assert HistoricalPriceService._subtract_intervals(target, covered) == []
+
+    def test_disjoint_inner_gap(self):
+        # The reviewer's exact scenario.
+        target = (_d("2025-01-01"), _d("2025-01-15"))
+        covered = [
+            (_d("2025-01-01"), _d("2025-01-05")),
+            (_d("2025-01-10"), _d("2025-01-15")),
+        ]
+        assert HistoricalPriceService._subtract_intervals(target, covered) == [
+            (_d("2025-01-06"), _d("2025-01-09"))
+        ]
+
+    def test_coverage_strictly_before_target(self):
+        target = (_d("2025-02-01"), _d("2025-02-10"))
+        covered = [(_d("2025-01-01"), _d("2025-01-15"))]
+        assert HistoricalPriceService._subtract_intervals(target, covered) == [target]
+
+    def test_coverage_extending_beyond_target(self):
+        target = (_d("2025-01-05"), _d("2025-01-25"))
+        covered = [(_d("2025-01-01"), _d("2025-01-10"))]
+        assert HistoricalPriceService._subtract_intervals(target, covered) == [
+            (_d("2025-01-11"), _d("2025-01-25"))
+        ]
+
+    def test_adjacent_coverage_treated_as_contiguous(self):
+        # [1-5] + [6-10] should leave no gap between them.
+        target = (_d("2025-01-01"), _d("2025-01-15"))
+        covered = [
+            (_d("2025-01-01"), _d("2025-01-05")),
+            (_d("2025-01-06"), _d("2025-01-10")),
+        ]
+        assert HistoricalPriceService._subtract_intervals(target, covered) == [
+            (_d("2025-01-11"), _d("2025-01-15"))
+        ]
+
+    def test_unsorted_input_handled(self):
+        target = (_d("2025-01-01"), _d("2025-01-31"))
+        covered = [
+            (_d("2025-01-20"), _d("2025-01-25")),
+            (_d("2025-01-05"), _d("2025-01-10")),
+        ]
+        gaps = HistoricalPriceService._subtract_intervals(target, covered)
+        assert gaps == [
+            (_d("2025-01-01"), _d("2025-01-04")),
+            (_d("2025-01-11"), _d("2025-01-19")),
+            (_d("2025-01-26"), _d("2025-01-31")),
+        ]
+
+    def test_overlapping_coverage_intervals(self):
+        target = (_d("2025-01-01"), _d("2025-01-31"))
+        covered = [
+            (_d("2025-01-05"), _d("2025-01-15")),
+            (_d("2025-01-10"), _d("2025-01-20")),
+        ]
+        gaps = HistoricalPriceService._subtract_intervals(target, covered)
+        assert gaps == [
+            (_d("2025-01-01"), _d("2025-01-04")),
+            (_d("2025-01-21"), _d("2025-01-31")),
+        ]
+
+    def test_invalid_target_returns_empty(self):
+        # start > end is treated as an empty target.
+        target = (_d("2025-02-01"), _d("2025-01-01"))
+        assert HistoricalPriceService._subtract_intervals(target, []) == []
+
+
 class TestDetermineFetchRanges:
-    """Tests for HistoricalPriceService._determine_fetch_ranges."""
+    """Tests for the coverage-table-driven _determine_fetch_ranges."""
 
-    def _dt(self, date_str):
-        return datetime.strptime(date_str, "%Y-%m-%d")
+    def test_no_coverage_returns_full_range(self):
+        start = _dt("2025-01-01")
+        end = _dt("2025-01-31")
+        yesterday = _d("2025-02-01")
 
-    def _d(self, date_str):
-        from datetime import date as d
+        with patch.object(HistoricalPriceService, "_load_coverage", return_value=[]):
+            ranges = HistoricalPriceService._determine_fetch_ranges(
+                "AAPL", start, end, yesterday
+            )
 
-        return d.fromisoformat(date_str)
+        assert len(ranges) == 1
+        assert ranges[0][0].date() == _d("2025-01-01")
+        assert ranges[0][1].date() == _d("2025-01-31")
 
-    def test_no_cache_returns_full_range(self):
-        start = self._dt("2025-01-01")
-        end = self._dt("2025-01-31")
-        yesterday = self._d("2025-02-01")
+    def test_full_coverage_returns_empty(self):
+        start = _dt("2025-01-10")
+        end = _dt("2025-01-20")
+        yesterday = _d("2025-01-25")
 
-        ranges = HistoricalPriceService._determine_fetch_ranges(
-            {}, start, end, yesterday
-        )
-        assert ranges == [(start, end)]
+        with patch.object(
+            HistoricalPriceService,
+            "_load_coverage",
+            return_value=[(_d("2025-01-01"), _d("2025-01-31"))],
+        ):
+            ranges = HistoricalPriceService._determine_fetch_ranges(
+                "AAPL", start, end, yesterday
+            )
 
-    def test_fully_cached_returns_empty(self):
-        start = self._dt("2025-01-10")
-        end = self._dt("2025-01-20")
-        yesterday = self._d("2025-01-25")
-        cached = {"2025-01-10": 100.0, "2025-01-20": 110.0}
-
-        ranges = HistoricalPriceService._determine_fetch_ranges(
-            cached, start, end, yesterday
-        )
         assert ranges == []
 
-    def test_gap_before_cached(self):
-        start = self._dt("2025-01-01")
-        end = self._dt("2025-01-15")
-        yesterday = self._d("2025-01-20")
-        cached = {"2025-01-10": 100.0, "2025-01-15": 105.0}
+    def test_disjoint_coverage_fetches_inner_gap(self):
+        # Reviewer's scenario: prior fetches left a hole in the middle.
+        start = _dt("2025-01-01")
+        end = _dt("2025-01-15")
+        yesterday = _d("2025-01-31")
+        coverage = [
+            (_d("2025-01-01"), _d("2025-01-05")),
+            (_d("2025-01-10"), _d("2025-01-15")),
+        ]
 
-        ranges = HistoricalPriceService._determine_fetch_ranges(
-            cached, start, end, yesterday
-        )
+        with patch.object(
+            HistoricalPriceService, "_load_coverage", return_value=coverage
+        ):
+            ranges = HistoricalPriceService._determine_fetch_ranges(
+                "AAPL", start, end, yesterday
+            )
+
         assert len(ranges) == 1
-        assert ranges[0][0] == start
-        assert ranges[0][1].date() == self._d("2025-01-09")
+        assert ranges[0][0].date() == _d("2025-01-06")
+        assert ranges[0][1].date() == _d("2025-01-09")
 
-    def test_gap_after_cached_before_yesterday(self):
-        start = self._dt("2025-01-10")
-        end = self._dt("2025-01-20")
-        yesterday = self._d("2025-01-25")
-        cached = {"2025-01-10": 100.0, "2025-01-15": 105.0}
+    def test_end_date_after_yesterday_capped(self):
+        start = _dt("2025-01-10")
+        end = _dt("2025-01-25")
+        yesterday = _d("2025-01-20")
 
-        ranges = HistoricalPriceService._determine_fetch_ranges(
-            cached, start, end, yesterday
-        )
+        with patch.object(HistoricalPriceService, "_load_coverage", return_value=[]):
+            ranges = HistoricalPriceService._determine_fetch_ranges(
+                "AAPL", start, end, yesterday
+            )
+
         assert len(ranges) == 1
-        assert ranges[0][0].date() == self._d("2025-01-16")
-
-    def test_gap_after_cached_latest_is_yesterday(self):
-        start = self._dt("2025-01-10")
-        end = self._dt("2025-01-21")
-        yesterday = self._d("2025-01-15")
-        cached = {"2025-01-10": 100.0, "2025-01-15": 105.0}
-
-        ranges = HistoricalPriceService._determine_fetch_ranges(
-            cached, start, end, yesterday
-        )
-        assert ranges == []
-
-    def test_gap_after_cached_extends_to_yesterday(self):
-        start = self._dt("2025-01-10")
-        end = self._dt("2025-01-25")
-        yesterday = self._d("2025-01-20")
-        cached = {"2025-01-10": 100.0, "2025-01-15": 105.0}
-
-        ranges = HistoricalPriceService._determine_fetch_ranges(
-            cached, start, end, yesterday
-        )
-        assert len(ranges) == 1
-        assert ranges[0][0].date() == self._d("2025-01-16")
         assert ranges[0][1].date() == yesterday
+
+    def test_start_after_yesterday_returns_empty(self):
+        # Whole window is in the future relative to historical-data cutoff.
+        start = _dt("2025-01-25")
+        end = _dt("2025-01-30")
+        yesterday = _d("2025-01-20")
+
+        ranges = HistoricalPriceService._determine_fetch_ranges(
+            "AAPL", start, end, yesterday
+        )
+        assert ranges == []
+
+    def test_gap_before_partial_coverage(self):
+        start = _dt("2025-01-01")
+        end = _dt("2025-01-15")
+        yesterday = _d("2025-01-31")
+        coverage = [(_d("2025-01-10"), _d("2025-01-15"))]
+
+        with patch.object(
+            HistoricalPriceService, "_load_coverage", return_value=coverage
+        ):
+            ranges = HistoricalPriceService._determine_fetch_ranges(
+                "AAPL", start, end, yesterday
+            )
+
+        assert len(ranges) == 1
+        assert ranges[0][0].date() == _d("2025-01-01")
+        assert ranges[0][1].date() == _d("2025-01-09")
 
 
 class TestFetchYahooRange:
@@ -183,8 +282,11 @@ class TestFetchSingleRange:
         resp_mock.status_code = 404
         http_err = requests.exceptions.HTTPError(response=resp_mock)
 
-        with patch.object(
-            HistoricalPriceService, "_fetch_yahoo_range", side_effect=http_err
+        with (
+            patch.object(
+                HistoricalPriceService, "_fetch_yahoo_range", side_effect=http_err
+            ),
+            patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
         ):
             prices = HistoricalPriceService._fetch_single_range(
                 "AAPL",
@@ -194,12 +296,16 @@ class TestFetchSingleRange:
             )
 
         assert prices == {}
+        mock_cov.assert_not_called()
 
     def test_generic_error_returns_empty(self):
-        with patch.object(
-            HistoricalPriceService,
-            "_fetch_yahoo_range",
-            side_effect=RuntimeError("boom"),
+        with (
+            patch.object(
+                HistoricalPriceService,
+                "_fetch_yahoo_range",
+                side_effect=RuntimeError("boom"),
+            ),
+            patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
         ):
             prices = HistoricalPriceService._fetch_single_range(
                 "AAPL",
@@ -209,11 +315,10 @@ class TestFetchSingleRange:
             )
 
         assert prices == {}
+        mock_cov.assert_not_called()
 
     def test_saves_historical_prices(self):
-        from datetime import date
-
-        today = date(2025, 1, 20)
+        today = _d("2025-01-20")
         fetched = {"2025-01-10": 100.0, "2025-01-20": 110.0}
 
         with (
@@ -223,6 +328,7 @@ class TestFetchSingleRange:
             patch.object(
                 HistoricalPriceService, "_save_historical_prices"
             ) as mock_save,
+            patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
         ):
             prices = HistoricalPriceService._fetch_single_range(
                 "AAPL", datetime(2025, 1, 10), datetime(2025, 1, 15), today
@@ -233,6 +339,43 @@ class TestFetchSingleRange:
         saved = mock_save.call_args.args[1]
         assert "2025-01-10" in saved
         assert "2025-01-20" not in saved
+        # Coverage is recorded for the fetch range, capped at yesterday.
+        mock_cov.assert_called_once_with("AAPL", _d("2025-01-10"), _d("2025-01-15"))
+
+    def test_records_coverage_even_when_yahoo_returns_empty(self):
+        # A successful fetch with zero rows (e.g. a weekend-only range) is
+        # still proof of coverage — without recording it, we'd refetch
+        # forever.
+        today = _d("2025-01-20")
+        with (
+            patch.object(HistoricalPriceService, "_fetch_yahoo_range", return_value={}),
+            patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
+        ):
+            prices = HistoricalPriceService._fetch_single_range(
+                "AAPL", datetime(2025, 1, 11), datetime(2025, 1, 12), today
+            )
+
+        assert prices == {}
+        mock_cov.assert_called_once_with("AAPL", _d("2025-01-11"), _d("2025-01-12"))
+
+    def test_coverage_capped_at_yesterday(self):
+        # Fetch range ends today, but coverage stops at yesterday because
+        # today's price isn't final.
+        today = _d("2025-01-20")
+        fetched = {"2025-01-19": 100.0}
+
+        with (
+            patch.object(
+                HistoricalPriceService, "_fetch_yahoo_range", return_value=fetched
+            ),
+            patch.object(HistoricalPriceService, "_save_historical_prices"),
+            patch.object(HistoricalPriceService, "_record_coverage") as mock_cov,
+        ):
+            HistoricalPriceService._fetch_single_range(
+                "AAPL", datetime(2025, 1, 18), datetime(2025, 1, 20), today
+            )
+
+        mock_cov.assert_called_once_with("AAPL", _d("2025-01-18"), _d("2025-01-19"))
 
 
 class TestHistoricalCaching:
@@ -356,6 +499,113 @@ class TestGetHistoricalPrices:
             result = HistoricalPriceService.get_historical_prices("AAPL", start, end)
 
         assert "2025-01-10" in result
+
+
+class TestDisjointCoverageEndToEnd:
+    """End-to-end guard for the bug the coverage table fixes.
+
+    Two prior disjoint fetches must not let a wider follow-up request skip
+    the gap between them. Uses a real SQLite DB so the coverage write/read
+    path is exercised.
+    """
+
+    def setup_method(self):
+        HistoricalPriceService._historical_cache.clear()
+
+    def test_wide_request_after_two_disjoint_fetches_fills_gap(self, tmp_path):
+        from decimal import Decimal
+
+        from sqlmodel import Session, SQLModel, create_engine, select
+
+        from app.models import HistoricalPrice, HistoricalPriceCoverage
+        from app.services.prices import _db_helpers as db_helpers
+        from app.services.prices import (
+            historical_price_service as hp_mod,
+        )
+
+        engine = create_engine(
+            f"sqlite:///{tmp_path / 'coverage.db'}",
+            connect_args={"check_same_thread": False},
+        )
+        SQLModel.metadata.create_all(engine)
+
+        # Seed two disjoint cached windows for AAPL: prior narrow fetches
+        # left a hole in the middle. Each prior fetch also recorded its
+        # interval in the coverage table.
+        with Session(engine) as s:
+            for d in ("2025-01-02", "2025-01-03"):
+                s.add(
+                    HistoricalPrice(
+                        ticker="AAPL",
+                        date=d,
+                        price=Decimal("100.00"),
+                        created_at=datetime.now(UTC),
+                    )
+                )
+            for d in ("2025-01-13", "2025-01-14"):
+                s.add(
+                    HistoricalPrice(
+                        ticker="AAPL",
+                        date=d,
+                        price=Decimal("110.00"),
+                        created_at=datetime.now(UTC),
+                    )
+                )
+            s.add(
+                HistoricalPriceCoverage(
+                    ticker="AAPL",
+                    period_start="2025-01-01",
+                    period_end="2025-01-05",
+                    created_at=datetime.now(UTC),
+                )
+            )
+            s.add(
+                HistoricalPriceCoverage(
+                    ticker="AAPL",
+                    period_start="2025-01-10",
+                    period_end="2025-01-15",
+                    created_at=datetime.now(UTC),
+                )
+            )
+            s.commit()
+
+        # The wide request spans both prior caches plus the gap. The dates
+        # are far in the past so today/yesterday capping doesn't apply.
+        start = datetime(2025, 1, 1)
+        end = datetime(2025, 1, 15)
+        gap_prices = {"2025-01-07": 105.0, "2025-01-08": 106.0}
+
+        with (
+            patch.object(hp_mod, "engine", engine),
+            patch.object(db_helpers, "engine", engine),
+            patch.object(
+                HistoricalPriceService, "_fetch_yahoo_range", return_value=gap_prices
+            ) as mock_yahoo,
+        ):
+            result = HistoricalPriceService.get_historical_prices("AAPL", start, end)
+
+        # Yahoo was called exactly once, for the inner gap [2025-01-06,
+        # 2025-01-09]. Without the coverage fix, the old logic would have
+        # treated min..max as fully cached and skipped Yahoo entirely.
+        assert mock_yahoo.call_count == 1
+        gap_start, gap_end = mock_yahoo.call_args.args[1:3]
+        assert gap_start.date() == _d("2025-01-06")
+        assert gap_end.date() == _d("2025-01-09")
+
+        # Result merges both prior caches with the new gap rows.
+        assert "2025-01-02" in result
+        assert "2025-01-13" in result
+        assert "2025-01-07" in result
+
+        # A third coverage row was written for the gap fetch.
+        with Session(engine) as s:
+            cov_rows = s.exec(
+                select(HistoricalPriceCoverage).where(
+                    HistoricalPriceCoverage.ticker == "AAPL"
+                )
+            ).all()
+        period_starts = {r.period_start for r in cov_rows}
+        assert "2025-01-06" in period_starts
 
 
 class TestGetHistoricalPricesForMultipleTickers:
