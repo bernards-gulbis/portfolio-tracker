@@ -164,7 +164,8 @@ function RootRedirect() {
 function PortfolioStatusRoute() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const portfolioId = id ? Number(id) : null;
+  const parsedId = id == null ? NaN : Number(id);
+  const portfolioId = Number.isFinite(parsedId) ? parsedId : null;
   const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
   const emptyRedirectedRef = useRef<number | null>(null);
 
@@ -221,7 +222,8 @@ function AppLayout() {
   const transactionsMatch = useMatch('/portfolios/:id/transactions');
 
   const idParam = portfolioMatch?.params.id;
-  const activePortfolioId = idParam ? Number(idParam) : null;
+  const parsedActiveId = idParam == null ? NaN : Number(idParam);
+  const activePortfolioId = Number.isFinite(parsedActiveId) ? parsedActiveId : null;
   const isOnSettings = settingsMatch != null;
   const isOnTransactions = transactionsMatch != null;
   const portfolioTab = isOnTransactions ? 'transactions' : 'portfolio';

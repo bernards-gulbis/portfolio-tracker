@@ -226,7 +226,10 @@ class HistoricalPriceService:
 
     @staticmethod
     def _log_http_error(
-        ticker: str, fetch_start: datetime, fetch_end: datetime, e
+        ticker: str,
+        fetch_start: datetime,
+        fetch_end: datetime,
+        e: requests.exceptions.RequestException,
     ) -> None:
         """Log an HTTP error from Yahoo, with concise output for expected 400/404."""
         status = e.response.status_code if e.response is not None else None

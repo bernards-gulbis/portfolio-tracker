@@ -28,7 +28,7 @@ export const PasswordSection = () => {
 
   const onSubmit = async (values: PasswordFormValues) => {
     if (isOauthUser) {
-      form.setError('root', { message: 'Password change not applicable for OAuth users' });
+      form.setError('root', { message: t('settings.password.oauthNotApplicable') });
       return;
     }
     try {

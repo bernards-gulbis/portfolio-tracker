@@ -27,19 +27,24 @@ const outFile = path.resolve(here, '..', 'src', 'api-generated.ts');
 
 // 1. Export the OpenAPI schema. Prefer the project's venv python
 // (matches what tests/lint use); fall back to ``python`` on PATH.
-const venvPythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
-const venvPythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
-const pythonExe =
-  process.platform === 'win32' && existsSync(venvPythonWin)
-    ? venvPythonWin
-    : existsSync(venvPythonUnix)
-      ? venvPythonUnix
-      : 'python';
+// README documents ``venv/`` (no leading dot); ``.venv/`` is also common.
+const VENV_LAYOUTS = ['.venv', 'venv'];
+const pythonExe = (() => {
+  for (const layout of VENV_LAYOUTS) {
+    const winPath = path.join(repoRoot, layout, 'Scripts', 'python.exe');
+    const unixPath = path.join(repoRoot, layout, 'bin', 'python');
+    if (process.platform === 'win32' && existsSync(winPath)) return winPath;
+    if (existsSync(unixPath)) return unixPath;
+  }
+  return 'python';
+})();
 
 const exportResult = spawnSync(
   pythonExe,
   ['-m', 'scripts.export_openapi'],
-  { cwd: apiDir, encoding: 'utf8' },
+  // ``maxBuffer`` raised above Node's 1 MB default — the OpenAPI JSON for
+  // a fully-populated schema can exceed that and trip ENOBUFS otherwise.
+  { cwd: apiDir, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 },
 );
 if (exportResult.error) {
   process.stderr.write(`Failed to spawn python: ${exportResult.error.message}\n`);

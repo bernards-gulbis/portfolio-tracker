@@ -291,10 +291,9 @@ const lv: Translation = {
     priceStaleBadge: 'Pēdējā zināmā cena uz {{asOf}}',
     priceAsOfUnknown: 'nezināmu datumu',
     transactionWarnings: 'Darījumu brīdinājumi',
-    fxIncomplete_zero: 'EUR skaitļi ir nepilnīgi, jo nevienam darījumam nav izmantojams valūtas kurss.',
-    fxIncomplete_one: 'EUR skaitļi ir nepilnīgi: {{count}} darījumam nepieciešams valūtas kurss vai EUR summa.',
-    fxIncomplete_other: 'EUR skaitļi ir nepilnīgi: {{count}} darījumiem nepieciešams valūtas kurss vai EUR summa.',
-    fxIncompleteCta: 'Labot darījumus',
+    fxIncomplete_zero: 'EUR skaitļi ir nepilnīgi, jo nevienam darījumam nav izmantojams valūtas kurss. <cta>Labot darījumus</cta>.',
+    fxIncomplete_one: 'EUR skaitļi ir nepilnīgi: {{count}} darījumam nepieciešams valūtas kurss vai EUR summa. <cta>Labot darījumus</cta>.',
+    fxIncomplete_other: 'EUR skaitļi ir nepilnīgi: {{count}} darījumiem nepieciešams valūtas kurss vai EUR summa. <cta>Labot darījumus</cta>.',
     warnings: {
       sellNotInHoldings: '[{{date}}] Nevar pārdot {{ticker}}: nav turējumos (izlaists)',
       sellOversell: '[{{date}}] Nevar pārdot {{quantity}} no {{ticker}}: pieejami tikai {{available}} (daļēja pārdošana)',
@@ -412,6 +411,7 @@ const lv: Translation = {
       submit: 'Mainīt paroli',
       submitOauth: 'Iestatīt paroli',
       oauthNote: 'Jūs ierakstījāties ar Google. Iestatot paroli, tiks iespējota arī e-pasta ierakstīšanās.',
+      oauthNotApplicable: 'Paroles maiņa nav piemērojama OAuth lietotājiem.',
     },
     account: {
       tab: 'Konts',

@@ -9,7 +9,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
 from app.core import get_session
-from app.core.rate_limit import RateLimiter, _client_ip, reset_for_tests
+from app.core.rate_limit import RateLimiter, _client_ip, rate_limit, reset_for_tests
 from main import app
 
 
@@ -84,9 +84,37 @@ class TestRateLimiterUnit:
         limiter.reset()
         assert limiter.check("k", 3, 60) is True
 
+    def test_sweep_drops_idle_keys(self):
+        """After many calls the global sweep removes keys whose timestamps have all expired."""
+        limiter = RateLimiter()
+        with patch("app.core.rate_limit.time.monotonic") as mock_time:
+            mock_time.return_value = 1000.0
+            # Seed an idle key, then advance well past its window.
+            limiter.check("idle-key", 3, 60)
+            assert "idle-key" in limiter._buckets
+
+            mock_time.return_value = 1000.0 + 61
+            # Drive enough calls to trigger the sweep (counter >= _SWEEP_EVERY).
+            for i in range(limiter._SWEEP_EVERY):
+                limiter.check(f"hot-{i % 4}", 100, 60)
+
+            assert "idle-key" not in limiter._buckets
+
+
+class TestRateLimitFactoryValidation:
+    def test_zero_max_requests_raises(self):
+        with pytest.raises(ValueError, match="positive integers"):
+            rate_limit(0, 60)
+
+    def test_negative_window_raises(self):
+        with pytest.raises(ValueError, match="positive integers"):
+            rate_limit(5, -1)
+
 
 class TestClientIp:
-    def test_uses_x_forwarded_for_first_value(self):
+    def test_ignores_x_forwarded_for_and_uses_client_host(self):
+        # XFF is spoofable without a trusted-proxy list, so the limiter
+        # keys solely on the immediate peer.
         request = type(
             "R",
             (),
@@ -95,9 +123,9 @@ class TestClientIp:
                 "client": type("C", (), {"host": "127.0.0.1"})(),
             },
         )()
-        assert _client_ip(request) == "10.0.0.1"
+        assert _client_ip(request) == "127.0.0.1"
 
-    def test_falls_back_to_client_host(self):
+    def test_uses_client_host(self):
         request = type(
             "R",
             (),

@@ -29,15 +29,16 @@ export const StatusToolbar = ({
           {t('status.livePriceError')}
         </span>
       )}
-      {hasPortfolio && latestUpdateAt > 0 && (
+      {hasPortfolio && (
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          {t('status.fetchedAt', {
-            time: new Date(latestUpdateAt).toLocaleTimeString(locale, {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            }),
-          })}
+          {latestUpdateAt > 0 &&
+            t('status.fetchedAt', {
+              time: new Date(latestUpdateAt).toLocaleTimeString(locale, {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }),
+            })}
           <Button
             variant="ghost"
             size="icon"
