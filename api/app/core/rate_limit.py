@@ -109,7 +109,7 @@ def rate_limit(max_requests: int, window_seconds: int):
             f"max_requests={max_requests}, window_seconds={window_seconds}"
         )
 
-    async def dep(request: Request):
+    def dep(request: Request):
         key = f"{_client_ip(request)}:{request.url.path}"
         if not _LIMITER.check(key, max_requests, window_seconds):
             raise HTTPException(

@@ -14,7 +14,10 @@ import { SettingsNav } from './settings/SettingsNav';
 import type { SettingsSection } from './settings/schemas';
 
 // Re-exports preserved for backward compatibility (tests import these by name).
-export { ProfileSection, PasswordSection, TaxSection, AccountSection };
+export { ProfileSection } from './settings/ProfileSection';
+export { PasswordSection } from './settings/PasswordSection';
+export { TaxSection } from './settings/TaxSection';
+export { AccountSection } from './settings/AccountSection';
 
 const SECTION_COMPONENTS: Record<SettingsSection, FC> = {
   profile: ProfileSection,

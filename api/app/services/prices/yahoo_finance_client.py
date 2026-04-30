@@ -77,11 +77,12 @@ class YahooFinanceClient:
                             f"HTTP {resp.status_code}", response=resp
                         )
                         logger.warning(
-                            "Yahoo error for %s (attempt %d/%d): HTTP %s",
+                            "Yahoo error for %s (attempt %d/%d): HTTP %s %s",
                             ticker,
                             attempt + 1,
                             cls._MAX_ATTEMPTS,
                             resp.status_code,
+                            resp.reason,
                         )
                         cls._sleep_before_retry(attempt)
                         continue
