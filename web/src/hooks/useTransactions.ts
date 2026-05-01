@@ -99,16 +99,28 @@ export const useDeleteTransaction = () => {
 };
 
 /**
- * Hook to import CSV transactions
+ * Hook to import CSV transactions. The ``dryRun`` flag (default false)
+ * lets the wizard validate + dedup without persisting; on dry-run we skip
+ * cache invalidation and the success toast since nothing actually changed.
  */
 export const useImportTransactionsCSV = () => {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: ({ portfolioId, file }: { portfolioId: number; file: File }) =>
-      importTransactionsCSV(portfolioId, file),
+    mutationFn: ({
+      portfolioId,
+      file,
+      dryRun,
+    }: {
+      portfolioId: number;
+      file: File;
+      dryRun?: boolean;
+    }) => importTransactionsCSV(portfolioId, file, { dryRun }),
     onSuccess: (result, variables) => {
+      if (variables.dryRun) {
+        return;
+      }
       queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
         exact: false

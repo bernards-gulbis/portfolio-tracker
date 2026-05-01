@@ -76,6 +76,10 @@ const BulkImportResponseSchema = z.object({
   imported_count: z.number(),
   skipped_count: z.number(),
   transactions: z.array(TransactionSchema),
+  // Optional for forward compat; default false matches a real (non-dry-run)
+  // import. When true, ``transactions`` is empty and the counts are
+  // projections of what *would* be imported.
+  dry_run: z.boolean().default(false),
 });
 export type BulkImportResponse = z.infer<typeof BulkImportResponseSchema>;
 
@@ -519,11 +523,15 @@ export const exportTransactionsCSV = async (portfolioId: number): Promise<Blob> 
 // ================== CSV Upload ==================
 
 /**
- * Import a CSV file to add transactions to a portfolio
+ * Import a CSV file to add transactions to a portfolio.
+ *
+ * When ``dryRun`` is true the backend parses + dedups but does not write,
+ * returning projected counts so the UI can confirm before committing.
  */
 export const importTransactionsCSV = async (
   portfolioId: number,
-  file: File
+  file: File,
+  options: { dryRun?: boolean } = {},
 ): Promise<BulkImportResponse> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -535,6 +543,7 @@ export const importTransactionsCSV = async (
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      params: options.dryRun ? { dry_run: 'true' } : undefined,
     }
   );
   return parseOrThrow(
