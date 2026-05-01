@@ -204,6 +204,21 @@ export const PortfolioStatusContent = ({
         />
       </div>
 
+      {/* Cost-basis-fallback banner — fires when the historical chart valued
+          some tickers at cost basis (flat line) because no price data was
+          ever found. Without this the user sees a flat segment and assumes
+          stable performance. */}
+      {performance && performance.cost_basis_fallback_tickers.length > 0 && (
+        <Alert>
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription>
+            {t('status.chartCostBasisFallback', {
+              tickers: performance.cost_basis_fallback_tickers.join(', '),
+            })}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
         {performanceError == null ? (

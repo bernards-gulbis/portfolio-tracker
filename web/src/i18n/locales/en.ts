@@ -327,6 +327,7 @@ const en = {
     estTax: 'Est. Tax ({{rate}}%)',
     estTaxFlatTooltip: 'Estimate uses a single flat rate against unrealized capital gains. It does not separate short-term vs long-term gains or apply a different rate to dividends, which Latvian law treats differently. Treat this as a rough indicator, not a tax filing figure.',
     providerUnavailable: 'Live price provider is temporarily unavailable. Holdings are valued at the last cached prices until service resumes — figures and charts may be slightly out of date.',
+    chartCostBasisFallback: 'No historical price data for {{tickers}}. The chart values these holdings at cost basis (flat line) — actual market value may differ.',
     on: 'on',
     afterTaxValue: 'After-tax Value',
     positions: 'Positions',

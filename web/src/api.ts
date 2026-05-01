@@ -211,6 +211,10 @@ const PortfolioPerformanceSchema = z.object({
   // and which were therefore valued at cost basis. Default-empty so old
   // fixtures without the field still parse.
   cost_basis_fallback_tickers: z.array(z.string()).default([]),
+  // Transaction-replay warnings collected while reconstructing the historical
+  // series (e.g. oversell, sell-of-non-held). Default-empty for forward
+  // compat with older backends.
+  warnings: z.array(TransactionWarningSchema).default([]),
 });
 export type PortfolioPerformance = z.infer<typeof PortfolioPerformanceSchema>;
 

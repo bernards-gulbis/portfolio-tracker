@@ -224,6 +224,7 @@ const mockPerformance: PortfolioPerformance = {
   portfolio_name: 'Test Portfolio',
   data_points: [],
   cost_basis_fallback_tickers: [],
+  warnings: [],
 };
 
 const mockLivePrices: LivePrices = {
