@@ -230,6 +230,7 @@ const mockLivePrices: LivePrices = {
   prices: { AAPL: { price: 200, source: 'live', as_of: '2026-01-01T12:00:00Z' } },
   usd_to_eur_rate: 0.92,
   timestamp: '2026-01-01T12:00:00Z',
+  provider_unavailable: false,
 };
 
 describe('Portfolio API functions', () => {

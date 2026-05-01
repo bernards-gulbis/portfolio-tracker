@@ -11,6 +11,7 @@ const EMPTY_LIVE: LivePrices = {
   prices: {},
   usd_to_eur_rate: null,
   timestamp: '',
+  provider_unavailable: false,
 };
 
 /**

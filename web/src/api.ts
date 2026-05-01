@@ -221,6 +221,10 @@ const LivePricesSchema = z.object({
   prices: z.record(z.string(), LivePriceInfoSchema),
   usd_to_eur_rate: z.number().nullable(),
   timestamp: z.string(),
+  // Optional for forward compatibility with older backends. When true the
+  // upstream Yahoo Finance circuit breaker is open and prices will mostly
+  // come from the DB cache or be missing.
+  provider_unavailable: z.boolean().default(false),
 });
 export type LivePrices = z.infer<typeof LivePricesSchema>;
 

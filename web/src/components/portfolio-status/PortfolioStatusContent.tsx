@@ -53,6 +53,10 @@ export interface PortfolioStatusContentProps {
   isPerformanceLoading: boolean;
   isAllocationLoading?: boolean;
   isEmptyPortfolio?: boolean;
+  /** True when the upstream price provider's circuit breaker is open.
+   *  Surfaces a single banner explaining why so many tickers may show
+   *  ``last_known``/``missing`` badges at once. */
+  providerUnavailable?: boolean;
   toolbar?: React.ReactNode;
 }
 
@@ -63,6 +67,7 @@ export const PortfolioStatusContent = ({
   isPerformanceLoading,
   isAllocationLoading = false,
   isEmptyPortfolio = false,
+  providerUnavailable = false,
   toolbar,
 }: PortfolioStatusContentProps) => {
   const { t } = useTranslation();
@@ -129,6 +134,18 @@ export const PortfolioStatusContent = ({
           missingCount={status.fx_missing_tx_ids.length}
           onGoToTransactions={goToTransactions}
         />
+      )}
+
+      {/* Yahoo Finance circuit-breaker banner — fires when the upstream
+          provider has crossed the failure threshold. One banner instead of
+          a row of "missing" chips on every ticker. */}
+      {providerUnavailable && (
+        <Alert>
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription>
+            {t('status.providerUnavailable')}
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Transaction Warnings */}

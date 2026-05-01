@@ -30,6 +30,7 @@ describe('useLivePrices', () => {
       prices: {},
       usd_to_eur_rate: 0.91,
       timestamp: '2026-03-03T12:00:00Z',
+      provider_unavailable: false,
     });
 
     const { result } = renderHook(() => useLivePrices([], true), {
@@ -51,6 +52,7 @@ describe('useLivePrices', () => {
       prices: { AAPL: { price: 150, source: 'live', as_of: '2026-03-03T12:00:00Z' } },
       usd_to_eur_rate: 0.91,
       timestamp: '2026-03-03T12:00:00Z',
+      provider_unavailable: false,
     });
 
     const { result } = renderHook(() => useLivePrices(['AAPL'], true), {
@@ -70,6 +72,7 @@ describe('useLivePrices', () => {
       },
       usd_to_eur_rate: 0.91,
       timestamp: '2026-03-03T12:00:00Z',
+      provider_unavailable: false,
     });
 
     const wrapper = createWrapper();
