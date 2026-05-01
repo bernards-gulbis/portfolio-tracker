@@ -137,7 +137,7 @@ async def import_transactions_csv(
     Pass ``?dry_run=true`` to validate the CSV and preview counts without
     persisting; subsequent re-submission without the flag commits the data.
     """
-    if not file.filename.endswith(".csv"):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
         raise FileUploadException("File must be a CSV file")
 
     max_file_size = 5 * 1024 * 1024  # 5MB

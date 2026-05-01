@@ -74,13 +74,14 @@ export const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalP
   }, [isOpen, reset]);
 
   const onPreview = async (values: FormValues) => {
-    if (!values.file) return;
+    if (values.file == null) return;
     try {
       const result = await importCSV.mutateAsync({
         portfolioId,
         file: values.file,
         dryRun: true,
       });
+      form.clearErrors('root');
       setPreview(result);
     } catch (err) {
       form.setError('root', { message: getErrorMessage(err) });
@@ -89,7 +90,7 @@ export const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalP
 
   const onConfirm = async () => {
     const values = form.getValues();
-    if (!values.file) return;
+    if (values.file == null) return;
     try {
       await importCSV.mutateAsync({ portfolioId, file: values.file });
       onClose();

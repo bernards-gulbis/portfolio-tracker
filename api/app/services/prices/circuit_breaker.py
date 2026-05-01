@@ -127,7 +127,7 @@ def call_with_breaker[T](
     breaker: CircuitBreaker,
     fn: Callable[[], T],
     *,
-    is_transient: Callable[[BaseException], bool] = lambda _e: True,
+    is_transient: Callable[[Exception], bool] = lambda _e: True,
 ) -> T:
     """Execute ``fn`` under breaker protection.
 
@@ -140,7 +140,7 @@ def call_with_breaker[T](
         raise CircuitOpenError("circuit breaker is open")
     try:
         result = fn()
-    except BaseException as exc:
+    except Exception as exc:
         if is_transient(exc):
             breaker.record_failure()
         else:
