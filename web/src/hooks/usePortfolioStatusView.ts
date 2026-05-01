@@ -71,8 +71,8 @@ export function usePortfolioStatusView(
 
   // Poll live prices even when the portfolio has no holdings: a
   // cash-only portfolio still needs fresh USD→EUR rate for display.
-  // Gating on tickers.length would leave it indefinitely stale under
-  // usePortfolioStatus's staleTime: Infinity.
+  // Gating on tickers.length would leave it stale until the status
+  // query revalidates (5 min default or window-focus).
   const {
     data: livePrices,
     isFetching: isLivePricesFetching,

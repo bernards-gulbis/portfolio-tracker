@@ -21,8 +21,6 @@ export const usePortfolios = () => {
   return useQuery({
     queryKey: PORTFOLIOS_KEY,
     queryFn: getPortfolios,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
   });
 };
 
