@@ -11,10 +11,6 @@ from sqlmodel import Session, func, select
 from app.models import Portfolio, Transaction
 
 
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
-
-
 class TransactionRepository:
     """Repository for Transaction data access.
 
@@ -157,7 +153,7 @@ class TransactionRepository:
 
     def update(self, transaction: Transaction) -> Transaction:
         """Update a transaction. Stamps ``updated_at``."""
-        transaction.updated_at = _utcnow()
+        transaction.updated_at = datetime.now(UTC)
         self.session.add(transaction)
         self.session.commit()
         self.session.refresh(transaction)
@@ -172,7 +168,7 @@ class TransactionRepository:
         transaction = self.get_by_id(transaction_id)
         if transaction is None:
             return False
-        transaction.deleted_at = _utcnow()
+        transaction.deleted_at = datetime.now(UTC)
         self.session.add(transaction)
         self.session.commit()
         return True

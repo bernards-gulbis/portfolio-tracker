@@ -45,12 +45,13 @@ const getValueHeaderInfo = (
   if (base == null) return { ...EMPTY_VALUE_HEADER, displayValue: formatted, principalDisplay };
 
   const diff = value - base;
+  const moneyWeightedPct = base > 0 ? (diff / base) * 100 : null;
   return {
     mode: 'value',
     displayValue: formatted,
     principalDisplay,
     changeDisplay: formatSignedCurrency(diff, currency, locale),
-    pctDisplay: point.returnPct == null ? '' : formatSignedPercent(point.returnPct),
+    pctDisplay: moneyWeightedPct == null ? '' : formatSignedPercent(moneyWeightedPct),
     isPositive: diff >= 0,
   };
 };
@@ -68,7 +69,8 @@ const getPctHeaderInfo = (point: ChartDataPoint): PctHeaderInfo => {
 };
 
 /** Compute the header display values.
- *  Uses the TWR return_pct (rebased) for the percentage — avoids division by near-zero principal.
+ *  Value-mode percent is money-weighted (diff / base) so it always agrees in sign with the
+ *  absolute change shown next to it; pct-mode keeps the rebased TWR for benchmark comparison.
  *  Absolute change: "all" period uses value − principal; shorter periods use value − first value. */
 export const getHeaderValues = (
   point: ChartDataPoint,

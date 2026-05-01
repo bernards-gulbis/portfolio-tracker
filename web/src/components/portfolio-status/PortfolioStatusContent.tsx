@@ -31,6 +31,7 @@ import { WithdrawalsTable } from '../WithdrawalsTable';
 
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
+import { InfoBanner } from './InfoBanner';
 import { StatCard } from './StatCard';
 import { WarningsAlert } from './WarningsAlert';
 import { computeDisplayFigures } from './displayFigures';
@@ -136,16 +137,9 @@ export const PortfolioStatusContent = ({
         />
       )}
 
-      {/* Yahoo Finance circuit-breaker banner — fires when the upstream
-          provider has crossed the failure threshold. One banner instead of
-          a row of "missing" chips on every ticker. */}
+      {/* One banner here instead of a row of "missing" chips on every ticker. */}
       {providerUnavailable && (
-        <Alert>
-          <InfoIcon className="h-4 w-4" />
-          <AlertDescription>
-            {t('status.providerUnavailable')}
-          </AlertDescription>
-        </Alert>
+        <InfoBanner>{t('status.providerUnavailable')}</InfoBanner>
       )}
 
       {/* Transaction Warnings */}
@@ -204,19 +198,14 @@ export const PortfolioStatusContent = ({
         />
       </div>
 
-      {/* Cost-basis-fallback banner — fires when the historical chart valued
-          some tickers at cost basis (flat line) because no price data was
-          ever found. Without this the user sees a flat segment and assumes
-          stable performance. */}
+      {/* Without this the user sees a flat chart segment and assumes stable
+          performance — actually we just had no price data for those tickers. */}
       {performance && performance.cost_basis_fallback_tickers.length > 0 && (
-        <Alert>
-          <InfoIcon className="h-4 w-4" />
-          <AlertDescription>
-            {t('status.chartCostBasisFallback', {
-              tickers: performance.cost_basis_fallback_tickers.join(', '),
-            })}
-          </AlertDescription>
-        </Alert>
+        <InfoBanner>
+          {t('status.chartCostBasisFallback', {
+            tickers: performance.cost_basis_fallback_tickers.join(', '),
+          })}
+        </InfoBanner>
       )}
 
       {/* Charts Section */}

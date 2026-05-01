@@ -207,9 +207,9 @@ const PortfolioPerformanceSchema = z.object({
   portfolio_id: z.number(),
   portfolio_name: z.string(),
   data_points: z.array(PerformanceDataPointSchema),
-  // Added in Package B.1 — tickers whose historical prices were unavailable
-  // and which were therefore valued at cost basis. Default-empty so old
-  // fixtures without the field still parse.
+  // Tickers whose historical prices were unavailable and which were
+  // therefore valued at cost basis. Default-empty so old fixtures without
+  // the field still parse.
   cost_basis_fallback_tickers: z.array(z.string()).default([]),
   // Transaction-replay warnings collected while reconstructing the historical
   // series (e.g. oversell, sell-of-non-held). Default-empty for forward
