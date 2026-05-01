@@ -346,8 +346,14 @@ class TestTransactionHandlers:
         assert state.holdings["GOOG"].quantity == Decimal("8")
         assert state.holdings["GOOG"].total_cost == Decimal("1600")
 
-    def test_sell_oversell_nonstrict_reconciles(self):
-        """In non-strict mode, oversell should still reconcile (partial sell + remove holding)."""
+    def test_sell_oversell_nonstrict_reconciles_with_warning(self):
+        """Oversell still reconciles in non-strict mode, AND emits a warning.
+
+        Previously the warning was suppressed in non-strict mode, which let
+        perf replay silently truncate quantities — the chart looked fine but
+        didn't reconcile with the broker. Warnings are now always collected
+        so any consumer can surface them.
+        """
         state = _TxState()
         state.cash = Decimal("0")
         state.holdings["AAPL"] = _Holding(
@@ -359,8 +365,8 @@ class TestTransactionHandlers:
             type=TransactionType.SELL, ticker="AAPL", quantity=10, total_amount=2000.0
         )
         _apply_transaction(state, tx, strict=False)
-        # No warnings in non-strict mode
-        assert len(state.warnings) == 0
+        assert len(state.warnings) == 1
+        assert state.warnings[0].code == "sellOversell"
         # Holding should be removed
         assert "AAPL" not in state.holdings
         # Partial sell: 5/10 of proceeds = 1000
@@ -493,10 +499,10 @@ class TestCalculatePerformance:
         ]
         txs_reversed = list(reversed(txs_ordered))
         end = datetime(2025, 2, 1)
-        points_ordered, _ = calculate_performance(
+        points_ordered, _, _ = calculate_performance(
             txs_ordered, end_date=end, num_points=5
         )
-        points_reversed, _ = calculate_performance(
+        points_reversed, _, _ = calculate_performance(
             txs_reversed, end_date=end, num_points=5
         )
         assert len(points_ordered) == len(points_reversed)
@@ -545,9 +551,10 @@ class TestGenerateDatePoints:
 
 class TestCalculatePerformanceEdgeCases:
     def test_empty_transactions_returns_empty_result(self):
-        data_points, fallback = calculate_performance([])
+        data_points, fallback, warnings = calculate_performance([])
         assert data_points == []
         assert fallback == []
+        assert warnings == []
 
     def test_start_date_equal_to_end_raises(self):
         tx = MagicMock()
@@ -617,7 +624,7 @@ class TestCalculatePerformanceEdgeCases:
                 return_value=0.9,
             ),
         ):
-            data_points, fallback = calculate_performance(
+            data_points, fallback, _ = calculate_performance(
                 txs,
                 start_date=datetime(2025, 1, 1),
                 end_date=datetime(2025, 2, 1),
@@ -625,6 +632,68 @@ class TestCalculatePerformanceEdgeCases:
             )
         assert len(data_points) == 5
         assert "UNKNOWN" in fallback
+
+    def test_oversell_warnings_surface_through_perf(self):
+        """An oversell during historical replay must propagate as a warning
+        in the perf response so the chart can flag tampered points rather
+        than silently rendering the truncated quantity."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2025, 1, 1),
+                total_amount=10000.0,
+                eur_amount=9000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 2),
+                ticker="AAPL",
+                quantity=5,
+                total_amount=-500.0,
+            ),
+            # Oversell — quantity 20 exceeds the 5 held.
+            _make_tx(
+                id=3,
+                type=TransactionType.SELL,
+                date=datetime(2025, 1, 10),
+                ticker="AAPL",
+                quantity=20,
+                total_amount=2000.0,
+            ),
+        ]
+        with (
+            patch(
+                "app.services.portfolio_perf.HistoricalPriceService."
+                "get_historical_prices_for_multiple_tickers",
+                return_value={},
+            ),
+            patch(
+                "app.services.portfolio_perf.LivePriceService.get_last_known_price",
+                return_value=None,
+            ),
+            patch(
+                "app.services.portfolio_valuation.FxRateService."
+                "get_historical_usd_to_eur_rates",
+                return_value={},
+            ),
+            patch(
+                "app.services.portfolio_valuation.FxRateService."
+                "get_usd_to_eur_rate_safe",
+                return_value=0.9,
+            ),
+        ):
+            _, _, warnings = calculate_performance(
+                txs,
+                start_date=datetime(2025, 1, 1),
+                end_date=datetime(2025, 2, 1),
+                num_points=5,
+            )
+
+        assert any(w["code"] == "sellOversell" for w in warnings), (
+            f"expected sellOversell warning, got {[w['code'] for w in warnings]}"
+        )
 
 
 # ── portfolio_valuation: _resolve_usd_to_eur_rate ─────────────────────
@@ -1115,7 +1184,7 @@ class TestCalculatePerformanceComplexity:
             "_apply_transaction",
             wraps=portfolio_perf._apply_transaction,
         ) as spy:
-            data_points, _ = calculate_performance(
+            data_points, _, _ = calculate_performance(
                 transactions, start, end, num_points=365
             )
 

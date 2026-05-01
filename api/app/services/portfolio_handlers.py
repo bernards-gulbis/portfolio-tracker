@@ -170,29 +170,35 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         state.cash += total
         return
     if ticker not in state.holdings:
-        if strict:
-            state.warnings.append(
-                _Warning(
-                    code="sellNotInHoldings",
-                    date=tx.date.strftime(_ISO_DATETIME_FMT),
-                    params={"ticker": ticker},
-                )
+        # Always emit: a sell of an unheld ticker is a data-quality issue
+        # the user needs to know about regardless of which calculation path
+        # is running. Status surfaces ``state.warnings`` directly; perf
+        # passes them through ``calculate_performance`` so the chart can
+        # flag tampered historical points.
+        state.warnings.append(
+            _Warning(
+                code="sellNotInHoldings",
+                date=tx.date.strftime(_ISO_DATETIME_FMT),
+                params={"ticker": ticker},
             )
+        )
         return
     h = state.holdings[ticker]
     if quantity > h.quantity + HOLDINGS_EPSILON:
-        if strict:
-            state.warnings.append(
-                _Warning(
-                    code="sellOversell",
-                    date=tx.date.strftime(_ISO_DATETIME_FMT),
-                    params={
-                        "ticker": ticker,
-                        "quantity": str(quantity),
-                        "available": str(h.quantity),
-                    },
-                )
+        # Always emit: the partial-sell branch silently truncates the
+        # quantity, which is dangerous when the underlying chart consumer
+        # (perf replay) has no other signal. See ``sellNotInHoldings`` above.
+        state.warnings.append(
+            _Warning(
+                code="sellOversell",
+                date=tx.date.strftime(_ISO_DATETIME_FMT),
+                params={
+                    "ticker": ticker,
+                    "quantity": str(quantity),
+                    "available": str(h.quantity),
+                },
             )
+        )
         # Partial sell: sell only what is held, with proportional total
         held = h.quantity
         partial_total = total * (held / quantity) if quantity > 0 else _ZERO

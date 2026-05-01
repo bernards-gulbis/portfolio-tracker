@@ -8,6 +8,20 @@ import requests
 from app.services.prices.yahoo_finance_client import YahooFinanceClient
 
 
+@pytest.fixture(autouse=True)
+def _reset_breaker():
+    """Each test starts with a closed circuit breaker.
+
+    Several tests deliberately exercise transient-failure paths; without
+    this reset, accumulating failures across tests would trip the
+    process-wide breaker and cause later tests to fail-fast with
+    ``CircuitOpenError`` instead of exercising the retry logic.
+    """
+    YahooFinanceClient.reset_circuit()
+    yield
+    YahooFinanceClient.reset_circuit()
+
+
 def _ok_response(payload: dict | None = None) -> Mock:
     resp = Mock()
     resp.status_code = 200
@@ -222,3 +236,58 @@ class TestRequestParameters:
         assert "User-Agent" in call.kwargs["headers"]
         assert call.kwargs["timeout"] == 10
         assert call.kwargs["params"] == {"interval": "1d"}
+
+
+class TestCircuitBreakerIntegration:
+    """The breaker should trip after sustained transient failures and let the
+    fail-fast path take over so a Yahoo outage doesn't burn the thread pool."""
+
+    def test_breaker_starts_closed(self):
+        assert YahooFinanceClient.is_circuit_open() is False
+
+    def test_breaker_trips_after_sustained_5xx_failures(self):
+        from app.services.prices.yahoo_finance_client import CircuitOpenError
+
+        # Default threshold is 5 — five separate fetch_chart calls each
+        # exhausting their own retries should trip the breaker.
+        always_500 = lambda *_a, **_k: _http_response(500)  # noqa: E731
+        with (
+            patch(
+                "app.services.prices.yahoo_finance_client.requests.get",
+                side_effect=always_500,
+            ),
+            patch("app.services.prices.yahoo_finance_client.time.sleep"),
+        ):
+            for _ in range(5):
+                with pytest.raises(requests.exceptions.HTTPError):
+                    YahooFinanceClient.fetch_chart("AAPL", {})
+
+        assert YahooFinanceClient.is_circuit_open() is True
+
+        # While open, fetch_chart should fail fast without calling out.
+        with patch("app.services.prices.yahoo_finance_client.requests.get") as mock_get:
+            with pytest.raises(CircuitOpenError):
+                YahooFinanceClient.fetch_chart("AAPL", {})
+            assert mock_get.call_count == 0
+
+    def test_permanent_4xx_does_not_trip_breaker(self):
+        # Six consecutive 404s — a delisted ticker — should not trip the
+        # breaker because Yahoo is still reachable.
+        always_404 = lambda *_a, **_k: _http_response(404)  # noqa: E731
+        with patch(
+            "app.services.prices.yahoo_finance_client.requests.get",
+            side_effect=always_404,
+        ):
+            for _ in range(6):
+                with pytest.raises(requests.exceptions.HTTPError):
+                    YahooFinanceClient.fetch_chart("BAD_TICKER", {})
+
+        assert YahooFinanceClient.is_circuit_open() is False
+
+    def test_successful_call_keeps_breaker_closed(self):
+        with patch(
+            "app.services.prices.yahoo_finance_client.requests.get",
+            return_value=_ok_response(),
+        ):
+            YahooFinanceClient.fetch_chart("AAPL", {})
+        assert YahooFinanceClient.is_circuit_open() is False

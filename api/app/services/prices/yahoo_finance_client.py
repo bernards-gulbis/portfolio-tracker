@@ -1,4 +1,4 @@
-"""Yahoo Finance HTTP client with retry/backoff.
+"""Yahoo Finance HTTP client with retry/backoff and circuit breaker.
 
 Owns all outgoing traffic to ``query1.finance.yahoo.com`` and the
 process-wide concurrency limit.
@@ -18,6 +18,17 @@ A class-level ``Semaphore(5)`` caps concurrent outgoing requests. The
 semaphore is held for the duration of an entire ``fetch_chart`` call,
 including backoff sleeps. This prevents thread-fan-out under contention
 at the cost of a small throughput hit when one slot is mid-retry.
+
+Circuit breaker
+---------------
+A process-wide :class:`CircuitBreaker` wraps the call. After
+``failure_threshold`` consecutive transient failures (network error,
+5xx, 408, 429) the breaker opens and ``fetch_chart`` raises
+:class:`CircuitOpenError` for ``recovery_timeout`` seconds before
+allowing a single probe. Permanent 4xx errors (404, 400) — which mean
+"Yahoo is reachable but you asked for nothing" — do not count toward the
+trip threshold. This stops a Yahoo outage from cascading into ~3 retries
+× 50 tickers of pointless backoff sleep.
 """
 
 import logging
@@ -27,7 +38,28 @@ from typing import Any, ClassVar
 
 import requests
 
+from .circuit_breaker import (
+    CircuitBreaker,
+    CircuitOpenError,
+    call_with_breaker,
+)
+
 logger = logging.getLogger(__name__)
+
+
+def _is_transient_yahoo_failure(exc: BaseException) -> bool:
+    """Treat network errors and Yahoo-side 5xx/transient-4xx as transient.
+
+    Permanent 4xx (404 unknown ticker, 400 bad request) are caller errors
+    and don't reflect Yahoo's health, so they don't trip the breaker.
+    """
+    if isinstance(exc, requests.exceptions.HTTPError):
+        resp = exc.response
+        if resp is None:
+            return True
+        status = resp.status_code
+        return status >= 500 or status in YahooFinanceClient._TRANSIENT_4XX
+    return isinstance(exc, requests.exceptions.RequestException)
 
 
 class YahooFinanceClient:
@@ -41,6 +73,7 @@ class YahooFinanceClient:
     _TRANSIENT_4XX = frozenset({408, 429})
 
     _semaphore = Semaphore(5)
+    _breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=30.0)
 
     @classmethod
     def fetch_chart(cls, ticker: str, params: dict[str, Any]) -> requests.Response:
@@ -49,8 +82,22 @@ class YahooFinanceClient:
         Returns the raw ``Response`` on 2xx. Raises ``HTTPError`` on
         non-transient 4xx without retrying. Retries on 5xx, 408, 429,
         and ``RequestException``; raises the last error after exhausting
-        attempts.
+        attempts. Raises :class:`CircuitOpenError` immediately when the
+        circuit breaker is open.
         """
+        return call_with_breaker(
+            cls._breaker,
+            lambda: cls._fetch_chart_impl(ticker, params),
+            is_transient=_is_transient_yahoo_failure,
+        )
+
+    @classmethod
+    def _fetch_chart_impl(
+        cls, ticker: str, params: dict[str, Any]
+    ) -> requests.Response:
+        """Inner retry loop without circuit-breaker wrapping. Used by
+        :meth:`fetch_chart` and exposed for tests that need to bypass the
+        breaker."""
         url = f"{cls._BASE_URL}/{ticker}"
         last_exc: BaseException | None = None
 
@@ -106,6 +153,19 @@ class YahooFinanceClient:
         raise last_exc
 
     @classmethod
+    def is_circuit_open(cls) -> bool:
+        """Whether the breaker is currently rejecting calls."""
+        return cls._breaker.is_open()
+
+    @classmethod
+    def reset_circuit(cls) -> None:
+        """Force the breaker back to CLOSED. Used by tests."""
+        cls._breaker.record_success()
+
+    @classmethod
     def _sleep_before_retry(cls, attempt: int) -> None:
         if attempt < cls._MAX_ATTEMPTS - 1:
             time.sleep(cls._BACKOFF_BASE_SECONDS * (2**attempt))
+
+
+__all__ = ["CircuitOpenError", "YahooFinanceClient"]

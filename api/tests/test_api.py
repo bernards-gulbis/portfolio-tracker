@@ -2957,7 +2957,12 @@ def test_sell_non_strict_unknown_ticker():
 
 
 def test_sell_non_strict_oversell():
-    """Oversell in non-strict mode should reconcile via partial sell."""
+    """Oversell reconciles via partial sell AND emits a warning.
+
+    Warnings are always collected; the consumer (status vs perf) decides
+    what to surface. This used to be suppressed under strict=False which
+    made perf replay silently use a truncated quantity.
+    """
     state = _TxState()
     state.cash = Decimal("5000")
     state.holdings["AAPL"] = _Holding(
@@ -2981,8 +2986,9 @@ def test_sell_non_strict_oversell():
     assert state.cash == Decimal("5750")
     # Holding should be removed after partial sell
     assert "AAPL" not in state.holdings
-    # No warnings in non-strict mode
-    assert len(state.warnings) == 0
+    # Warning is now always emitted regardless of strict mode.
+    assert len(state.warnings) == 1
+    assert state.warnings[0].code == "sellOversell"
 
 
 def test_sell_without_ticker():
@@ -3003,6 +3009,58 @@ def test_sell_without_ticker():
 
     # Cash should increase by total_amount
     assert state.cash == Decimal("6500")
+
+
+def test_performance_oversell_warning_surfaces_in_response(client: TestClient):
+    """An oversell during historical replay must show up as a warning on the
+    performance endpoint, not just on the status endpoint."""
+    portfolio_response = client.post(
+        "/portfolios/", json={"name": "Oversell Perf Test"}
+    )
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 10000.0,
+            "eur_amount": 10000.0,
+            "fee": 0.0,
+        },
+    )
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 5.0,
+            "price_per_share": 100.0,
+            "total_amount": -500.0,
+            "fee": 0.0,
+        },
+    )
+    # Oversell — quantity 20 but only 5 are held.
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-15T10:00:00",
+            "type": "Sell",
+            "ticker": "AAPL",
+            "quantity": 20.0,
+            "price_per_share": 100.0,
+            "total_amount": 2000.0,
+            "fee": 0.0,
+        },
+    )
+
+    response = client.get(f"/portfolios/{portfolio_id}/performance")
+    assert response.status_code == 200
+    data = response.json()
+    assert any(w["code"] == "sellOversell" for w in data["warnings"]), (
+        f"expected sellOversell in warnings, got {[w['code'] for w in data['warnings']]}"
+    )
 
 
 # ================== Performance Last Known Price Fallback Tests ==================
@@ -3776,33 +3834,25 @@ def test_warning_withdraw_negative_cash():
     assert state.warnings[0].date == "2024-01-02T00:00:00"
 
 
-def test_no_warnings_in_non_strict_mode():
-    """Non-strict mode should never append warnings but still reconcile oversell."""
+def test_strict_only_warnings_suppressed_in_non_strict_mode():
+    """Strict-only warnings (e.g. ``withdrawNegativeCash``) stay suppressed
+    in non-strict mode while data-quality warnings (oversell) always fire."""
     state = _TxState()
-    state.cash = Decimal("5000")
-    state.holdings["AAPL"] = _Holding(
-        quantity=Decimal("5"),
-        total_cost=Decimal("500"),
-        first_buy_date=datetime(2024, 1, 1),
-    )
+    state.cash = Decimal("100")  # would go negative on a 500 withdrawal
 
-    # Oversell in non-strict mode
     tx = Transaction(
         id=1,
         portfolio_id=1,
         date=datetime(2024, 1, 2),
-        type=TransactionType.SELL,
-        ticker="AAPL",
-        quantity=20.0,
-        total_amount=3000.0,
+        type=TransactionType.WITHDRAW,
+        total_amount=-500.0,
+        eur_amount=-460.0,
     )
     _apply_transaction(state, tx, strict=False)
 
+    # ``withdrawNegativeCash`` is still gated behind strict mode.
     assert len(state.warnings) == 0
-    # Partial sell: 5/20 of 3000 = 750 added to cash
-    assert state.cash == Decimal("5750")
-    # Holding removed after partial sell
-    assert "AAPL" not in state.holdings
+    assert state.cash == Decimal("-400")
 
 
 # ================== Live Prices Tests ==================
@@ -3894,6 +3944,47 @@ def test_live_prices_price_fetch_error_returns_none_prices(client: TestClient):
     assert data["prices"]["AAPL"]["price"] is None
     assert data["prices"]["AAPL"]["source"] == "missing"
     assert data["prices"]["AAPL"]["as_of"] is None
+
+
+def test_live_prices_provider_unavailable_flag(client: TestClient):
+    """When the upstream circuit breaker is open, the response surfaces it."""
+    with (
+        patch("app.routers.portfolios.LivePriceService") as mock_live,
+        patch("app.routers.portfolios.FxRateService") as mock_fx,
+        patch(
+            "app.routers.portfolios.YahooFinanceClient.is_circuit_open",
+            return_value=True,
+        ),
+    ):
+        mock_live.get_current_prices.return_value = {"AAPL": None}
+        mock_live.get_last_known_price_with_date.return_value = None
+        mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
+
+        response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider_unavailable"] is True
+
+
+def test_live_prices_provider_available_by_default(client: TestClient):
+    """When the breaker is closed, ``provider_unavailable`` is False."""
+    with (
+        patch("app.routers.portfolios.LivePriceService") as mock_live,
+        patch("app.routers.portfolios.FxRateService") as mock_fx,
+        patch(
+            "app.routers.portfolios.YahooFinanceClient.is_circuit_open",
+            return_value=False,
+        ),
+    ):
+        mock_live.get_current_prices.return_value = {"AAPL": 192.5}
+        mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
+
+        response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider_unavailable"] is False
 
 
 def test_csv_upload_file_too_large(client: TestClient):

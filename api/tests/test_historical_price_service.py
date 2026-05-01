@@ -877,7 +877,7 @@ class TestCachedHistoricalPricesFloatCoercion:
                 return_value=[],
             ),
         ):
-            data_points, _ = calculate_performance(
+            data_points, _, _ = calculate_performance(
                 tx,
                 _dt(2026, 4, 2),
                 _dt(2026, 4, 15),

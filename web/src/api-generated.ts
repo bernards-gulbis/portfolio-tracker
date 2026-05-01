@@ -677,6 +677,11 @@ export interface components {
                 [key: string]: components["schemas"]["LivePriceInfo"];
             };
             /**
+             * Provider Unavailable
+             * @default false
+             */
+            provider_unavailable: boolean;
+            /**
              * Timestamp
              * Format: date-time
              */
@@ -757,6 +762,8 @@ export interface components {
             portfolio_id: number;
             /** Portfolio Name */
             portfolio_name: string;
+            /** Warnings */
+            warnings?: components["schemas"]["TransactionWarning"][];
         };
         /**
          * PortfolioResponse
@@ -897,6 +904,11 @@ export interface components {
          * @description Schema for transaction response
          */
         TransactionResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
             /** Currency */
             currency?: string | null;
             /**
@@ -925,6 +937,8 @@ export interface components {
             /** Total Amount */
             total_amount: number;
             type: components["schemas"]["TransactionType"];
+            /** Updated At */
+            updated_at?: string | null;
         };
         /**
          * TransactionType
