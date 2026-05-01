@@ -3,6 +3,7 @@ Transaction repository for data access
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, func, select
@@ -10,8 +11,18 @@ from sqlmodel import Session, func, select
 from app.models import Portfolio, Transaction
 
 
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
 class TransactionRepository:
-    """Repository for Transaction data access"""
+    """Repository for Transaction data access.
+
+    All read methods filter out soft-deleted rows by default (``deleted_at IS
+    NULL``); pass ``include_deleted=True`` for audit/recovery use cases. The
+    ``delete`` method performs a soft-delete (sets ``deleted_at = utcnow``);
+    use ``hard_delete`` only when genuinely removing data is required.
+    """
 
     def __init__(self, session: Session):
         self.session = session
@@ -36,28 +47,45 @@ class TransactionRepository:
             self.session.rollback()
             raise
 
-    def get_by_id(self, transaction_id: int) -> Transaction | None:
-        """Get a transaction by ID"""
-        return self.session.get(Transaction, transaction_id)
+    def get_by_id(
+        self, transaction_id: int, *, include_deleted: bool = False
+    ) -> Transaction | None:
+        """Get a transaction by ID. Excludes soft-deleted rows by default."""
+        tx = self.session.get(Transaction, transaction_id)
+        if tx is None:
+            return None
+        if not include_deleted and tx.deleted_at is not None:
+            return None
+        return tx
 
     def get_by_id_and_user(
-        self, transaction_id: int, user_id: uuid.UUID
+        self,
+        transaction_id: int,
+        user_id: uuid.UUID,
+        *,
+        include_deleted: bool = False,
     ) -> Transaction | None:
-        """Get a transaction by ID verifying ownership via portfolio"""
+        """Get a transaction by ID verifying ownership via portfolio."""
         statement = (
             select(Transaction)
             .join(Portfolio, Transaction.portfolio_id == Portfolio.id)
             .where(Transaction.id == transaction_id, Portfolio.user_id == user_id)
         )
+        if not include_deleted:
+            statement = statement.where(Transaction.deleted_at.is_(None))
         return self.session.exec(statement).first()
 
-    def get_by_portfolio_id(self, portfolio_id: int) -> list[Transaction]:
-        """Get all transactions for a specific portfolio, ordered chronologically"""
+    def get_by_portfolio_id(
+        self, portfolio_id: int, *, include_deleted: bool = False
+    ) -> list[Transaction]:
+        """Get all live transactions for a portfolio, ordered chronologically."""
         statement = (
             select(Transaction)
             .where(Transaction.portfolio_id == portfolio_id)
             .order_by(Transaction.date, Transaction.id)
         )
+        if not include_deleted:
+            statement = statement.where(Transaction.deleted_at.is_(None))
         return list(self.session.exec(statement).all())
 
     def get_by_portfolio_id_paginated(
@@ -69,8 +97,11 @@ class TransactionRepository:
         transaction_types: list[str] | None = None,
         sort_order: str = "desc",
     ) -> tuple[list[Transaction], int]:
-        """Get paginated transactions for a specific portfolio"""
-        conditions = [Transaction.portfolio_id == portfolio_id]
+        """Get paginated live transactions for a portfolio."""
+        conditions = [
+            Transaction.portfolio_id == portfolio_id,
+            Transaction.deleted_at.is_(None),
+        ]
         if ticker:
             conditions.append(Transaction.ticker.ilike(f"%{ticker}%"))
         if transaction_types:
@@ -98,17 +129,36 @@ class TransactionRepository:
         return transactions, total
 
     def update(self, transaction: Transaction) -> Transaction:
-        """Update a transaction"""
+        """Update a transaction. Stamps ``updated_at``."""
+        transaction.updated_at = _utcnow()
         self.session.add(transaction)
         self.session.commit()
         self.session.refresh(transaction)
         return transaction
 
     def delete(self, transaction_id: int) -> bool:
-        """Delete a transaction"""
+        """Soft-delete a transaction by stamping ``deleted_at``.
+
+        Returns ``True`` if a live row was found and marked deleted, ``False``
+        if the row does not exist or was already soft-deleted (idempotent).
+        """
         transaction = self.get_by_id(transaction_id)
-        if transaction:
-            self.session.delete(transaction)
-            self.session.commit()
-            return True
-        return False
+        if transaction is None:
+            return False
+        transaction.deleted_at = _utcnow()
+        self.session.add(transaction)
+        self.session.commit()
+        return True
+
+    def hard_delete(self, transaction_id: int) -> bool:
+        """Permanently remove a transaction (bypasses the audit trail).
+
+        Reserved for genuine data-removal needs (e.g. GDPR erasure). Most
+        callers should prefer :meth:`delete`.
+        """
+        transaction = self.session.get(Transaction, transaction_id)
+        if transaction is None:
+            return False
+        self.session.delete(transaction)
+        self.session.commit()
+        return True

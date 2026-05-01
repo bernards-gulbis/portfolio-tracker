@@ -1,6 +1,6 @@
 """Transaction database model"""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -11,6 +11,10 @@ from .transaction_type import TransactionType
 
 if TYPE_CHECKING:
     from .portfolio import Portfolio
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 # Enforces the ledger's sign semantics on total_amount: DEPOSIT/SELL/DIVIDEND
@@ -64,6 +68,15 @@ class Transaction(SQLModel, table=True):
     split_ratio: Decimal | None = Field(default=None, max_digits=20, decimal_places=8)
     currency: str | None = Field(default=None, max_length=3)
     fx_rate: Decimal | None = Field(default=None, max_digits=12, decimal_places=6)
+
+    # Audit columns. ``date`` is the user-supplied transaction date (when the
+    # trade happened in the real world); ``created_at`` is when the row was
+    # written to the ledger. ``deleted_at`` makes deletes recoverable — repo
+    # queries filter ``deleted_at IS NULL`` by default; calculations replay
+    # only live rows.
+    created_at: datetime = Field(default_factory=_utcnow, index=True)
+    updated_at: datetime | None = Field(default=None)
+    deleted_at: datetime | None = Field(default=None, index=True)
 
     # Relationship
     portfolio: "Portfolio" = Relationship(back_populates="transactions")
