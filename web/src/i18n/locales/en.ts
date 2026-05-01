@@ -315,6 +315,7 @@ const en = {
     totalReturn: 'Total Return',
     annualized: 'Annualized',
     estTax: 'Est. Tax ({{rate}}%)',
+    estTaxFlatTooltip: 'Estimate uses a single flat rate against unrealized capital gains. It does not separate short-term vs long-term gains or apply a different rate to dividends, which Latvian law treats differently. Treat this as a rough indicator, not a tax filing figure.',
     on: 'on',
     afterTaxValue: 'After-tax Value',
     positions: 'Positions',

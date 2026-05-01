@@ -317,6 +317,7 @@ const lv: Translation = {
     totalReturn: 'Kopējā peļņa',
     annualized: 'Gada',
     estTax: 'Aplēstais nodoklis ({{rate}}%)',
+    estTaxFlatTooltip: 'Aplēse izmanto vienotu likmi nerealizētajai kapitāla peļņai. Tā nenodala īstermiņa un ilgtermiņa peļņu un nepiemēro citu likmi dividendēm, kuras Latvijas tiesību akti aplūko atšķirīgi. Uzskatiet to par aptuvenu rādītāju, nevis par nodokļu deklarācijas summu.',
     on: 'no',
     afterTaxValue: 'Vērtība pēc nodokļa',
     positions: 'Pozīcijas',

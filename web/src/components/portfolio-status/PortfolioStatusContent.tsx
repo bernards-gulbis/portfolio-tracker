@@ -6,6 +6,7 @@ import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import {
   formatCurrency,
@@ -163,8 +164,23 @@ export const PortfolioStatusContent = ({
           value={afterTaxValue == null ? '-' : formatCurrency(afterTaxValue, currency, locale)}
           caption={
             estimatedTax == null ? undefined : (
-              <p className="text-muted-foreground">
-                {t('status.estTax', { rate: taxRatePct })}: −{formatCurrency(estimatedTax, currency, locale)}
+              <p className="text-muted-foreground inline-flex items-center gap-1">
+                <span>
+                  {t('status.estTax', { rate: taxRatePct })}: −{formatCurrency(estimatedTax, currency, locale)}
+                </span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoIcon
+                        aria-label={t('status.estTaxFlatTooltip')}
+                        className="h-3.5 w-3.5 text-muted-foreground cursor-help"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-72">
+                      <p>{t('status.estTaxFlatTooltip')}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </p>
             )
           }
