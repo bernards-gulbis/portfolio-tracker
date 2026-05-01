@@ -88,6 +88,33 @@ class TransactionRepository:
             statement = statement.where(Transaction.deleted_at.is_(None))
         return list(self.session.exec(statement).all())
 
+    def get_by_portfolio_id_in_date_range(
+        self,
+        portfolio_id: int,
+        start_date: datetime,
+        end_date: datetime,
+        *,
+        include_deleted: bool = False,
+    ) -> list[Transaction]:
+        """Get live transactions for a portfolio within a date range (inclusive).
+
+        Used by CSV import dedup so a 50k-row history doesn't get loaded into
+        memory just to dedup a 100-row import. The date range comes from the
+        parsed CSV's min/max dates.
+        """
+        statement = (
+            select(Transaction)
+            .where(
+                Transaction.portfolio_id == portfolio_id,
+                Transaction.date >= start_date,
+                Transaction.date <= end_date,
+            )
+            .order_by(Transaction.date, Transaction.id)
+        )
+        if not include_deleted:
+            statement = statement.where(Transaction.deleted_at.is_(None))
+        return list(self.session.exec(statement).all())
+
     def get_by_portfolio_id_paginated(
         self,
         portfolio_id: int,

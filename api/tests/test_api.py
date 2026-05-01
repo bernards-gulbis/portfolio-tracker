@@ -740,6 +740,81 @@ def test_csv_upload(client: TestClient):
     assert transaction2["fx_rate"] is None
 
 
+def test_csv_upload_dry_run_does_not_persist(client: TestClient):
+    """A ?dry_run=true import should validate + dedup but not write."""
+    portfolio_response = client.post("/portfolios/", json={"name": "CSV Dry Run Test"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    csv_content = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+    files = {"file": ("t.csv", BytesIO(csv_content.encode()), "text/csv")}
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files=files,
+        params={"dry_run": "true"},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["dry_run"] is True
+    assert data["imported_count"] == 1
+    assert data["skipped_count"] == 0
+    # Un-persisted preview returns no transaction objects.
+    assert data["transactions"] == []
+
+    # Confirm nothing was actually written.
+    list_response = client.get(f"/portfolios/{portfolio_id}/transactions")
+    assert list_response.json()["total"] == 0
+
+
+def test_csv_upload_dry_run_dedup_against_existing(client: TestClient):
+    """Dry-run reports skipped count when the row already exists."""
+    portfolio_response = client.post("/portfolios/", json={"name": "CSV Dry Run Dedup"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    csv_content = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+    # Real import first.
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files={"file": ("t.csv", BytesIO(csv_content.encode()), "text/csv")},
+    )
+    # Dry-run of the same content — should report 1 skipped, 0 imported.
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files={"file": ("t.csv", BytesIO(csv_content.encode()), "text/csv")},
+        params={"dry_run": "true"},
+    )
+
+    data = response.json()
+    assert data["dry_run"] is True
+    assert data["imported_count"] == 0
+    assert data["skipped_count"] == 1
+
+
+def test_csv_upload_row_cap_rejected(client: TestClient):
+    """A CSV exceeding MAX_CSV_ROWS should be rejected with 400."""
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
+
+    from app.services.transaction_service import MAX_CSV_ROWS
+
+    portfolio_response = client.post("/portfolios/", json={"name": "CSV Row Cap"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    base = _dt(2024, 1, 1)
+    rows = [
+        f"{(base + _td(seconds=i)).strftime('%m/%d/%Y %H:%M:%S')},Deposit,{1000 + i}"
+        for i in range(MAX_CSV_ROWS + 5)
+    ]
+    csv_content = "date,type,total_amount\n" + "\n".join(rows) + "\n"
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/import",
+        files={"file": ("t.csv", BytesIO(csv_content.encode()), "text/csv")},
+    )
+
+    assert response.status_code == 400
+    assert str(MAX_CSV_ROWS) in response.json()["detail"]
+
+
 def test_csv_upload_invalid_file_type(client: TestClient):
     """Test uploading a non-CSV file"""
     # Create portfolio

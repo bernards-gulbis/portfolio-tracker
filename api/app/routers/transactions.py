@@ -116,6 +116,15 @@ async def import_transactions_csv(
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
     file: Annotated[UploadFile, File()],
+    dry_run: Annotated[
+        bool,
+        Query(
+            description=(
+                "When true, parse + dedup but do not write. Returns projected "
+                "imported/skipped counts so the UI can confirm before committing."
+            )
+        ),
+    ] = False,
 ):
     """
     Import a CSV file to bulk import transactions.
@@ -124,6 +133,9 @@ async def import_transactions_csv(
     date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
     2/12/2020 20:14:39,Deposit,,,,,3000,2760.27,,USD,1.0871
     2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,,,
+
+    Pass ``?dry_run=true`` to validate the CSV and preview counts without
+    persisting; subsequent re-submission without the flag commits the data.
     """
     if not file.filename.endswith(".csv"):
         raise FileUploadException("File must be a CSV file")
@@ -147,13 +159,16 @@ async def import_transactions_csv(
 
     service = TransactionService(session)
     transactions, skipped_count = service.import_from_csv(
-        csv_content, portfolio_id, user.id
+        csv_content, portfolio_id, user.id, dry_run=dry_run
     )
 
     return BulkImportResponse(
         imported_count=len(transactions),
         skipped_count=skipped_count,
-        transactions=transactions,
+        # Un-persisted previews can't materialise as ``TransactionResponse``
+        # (no id / created_at). The frontend confirms via counts only.
+        transactions=[] if dry_run else transactions,
+        dry_run=dry_run,
     )
 
 

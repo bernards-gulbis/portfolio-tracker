@@ -414,6 +414,9 @@ export interface paths {
          *     date,type,ticker,quantity,price_per_share,fee,total_amount,eur,split_ratio,currency,fx_rate
          *     2/12/2020 20:14:39,Deposit,,,,,3000,2760.27,,USD,1.0871
          *     2/12/2020 20:16:10,Buy,MSFT,15.00000001,183.69,0.00,"-2,755.35",,,,
+         *
+         *     Pass ``?dry_run=true`` to validate the CSV and preview counts without
+         *     persisting; subsequent re-submission without the flag commits the data.
          */
         post: operations["import_transactions_csv_portfolios__portfolio_id__transactions_import_post"];
         delete?: never;
@@ -550,9 +553,20 @@ export interface components {
         };
         /**
          * BulkImportResponse
-         * @description Schema for CSV bulk import response
+         * @description Schema for CSV bulk import response.
+         *
+         *     When ``dry_run=True``, ``imported_count`` and ``skipped_count`` are
+         *     projections of what *would* happen and ``transactions`` is empty —
+         *     the un-persisted parsed rows have no DB ids, so we omit them rather
+         *     than fake the response shape. The frontend uses these counts to show
+         *     a confirmation dialog before re-submitting without ``dry_run``.
          */
         BulkImportResponse: {
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
             /** Imported Count */
             imported_count: number;
             /** Skipped Count */
@@ -1917,7 +1931,10 @@ export interface operations {
     };
     import_transactions_csv_portfolios__portfolio_id__transactions_import_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When true, parse + dedup but do not write. Returns projected imported/skipped counts so the UI can confirm before committing. */
+                dry_run?: boolean;
+            };
             header?: never;
             path: {
                 portfolio_id: number;

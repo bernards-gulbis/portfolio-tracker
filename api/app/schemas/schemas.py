@@ -250,11 +250,19 @@ class TransactionResponse(TransactionBase):
 
 
 class BulkImportResponse(BaseModel):
-    """Schema for CSV bulk import response"""
+    """Schema for CSV bulk import response.
+
+    When ``dry_run=True``, ``imported_count`` and ``skipped_count`` are
+    projections of what *would* happen and ``transactions`` is empty —
+    the un-persisted parsed rows have no DB ids, so we omit them rather
+    than fake the response shape. The frontend uses these counts to show
+    a confirmation dialog before re-submitting without ``dry_run``.
+    """
 
     imported_count: int
     skipped_count: int
     transactions: list[TransactionResponse]
+    dry_run: bool = False
 
 
 class PaginatedTransactionResponse(BaseModel):
