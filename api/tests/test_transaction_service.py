@@ -840,6 +840,113 @@ class TestImportCSVDeduplication:
         assert all(t.quantity == 51 for t in txs)
 
 
+def _csv_date_at_offset(offset: int) -> str:
+    """Return a valid MM/DD/YYYY HH:MM:SS string offset by ``offset`` seconds
+    from 2024-01-01 00:00:00. Distinct for offsets up to one year (>= MAX)."""
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
+
+    base = _dt(2024, 1, 1)
+    return (base + _td(seconds=offset)).strftime("%m/%d/%Y %H:%M:%S")
+
+
+class TestImportCSVRowCap:
+    def test_exceeding_row_cap_rejects_with_invalid_format(
+        self, svc, user_id, portfolio_id
+    ):
+        """A CSV with more rows than ``MAX_CSV_ROWS`` should be rejected
+        before parsing the entire file into memory."""
+        from app.services.transaction_service import MAX_CSV_ROWS
+
+        rows = [
+            f"{_csv_date_at_offset(i)},Deposit,{1000 + i}"
+            for i in range(MAX_CSV_ROWS + 5)
+        ]
+        csv = "date,type,total_amount\n" + "\n".join(rows) + "\n"
+        with pytest.raises(InvalidCSVFormatException, match=str(MAX_CSV_ROWS)):
+            svc.import_from_csv(csv, portfolio_id, user_id)
+
+
+class TestImportCSVDryRun:
+    def test_dry_run_does_not_persist_but_returns_counts(
+        self, svc, user_id, portfolio_id
+    ):
+        csv = (
+            "date,type,total_amount\n"
+            "01/01/2024 00:00:00,Deposit,1000\n"
+            "01/02/2024 00:00:00,Deposit,2000\n"
+        )
+        txs, skipped = svc.import_from_csv(csv, portfolio_id, user_id, dry_run=True)
+        assert len(txs) == 2
+        assert skipped == 0
+        # Returned objects are un-persisted — no DB ids.
+        assert all(t.id is None for t in txs)
+
+        # No rows actually written.
+        listed, total = svc.get_transactions_by_portfolio_paginated(
+            portfolio_id, user_id, page=1, page_size=10
+        )
+        assert total == 0
+        assert listed == []
+
+    def test_dry_run_followed_by_real_import_persists(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+        svc.import_from_csv(csv, portfolio_id, user_id, dry_run=True)
+        # Real follow-up persists.
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert len(txs) == 1
+        assert txs[0].id is not None
+
+    def test_dry_run_dedup_against_existing(self, svc, user_id, portfolio_id):
+        """Dry-run should report the same skipped count as a real import."""
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Deposit,1000\n"
+        svc.import_from_csv(csv, portfolio_id, user_id)
+
+        # Re-import same row in dry-run — should report 0 imported, 1 skipped.
+        txs, skipped = svc.import_from_csv(csv, portfolio_id, user_id, dry_run=True)
+        assert len(txs) == 0
+        assert skipped == 1
+
+
+class TestImportCSVDedupScopedToDateRange:
+    def test_dedup_only_loads_rows_in_csv_date_range(
+        self, svc, user_id, portfolio_id, monkeypatch
+    ):
+        """The dedup query should be scoped to the CSV's date range so a
+        large historical portfolio doesn't load every row to dedup a
+        recent import."""
+        # Seed rows OUTSIDE the import range so the scoped query excludes them.
+        seed_csv = (
+            "date,type,total_amount\n"
+            "01/01/2020 00:00:00,Deposit,500\n"
+            "06/01/2020 00:00:00,Deposit,500\n"
+        )
+        svc.import_from_csv(seed_csv, portfolio_id, user_id)
+
+        # Spy on the scoped repo method to confirm it is what gets called.
+        original = svc.transaction_repo.get_by_portfolio_id_in_date_range
+        calls = []
+
+        def _spy(pid, start, end, **kwargs):
+            calls.append((pid, start, end))
+            return original(pid, start, end, **kwargs)
+
+        monkeypatch.setattr(
+            svc.transaction_repo, "get_by_portfolio_id_in_date_range", _spy
+        )
+
+        # Import in 2024 — outside the seeded 2020 range.
+        import_csv = "date,type,total_amount\n01/15/2024 00:00:00,Deposit,1000\n"
+        txs, skipped = svc.import_from_csv(import_csv, portfolio_id, user_id)
+        assert len(txs) == 1
+        assert skipped == 0
+        assert len(calls) == 1
+        _, start, end = calls[0]
+        # Range is the CSV's min/max — both 2024-01-15 here.
+        assert start.year == 2024
+        assert end.year == 2024
+
+
 # ── _clean_csv_number ────────────────────────────────────────────────
 
 

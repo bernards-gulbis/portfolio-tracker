@@ -66,7 +66,7 @@ describe('ImportCSVModal', () => {
   it('shows validation error when no file is selected', async () => {
     renderModal();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
     await waitFor(() => {
       expect(screen.getByText('Please select a file')).toBeInTheDocument();
@@ -74,24 +74,94 @@ describe('ImportCSVModal', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('submits form with valid csv file successfully', async () => {
-    mockMutateAsync.mockResolvedValueOnce({ imported_count: 5, transactions: [] });
+  it('Preview triggers a dry-run and shows the projected counts', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      imported_count: 5,
+      skipped_count: 2,
+      transactions: [],
+      dry_run: true,
+    });
     renderModal();
 
     const input = screen.getByLabelText('CSV File');
     const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
     setFileOnInput(input, file);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
     await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
       portfolioId: 1,
       file: expect.any(File),
+      dryRun: true,
     }));
-    expect(screen.queryByText(/Please select a file/)).not.toBeInTheDocument();
+
+    // Step 2 of the wizard is now visible.
+    await waitFor(() => {
+      expect(screen.getByText(/5 new transactions will be added/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/2 duplicate rows will be skipped/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm import' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
-  it('shows API error on import failure', async () => {
+  it('Confirm import on the preview step runs the real (non-dry-run) import', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      imported_count: 3,
+      skipped_count: 0,
+      transactions: [],
+      dry_run: true,
+    });
+    renderModal();
+
+    const input = screen.getByLabelText('CSV File');
+    const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
+    setFileOnInput(input, file);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => screen.getByRole('button', { name: 'Confirm import' }));
+
+    mockMutateAsync.mockResolvedValueOnce({
+      imported_count: 3,
+      skipped_count: 0,
+      transactions: [],
+      dry_run: false,
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+
+    await waitFor(() => {
+      // Two calls total: dry-run, then real import without ``dryRun`` set.
+      expect(mockMutateAsync).toHaveBeenCalledTimes(2);
+      expect(mockMutateAsync).toHaveBeenLastCalledWith({
+        portfolioId: 1,
+        file: expect.any(File),
+      });
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+  });
+
+  it('Back from preview step returns to file selection', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      imported_count: 1,
+      skipped_count: 0,
+      transactions: [],
+      dry_run: true,
+    });
+    renderModal();
+
+    const input = screen.getByLabelText('CSV File');
+    const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
+    setFileOnInput(input, file);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => screen.getByRole('button', { name: 'Back' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    // Back to step 1: Preview button visible again, Confirm import gone.
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument();
+  });
+
+  it('shows API error on dry-run failure and stays on step 1', async () => {
     mockMutateAsync.mockRejectedValueOnce(new Error('Invalid CSV format'));
     renderModal();
 
@@ -99,11 +169,13 @@ describe('ImportCSVModal', () => {
     const file = new File(['bad data'], 'data.csv', { type: 'text/csv' });
     setFileOnInput(input, file);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
     await waitFor(() => {
       expect(screen.getByText('Invalid CSV format')).toBeInTheDocument();
     });
+    // Did not advance to step 2.
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument();
   });
 
   it('shows validation error when file is not a .csv', async () => {
@@ -113,7 +185,7 @@ describe('ImportCSVModal', () => {
     const file = new File(['data'], 'data.txt', { type: 'text/plain' });
     setFileOnInput(input, file);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
     await waitFor(() => {
       expect(screen.getByText('Please select a CSV file')).toBeInTheDocument();

@@ -6,6 +6,7 @@ import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import {
   formatCurrency,
@@ -30,6 +31,7 @@ import { WithdrawalsTable } from '../WithdrawalsTable';
 
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
+import { InfoBanner } from './InfoBanner';
 import { StatCard } from './StatCard';
 import { WarningsAlert } from './WarningsAlert';
 import { computeDisplayFigures } from './displayFigures';
@@ -52,6 +54,10 @@ export interface PortfolioStatusContentProps {
   isPerformanceLoading: boolean;
   isAllocationLoading?: boolean;
   isEmptyPortfolio?: boolean;
+  /** True when the upstream price provider's circuit breaker is open.
+   *  Surfaces a single banner explaining why so many tickers may show
+   *  ``last_known``/``missing`` badges at once. */
+  providerUnavailable?: boolean;
   toolbar?: React.ReactNode;
 }
 
@@ -62,6 +68,7 @@ export const PortfolioStatusContent = ({
   isPerformanceLoading,
   isAllocationLoading = false,
   isEmptyPortfolio = false,
+  providerUnavailable = false,
   toolbar,
 }: PortfolioStatusContentProps) => {
   const { t } = useTranslation();
@@ -130,6 +137,11 @@ export const PortfolioStatusContent = ({
         />
       )}
 
+      {/* One banner here instead of a row of "missing" chips on every ticker. */}
+      {providerUnavailable && (
+        <InfoBanner>{t('status.providerUnavailable')}</InfoBanner>
+      )}
+
       {/* Transaction Warnings */}
       <WarningsAlert warnings={status.warnings} locale={locale} />
 
@@ -163,13 +175,38 @@ export const PortfolioStatusContent = ({
           value={afterTaxValue == null ? '-' : formatCurrency(afterTaxValue, currency, locale)}
           caption={
             estimatedTax == null ? undefined : (
-              <p className="text-muted-foreground">
-                {t('status.estTax', { rate: taxRatePct })}: −{formatCurrency(estimatedTax, currency, locale)}
+              <p className="text-muted-foreground inline-flex items-center gap-1">
+                <span>
+                  {t('status.estTax', { rate: taxRatePct })}: −{formatCurrency(estimatedTax, currency, locale)}
+                </span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoIcon
+                        aria-label={t('status.estTaxFlatTooltip')}
+                        className="h-3.5 w-3.5 text-muted-foreground cursor-help"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-72">
+                      <p>{t('status.estTaxFlatTooltip')}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </p>
             )
           }
         />
       </div>
+
+      {/* Without this the user sees a flat chart segment and assumes stable
+          performance — actually we just had no price data for those tickers. */}
+      {performance && performance.cost_basis_fallback_tickers.length > 0 && (
+        <InfoBanner>
+          {t('status.chartCostBasisFallback', {
+            tickers: performance.cost_basis_fallback_tickers.join(', '),
+          })}
+        </InfoBanner>
+      )}
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">

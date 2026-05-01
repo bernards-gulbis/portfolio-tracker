@@ -82,6 +82,7 @@ export const PortfolioStatusView = () => {
         isPerformanceLoading={isPerformanceLoading}
         isAllocationLoading={isLivePricesFetching && !livePrices}
         isEmptyPortfolio={isEmptyPortfolio}
+        providerUnavailable={livePrices?.provider_unavailable === true}
         toolbar={
           <StatusToolbar
             isEmptyPortfolio={isEmptyPortfolio}

@@ -36,6 +36,7 @@ const mockPerformanceData: PortfolioPerformance = {
   portfolio_id: 1,
   portfolio_name: 'Test Portfolio',
   cost_basis_fallback_tickers: [],
+  warnings: [],
   data_points: [
     {
       date: '2024-01-01',
@@ -212,6 +213,7 @@ describe('usePortfolioPerformance', () => {
         portfolio_id: 1,
         portfolio_name: 'Test Portfolio',
         cost_basis_fallback_tickers: [],
+        warnings: [],
         data_points: [
           {
             date: '2024-01-01',
@@ -240,6 +242,7 @@ describe('usePortfolioPerformance', () => {
         portfolio_id: 1,
         portfolio_name: 'Empty Portfolio',
         cost_basis_fallback_tickers: [],
+        warnings: [],
         data_points: [],
       };
 
@@ -262,6 +265,7 @@ describe('usePortfolioPerformance', () => {
         portfolio_id: 1,
         portfolio_name: 'Test Portfolio',
         cost_basis_fallback_tickers: [],
+        warnings: [],
         data_points: [
           {
             date: '2024-01-01',

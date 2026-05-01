@@ -219,18 +219,18 @@ describe('useImportTransactionsCSV', () => {
   });
 
   it('calls importTransactionsCSV API with portfolioId and file', async () => {
-    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 3, skipped_count: 0, transactions: [] });
+    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 3, skipped_count: 0, transactions: [], dry_run: false });
 
     const { result } = renderHook(() => useImportTransactionsCSV(), { wrapper: createWrapper() });
     const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
 
     await result.current.mutateAsync({ portfolioId: 1, file });
 
-    expect(api.importTransactionsCSV).toHaveBeenCalledWith(1, file);
+    expect(api.importTransactionsCSV).toHaveBeenCalledWith(1, file, { dryRun: undefined });
   });
 
   it('shows plural "transactions" toast when count > 1', async () => {
-    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 3, skipped_count: 0, transactions: [] });
+    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 3, skipped_count: 0, transactions: [], dry_run: false });
 
     const { result } = renderHook(() => useImportTransactionsCSV(), { wrapper: createWrapper() });
     const file = new File([''], 'data.csv', { type: 'text/csv' });
@@ -243,7 +243,7 @@ describe('useImportTransactionsCSV', () => {
   });
 
   it('shows singular "transaction" toast when count is 1', async () => {
-    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 1, skipped_count: 0, transactions: [] });
+    vi.mocked(api.importTransactionsCSV).mockResolvedValueOnce({ imported_count: 1, skipped_count: 0, transactions: [], dry_run: false });
 
     const { result } = renderHook(() => useImportTransactionsCSV(), { wrapper: createWrapper() });
     const file = new File([''], 'data.csv', { type: 'text/csv' });

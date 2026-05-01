@@ -36,6 +36,7 @@ const makeLivePrices = (overrides: Partial<LivePrices> = {}): LivePrices => ({
   prices: { AAPL: live(210), MSFT: live(420) },
   usd_to_eur_rate: 0.91,
   timestamp: '2026-03-03T12:00:00Z',
+  provider_unavailable: false,
   ...overrides,
 });
 
@@ -81,7 +82,12 @@ describe('computePricedStatus', () => {
   });
 
   it('returns null price fields when live prices map is empty (not yet loaded)', () => {
-    const livePrices: LivePrices = { prices: {}, usd_to_eur_rate: null, timestamp: '' };
+    const livePrices: LivePrices = {
+      prices: {},
+      usd_to_eur_rate: null,
+      timestamp: '',
+      provider_unavailable: false,
+    };
     const result = computePricedStatus(makeStatus(), livePrices);
 
     expect(result.current_value).toBeNull();

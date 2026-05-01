@@ -243,16 +243,26 @@ class TransactionResponse(TransactionBase):
 
     id: int
     portfolio_id: int
+    created_at: datetime
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class BulkImportResponse(BaseModel):
-    """Schema for CSV bulk import response"""
+    """Schema for CSV bulk import response.
+
+    When ``dry_run=True``, ``imported_count`` and ``skipped_count`` are
+    projections of what *would* happen and ``transactions`` is empty —
+    the un-persisted parsed rows have no DB ids, so we omit them rather
+    than fake the response shape. The frontend uses these counts to show
+    a confirmation dialog before re-submitting without ``dry_run``.
+    """
 
     imported_count: int
     skipped_count: int
     transactions: list[TransactionResponse]
+    dry_run: bool = False
 
 
 class PaginatedTransactionResponse(BaseModel):
@@ -417,6 +427,12 @@ class LivePricesResponse(BaseModel):
     prices: dict[str, LivePriceInfo]
     usd_to_eur_rate: float | None = None
     timestamp: datetime
+    # True when the upstream provider's circuit breaker is open — i.e. we
+    # gave up calling Yahoo for a cooldown period. Per-ticker ``source``
+    # already encodes "live" vs "last_known" vs "missing"; this flag lets
+    # the UI surface a single "provider unavailable" banner rather than a
+    # row of confused "missing" chips.
+    provider_unavailable: bool = False
 
 
 class PerformanceDataPoint(BaseModel):
@@ -445,6 +461,11 @@ class PortfolioPerformanceResponse(BaseModel):
     # therefore valued at cost basis for some or all of the series.
     # Non-empty means the chart is lying flat for those symbols.
     cost_basis_fallback_tickers: list[str] = Field(default_factory=list)
+    # Transaction-replay warnings collected while reconstructing the
+    # historical series (oversell, sell-of-non-held). The same data also
+    # appears in ``PortfolioStatusResponse.warnings`` so the chart can flag
+    # tampered historical points without polling status separately.
+    warnings: list[TransactionWarning] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

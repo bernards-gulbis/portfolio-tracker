@@ -22,6 +22,7 @@ const makePerformance = (data_points: PerformanceDataPoint[]): PortfolioPerforma
   portfolio_name: 'p',
   data_points,
   cost_basis_fallback_tickers: [],
+  warnings: [],
 });
 
 const baseStatus = {

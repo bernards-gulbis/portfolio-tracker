@@ -8,10 +8,10 @@ import { getLivePrices, LivePrices } from '../api';
  * An empty ``tickers`` array is intentionally allowed: cash-only
  * portfolios still need the USD→EUR rate to display amounts. Gating
  * the query on ``tickers.length > 0`` would leave those portfolios
- * with whatever FX rate came back in the initial status fetch,
- * indefinitely stale under the app's ``staleTime: Infinity``
- * status-caching policy. The backend returns ``prices: {}`` and a
- * fresh ``usd_to_eur_rate`` when no tickers are requested.
+ * with whatever FX rate came back in the initial status fetch — only
+ * revalidating when the status query itself goes stale (5 min default
+ * + on focus). The backend returns ``prices: {}`` and a fresh
+ * ``usd_to_eur_rate`` when no tickers are requested.
  */
 export const useLivePrices = (
   tickers: string[],

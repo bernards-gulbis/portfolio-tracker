@@ -76,6 +76,10 @@ const BulkImportResponseSchema = z.object({
   imported_count: z.number(),
   skipped_count: z.number(),
   transactions: z.array(TransactionSchema),
+  // Optional for forward compat; default false matches a real (non-dry-run)
+  // import. When true, ``transactions`` is empty and the counts are
+  // projections of what *would* be imported.
+  dry_run: z.boolean().default(false),
 });
 export type BulkImportResponse = z.infer<typeof BulkImportResponseSchema>;
 
@@ -203,10 +207,14 @@ const PortfolioPerformanceSchema = z.object({
   portfolio_id: z.number(),
   portfolio_name: z.string(),
   data_points: z.array(PerformanceDataPointSchema),
-  // Added in Package B.1 — tickers whose historical prices were unavailable
-  // and which were therefore valued at cost basis. Default-empty so old
-  // fixtures without the field still parse.
+  // Tickers whose historical prices were unavailable and which were
+  // therefore valued at cost basis. Default-empty so old fixtures without
+  // the field still parse.
   cost_basis_fallback_tickers: z.array(z.string()).default([]),
+  // Transaction-replay warnings collected while reconstructing the historical
+  // series (e.g. oversell, sell-of-non-held). Default-empty for forward
+  // compat with older backends.
+  warnings: z.array(TransactionWarningSchema).default([]),
 });
 export type PortfolioPerformance = z.infer<typeof PortfolioPerformanceSchema>;
 
@@ -221,6 +229,10 @@ const LivePricesSchema = z.object({
   prices: z.record(z.string(), LivePriceInfoSchema),
   usd_to_eur_rate: z.number().nullable(),
   timestamp: z.string(),
+  // Optional for forward compatibility with older backends. When true the
+  // upstream Yahoo Finance circuit breaker is open and prices will mostly
+  // come from the DB cache or be missing.
+  provider_unavailable: z.boolean().default(false),
 });
 export type LivePrices = z.infer<typeof LivePricesSchema>;
 
@@ -515,11 +527,15 @@ export const exportTransactionsCSV = async (portfolioId: number): Promise<Blob> 
 // ================== CSV Upload ==================
 
 /**
- * Import a CSV file to add transactions to a portfolio
+ * Import a CSV file to add transactions to a portfolio.
+ *
+ * When ``dryRun`` is true the backend parses + dedups but does not write,
+ * returning projected counts so the UI can confirm before committing.
  */
 export const importTransactionsCSV = async (
   portfolioId: number,
-  file: File
+  file: File,
+  options: { dryRun?: boolean } = {},
 ): Promise<BulkImportResponse> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -531,6 +547,7 @@ export const importTransactionsCSV = async (
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      params: options.dryRun ? { dry_run: 'true' } : undefined,
     }
   );
   return parseOrThrow(

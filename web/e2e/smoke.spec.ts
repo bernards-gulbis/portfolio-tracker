@@ -39,7 +39,8 @@ test('login → create portfolio → import CSV → toggle EUR/USD → see chart
   await page.getByRole('button', { name: 'Transaction table actions menu' }).click();
   await page.getByRole('menuitem', { name: 'Import CSV' }).click();
   await page.locator('#csv-file').setInputFiles(CSV_FIXTURE);
-  await page.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('button', { name: 'Preview' }).click();
+  await page.getByRole('button', { name: 'Confirm import' }).click();
   // The dialog stays open until the import API call resolves. Wait for it
   // to close so the Summary tab click isn't racing the modal overlay.
   await page.getByRole('dialog', { name: 'Upload Transactions CSV' }).waitFor({ state: 'hidden' });

@@ -41,6 +41,11 @@ def _dedup_key(t: Transaction) -> tuple:
     )
 
 
+# Rejecting at parse time bounds memory and DB-roundtrip cost. 5000 rows
+# covers ~14 years of daily-trader activity and decades of buy-and-hold.
+MAX_CSV_ROWS = 5000
+
+
 _ERR_EUR_AMOUNT_SIGN_MISMATCH = "eur_amount sign must match total_amount sign"
 
 
@@ -307,18 +312,38 @@ class TransactionService:
         self.transaction_repo.delete(transaction_id)
 
     def import_from_csv(
-        self, csv_content: str, portfolio_id: int, user_id: uuid.UUID
+        self,
+        csv_content: str,
+        portfolio_id: int,
+        user_id: uuid.UUID,
+        *,
+        dry_run: bool = False,
     ) -> tuple[list[Transaction], int]:
         """Import transactions from CSV with deduplication (user-scoped).
 
-        Returns (created_transactions, skipped_count).
+        Parses + dedups against existing transactions in the date range
+        covered by the CSV. When ``dry_run=True``, returns the would-be
+        new-transactions list without persisting; the returned objects are
+        un-persisted ``Transaction`` instances with ``id=None``.
+
+        The dedup query is scoped to the CSV's [min_date, max_date] window
+        rather than loading the full portfolio history — a 50k-row history
+        no longer needs to enter memory to dedup a 100-row import.
+
+        Returns ``(transactions, skipped_count)``.
         """
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
 
         parsed = self._parse_csv(csv_content, portfolio_id)
 
-        existing = self.transaction_repo.get_by_portfolio_id(portfolio_id)
+        # Dedup scope: only existing rows whose date falls in the parsed
+        # CSV's range. ``parsed`` is non-empty by ``_parse_csv`` invariant.
+        min_date = min(t.date for t in parsed)
+        max_date = max(t.date for t in parsed)
+        existing = self.transaction_repo.get_by_portfolio_id_in_date_range(
+            portfolio_id, min_date, max_date
+        )
         remaining = Counter(_dedup_key(t) for t in existing)
 
         new_transactions: list[Transaction] = []
@@ -330,11 +355,10 @@ class TransactionService:
                 new_transactions.append(t)
         skipped_count = len(parsed) - len(new_transactions)
 
-        if new_transactions:
-            created = self.transaction_repo.bulk_create(new_transactions)
-        else:
-            created = []
+        if dry_run or not new_transactions:
+            return new_transactions, skipped_count
 
+        created = self.transaction_repo.bulk_create(new_transactions)
         return created, skipped_count
 
     def _validate_transaction_data(
@@ -420,7 +444,12 @@ class TransactionService:
             )
 
     def _parse_csv(self, csv_content: str, portfolio_id: int) -> list[Transaction]:
-        """Parse CSV content and create Transaction objects"""
+        """Parse CSV content and create Transaction objects.
+
+        Rejects imports exceeding ``MAX_CSV_ROWS`` early so a malicious or
+        accidental upload can't load 100k rows into memory or burn the DB
+        connection on a single user's request.
+        """
         transactions = []
         csv_file = StringIO(csv_content)
 
@@ -434,6 +463,11 @@ class TransactionService:
                 )
 
             for line_num, row in enumerate(reader, start=2):
+                if len(transactions) >= MAX_CSV_ROWS:
+                    raise InvalidCSVFormatException(
+                        f"CSV exceeds the {MAX_CSV_ROWS}-row import limit. "
+                        "Split the file into smaller imports."
+                    )
                 try:
                     transaction = self._parse_csv_row(row, portfolio_id)
                     transactions.append(transaction)

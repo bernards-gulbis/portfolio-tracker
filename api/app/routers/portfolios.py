@@ -20,6 +20,7 @@ from app.schemas import (
     PortfolioResponse,
     PortfolioStatusResponse,
     PortfolioUpdate,
+    TransactionWarning,
 )
 from app.services import PortfolioService
 from app.services.prices import (
@@ -27,6 +28,7 @@ from app.services.prices import (
     HistoricalPriceService,
     LivePriceService,
 )
+from app.services.prices.yahoo_finance_client import YahooFinanceClient
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +80,16 @@ def get_live_prices(
             status_code=400,
             detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
         )
+    # ``LivePriceService.get_current_prices`` catches its own per-ticker
+    # exceptions and returns ``None`` for failed lookups, so the only paths
+    # that escape here are programming errors (e.g. a misconfigured
+    # ThreadPoolExecutor). Catching ``RuntimeError`` keeps the response
+    # alive for those rare cases without swallowing genuine bugs that should
+    # surface as 500s during development.
     try:
         live_prices = LivePriceService.get_current_prices(tickers) if tickers else {}
-    except Exception as e:
-        logger.error("Error fetching live prices: %s", e, exc_info=True)
+    except RuntimeError as e:
+        logger.error("Live price fetch infrastructure error: %s", e, exc_info=True)
         live_prices = dict.fromkeys(tickers)
 
     now = datetime.now(UTC)
@@ -107,6 +115,7 @@ def get_live_prices(
         prices=prices,
         usd_to_eur_rate=usd_to_eur_rate,
         timestamp=now,
+        provider_unavailable=YahooFinanceClient.is_circuit_open(),
     )
 
 
@@ -220,11 +229,12 @@ def get_portfolio_performance(
     try:
         HistoricalPriceService.clear_session_cache()
         # get_portfolio_performance verifies ownership and returns
-        # (name, data_points, cost_basis_fallback_tickers)
+        # (name, data_points, cost_basis_fallback_tickers, warnings)
         (
             portfolio_name,
             performance_data,
             cost_basis_fallback_tickers,
+            warnings,
         ) = service.get_portfolio_performance(
             portfolio_id,
             user_id=user.id,
@@ -251,6 +261,7 @@ def get_portfolio_performance(
             portfolio_name=portfolio_name,
             data_points=data_points,
             cost_basis_fallback_tickers=cost_basis_fallback_tickers,
+            warnings=[TransactionWarning(**w) for w in warnings],
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

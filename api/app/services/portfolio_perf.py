@@ -1,5 +1,6 @@
 """Performance time-series calculation for portfolios."""
 
+import dataclasses
 import logging
 from bisect import bisect_right
 from dataclasses import dataclass
@@ -270,10 +271,10 @@ def calculate_performance(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     num_points: int = 60,
-) -> tuple[list[dict], list[str]]:
+) -> tuple[list[dict], list[str], list[dict]]:
     """Calculate portfolio performance time-series from transactions.
 
-    Returns ``(data_points, cost_basis_fallback_tickers)``:
+    Returns ``(data_points, cost_basis_fallback_tickers, warnings)``:
 
     * ``data_points`` — list of dicts with keys ``date``, ``principal``,
       ``principal_eur``, ``current_value``, ``fx_rate``, ``return_pct``,
@@ -284,9 +285,15 @@ def calculate_performance(
       Surfacing this lets the UI warn the user that the chart is
       cost-basis-only for those symbols rather than silently drawing a flat
       line the user might read as "no change".
+    * ``warnings`` — transaction-replay warnings collected during the
+      historical reconstruction (oversell, sell-of-non-held). Each is a dict
+      with ``code`` / ``date`` / ``params`` matching ``TransactionWarning``.
+      Without this the chart would silently use a truncated quantity from a
+      data-quality issue (e.g. an undeclared split) and the user would see a
+      reasonable-looking line that doesn't reconcile with the broker.
     """
     if not transactions:
-        return [], []
+        return [], [], []
 
     transactions = sorted(transactions, key=lambda t: t.date)
 
@@ -361,4 +368,5 @@ def calculate_performance(
         )
         performance_data.append(data_point_dict)
 
-    return performance_data, sorted(cost_basis_fallback_tickers)
+    warnings = [dataclasses.asdict(w) for w in state.warnings]
+    return performance_data, sorted(cost_basis_fallback_tickers), warnings
