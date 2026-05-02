@@ -748,20 +748,20 @@ export interface components {
             sp500_return_pct?: number | null;
         };
         /**
+         * PortfolioBase
+         * @description Base portfolio schema (used for both create and update).
+         */
+        PortfolioBase: {
+            /** Name */
+            name: string;
+        };
+        /**
          * PortfolioCopy
          * @description Schema for copying a portfolio
          */
         PortfolioCopy: {
             /** New Name */
             new_name: string;
-        };
-        /**
-         * PortfolioCreate
-         * @description Schema for creating a portfolio
-         */
-        PortfolioCreate: {
-            /** Name */
-            name: string;
         };
         /**
          * PortfolioPerformanceResponse
@@ -852,14 +852,6 @@ export interface components {
             usd_to_eur_rate?: number | null;
             /** Warnings */
             warnings?: components["schemas"]["TransactionWarning"][];
-        };
-        /**
-         * PortfolioUpdate
-         * @description Schema for updating a portfolio
-         */
-        PortfolioUpdate: {
-            /** Name */
-            name: string;
         };
         /**
          * RealizedSaleResponse
@@ -1546,7 +1538,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PortfolioCreate"];
+                "application/json": components["schemas"]["PortfolioBase"];
             };
         };
         responses: {
@@ -1650,7 +1642,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PortfolioUpdate"];
+                "application/json": components["schemas"]["PortfolioBase"];
             };
         };
         responses: {

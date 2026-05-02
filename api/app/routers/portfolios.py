@@ -14,12 +14,11 @@ from app.schemas import (
     LivePriceInfo,
     LivePricesResponse,
     PerformanceDataPoint,
+    PortfolioBase,
     PortfolioCopy,
-    PortfolioCreate,
     PortfolioPerformanceResponse,
     PortfolioResponse,
     PortfolioStatusResponse,
-    PortfolioUpdate,
 )
 from app.services import PortfolioService
 from app.services.prices import (
@@ -38,7 +37,7 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 @router.post("/", response_model=PortfolioResponse, status_code=201)
 def create_portfolio(
-    portfolio: PortfolioCreate,
+    portfolio: PortfolioBase,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
 ):
@@ -152,7 +151,7 @@ def get_portfolio_status(
 @router.put("/{portfolio_id}", response_model=PortfolioResponse)
 def update_portfolio(
     portfolio_id: int,
-    portfolio: PortfolioUpdate,
+    portfolio: PortfolioBase,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
 ):

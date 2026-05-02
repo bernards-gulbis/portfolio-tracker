@@ -83,29 +83,12 @@ class TransactionService:
         fx_rate: float | None = None,
     ) -> Transaction:
         """Create a new transaction with validation"""
-        # Verify portfolio exists and belongs to user
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
 
-        # Validate fx_rate
-        if fx_rate is not None and fx_rate <= 0:
-            raise InvalidTransactionDataException("fx_rate must be positive")
-
-        # Validate split_ratio
-        if split_ratio is not None and split_ratio <= 0:
-            raise InvalidTransactionDataException("split_ratio must be positive")
-
-        # Validate eur_amount sign matches total_amount sign
-        if (
-            eur_amount is not None
-            and transaction_type != TransactionType.SPLIT
-            and (
-                (total_amount > 0 and eur_amount < 0)
-                or (total_amount < 0 and eur_amount > 0)
-            )
-        ):
-            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
-
+        self._validate_numeric_constraints(
+            transaction_type, total_amount, fx_rate, split_ratio, eur_amount
+        )
         self._validate_transaction_data(
             transaction_type, ticker, quantity, price_per_share, total_amount, fee
         )
@@ -243,23 +226,9 @@ class TransactionService:
         val_fee = _coalesce(fee, transaction.fee)
         val_eur_amount = _coalesce(eur_amount, transaction.eur_amount)
 
-        if fx_rate is not None and fx_rate <= 0:
-            raise InvalidTransactionDataException("fx_rate must be positive")
-
-        if split_ratio is not None and split_ratio <= 0:
-            raise InvalidTransactionDataException("split_ratio must be positive")
-
-        # Validate eur_amount sign matches total_amount sign
-        if (
-            val_eur_amount is not None
-            and val_type != TransactionType.SPLIT
-            and (
-                (val_total_amount > 0 and val_eur_amount < 0)
-                or (val_total_amount < 0 and val_eur_amount > 0)
-            )
-        ):
-            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
-
+        self._validate_numeric_constraints(
+            val_type, val_total_amount, fx_rate, split_ratio, val_eur_amount
+        )
         self._validate_transaction_data(
             val_type,
             val_ticker,
@@ -269,38 +238,32 @@ class TransactionService:
             val_fee,
         )
 
-        # Numeric fields must be coerced to Decimal before setattr — SQLModel
+        # Numeric fields must be coerced to Decimal before assignment — SQLModel
         # table=True models don't run Pydantic validation on assignment, so a
         # raw float would stay a float on the in-memory instance and mix with
         # DB-loaded Decimals on subsequent arithmetic.
-        _numeric_fields = {
-            "quantity",
-            "price_per_share",
-            "fee",
-            "total_amount",
-            "eur_amount",
-            "split_ratio",
-            "fx_rate",
-        }
-        provided = {
-            "date": date,
-            "type": transaction_type,
-            "ticker": ticker,
-            "quantity": quantity,
-            "price_per_share": price_per_share,
-            "fee": fee,
-            "total_amount": total_amount,
-            "eur_amount": eur_amount,
-            "split_ratio": split_ratio,
-            "currency": currency,
-            "fx_rate": fx_rate,
-        }
-        for field, value in provided.items():
-            if value is None:
-                continue
-            if field in _numeric_fields:
-                value = _to_decimal(value)
-            setattr(transaction, field, value)
+        if date is not None:
+            transaction.date = date
+        if transaction_type is not None:
+            transaction.type = transaction_type
+        if ticker is not None:
+            transaction.ticker = ticker
+        if currency is not None:
+            transaction.currency = currency
+        if quantity is not None:
+            transaction.quantity = _to_decimal(quantity)
+        if price_per_share is not None:
+            transaction.price_per_share = _to_decimal(price_per_share)
+        if fee is not None:
+            transaction.fee = _to_decimal(fee)
+        if total_amount is not None:
+            transaction.total_amount = _to_decimal(total_amount)
+        if eur_amount is not None:
+            transaction.eur_amount = _to_decimal(eur_amount)
+        if split_ratio is not None:
+            transaction.split_ratio = _to_decimal(split_ratio)
+        if fx_rate is not None:
+            transaction.fx_rate = _to_decimal(fx_rate)
 
         return self.transaction_repo.update(transaction)
 
@@ -360,6 +323,34 @@ class TransactionService:
 
         created = self.transaction_repo.bulk_create(new_transactions)
         return created, skipped_count
+
+    @staticmethod
+    def _validate_numeric_constraints(
+        transaction_type: TransactionType,
+        total_amount: float,
+        fx_rate: float | None,
+        split_ratio: float | None,
+        eur_amount: float | None,
+    ) -> None:
+        """Validate fx_rate / split_ratio positivity and the eur_amount-vs-total_amount sign agreement.
+
+        Shared by ``create_transaction`` and ``update_transaction`` so the same
+        sign-mismatch rule applies to both — historically this block was
+        duplicated and could drift out of sync.
+        """
+        if fx_rate is not None and fx_rate <= 0:
+            raise InvalidTransactionDataException("fx_rate must be positive")
+        if split_ratio is not None and split_ratio <= 0:
+            raise InvalidTransactionDataException("split_ratio must be positive")
+        if (
+            eur_amount is not None
+            and transaction_type != TransactionType.SPLIT
+            and (
+                (total_amount > 0 and eur_amount < 0)
+                or (total_amount < 0 and eur_amount > 0)
+            )
+        ):
+            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
 
     def _validate_transaction_data(
         self,

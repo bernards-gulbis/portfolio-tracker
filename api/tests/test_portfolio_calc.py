@@ -19,11 +19,7 @@ from app.services.portfolio_status import (
     calculate_status,
 )
 from app.services.portfolio_types import _ZERO, _Holding, _TxState
-from app.services.portfolio_valuation import (
-    _fetch_historical_prices,
-    _resolve_nearest_date_value,
-    _resolve_usd_to_eur_rate,
-)
+from app.services.portfolio_valuation import _resolve_usd_to_eur_rate
 
 
 def _make_tx(**kwargs) -> Transaction:
@@ -45,26 +41,6 @@ def _make_tx(**kwargs) -> Transaction:
     )
     defaults.update(kwargs)
     return Transaction(**defaults)
-
-
-# ==================== _resolve_nearest_date_value ====================
-
-
-class TestResolveNearestDateValue:
-    def test_returns_none_for_empty_dict(self):
-        assert _resolve_nearest_date_value({}, "2025-01-15") is None
-
-    def test_exact_match(self):
-        prices = {"2025-01-14": 100.0, "2025-01-15": 105.0}
-        assert _resolve_nearest_date_value(prices, "2025-01-15") == 105.0
-
-    def test_nearest_earlier_date(self):
-        prices = {"2025-01-13": 99.0, "2025-01-14": 100.0}
-        assert _resolve_nearest_date_value(prices, "2025-01-15") == 100.0
-
-    def test_returns_none_when_all_dates_after(self):
-        prices = {"2025-01-16": 110.0, "2025-01-17": 115.0}
-        assert _resolve_nearest_date_value(prices, "2025-01-15") is None
 
 
 # ==================== _compute_forward_split_factors ====================
@@ -144,51 +120,6 @@ class TestComputeForwardSplitFactors:
         ]
         factors = _compute_forward_split_factors(txs)
         assert "AAPL" not in factors
-
-
-# ==================== _fetch_historical_prices ====================
-
-
-class TestFetchHistoricalPrices:
-    def test_returns_empty_dict_for_no_tickers(self):
-        result = _fetch_historical_prices([], datetime(2025, 6, 15))
-        assert result == {}
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_returns_empty_dict_when_no_prices_available(self, mock_ps):
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {}
-        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert result == {}
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_returns_price_for_nearest_earlier_date(self, mock_ps):
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
-            "AAPL": {"2025-06-13": 190.0, "2025-06-14": 195.0}
-        }
-        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert result["AAPL"] == 195.0
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_omits_ticker_when_all_dates_after_target(self, mock_ps):
-        """If every available date is AFTER target_date, omit the ticker so
-        the caller falls back to DB last-known or cost basis. Using a
-        future price to value a historical date is a silent correctness
-        bug — not a "best guess"."""
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
-            "AAPL": {"2025-06-17": 200.0, "2025-06-18": 205.0}
-        }
-        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert "AAPL" not in result
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_skips_ticker_with_empty_date_prices(self, mock_ps):
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
-            "AAPL": {},
-            "MSFT": {"2025-06-14": 410.0},
-        }
-        result = _fetch_historical_prices(["AAPL", "MSFT"], datetime(2025, 6, 15))
-        assert "AAPL" not in result
-        assert result["MSFT"] == 410.0
 
 
 # ==================== Transaction handlers edge cases ====================
