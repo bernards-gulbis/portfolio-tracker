@@ -30,7 +30,7 @@ export const computeDisplayFigures = (
 ): DisplayFigures => {
   const showEur = currency === 'EUR';
 
-  const totalValue = showEur ? eur?.currentValueEur ?? null : status.current_value;
+  const totalValue = showEur ? (eur?.currentValueEur ?? null) : status.current_value;
   const netInvested = showEur ? status.principal_eur : status.principal;
 
   const totalReturn =
@@ -38,7 +38,7 @@ export const computeDisplayFigures = (
 
   let estimatedTax: number | null = null;
   if (totalValue != null) {
-    estimatedTax = showEur ? eur?.taxEur ?? null : computeUsdTax(status, totalValue);
+    estimatedTax = showEur ? (eur?.taxEur ?? null) : computeUsdTax(status, totalValue);
   }
 
   const afterTaxValue =
@@ -50,7 +50,7 @@ export const computeDisplayFigures = (
     totalReturn,
     estimatedTax,
     afterTaxValue,
-    fxImpact: showEur ? eur?.currencyGainsEur ?? null : null,
-    fxImpactPct: showEur ? eur?.currencyGainsPct ?? null : null,
+    fxImpact: showEur ? (eur?.currencyGainsEur ?? null) : null,
+    fxImpactPct: showEur ? (eur?.currencyGainsPct ?? null) : null,
   };
 };

@@ -43,9 +43,7 @@ const findStartIdx = (
   points: PortfolioPerformance['data_points'],
   showEur: boolean,
 ): number =>
-  showEur
-    ? points.findIndex((p) => p.return_pct != null && p.fx_rate != null)
-    : points.findIndex((p) => p.return_pct != null);
+  points.findIndex((p) => p.return_pct != null && (!showEur || p.fx_rate != null));
 
 export const useDerivedReturns = (
   performance: PortfolioPerformance | undefined,

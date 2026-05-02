@@ -64,6 +64,13 @@ _NUMERIC_UPDATE_FIELDS = frozenset(
     }
 )
 
+_NEGATIVE_TX_TYPES = frozenset(
+    {TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE}
+)
+_POSITIVE_TX_TYPES = frozenset(
+    {TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND}
+)
+
 
 def _csv_field(value):
     """Convert None to empty string for CSV export."""
@@ -248,33 +255,6 @@ class TransactionService:
         if not transaction:
             raise TransactionNotFoundException(transaction_id)
 
-        def _resolve(new, existing):
-            """Return *existing* when *new* is _UNSET (omitted), else *new*
-            (which may be ``None`` to clear)."""
-            return existing if isinstance(new, _UnsetType) else new
-
-        val_type = _resolve(transaction_type, transaction.type)
-        val_ticker = _resolve(ticker, transaction.ticker)
-        val_quantity = _resolve(quantity, transaction.quantity)
-        val_price_per_share = _resolve(price_per_share, transaction.price_per_share)
-        val_total_amount = _resolve(total_amount, transaction.total_amount)
-        val_fee = _resolve(fee, transaction.fee)
-        val_eur_amount = _resolve(eur_amount, transaction.eur_amount)
-        val_fx_rate = _resolve(fx_rate, transaction.fx_rate)
-        val_split_ratio = _resolve(split_ratio, transaction.split_ratio)
-
-        self._validate_numeric_constraints(
-            val_type, val_total_amount, val_fx_rate, val_split_ratio, val_eur_amount
-        )
-        self._validate_transaction_data(
-            val_type,
-            val_ticker,
-            val_quantity,
-            val_price_per_share,
-            val_total_amount,
-            val_fee,
-        )
-
         updates = {
             "date": date,
             "type": transaction_type,
@@ -288,6 +268,28 @@ class TransactionService:
             "split_ratio": split_ratio,
             "fx_rate": fx_rate,
         }
+
+        def _effective(field: str, new):
+            """Existing value when *new* is _UNSET (omitted); otherwise *new*
+            (which may be ``None`` to clear the column)."""
+            return getattr(transaction, field) if isinstance(new, _UnsetType) else new
+
+        self._validate_numeric_constraints(
+            _effective("type", transaction_type),
+            _effective("total_amount", total_amount),
+            _effective("fx_rate", fx_rate),
+            _effective("split_ratio", split_ratio),
+            _effective("eur_amount", eur_amount),
+        )
+        self._validate_transaction_data(
+            _effective("type", transaction_type),
+            _effective("ticker", ticker),
+            _effective("quantity", quantity),
+            _effective("price_per_share", price_per_share),
+            _effective("total_amount", total_amount),
+            _effective("fee", fee),
+        )
+
         for field, value in updates.items():
             if isinstance(value, _UnsetType):
                 continue
@@ -581,20 +583,9 @@ class TransactionService:
         transaction_type: TransactionType, total_amount: float
     ) -> float:
         """Return total_amount with the correct sign for the transaction type."""
-        negative_types = {
-            TransactionType.BUY,
-            TransactionType.WITHDRAW,
-            TransactionType.FEE,
-        }
-        positive_types = {
-            TransactionType.DEPOSIT,
-            TransactionType.SELL,
-            TransactionType.DIVIDEND,
-        }
-
-        if transaction_type in negative_types:
+        if transaction_type in _NEGATIVE_TX_TYPES:
             return -abs(total_amount)
-        if transaction_type in positive_types:
+        if transaction_type in _POSITIVE_TX_TYPES:
             return abs(total_amount)
         if transaction_type == TransactionType.SPLIT and total_amount != 0:
             raise ValueError("SPLIT transactions must have total_amount of 0")

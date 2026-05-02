@@ -248,8 +248,6 @@ const GoogleAuthorizeUrlSchema = z.object({
 export type UserUpdate = schemas['UserUpdate'];
 export type CloseAccountRequest = schemas['CloseAccountRequest'];
 export type PortfolioBase = schemas['PortfolioBase'];
-export type PortfolioCreate = PortfolioBase;
-export type PortfolioUpdate = PortfolioBase;
 export type PortfolioCopy = schemas['PortfolioCopy'];
 export type TransactionCreate = schemas['TransactionCreate'];
 export type TransactionUpdate = schemas['TransactionUpdate'];
@@ -349,14 +347,14 @@ export const getPortfolios = async (): Promise<Portfolio[]> => {
   return parseOrThrow(z.array(PortfolioSchema), response.data, 'GET /portfolios/');
 };
 
-export const createPortfolio = async (portfolio: PortfolioCreate): Promise<Portfolio> => {
+export const createPortfolio = async (portfolio: PortfolioBase): Promise<Portfolio> => {
   const response = await api.post('/portfolios/', portfolio);
   return parseOrThrow(PortfolioSchema, response.data, 'POST /portfolios/');
 };
 
 export const updatePortfolio = async (
   portfolioId: number,
-  portfolio: PortfolioUpdate
+  portfolio: PortfolioBase
 ): Promise<Portfolio> => {
   const response = await api.put(`/portfolios/${portfolioId}`, portfolio);
   return parseOrThrow(

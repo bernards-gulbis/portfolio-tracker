@@ -8,8 +8,7 @@ import {
   deletePortfolio,
   copyPortfolio,
   type Portfolio,
-  type PortfolioCreate,
-  type PortfolioUpdate,
+  type PortfolioBase,
 } from '../api';
 
 const PORTFOLIOS_KEY = ['portfolios'] as const;
@@ -49,7 +48,7 @@ export const useCreatePortfolio = () => {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: (data: PortfolioCreate) => createPortfolio(data),
+    mutationFn: (data: PortfolioBase) => createPortfolio(data),
     onMutate: async (data) => {
       const context = await snapshot();
       const optimistic: Portfolio = {
@@ -77,7 +76,7 @@ export const useUpdatePortfolio = () => {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: ({ portfolioId, data }: { portfolioId: number; data: PortfolioUpdate }) =>
+    mutationFn: ({ portfolioId, data }: { portfolioId: number; data: PortfolioBase }) =>
       updatePortfolio(portfolioId, data),
     onMutate: async ({ portfolioId, data }) => {
       const context = await snapshot();

@@ -149,23 +149,15 @@ def _maybe_warn_fx_missing(state: _TxState, tx: Transaction, source: str) -> Non
         state.fx_missing_tx_ids.append(tx.id)
     if state.fx_rates_unavailable:
         return
-    date_str = tx.date.strftime(_ISO_DATETIME_FMT)
-    if tx.ticker:
-        state.warnings.append(
-            _Warning(
-                code="fxRateMissingTicker",
-                date=date_str,
-                params={"ticker": tx.ticker},
-            )
+    code = "fxRateMissingTicker" if tx.ticker else "fxRateMissing"
+    params = {"ticker": tx.ticker} if tx.ticker else {}
+    state.warnings.append(
+        _Warning(
+            code=code,
+            date=tx.date.strftime(_ISO_DATETIME_FMT),
+            params=params,
         )
-    else:
-        state.warnings.append(
-            _Warning(
-                code="fxRateMissing",
-                date=date_str,
-                params={},
-            )
-        )
+    )
 
 
 def _apply_deposit(state: _TxState, tx: Transaction, strict: bool) -> None:

@@ -107,8 +107,14 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
 
   // Sum nullable EUR fields, returning null if any contributing value is null.
   // Partial sums on display would silently understate totals.
-  const sumNullable = (values: (number | null)[]): number | null =>
-    values.some((v) => v == null) ? null : values.reduce((s: number, v) => s + (v as number), 0);
+  const sumNullable = (values: (number | null)[]): number | null => {
+    let total = 0;
+    for (const v of values) {
+      if (v == null) return null;
+      total += v;
+    }
+    return total;
+  };
 
   const withdrawalTotals = useMemo(() => {
     let totalTaxable = 0;

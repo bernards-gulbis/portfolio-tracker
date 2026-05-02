@@ -55,9 +55,7 @@ def _build_holdings_list(
                 quantity=float(h.quantity),
                 average_cost=float(avg_cost),
                 total_cost=float(h.total_cost),
-                first_buy_date=h.first_buy_date.date()
-                if hasattr(h.first_buy_date, "date")
-                else h.first_buy_date,
+                first_buy_date=h.first_buy_date.date(),
             )
         )
         holdings_cost += h.total_cost
@@ -144,10 +142,9 @@ def calculate_status(
     # Surface partial-conversion failures cleanly: any incomplete EUR aggregate
     # flips the response-level ``eur_incomplete`` flag, and the affected tx ids
     # are deduped + sorted for stable UI deep-linking.
-    eur_incomplete = (
-        state.principal_eur.is_incomplete
-        or state.principal_eur_avg.is_incomplete
-        or state.dividends_eur.is_incomplete
+    eur_incomplete = any(
+        acc.is_incomplete
+        for acc in (state.principal_eur, state.principal_eur_avg, state.dividends_eur)
     )
     fx_missing_tx_ids = sorted(set(state.fx_missing_tx_ids))
 
