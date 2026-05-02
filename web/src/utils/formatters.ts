@@ -31,11 +31,15 @@ export const formatSignedCurrency = (value: number | null | undefined, currency:
 
 /**
  * Strips trailing zeros (and an orphaned decimal point) from a fixed-decimal
- * string. Two anchored patterns are used instead of `/\.?0+$/` so the regex
- * is unambiguously linear (SonarQube S5852).
+ * string. Index walk rather than regex so the work is unconditionally linear
+ * (SonarQube S5852: avoid super-linear backtracking).
  */
-const trimTrailingZeros = (s: string): string =>
-  s.replace(/0+$/, '').replace(/\.$/, '');
+const trimTrailingZeros = (s: string): string => {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '0') end--;
+  if (end > 0 && s[end - 1] === '.') end--;
+  return s.slice(0, end);
+};
 
 /** Up to 8 decimals, trailing zeros stripped. */
 export const formatQuantity = (value: number): string => {

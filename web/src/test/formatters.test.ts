@@ -154,6 +154,7 @@ describe('Formatters', () => {
     it('strips trailing zeros from whole and fractional values', () => {
       expect(formatQuantity(0)).toBe('0');
       expect(formatQuantity(5)).toBe('5');
+      expect(formatQuantity(10)).toBe('10');
       expect(formatQuantity(1.5)).toBe('1.5');
       expect(formatQuantity(-2.25)).toBe('-2.25');
     });
