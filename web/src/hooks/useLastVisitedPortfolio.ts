@@ -1,13 +1,12 @@
 import { useMemo } from 'react';
 
+import { parsePortfolioId } from '../utils/parsePortfolioId';
+
 const STORAGE_KEY = 'pt_last_portfolio_id';
 
 function read(): number | null {
   try {
-    const raw = globalThis.localStorage.getItem(STORAGE_KEY);
-    if (raw == null) return null;
-    const id = Number(raw);
-    return Number.isInteger(id) && id > 0 ? id : null;
+    return parsePortfolioId(globalThis.localStorage.getItem(STORAGE_KEY));
   } catch {
     return null;
   }

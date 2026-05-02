@@ -13,6 +13,8 @@ import { FilterControls } from './RealizedGainsTable';
 
 const PAGE_SIZE = 10;
 
+type SortKey = 'date' | 'amount' | 'fx_gain';
+
 interface WithdrawalsTableProps {
   realizedWithdrawals: WithdrawalFx[];
   locale: string;
@@ -49,10 +51,15 @@ const TaxCell = ({ taxable, taxRate, locale, label, captionClassName }: TaxCellP
 
 export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEur, dividendsEur, taxRate }: WithdrawalsTableProps) => {
   const { t } = useTranslation();
-  const [sortKey, setSortKey] = useState<string>('date');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(1);
   const [yearFilter, setYearFilter] = useState<string>('all');
+
+  const taxRatePercent = useMemo(
+    () => new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(taxRate * 100),
+    [locale, taxRate],
+  );
 
   const availableYears = useMemo(() => {
     const years = new Set(realizedWithdrawals.map((w) => w.date.slice(0, 4)));
@@ -121,7 +128,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
     if (sortKey === key) {
       setSortAsc((prev) => !prev);
     } else {
-      setSortKey(key);
+      setSortKey(key as SortKey);
       setSortAsc(false);
     }
     setPage(1);
@@ -153,7 +160,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
               <SortableTableHead label={t('status.columns.realizedFxGL')} sortKey="fx_gain" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
               <TableHead className="text-right">
                 <span className="inline-flex items-center gap-1">
-                  {t('status.columns.tax')} ({new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(taxRate * 100)}%)
+                  {t('status.columns.tax')} ({taxRatePercent}%)
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>

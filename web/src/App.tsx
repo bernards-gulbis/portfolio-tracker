@@ -55,6 +55,7 @@ import {
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
 import { useLastVisitedPortfolio } from './hooks/useLastVisitedPortfolio';
+import { parsePortfolioId } from './utils/parsePortfolioId';
 import { CreatePortfolioModal } from './components/CreatePortfolioModal';
 import { PortfolioActions } from './components/PortfolioActions';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -73,14 +74,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// Portfolio ids are positive auto-increment integers; reject 0, negatives,
-// floats, and the empty string (which Number coerces to 0).
-function parsePortfolioId(raw: string | undefined): number | null {
-  if (raw == null) return null;
-  const n = Number(raw);
-  return Number.isInteger(n) && n > 0 ? n : null;
-}
 
 const THEME_OPTIONS = [
   { value: 'light', key: 'app.header.themeLight' },

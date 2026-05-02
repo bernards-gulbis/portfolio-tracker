@@ -247,8 +247,9 @@ const GoogleAuthorizeUrlSchema = z.object({
 
 export type UserUpdate = schemas['UserUpdate'];
 export type CloseAccountRequest = schemas['CloseAccountRequest'];
-export type PortfolioCreate = schemas['PortfolioCreate'];
-export type PortfolioUpdate = schemas['PortfolioUpdate'];
+export type PortfolioBase = schemas['PortfolioBase'];
+export type PortfolioCreate = PortfolioBase;
+export type PortfolioUpdate = PortfolioBase;
 export type PortfolioCopy = schemas['PortfolioCopy'];
 export type TransactionCreate = schemas['TransactionCreate'];
 export type TransactionUpdate = schemas['TransactionUpdate'];

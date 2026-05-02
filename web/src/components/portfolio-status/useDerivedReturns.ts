@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import type { PortfolioPerformance, PricedPortfolioStatus } from '../../api';
+import { MS_PER_DAY } from '../../utils/formatters';
 
 export interface DerivedReturns {
   /** Annualized EUR-adjusted (when ``showEur``) TWR; null if span < 30 days
@@ -8,7 +9,6 @@ export interface DerivedReturns {
   annualizedReturn: number | null;
 }
 
-const MS_PER_DAY = 86_400_000;
 const MIN_ANNUALIZE_DAYS = 30;
 
 /** Compute the (optionally EUR-adjusted) trailing TWR % from a perf series.

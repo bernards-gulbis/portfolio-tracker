@@ -69,10 +69,7 @@ export function usePortfolioStatusView(
   const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
   const tickers = useMemo(
-    () =>
-      Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])).sort((a, b) =>
-        a.localeCompare(b),
-      ),
+    () => status?.holdings.map((h) => h.ticker) ?? [],
     [status?.holdings],
   );
 

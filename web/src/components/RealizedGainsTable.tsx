@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass } from '../utils/formatters';
+import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass, MS_PER_DAY } from '../utils/formatters';
 import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
 import { useGainsTableData, useDividendsTableData } from '../hooks/useRealizedGainsData';
 import type { TickerGroup, DividendTickerGroup } from '../hooks/useRealizedGainsData';
@@ -332,7 +332,7 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
                 const sellPrice = sale.quantity > 0 ? sale.proceeds / sale.quantity : 0;
                 const buyPrice = sale.quantity > 0 ? sale.cost_basis / sale.quantity : 0;
                 const isPartialSell = sale.quantity_before - sale.quantity > 1e-6;
-                const daysHeld = Math.floor((new Date(sale.date).getTime() - new Date(sale.first_buy_date).getTime()) / 86_400_000);
+                const daysHeld = Math.floor((new Date(sale.date).getTime() - new Date(sale.first_buy_date).getTime()) / MS_PER_DAY);
                 return (
                   <TableRow key={`${sale.date}-${idx}`}>
                     <TableCell className="text-muted-foreground">{formatDateCompact(sale.date, locale)}</TableCell>

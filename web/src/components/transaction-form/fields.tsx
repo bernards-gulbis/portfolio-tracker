@@ -20,6 +20,10 @@ import { roundCurrencyOnBlur } from './helpers';
 
 type MoneyFieldName = 'pricePerShare' | 'fee' | 'totalAmount' | 'valueEur';
 
+type MoneyCurrency = 'USD' | 'EUR';
+
+const CURRENCY_SYMBOL: Record<MoneyCurrency, string> = { USD: '$', EUR: '€' };
+
 interface MoneyFieldProps {
   control: Control<FormValues>;
   name: MoneyFieldName;
@@ -28,10 +32,7 @@ interface MoneyFieldProps {
   placeholder?: string;
   step?: string;
   min?: string;
-  /** Currency symbol shown in the leading addon. */
-  currencySymbol: '$' | '€';
-  /** Optional trailing currency code addon (e.g. "EUR"). */
-  trailingCurrencyCode?: string;
+  currency: MoneyCurrency;
   onValueChange?: () => void;
 }
 
@@ -43,8 +44,7 @@ export function MoneyField({
   placeholder = '0.00',
   step = '0.01',
   min,
-  currencySymbol,
-  trailingCurrencyCode,
+  currency,
   onValueChange,
 }: MoneyFieldProps): ReactElement {
   return (
@@ -56,7 +56,7 @@ export function MoneyField({
           <FieldLabel htmlFor={id}>{label}</FieldLabel>
           <InputGroup>
             <InputGroupAddon>
-              <InputGroupText>{currencySymbol}</InputGroupText>
+              <InputGroupText>{CURRENCY_SYMBOL[currency]}</InputGroupText>
             </InputGroupAddon>
             <InputGroupInput
               {...field}
@@ -73,9 +73,9 @@ export function MoneyField({
               }}
               onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
             />
-            {trailingCurrencyCode && (
+            {currency === 'EUR' && (
               <InputGroupAddon align="inline-end">
-                <InputGroupText>{trailingCurrencyCode}</InputGroupText>
+                <InputGroupText>EUR</InputGroupText>
               </InputGroupAddon>
             )}
           </InputGroup>

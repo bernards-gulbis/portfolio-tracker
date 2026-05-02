@@ -3,6 +3,17 @@ import * as z from 'zod';
 import { TransactionType } from '../../api';
 import i18n from '../../i18n/index';
 
+/** Display order for the transaction type select and the table filter. */
+export const TRANSACTION_TYPE_ORDER: TransactionType[] = [
+  TransactionType.DEPOSIT,
+  TransactionType.WITHDRAW,
+  TransactionType.BUY,
+  TransactionType.SELL,
+  TransactionType.DIVIDEND,
+  TransactionType.FEE,
+  TransactionType.SPLIT,
+];
+
 export const TICKER_TYPES = new Set<TransactionType>([
   TransactionType.BUY,
   TransactionType.SELL,

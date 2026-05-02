@@ -47,16 +47,7 @@ import {
 import { toast } from 'sonner';
 import { SortableTableHead } from './SortableTableHead';
 import { PaginationControls } from './PaginationControls';
-
-const TRANSACTION_TYPES: TransactionType[] = [
-  TransactionType.DEPOSIT,
-  TransactionType.WITHDRAW,
-  TransactionType.BUY,
-  TransactionType.SELL,
-  TransactionType.DIVIDEND,
-  TransactionType.FEE,
-  TransactionType.SPLIT,
-];
+import { TRANSACTION_TYPE_ORDER } from './transaction-form/schema';
 
 const TYPE_BADGE_CLASSES: Record<TransactionType, string> = {
   [TransactionType.BUY]: 'bg-badge-buy-bg text-badge-buy-fg',
@@ -199,7 +190,7 @@ export const TransactionTable = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          {TRANSACTION_TYPES.map((type) => (
+          {TRANSACTION_TYPE_ORDER.map((type) => (
             <DropdownMenuCheckboxItem
               key={type}
               checked={typeFilter.includes(type)}

@@ -9,6 +9,7 @@ import { TransactionTable } from './TransactionTable';
 import { ImportCSVModal } from './ImportCSVModal';
 import { TransactionModal } from './TransactionModal';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
+import { parsePortfolioId } from '../utils/parsePortfolioId';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +28,7 @@ import { AlertTriangleIcon, Plus, MoreVertical, UploadIcon, DownloadIcon, Receip
 export const TransactionView = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
-  const activePortfolioId = id ? Number(id) : null;
+  const activePortfolioId = parsePortfolioId(id);
   const [currentPage, setCurrentPage] = useState(1);
   const [tickerSearch, setTickerSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);

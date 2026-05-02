@@ -14,9 +14,9 @@ export const usePortfolioStatus = (portfolioId: number | null) =>
   useQuery<PortfolioStatus>({
     queryKey: ['portfolioStatus', portfolioId],
     queryFn: () => {
-      if (!portfolioId) throw new Error('Portfolio ID is required');
+      if (portfolioId == null) throw new Error('Portfolio ID is required');
       return getPortfolioStatus(portfolioId);
     },
-    enabled: !!portfolioId,
+    enabled: portfolioId != null,
     gcTime: Infinity,
   });

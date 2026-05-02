@@ -38,21 +38,14 @@ function renderCurrentValue(holding: PricedHolding, eurVals: EurVals | null, loc
 }
 
 function renderUnrealizedGL(holding: PricedHolding, eurVals: EurVals | null, locale: string) {
-  const eurValue = eurVals?.unrealizedGainLossEur;
-  const usdValue = holding.unrealized_gain_loss;
   const pct = holding.unrealized_gain_loss_pct;
+  if (pct == null) return '-';
 
-  let value: number | null = null;
-  let currency: 'EUR' | 'USD' = 'USD';
-  if (eurValue != null && pct != null) {
-    value = eurValue;
-    currency = 'EUR';
-  } else if (usdValue != null && pct != null) {
-    value = usdValue;
-    currency = 'USD';
-  }
+  const eurValue = eurVals?.unrealizedGainLossEur;
+  const value = eurValue ?? holding.unrealized_gain_loss;
+  if (value == null) return '-';
 
-  if (value == null || pct == null) return '-';
+  const currency = eurValue == null ? 'USD' : 'EUR';
   const valueClass = getValueClass(value);
   return (
     <div className="flex flex-col items-end">
@@ -90,51 +83,41 @@ export const HoldingsTable = memo(({
   const daysHeldMap = useMemo(() => computeDaysHeld(holdings), [holdings]);
 
   const holdingsWithEur = useMemo(() => {
-    const rate = showEur && eurMetrics !== null ? eurMetrics.rate : null;
+    const rate = showEur && eurAvailable ? eurMetrics.rate : null;
     return holdings.map((h) => ({
       holding: h,
       eurVals: rate == null ? null : applyRateToHolding(h, rate),
     }));
-  }, [holdings, showEur, eurMetrics]);
+  }, [holdings, showEur, eurAvailable, eurMetrics]);
 
-  const totalUnrealizedGL = useMemo(() => {
-    let sum = 0;
-    let hasValue = false;
+  const { totalUnrealizedGL, totalMarketValue, totalCost } = useMemo(() => {
+    let glSum = 0;
+    let glHasValue = false;
+    let marketSum = cashDisplay;
+    let costSum = 0;
     for (const { holding, eurVals } of holdingsWithEur) {
-      if (showEur && eurVals?.unrealizedGainLossEur != null) {
-        sum += eurVals.unrealizedGainLossEur;
-        hasValue = true;
+      const useEur = showEur && eurVals?.unrealizedGainLossEur != null;
+      if (useEur) {
+        glSum += eurVals.unrealizedGainLossEur as number;
+        glHasValue = true;
+        costSum += eurVals.totalCostEur;
       } else if (holding.unrealized_gain_loss != null) {
-        sum += holding.unrealized_gain_loss;
-        hasValue = true;
+        glSum += holding.unrealized_gain_loss;
+        glHasValue = true;
+        costSum += holding.total_cost;
       }
-    }
-    return hasValue ? sum : null;
-  }, [holdingsWithEur, showEur]);
-
-  const totalMarketValue = useMemo(() => {
-    let sum = cashDisplay;
-    for (const { holding, eurVals } of holdingsWithEur) {
       if (showEur && eurVals?.currentValueEur != null) {
-        sum += eurVals.currentValueEur;
+        marketSum += eurVals.currentValueEur;
       } else if (holding.current_value != null) {
-        sum += holding.current_value;
+        marketSum += holding.current_value;
       }
     }
-    return sum;
+    return {
+      totalUnrealizedGL: glHasValue ? glSum : null,
+      totalMarketValue: marketSum,
+      totalCost: costSum,
+    };
   }, [holdingsWithEur, showEur, cashDisplay]);
-
-  const totalCost = useMemo(() => {
-    let sum = 0;
-    for (const { holding, eurVals } of holdingsWithEur) {
-      if (showEur && eurVals?.unrealizedGainLossEur != null) {
-        sum += eurVals.totalCostEur;
-      } else if (holding.unrealized_gain_loss != null) {
-        sum += holding.total_cost;
-      }
-    }
-    return sum;
-  }, [holdingsWithEur, showEur]);
 
   const totalUnrealizedPct = totalUnrealizedGL == null || totalCost <= 0
     ? null

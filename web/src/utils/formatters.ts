@@ -1,3 +1,5 @@
+export const MS_PER_DAY = 86_400_000;
+
 /** Cached so rapid updates (e.g. chart hover) don't recreate Intl formatters. */
 const currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
@@ -119,5 +121,5 @@ export const daysSinceLocalDate = (dateStr: string, now: number): number => {
     todayLocal.getMonth(),
     todayLocal.getDate(),
   );
-  return Math.floor((todayUtc - thenUtc) / 86_400_000);
+  return Math.floor((todayUtc - thenUtc) / MS_PER_DAY);
 };

@@ -1,7 +1,7 @@
 import { useLocale } from '../hooks/useLocale';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Transaction, TransactionType } from '../api';
+import { Transaction } from '../api';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ import {
 import { DatePickerField } from './transaction-form/DatePickerField';
 import { TickerCombobox } from './transaction-form/TickerCombobox';
 import { MoneyField, NumberField } from './transaction-form/fields';
+import { TRANSACTION_TYPE_ORDER } from './transaction-form/schema';
 import { useTransactionForm } from './transaction-form/useTransactionForm';
 
 interface TransactionModalProps {
@@ -39,16 +40,6 @@ interface TransactionModalProps {
   portfolioId: number;
   transaction?: Transaction;
 }
-
-const TRANSACTION_TYPE_ORDER: TransactionType[] = [
-  TransactionType.DEPOSIT,
-  TransactionType.WITHDRAW,
-  TransactionType.BUY,
-  TransactionType.SELL,
-  TransactionType.DIVIDEND,
-  TransactionType.FEE,
-  TransactionType.SPLIT,
-];
 
 export const TransactionModal = ({
   isOpen,
@@ -257,7 +248,7 @@ export const TransactionModal = ({
                 id="tx-price"
                 label={t('transaction.modal.fields.pricePerShare')}
                 min="0.01"
-                currencySymbol="$"
+                currency="USD"
                 onValueChange={markPriceAsUserEdited}
               />
             )}
@@ -268,7 +259,7 @@ export const TransactionModal = ({
                 name="fee"
                 id="tx-fee"
                 label={t('transaction.modal.fields.fee')}
-                currencySymbol="$"
+                currency="USD"
               />
             )}
 
@@ -279,7 +270,7 @@ export const TransactionModal = ({
                 id="tx-total"
                 label={t('transaction.modal.fields.totalAmount')}
                 min="0.01"
-                currencySymbol="$"
+                currency="USD"
               />
             )}
 
@@ -289,8 +280,7 @@ export const TransactionModal = ({
                 name="valueEur"
                 id="tx-eur"
                 label={t('transaction.modal.fields.amountInEur')}
-                currencySymbol="€"
-                trailingCurrencyCode="EUR"
+                currency="EUR"
               />
             )}
 
