@@ -29,6 +29,17 @@ const formatEurOrDash = (value: number | null, locale: string): string =>
 const formatSignedEurOrDash = (value: number | null, locale: string): string =>
   value == null ? '-' : formatSignedCurrency(value, 'EUR', locale);
 
+// Returns null if any contributing value is null — partial sums on display
+// would silently understate totals.
+const sumNullable = (values: (number | null)[]): number | null => {
+  let total = 0;
+  for (const v of values) {
+    if (v == null) return null;
+    total += v;
+  }
+  return total;
+};
+
 interface TaxCellProps {
   taxable: number;
   taxRate: number;
@@ -104,17 +115,6 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
   const totalPages = Math.max(1, Math.ceil(sortedWithdrawals.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedWithdrawals = sortedWithdrawals.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  // Sum nullable EUR fields, returning null if any contributing value is null.
-  // Partial sums on display would silently understate totals.
-  const sumNullable = (values: (number | null)[]): number | null => {
-    let total = 0;
-    for (const v of values) {
-      if (v == null) return null;
-      total += v;
-    }
-    return total;
-  };
 
   const withdrawalTotals = useMemo(() => {
     let totalTaxable = 0;
