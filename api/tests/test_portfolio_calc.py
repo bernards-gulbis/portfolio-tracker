@@ -691,8 +691,8 @@ class TestCalculatePerformanceEdgeCases:
                 num_points=5,
             )
 
-        assert any(w["code"] == "sellOversell" for w in warnings), (
-            f"expected sellOversell warning, got {[w['code'] for w in warnings]}"
+        assert any(w.code == "sellOversell" for w in warnings), (
+            f"expected sellOversell warning, got {[w.code for w in warnings]}"
         )
 
 

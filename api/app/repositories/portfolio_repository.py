@@ -59,8 +59,17 @@ class PortfolioRepository:
         return False
 
     def exists_for_user(self, portfolio_id: int, user_id: uuid.UUID) -> bool:
-        """Check if a portfolio exists and belongs to user"""
-        return self.get_by_id_and_user(portfolio_id, user_id) is not None
+        """Check if a portfolio exists and belongs to user.
+
+        Issues a PK-only ``SELECT`` so the index can answer it without
+        materializing the row — called on every transaction CRUD path.
+        """
+        statement = (
+            select(Portfolio.id)
+            .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
+            .limit(1)
+        )
+        return self.session.exec(statement).first() is not None
 
     def copy_with_transactions(
         self, portfolio_id: int, new_name: str, user_id: uuid.UUID

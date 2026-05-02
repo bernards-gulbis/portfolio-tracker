@@ -1,6 +1,5 @@
 """Performance time-series calculation for portfolios."""
 
-import dataclasses
 import logging
 from bisect import bisect_right
 from dataclasses import dataclass
@@ -8,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.models import Transaction, TransactionType
+from app.schemas.schemas import TransactionWarning
 from app.services.portfolio_handlers import (
     _apply_transaction,
     _compute_forward_split_factors,
@@ -271,7 +271,7 @@ def calculate_performance(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     num_points: int = 60,
-) -> tuple[list[dict], list[str], list[dict]]:
+) -> tuple[list[dict], list[str], list[TransactionWarning]]:
     """Calculate portfolio performance time-series from transactions.
 
     Returns ``(data_points, cost_basis_fallback_tickers, warnings)``:
@@ -285,11 +285,10 @@ def calculate_performance(
       Surfacing this lets the UI warn the user that the chart is
       cost-basis-only for those symbols rather than silently drawing a flat
       line the user might read as "no change".
-    * ``warnings`` — transaction-replay warnings collected during the
-      historical reconstruction (oversell, sell-of-non-held). Each is a dict
-      with ``code`` / ``date`` / ``params`` matching ``TransactionWarning``.
-      Without this the chart would silently use a truncated quantity from a
-      data-quality issue (e.g. an undeclared split) and the user would see a
+    * ``warnings`` — :class:`TransactionWarning` instances collected during
+      historical replay (oversell, sell-of-non-held, etc.). Without this the
+      chart would silently use a truncated quantity from a data-quality
+      issue (e.g. an undeclared split) and the user would see a
       reasonable-looking line that doesn't reconcile with the broker.
     """
     if not transactions:
@@ -368,5 +367,8 @@ def calculate_performance(
         )
         performance_data.append(data_point_dict)
 
-    warnings = [dataclasses.asdict(w) for w in state.warnings]
+    warnings = [
+        TransactionWarning(code=w.code, date=w.date, params=w.params)
+        for w in state.warnings
+    ]
     return performance_data, sorted(cost_basis_fallback_tickers), warnings

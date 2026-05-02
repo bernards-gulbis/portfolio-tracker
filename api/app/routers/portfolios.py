@@ -20,7 +20,6 @@ from app.schemas import (
     PortfolioResponse,
     PortfolioStatusResponse,
     PortfolioUpdate,
-    TransactionWarning,
 )
 from app.services import PortfolioService
 from app.services.prices import (
@@ -261,7 +260,7 @@ def get_portfolio_performance(
             portfolio_name=portfolio_name,
             data_points=data_points,
             cost_basis_fallback_tickers=cost_basis_fallback_tickers,
-            warnings=[TransactionWarning(**w) for w in warnings],
+            warnings=warnings,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

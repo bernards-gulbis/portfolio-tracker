@@ -175,7 +175,10 @@ def calculate_status(
             WithdrawalFxResponse(**dataclasses.asdict(w))
             for w in state.realized_withdrawals
         ],
-        warnings=[TransactionWarning(**dataclasses.asdict(w)) for w in state.warnings],
+        warnings=[
+            TransactionWarning(code=w.code, date=w.date, params=w.params)
+            for w in state.warnings
+        ],
         usd_to_eur_rate=usd_to_eur_rate,
         eur_incomplete=eur_incomplete,
         fx_missing_tx_ids=fx_missing_tx_ids,

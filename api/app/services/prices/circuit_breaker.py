@@ -20,13 +20,19 @@ transient via :func:`call_with_breaker`'s ``is_transient`` predicate.
 import logging
 import time
 from collections.abc import Callable
+from enum import StrEnum
 from threading import Lock
 
 logger = logging.getLogger(__name__)
 
-STATE_CLOSED = "closed"
-STATE_OPEN = "open"
-STATE_HALF_OPEN = "half_open"
+
+class CircuitState(StrEnum):
+    """Circuit breaker state. ``StrEnum`` so equality against the raw values
+    (``"closed"`` / ``"open"`` / ``"half_open"``) still works."""
+
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
 
 
 class CircuitOpenError(RuntimeError):
@@ -60,16 +66,16 @@ class CircuitBreaker:
         self._half_open_in_flight = False
 
     @property
-    def state(self) -> str:
+    def state(self) -> CircuitState:
         with self._lock:
             return self._state_locked()
 
-    def _state_locked(self) -> str:
+    def _state_locked(self) -> CircuitState:
         if self._opened_at is None:
-            return STATE_CLOSED
+            return CircuitState.CLOSED
         if self._clock() - self._opened_at < self._recovery_timeout:
-            return STATE_OPEN
-        return STATE_HALF_OPEN
+            return CircuitState.OPEN
+        return CircuitState.HALF_OPEN
 
     def acquire(self) -> bool:
         """Return ``True`` if a call may proceed, ``False`` if rejected.
@@ -79,9 +85,9 @@ class CircuitBreaker:
         """
         with self._lock:
             state = self._state_locked()
-            if state == STATE_OPEN:
+            if state == CircuitState.OPEN:
                 return False
-            if state == STATE_HALF_OPEN:
+            if state == CircuitState.HALF_OPEN:
                 if self._half_open_in_flight:
                     return False
                 self._half_open_in_flight = True
@@ -120,7 +126,7 @@ class CircuitBreaker:
 
     def is_open(self) -> bool:
         """Whether calls are currently being rejected (OPEN state)."""
-        return self.state == STATE_OPEN
+        return self.state == CircuitState.OPEN
 
 
 def call_with_breaker[T](
