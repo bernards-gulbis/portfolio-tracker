@@ -1,4 +1,24 @@
-import type { LivePrices, PricedHolding, PricedPortfolioStatus, PortfolioStatus } from '../api';
+import type {
+  Holding,
+  LivePrices,
+  PricedHolding,
+  PricedPortfolioStatus,
+  PortfolioStatus,
+} from '../api';
+
+const unpriced = (
+  h: Holding,
+  source: PricedHolding['price_source'] = 'missing',
+  asOf: string | null = null,
+): PricedHolding => ({
+  ...h,
+  current_price: null,
+  current_value: null,
+  unrealized_gain_loss: null,
+  unrealized_gain_loss_pct: null,
+  price_source: source,
+  price_as_of: asOf,
+});
 
 /**
  * Compute a fully-priced portfolio status from transaction-derived status + live prices.
@@ -17,17 +37,7 @@ export const computePricedStatus = (
   const missingPrices: string[] = [];
 
   const pricedHoldings: PricedHolding[] = status.holdings.map((h) => {
-    if (!hasLivePrices) {
-      return {
-        ...h,
-        current_price: null,
-        current_value: null,
-        unrealized_gain_loss: null,
-        unrealized_gain_loss_pct: null,
-        price_source: 'missing',
-        price_as_of: null,
-      };
-    }
+    if (!hasLivePrices) return unpriced(h);
 
     const info = livePrices.prices[h.ticker];
     const price = info?.price ?? null;
@@ -36,28 +46,18 @@ export const computePricedStatus = (
 
     if (price == null) {
       missingPrices.push(h.ticker);
-      return {
-        ...h,
-        current_price: null,
-        current_value: null,
-        unrealized_gain_loss: null,
-        unrealized_gain_loss_pct: null,
-        price_source: source,
-        price_as_of: asOf,
-      };
+      return unpriced(h, source, asOf);
     }
 
     const currentValue = price * h.quantity;
     const unrealizedGainLoss = currentValue - h.total_cost;
-    const unrealizedGainLossPct =
-      h.total_cost === 0 ? null : (unrealizedGainLoss / h.total_cost) * 100;
-
     return {
       ...h,
       current_price: price,
       current_value: currentValue,
       unrealized_gain_loss: unrealizedGainLoss,
-      unrealized_gain_loss_pct: unrealizedGainLossPct,
+      unrealized_gain_loss_pct:
+        h.total_cost === 0 ? null : (unrealizedGainLoss / h.total_cost) * 100,
       price_source: source,
       price_as_of: asOf,
     };
@@ -69,17 +69,12 @@ export const computePricedStatus = (
   let unrealizedGainsPct: number | null = null;
 
   if (hasLivePrices) {
-    // Holdings with null current_value (missing price) are treated as zero
-    holdingsValue = pricedHoldings.reduce(
-      (sum, h) => sum + (h.current_value ?? 0),
-      0,
-    );
+    // Holdings with null current_value (missing price) are treated as zero.
+    holdingsValue = pricedHoldings.reduce((sum, h) => sum + (h.current_value ?? 0), 0);
     currentValue = status.cash + holdingsValue;
     unrealizedGains = holdingsValue - status.holdings_cost;
     unrealizedGainsPct =
-      status.holdings_cost === 0
-        ? null
-        : (unrealizedGains / status.holdings_cost) * 100;
+      status.holdings_cost === 0 ? null : (unrealizedGains / status.holdings_cost) * 100;
   }
 
   return {

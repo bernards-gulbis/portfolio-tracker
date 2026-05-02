@@ -1,12 +1,11 @@
 import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import * as z from 'zod';
-import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useCopyPortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
+import { portfolioNameSchema, PortfolioNameValues } from '../utils/portfolioNameSchema';
 import {
   Dialog,
   DialogContent,
@@ -20,18 +19,6 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
-
-const schema = z.object({
-  name: z.string().superRefine((val, ctx) => {
-    if (val.trim().length < 1) {
-      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameRequired') });
-    } else if (val.trim().length > 255) {
-      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameTooLong') });
-    }
-  }),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 interface CopyPortfolioModalProps {
   isOpen: boolean;
@@ -50,8 +37,8 @@ export const CopyPortfolioModal = ({
   const navigate = useNavigate();
   const copyPortfolio = useCopyPortfolio();
   const defaultName = t('portfolio.copy.defaultName', { name: portfolioName });
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const form = useForm<PortfolioNameValues>({
+    resolver: zodResolver(portfolioNameSchema),
     defaultValues: { name: defaultName },
   });
 
@@ -61,7 +48,7 @@ export const CopyPortfolioModal = ({
     if (isOpen) reset({ name: defaultName });
   }, [isOpen, defaultName, reset]);
 
-  const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (values: PortfolioNameValues) => {
     try {
       const copied = await copyPortfolio.mutateAsync({ portfolioId, newName: values.name.trim() });
       onClose();

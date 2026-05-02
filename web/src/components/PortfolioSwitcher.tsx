@@ -28,6 +28,11 @@ export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: Portfoli
 
   const activePortfolio = portfolios?.find((p) => p.id === activePortfolioId);
 
+  const handleSelect = (portfolioId: number) => {
+    navigate(`/portfolios/${portfolioId}`);
+    setOpen(false);
+  };
+
   const renderPortfolioItems = () => {
     if (error) {
       return (
@@ -36,28 +41,25 @@ export const PortfolioSwitcher = ({ activePortfolioId, onCreateClick }: Portfoli
         </div>
       );
     }
-    if (portfolios && portfolios.length > 0) {
-      return portfolios.map((portfolio) => (
-        <DropdownMenuItem
-          key={portfolio.id}
-          className="gap-2 p-2"
-          onClick={() => {
-            navigate(`/portfolios/${portfolio.id}`);
-            setOpen(false);
-          }}
-        >
-          <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
-            <BriefcaseBusiness className="h-4 w-4 shrink-0" />
-          </div>
-          <span className="truncate">{portfolio.name}</span>
-        </DropdownMenuItem>
-      ));
+    if (!portfolios?.length) {
+      return (
+        <div className="px-2 py-1.5 text-xs text-muted-foreground">
+          {t('portfolio.list.empty.switcherHint')}
+        </div>
+      );
     }
-    return (
-      <div className="px-2 py-1.5 text-xs text-muted-foreground">
-        {t('portfolio.list.empty.switcherHint')}
-      </div>
-    );
+    return portfolios.map((portfolio) => (
+      <DropdownMenuItem
+        key={portfolio.id}
+        className="gap-2 p-2"
+        onClick={() => handleSelect(portfolio.id)}
+      >
+        <div className="flex h-6 w-6 items-center justify-center rounded-sm border">
+          <BriefcaseBusiness className="h-4 w-4 shrink-0" />
+        </div>
+        <span className="truncate">{portfolio.name}</span>
+      </DropdownMenuItem>
+    ));
   };
 
   if (isLoading) {

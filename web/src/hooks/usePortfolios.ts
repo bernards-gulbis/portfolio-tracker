@@ -14,9 +14,29 @@ import {
 
 const PORTFOLIOS_KEY = ['portfolios'] as const;
 
-/**
- * Hook to fetch all portfolios
- */
+type OptimisticContext = { previous: Portfolio[] | undefined };
+
+function useOptimisticPortfoliosMutation() {
+  const queryClient = useQueryClient();
+
+  const snapshot = async (): Promise<OptimisticContext> => {
+    await queryClient.cancelQueries({ queryKey: PORTFOLIOS_KEY });
+    return { previous: queryClient.getQueryData<Portfolio[]>(PORTFOLIOS_KEY) };
+  };
+
+  const rollback = (context: OptimisticContext | undefined) => {
+    if (context?.previous != null) {
+      queryClient.setQueryData(PORTFOLIOS_KEY, context.previous);
+    }
+  };
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: PORTFOLIOS_KEY });
+  };
+
+  return { queryClient, snapshot, rollback, invalidate };
+}
+
 export const usePortfolios = () => {
   return useQuery({
     queryKey: PORTFOLIOS_KEY,
@@ -24,25 +44,17 @@ export const usePortfolios = () => {
   });
 };
 
-/**
- * Hook to create a new portfolio.
- *
- * Optimistic: appends a placeholder portfolio with a negative temporary id
- * to the cached list immediately, then either replaces it with the server
- * response (onSettled invalidate) or rolls back on error.
- */
 export const useCreatePortfolio = () => {
-  const queryClient = useQueryClient();
+  const { queryClient, snapshot, rollback, invalidate } = useOptimisticPortfoliosMutation();
   const { t } = useTranslation();
 
   return useMutation({
     mutationFn: (data: PortfolioCreate) => createPortfolio(data),
     onMutate: async (data) => {
-      await queryClient.cancelQueries({ queryKey: PORTFOLIOS_KEY });
-      const previous = queryClient.getQueryData<Portfolio[]>(PORTFOLIOS_KEY);
+      const context = await snapshot();
       const optimistic: Portfolio = {
-        // Negative id is impossible from the server (auto-increment > 0) so
-        // there's no collision risk with real ids during the in-flight window.
+        // Negative id avoids collision with server-issued auto-increment ids
+        // during the in-flight window.
         id: -Date.now(),
         name: data.name,
         created_at: new Date().toISOString(),
@@ -50,98 +62,63 @@ export const useCreatePortfolio = () => {
       queryClient.setQueryData<Portfolio[]>(PORTFOLIOS_KEY, (old) =>
         old ? [...old, optimistic] : [optimistic],
       );
-      return { previous };
+      return context;
     },
-    onError: (_err, _vars, context) => {
-      if (context?.previous != null) {
-        queryClient.setQueryData(PORTFOLIOS_KEY, context.previous);
-      }
-    },
+    onError: (_err, _vars, context) => rollback(context),
     onSuccess: (portfolio) => {
       toast.success(t('portfolio.toasts.created', { name: portfolio.name }));
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: PORTFOLIOS_KEY });
-    },
+    onSettled: invalidate,
   });
 };
 
-/**
- * Hook to update a portfolio.
- *
- * Optimistic: renames the portfolio in the cached list immediately so the
- * dropdown reflects the new name before the server confirms.
- */
 export const useUpdatePortfolio = () => {
-  const queryClient = useQueryClient();
+  const { queryClient, snapshot, rollback, invalidate } = useOptimisticPortfoliosMutation();
   const { t } = useTranslation();
 
   return useMutation({
     mutationFn: ({ portfolioId, data }: { portfolioId: number; data: PortfolioUpdate }) =>
       updatePortfolio(portfolioId, data),
     onMutate: async ({ portfolioId, data }) => {
-      await queryClient.cancelQueries({ queryKey: PORTFOLIOS_KEY });
-      const previous = queryClient.getQueryData<Portfolio[]>(PORTFOLIOS_KEY);
+      const context = await snapshot();
       queryClient.setQueryData<Portfolio[]>(PORTFOLIOS_KEY, (old) =>
         old?.map((p) => (p.id === portfolioId ? { ...p, name: data.name } : p)) ?? old,
       );
-      return { previous };
+      return context;
     },
-    onError: (_err, _vars, context) => {
-      if (context?.previous != null) {
-        queryClient.setQueryData(PORTFOLIOS_KEY, context.previous);
-      }
-    },
+    onError: (_err, _vars, context) => rollback(context),
     onSuccess: (portfolio, { portfolioId }) => {
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] });
       toast.success(t('portfolio.toasts.renamed', { name: portfolio.name }));
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: PORTFOLIOS_KEY });
-    },
+    onSettled: invalidate,
   });
 };
 
-/**
- * Hook to delete a portfolio.
- *
- * Optimistic: removes from the cached list immediately. On rollback, the
- * portfolio reappears in the dropdown.
- */
 export const useDeletePortfolio = () => {
-  const queryClient = useQueryClient();
+  const { queryClient, snapshot, rollback, invalidate } = useOptimisticPortfoliosMutation();
   const { t } = useTranslation();
 
   return useMutation({
     mutationFn: (portfolioId: number) => deletePortfolio(portfolioId),
     onMutate: async (portfolioId) => {
-      await queryClient.cancelQueries({ queryKey: PORTFOLIOS_KEY });
-      const previous = queryClient.getQueryData<Portfolio[]>(PORTFOLIOS_KEY);
+      const context = await snapshot();
       queryClient.setQueryData<Portfolio[]>(PORTFOLIOS_KEY, (old) =>
         old?.filter((p) => p.id !== portfolioId) ?? old,
       );
-      return { previous };
+      return context;
     },
-    onError: (_err, _vars, context) => {
-      if (context?.previous != null) {
-        queryClient.setQueryData(PORTFOLIOS_KEY, context.previous);
-      }
-    },
+    onError: (_err, _vars, context) => rollback(context),
     onSuccess: (_data, portfolioId) => {
       queryClient.removeQueries({ queryKey: ['portfolioStatus', portfolioId] });
       queryClient.removeQueries({ queryKey: ['transactions', portfolioId] });
       queryClient.removeQueries({ queryKey: ['portfolioPerformance', portfolioId] });
       toast.success(t('portfolio.toasts.deleted'));
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: PORTFOLIOS_KEY });
-    },
+    onSettled: invalidate,
   });
 };
 
-/**
- * Hook to copy a portfolio with all its transactions
- */
 export const useCopyPortfolio = () => {
   const queryClient = useQueryClient();
   const { t } = useTranslation();

@@ -21,15 +21,17 @@ import { AppFooter } from './AppFooter';
 
 const emailValidator = z.email();
 
+const emailField = z.string().superRefine((val, ctx) => {
+  if (!emailValidator.safeParse(val).success) {
+    ctx.addIssue({ code: 'custom', message: i18n.t('auth.validation.invalidEmail') });
+  }
+});
+
 const loginSchema = z.object({
-  email: z.string().superRefine((val, ctx) => {
-    if (!emailValidator.safeParse(val).success) {
-      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.invalidEmail') });
-    }
-  }),
+  email: emailField,
   password: z.string().superRefine((val, ctx) => {
     if (val.length < 1) {
-      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.passwordRequired') });
+      ctx.addIssue({ code: 'custom', message: i18n.t('auth.validation.passwordRequired') });
     }
   }),
 });
@@ -37,17 +39,13 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().superRefine((val, ctx) => {
     if (val.trim().length < 1) {
-      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.nameRequired') });
+      ctx.addIssue({ code: 'custom', message: i18n.t('auth.validation.nameRequired') });
     }
   }),
-  email: z.string().superRefine((val, ctx) => {
-    if (!emailValidator.safeParse(val).success) {
-      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.invalidEmail') });
-    }
-  }),
+  email: emailField,
   password: z.string().superRefine((val, ctx) => {
     if (val.length < 8) {
-      ctx.addIssue({ code: "custom", message: i18n.t('auth.validation.passwordMinLength') });
+      ctx.addIssue({ code: 'custom', message: i18n.t('auth.validation.passwordMinLength') });
     }
   }),
 });
@@ -111,8 +109,8 @@ export const LoginPage = () => {
     }
   };
 
-  // The forms use key="login"/"register" so they remount on mode switch,
-  // resetting all state automatically — no explicit clearErrors() needed.
+  // Forms use key="login"/"register" — remounting on mode switch resets state
+  // automatically, so no explicit clearErrors() is needed.
   const switchToRegister = () => setMode('register');
   const switchToLogin = () => setMode('login');
 

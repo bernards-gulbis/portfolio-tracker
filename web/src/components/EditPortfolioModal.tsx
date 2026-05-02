@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import * as z from 'zod';
-import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
 import { useUpdatePortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
+import { portfolioNameSchema, PortfolioNameValues } from '../utils/portfolioNameSchema';
 import {
   Dialog,
   DialogContent,
@@ -19,18 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
-
-const schema = z.object({
-  name: z.string().superRefine((val, ctx) => {
-    if (val.trim().length < 1) {
-      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameRequired') });
-    } else if (val.trim().length > 255) {
-      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameTooLong') });
-    }
-  }),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 interface EditPortfolioModalProps {
   isOpen: boolean;
@@ -47,8 +34,8 @@ export const EditPortfolioModal = ({
 }: EditPortfolioModalProps) => {
   const { t } = useTranslation();
   const updatePortfolio = useUpdatePortfolio();
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const form = useForm<PortfolioNameValues>({
+    resolver: zodResolver(portfolioNameSchema),
     defaultValues: { name: currentName },
   });
 
@@ -58,7 +45,7 @@ export const EditPortfolioModal = ({
     if (isOpen) reset({ name: currentName });
   }, [isOpen, currentName, reset]);
 
-  const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (values: PortfolioNameValues) => {
     if (values.name.trim() === currentName) {
       onClose();
       return;

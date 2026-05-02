@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronRightIcon } from 'lucide-react';
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export interface CollapsibleSectionProps {
@@ -20,7 +21,9 @@ export const CollapsibleSection = ({
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <ChevronRightIcon className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <ChevronRightIcon
+          className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+        />
         <span>{title}</span>
         {secondary != null && (
           <span className="text-xs font-normal text-muted-foreground">{secondary}</span>

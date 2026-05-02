@@ -16,9 +16,6 @@ import { ChevronRightIcon } from 'lucide-react';
 import { PaginationControls } from './PaginationControls';
 import { SortableTableHead } from './SortableTableHead';
 
-
-// ================== Filter Controls ==================
-
 interface FilterControlsProps {
   availableYears: string[];
   yearFilter: string;
@@ -61,6 +58,31 @@ export const FilterControls = ({ availableYears, yearFilter, onYearChange, filte
     </div>
   );
 };
+
+interface EmptyTableRowProps {
+  colSpan: number;
+  message: string;
+}
+
+const EmptyTableRow = ({ colSpan, message }: EmptyTableRowProps) => (
+  <TableRow>
+    <TableCell colSpan={colSpan} className="text-center text-muted-foreground py-6 text-sm">
+      {message}
+    </TableCell>
+  </TableRow>
+);
+
+function formatDividendAmount(
+  amountUsd: number,
+  amountEur: number | null,
+  displayCurrency: 'EUR' | 'USD',
+  locale: string,
+): string {
+  if (displayCurrency === 'EUR' && amountEur != null) {
+    return formatCurrency(amountEur, 'EUR', locale);
+  }
+  return formatCurrency(amountUsd, 'USD', locale);
+}
 
 // ================== Expandable Group Row ==================
 
@@ -140,11 +162,7 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
           </TableHeader>
           <TableBody>
             {pagedGains.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">
-                  {t('status.noRealizedGains')}
-                </TableCell>
-              </TableRow>
+              <EmptyTableRow colSpan={4} message={t('status.noRealizedGains')} />
             )}
             {pagedGains.map((group) => (
               <GainsTickerGroupRow
@@ -218,11 +236,7 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
           </TableHeader>
           <TableBody>
             {pagedDividends.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">
-                  {t('status.noDividends')}
-                </TableCell>
-              </TableRow>
+              <EmptyTableRow colSpan={4} message={t('status.noDividends')} />
             )}
             {pagedDividends.map((group) => (
               <DividendTickerGroupRow
@@ -244,9 +258,7 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
                   </Badge>
                 </TableCell>
                 <TableCell className="min-w-[7rem] text-right text-sm tabular-nums">
-                  {displayCurrency === 'EUR' && dividendTotals.totalEur != null
-                    ? formatCurrency(dividendTotals.totalEur, 'EUR', locale)
-                    : formatCurrency(dividendTotals.totalUsd, 'USD', locale)}
+                  {formatDividendAmount(dividendTotals.totalUsd, dividendTotals.totalEur, displayCurrency, locale)}
                 </TableCell>
               </TableRow>
             )}
@@ -402,9 +414,7 @@ const DividendTickerGroupRow = ({ group, isExpanded, onToggle, displayCurrency, 
             </Badge>
           </TableCell>
           <TableCell className="min-w-[7rem] text-right text-sm font-medium tabular-nums">
-            {displayCurrency === 'EUR' && group.totalAmountEur != null
-              ? formatCurrency(group.totalAmountEur, 'EUR', locale)
-              : formatCurrency(group.totalAmount, 'USD', locale)}
+            {formatDividendAmount(group.totalAmount, group.totalAmountEur, displayCurrency, locale)}
           </TableCell>
         </>
       }
@@ -421,9 +431,7 @@ const DividendTickerGroupRow = ({ group, isExpanded, onToggle, displayCurrency, 
               <TableRow key={`${payment.date}-${idx}`}>
                 <TableCell className="text-muted-foreground">{formatDateCompact(payment.date, locale)}</TableCell>
                 <TableCell className="text-right tabular-nums text-muted-foreground">
-                  {displayCurrency === 'EUR' && payment.amount_eur != null
-                    ? formatCurrency(payment.amount_eur, 'EUR', locale)
-                    : formatCurrency(payment.amount, 'USD', locale)}
+                  {formatDividendAmount(payment.amount, payment.amount_eur, displayCurrency, locale)}
                 </TableCell>
               </TableRow>
             ))}

@@ -64,15 +64,23 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AppFooter } from './components/AppFooter';
 import { getErrorMessage } from './api';
 
-// Module-scoped so AuthContext can call queryClient.clear() on logout
+// Module-scoped so AuthContext can call queryClient.clear() on logout.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
       retry: 1,
     },
   },
 });
+
+// Portfolio ids are positive auto-increment integers; reject 0, negatives,
+// floats, and the empty string (which Number coerces to 0).
+function parsePortfolioId(raw: string | undefined): number | null {
+  if (raw == null) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
 
 const THEME_OPTIONS = [
   { value: 'light', key: 'app.header.themeLight' },
@@ -124,8 +132,22 @@ function AuthGuard() {
       <Route element={<AppLayout />}>
         <Route path="/" element={<RootRedirect />} />
         <Route path="/portfolios/:id" element={<PortfolioStatusRoute />} />
-        <Route path="/portfolios/:id/transactions" element={<TransactionViewRoute />} />
-        <Route path="/settings" element={<SettingsRoute />} />
+        <Route
+          path="/portfolios/:id/transactions"
+          element={
+            <ErrorBoundary fullScreen={false}>
+              <TransactionView />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ErrorBoundary fullScreen={false}>
+              <SettingsPage />
+            </ErrorBoundary>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
@@ -178,18 +200,12 @@ function RootRedirect() {
 function PortfolioStatusRoute() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const parsedId = id == null ? Number.NaN : Number(id);
-  // Portfolio ids are positive auto-increment integers; reject 0,
-  // negatives, floats, and the empty string (which Number coerces
-  // to 0). Matches the rule already enforced in
-  // useLastVisitedPortfolio and PortfolioStatusView.
-  const portfolioId =
-    Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null;
+  const portfolioId = parsePortfolioId(id);
   const { data: portfolioStatus } = usePortfolioStatus(portfolioId);
   const emptyRedirectedRef = useRef<number | null>(null);
 
-  // Auto-navigate to Transactions for brand-new portfolios (no transactions entered yet).
-  // ``replace`` so the back button doesn't re-trigger this redirect.
+  // Auto-navigate to Transactions for brand-new portfolios. ``replace`` so the
+  // back button doesn't re-trigger this redirect.
   useEffect(() => {
     if (portfolioId == null || portfolioStatus == null) return;
     if (emptyRedirectedRef.current === portfolioId) return;
@@ -202,22 +218,6 @@ function PortfolioStatusRoute() {
   return (
     <ErrorBoundary fullScreen={false}>
       <PortfolioStatusView />
-    </ErrorBoundary>
-  );
-}
-
-function TransactionViewRoute() {
-  return (
-    <ErrorBoundary fullScreen={false}>
-      <TransactionView />
-    </ErrorBoundary>
-  );
-}
-
-function SettingsRoute() {
-  return (
-    <ErrorBoundary fullScreen={false}>
-      <SettingsPage />
     </ErrorBoundary>
   );
 }
@@ -238,10 +238,7 @@ function AppLayout() {
   const settingsMatch = useMatch('/settings');
   const transactionsMatch = useMatch('/portfolios/:id/transactions');
 
-  const idParam = portfolioMatch?.params.id;
-  const parsedActiveId = idParam == null ? Number.NaN : Number(idParam);
-  const activePortfolioId =
-    Number.isInteger(parsedActiveId) && parsedActiveId > 0 ? parsedActiveId : null;
+  const activePortfolioId = parsePortfolioId(portfolioMatch?.params.id);
   const isOnSettings = settingsMatch != null;
   const isOnTransactions = transactionsMatch != null;
   const portfolioTab = isOnTransactions ? 'transactions' : 'portfolio';
@@ -255,11 +252,8 @@ function AppLayout() {
 
   const handleTabChange = (value: string) => {
     if (activePortfolioId == null) return;
-    if (value === 'transactions') {
-      navigate(`/portfolios/${activePortfolioId}/transactions`);
-    } else {
-      navigate(`/portfolios/${activePortfolioId}`);
-    }
+    const suffix = value === 'transactions' ? '/transactions' : '';
+    navigate(`/portfolios/${activePortfolioId}${suffix}`);
   };
 
   return (

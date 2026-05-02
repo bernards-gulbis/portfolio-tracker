@@ -22,13 +22,13 @@ import { Spinner } from '@/components/ui/spinner';
 
 const schema = z.object({
   file: z.any().superRefine((val, ctx) => {
-    if (!(val instanceof File)) {
-      ctx.addIssue({ code: 'custom', message: i18n.t('transaction.csv.validation.fileRequired') });
+    if (val instanceof File) {
+      if (!val.name.toLowerCase().endsWith('.csv')) {
+        ctx.addIssue({ code: 'custom', message: i18n.t('transaction.csv.validation.fileMustBeCsv') });
+      }
       return;
     }
-    if (!val.name.toLowerCase().endsWith('.csv')) {
-      ctx.addIssue({ code: 'custom', message: i18n.t('transaction.csv.validation.fileMustBeCsv') });
-    }
+    ctx.addIssue({ code: 'custom', message: i18n.t('transaction.csv.validation.fileRequired') });
   }),
 });
 
@@ -89,10 +89,10 @@ export const ImportCSVModal = ({ isOpen, onClose, portfolioId }: ImportCSVModalP
   };
 
   const onConfirm = async () => {
-    const values = form.getValues();
-    if (values.file == null) return;
+    const { file } = form.getValues();
+    if (file == null) return;
     try {
-      await importCSV.mutateAsync({ portfolioId, file: values.file });
+      await importCSV.mutateAsync({ portfolioId, file });
       onClose();
     } catch (err) {
       // Surface the error and drop back to step 1 so the user can try again.

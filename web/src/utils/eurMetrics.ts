@@ -24,53 +24,42 @@ export interface HoldingEurValues {
 
 /**
  * Compute all EUR-denominated portfolio metrics from a PricedPortfolioStatus + live rate.
- * Returns null when usd_to_eur_rate is null (rate unavailable).
- *
- * Tax / total-return-after-tax / FX-impact metrics also return null when their
- * underlying EUR aggregates (``principal_eur``, ``principal_eur_avg``, or
- * ``dividends_eur``) are null — i.e. when the backend reports incomplete EUR
- * data for any contributing transaction. Computing tax against a partial sum
- * would silently overstate or understate the figure.
+ * Tax-related fields return null when any underlying EUR aggregate is missing — using
+ * a partial sum would silently over- or understate the figure.
  */
 export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | null => {
   const rate = status.usd_to_eur_rate;
-  if (rate === null || rate === undefined) return null;
+  if (rate == null) return null;
 
   const currentValueEur = status.current_value == null ? null : status.current_value * rate;
   const unrealizedGainsEur = status.unrealized_gains == null ? null : status.unrealized_gains * rate;
   const cashEur = status.cash * rate;
 
-  // Currency gains compare today's USD principal converted at the live rate
-  // against the EUR principal accumulated at historical rates. Both inputs
-  // must be defined; otherwise the difference is meaningless.
-  const currencyGainsEur =
-    status.principal_eur_avg == null ? null : status.principal * rate - status.principal_eur_avg;
+  const principalEurAvg = status.principal_eur_avg;
+  const currencyGainsEur = principalEurAvg == null ? null : status.principal * rate - principalEurAvg;
   const currencyGainsPct =
-    status.principal_eur_avg != null && status.principal_eur_avg > 0 && currencyGainsEur != null
-      ? (currencyGainsEur / status.principal_eur_avg) * 100
+    currencyGainsEur != null && principalEurAvg != null && principalEurAvg > 0
+      ? (currencyGainsEur / principalEurAvg) * 100
       : null;
 
-  // Skip tax when any EUR aggregate it depends on is unavailable — current
-  // value, principal, or dividends-with-no-conversion. Using a partial sum
-  // would yield a silently-wrong tax figure.
-  const skipTax =
-    currentValueEur == null ||
-    status.principal_eur == null ||
-    (status.dividends > 0 && status.dividends_eur == null);
+  const principalEur = status.principal_eur;
+  const dividendsEurMissing = status.dividends > 0 && status.dividends_eur == null;
+  const canComputeTax = currentValueEur != null && principalEur != null && !dividendsEurMissing;
+
   let capitalGainsEur: number | null = null;
   let taxEur: number | null = null;
   let totalReturnAfterTaxEur: number | null = null;
   let totalReturnAfterTaxPct: number | null = null;
   let currentValueAfterTaxEur: number | null = null;
 
-  if (!skipTax && currentValueEur != null && status.principal_eur != null) {
+  if (canComputeTax && currentValueEur != null && principalEur != null) {
     const dividendsForTax = status.dividends_eur ?? 0;
-    capitalGainsEur = currentValueEur - status.principal_eur - dividendsForTax;
+    capitalGainsEur = currentValueEur - principalEur - dividendsForTax;
     taxEur = capitalGainsEur > 0 ? capitalGainsEur * status.capital_gains_tax_rate : 0;
     currentValueAfterTaxEur = currentValueEur - taxEur;
-    totalReturnAfterTaxEur = currentValueEur - status.principal_eur - taxEur;
+    totalReturnAfterTaxEur = currentValueEur - principalEur - taxEur;
     totalReturnAfterTaxPct =
-      status.principal_eur > 0 ? (totalReturnAfterTaxEur / status.principal_eur) * 100 : null;
+      principalEur > 0 ? (totalReturnAfterTaxEur / principalEur) * 100 : null;
   }
 
   return {
@@ -89,44 +78,37 @@ export const computeEurMetrics = (status: PricedPortfolioStatus): EurMetrics | n
 };
 
 /**
- * Compute per-withdrawal taxable amounts.
- * In the Latvian model, withdrawals are tax-free up to (total deposited EUR + dividends EUR).
- * Returns a Map from original array index → taxable EUR amount for that withdrawal.
- *
- * When ``principalEur`` is null (some deposits lack a historical FX rate), the
- * taxable threshold cannot be computed accurately — the function returns an
- * empty map so callers render "—" instead of a wrong number.
+ * Compute per-withdrawal taxable amounts. In the Latvian model, withdrawals are
+ * tax-free up to (total deposited EUR + dividends EUR). Returns a Map from original
+ * array index → taxable EUR amount. Returns an empty map when EUR aggregates are
+ * incomplete so callers render "—" rather than a wrong number.
  */
 export const computeWithdrawalTaxMap = (
   withdrawals: WithdrawalFx[],
   principalEur: number | null,
   dividendsEur: number | null,
 ): Map<number, number> => {
-  if (principalEur == null) return new Map();
-  // When dividends EUR is unknown (some dividend rows lack a historical FX
-  // rate), the tax-free threshold cannot be computed accurately — substituting
-  // 0 would silently overstate taxes. Bail so callers render "—" instead.
-  if (dividendsEur == null) return new Map();
+  if (principalEur == null || dividendsEur == null) return new Map();
+
   const usableWithdrawals = withdrawals.filter(
     (w): w is WithdrawalFx & { amount_eur: number } => w.amount_eur != null,
   );
   const totalWithdrawnEur = usableWithdrawals.reduce((s, w) => s + w.amount_eur, 0);
-  const totalDepositedEur = principalEur + totalWithdrawnEur;
-  const threshold = totalDepositedEur + dividendsEur;
+  const threshold = principalEur + totalWithdrawnEur + dividendsEur;
 
   const indexed = withdrawals
     .map((w, i) => ({ w, i }))
     .filter(({ w }) => w.amount_eur != null);
   indexed.sort((a, b) => a.w.date.localeCompare(b.w.date));
+
   const map = new Map<number, number>();
   let running = 0;
   let prevTaxable = 0;
   for (const { w, i } of indexed) {
     running += w.amount_eur as number;
     const cumTaxable = Math.max(0, running - threshold);
-    const taxableThisRow = cumTaxable - prevTaxable;
+    map.set(i, cumTaxable - prevTaxable);
     prevTaxable = cumTaxable;
-    map.set(i, taxableThisRow);
   }
   return map;
 };

@@ -4,14 +4,13 @@ type ResolvedTheme = 'light' | 'dark';
 type ThemePreference = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
-  /** The user's preference (light | dark | system) */
   preference: ThemePreference;
-  /** The resolved theme applied to the document (light | dark) */
   theme: ResolvedTheme;
   setPreference: (p: ThemePreference) => void;
   toggleTheme: () => void;
 }
 
+const STORAGE_KEY = 'theme';
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 function getSystemTheme(): ResolvedTheme {
@@ -33,7 +32,7 @@ function getSystemThemeServer(): ResolvedTheme {
 function readPreference(): ThemePreference {
   if (globalThis.window === undefined) return 'system';
   try {
-    const saved = localStorage.getItem('theme');
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
   } catch {
     // localStorage unavailable
@@ -41,11 +40,9 @@ function readPreference(): ThemePreference {
   return 'system';
 }
 
-
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [preference, setPreference] = useState<ThemePreference>(readPreference);
-  // useSyncExternalStore handles subscription, snapshot, and tearing-safety in one
-  // call — and resyncs on mount automatically if the OS scheme shifted between
+  // useSyncExternalStore resyncs on mount if the OS scheme shifted between
   // initial render and the listener attaching.
   const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemTheme, getSystemThemeServer);
   const resolved: ResolvedTheme = preference === 'system' ? systemTheme : preference;
@@ -53,13 +50,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const persistAndSetPreference = useCallback((p: ThemePreference) => {
     setPreference(p);
     try {
-      localStorage.setItem('theme', p);
+      localStorage.setItem(STORAGE_KEY, p);
     } catch {
       // localStorage unavailable
     }
-  }, [setPreference]);
+  }, []);
 
-  // Apply to document
   useEffect(() => {
     if (globalThis.window === undefined) return;
     document.documentElement.classList.toggle('dark', resolved === 'dark');
@@ -74,11 +70,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [preference, resolved, persistAndSetPreference, toggleTheme]
   );
 
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
 
 // eslint-disable-next-line react-refresh/only-export-components

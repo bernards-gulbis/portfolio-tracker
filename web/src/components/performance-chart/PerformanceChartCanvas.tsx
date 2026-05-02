@@ -34,7 +34,6 @@ interface Props {
   onMouseLeave: () => void;
 }
 
-/** The actual ComposedChart with all its series, axes, and tooltip. */
 export const PerformanceChartCanvas = ({
   chartConfig,
   chartData,

@@ -28,15 +28,9 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from '@/components/ui/input-group';
 import { DatePickerField } from './transaction-form/DatePickerField';
 import { TickerCombobox } from './transaction-form/TickerCombobox';
-import { roundCurrencyOnBlur } from './transaction-form/helpers';
+import { MoneyField, NumberField } from './transaction-form/fields';
 import { useTransactionForm } from './transaction-form/useTransactionForm';
 
 interface TransactionModalProps {
@@ -45,6 +39,16 @@ interface TransactionModalProps {
   portfolioId: number;
   transaction?: Transaction;
 }
+
+const TRANSACTION_TYPE_ORDER: TransactionType[] = [
+  TransactionType.DEPOSIT,
+  TransactionType.WITHDRAW,
+  TransactionType.BUY,
+  TransactionType.SELL,
+  TransactionType.DIVIDEND,
+  TransactionType.FEE,
+  TransactionType.SPLIT,
+];
 
 export const TransactionModal = ({
   isOpen,
@@ -77,7 +81,7 @@ export const TransactionModal = ({
     markPriceAsUserEdited,
   } = useTransactionForm({ isOpen, portfolioId, transaction, onClose });
 
-  const { clearErrors } = form;
+  const { control, clearErrors } = form;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -91,13 +95,10 @@ export const TransactionModal = ({
 
         <form id="transaction-form" onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup className="py-4">
-
-            {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Date */}
               <Controller
                 name="date"
-                control={form.control}
+                control={control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-date">{t('transaction.modal.fields.date')}</FieldLabel>
@@ -114,10 +115,9 @@ export const TransactionModal = ({
                 )}
               />
 
-              {/* Time — native time input */}
               <Controller
                 name="time"
-                control={form.control}
+                control={control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-time">{t('transaction.modal.fields.time')}</FieldLabel>
@@ -135,10 +135,9 @@ export const TransactionModal = ({
               />
             </div>
 
-            {/* Transaction Type */}
             <Controller
               name="type"
-              control={form.control}
+              control={control}
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="tx-type">{t('transaction.modal.fields.type')}</FieldLabel>
@@ -154,24 +153,21 @@ export const TransactionModal = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={TransactionType.DEPOSIT}>{t('transaction.modal.types.Deposit')}</SelectItem>
-                      <SelectItem value={TransactionType.WITHDRAW}>{t('transaction.modal.types.Withdraw')}</SelectItem>
-                      <SelectItem value={TransactionType.BUY}>{t('transaction.modal.types.Buy')}</SelectItem>
-                      <SelectItem value={TransactionType.SELL}>{t('transaction.modal.types.Sell')}</SelectItem>
-                      <SelectItem value={TransactionType.DIVIDEND}>{t('transaction.modal.types.Dividend')}</SelectItem>
-                      <SelectItem value={TransactionType.FEE}>{t('transaction.modal.types.Fee')}</SelectItem>
-                      <SelectItem value={TransactionType.SPLIT}>{t('transaction.modal.types.Split')}</SelectItem>
+                      {TRANSACTION_TYPE_ORDER.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {t(`transaction.modal.types.${type}`)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </Field>
               )}
             />
 
-            {/* Ticker */}
             {showTicker && (
               <Controller
                 name="ticker"
-                control={form.control}
+                control={control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid || undefined}>
                     <FieldLabel htmlFor="tx-ticker">{t('transaction.modal.fields.ticker')}</FieldLabel>
@@ -204,234 +200,123 @@ export const TransactionModal = ({
               />
             )}
 
-            {/* Quantity */}
             {showQuantity && (
               <Controller
                 name="quantity"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-quantity">{t('transaction.modal.fields.quantity')}</FieldLabel>
-                    {isSell && selectedHolding ? (
-                      <div className="flex gap-2">
-                        <Input
-                          {...field}
-                          id="tx-quantity"
-                          type="number"
-                          step="0.00000001"
-                          min="0.00000001"
-                          placeholder={t('transaction.modal.fields.quantityPlaceholder')}
-                          autoComplete="off"
-                          aria-invalid={fieldState.invalid}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0 self-center"
-                          onClick={() => form.setValue('quantity', String(selectedHolding.quantity))}
-                        >
-                          {t('transaction.modal.fields.sellAll')}
-                        </Button>
-                      </div>
-                    ) : (
-                      <Input
-                        {...field}
-                        id="tx-quantity"
-                        type="number"
-                        step="0.00000001"
-                        min="0.00000001"
-                        placeholder={t('transaction.modal.fields.quantityPlaceholder')}
-                        autoComplete="off"
-                        aria-invalid={fieldState.invalid}
-                      />
-                    )}
-                    {isSell && selectedHolding && (
-                      <FieldDescription>
-                        {t('transaction.modal.fields.availableQuantity', { quantity: selectedHolding.quantity })}
-                      </FieldDescription>
-                    )}
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
+                control={control}
+                render={({ field, fieldState }) => {
+                  const showSellAll = isSell && selectedHolding;
+                  const input = (
+                    <Input
+                      {...field}
+                      id="tx-quantity"
+                      type="number"
+                      step="0.00000001"
+                      min="0.00000001"
+                      placeholder={t('transaction.modal.fields.quantityPlaceholder')}
+                      autoComplete="off"
+                      aria-invalid={fieldState.invalid}
+                      className={showSellAll ? 'flex-1' : undefined}
+                    />
+                  );
+                  return (
+                    <Field data-invalid={fieldState.invalid || undefined}>
+                      <FieldLabel htmlFor="tx-quantity">{t('transaction.modal.fields.quantity')}</FieldLabel>
+                      {showSellAll ? (
+                        <div className="flex gap-2">
+                          {input}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 self-center"
+                            onClick={() => form.setValue('quantity', String(selectedHolding.quantity))}
+                          >
+                            {t('transaction.modal.fields.sellAll')}
+                          </Button>
+                        </div>
+                      ) : (
+                        input
+                      )}
+                      {showSellAll && (
+                        <FieldDescription>
+                          {t('transaction.modal.fields.availableQuantity', { quantity: selectedHolding.quantity })}
+                        </FieldDescription>
+                      )}
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  );
+                }}
               />
             )}
 
-            {/* Price per Share */}
             {showPricePerShare && (
-              <Controller
+              <MoneyField
+                control={control}
                 name="pricePerShare"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-price">{t('transaction.modal.fields.pricePerShare')}</FieldLabel>
-                    <InputGroup>
-                      <InputGroupAddon>
-                        <InputGroupText>$</InputGroupText>
-                      </InputGroupAddon>
-                      <InputGroupInput
-                        {...field}
-                        id="tx-price"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        placeholder="0.00"
-                        autoComplete="off"
-                        aria-invalid={fieldState.invalid}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          markPriceAsUserEdited();
-                        }}
-                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
-                      />
-                    </InputGroup>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
+                id="tx-price"
+                label={t('transaction.modal.fields.pricePerShare')}
+                min="0.01"
+                currencySymbol="$"
+                onValueChange={markPriceAsUserEdited}
               />
             )}
 
-            {/* Fee */}
             {showFee && (
-              <Controller
+              <MoneyField
+                control={control}
                 name="fee"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-fee">{t('transaction.modal.fields.fee')}</FieldLabel>
-                    <InputGroup>
-                      <InputGroupAddon>
-                        <InputGroupText>$</InputGroupText>
-                      </InputGroupAddon>
-                      <InputGroupInput
-                        {...field}
-                        id="tx-fee"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        autoComplete="off"
-                        aria-invalid={fieldState.invalid}
-                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
-                      />
-                    </InputGroup>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
+                id="tx-fee"
+                label={t('transaction.modal.fields.fee')}
+                currencySymbol="$"
               />
             )}
 
-            {/* Total Amount */}
             {showTotalAmount && (
-              <Controller
+              <MoneyField
+                control={control}
                 name="totalAmount"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-total">{t('transaction.modal.fields.totalAmount')}</FieldLabel>
-                    <InputGroup>
-                      <InputGroupAddon>
-                        <InputGroupText>$</InputGroupText>
-                      </InputGroupAddon>
-                      <InputGroupInput
-                        {...field}
-                        id="tx-total"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        placeholder="0.00"
-                        autoComplete="off"
-                        aria-invalid={fieldState.invalid}
-                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
-                      />
-                    </InputGroup>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
+                id="tx-total"
+                label={t('transaction.modal.fields.totalAmount')}
+                min="0.01"
+                currencySymbol="$"
               />
             )}
 
-            {/* Amount in EUR */}
             {showValueEur && (
-              <Controller
+              <MoneyField
+                control={control}
                 name="valueEur"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-eur">{t('transaction.modal.fields.amountInEur')}</FieldLabel>
-                    <InputGroup>
-                      <InputGroupAddon>
-                        <InputGroupText>€</InputGroupText>
-                      </InputGroupAddon>
-                      <InputGroupInput
-                        {...field}
-                        id="tx-eur"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        autoComplete="off"
-                        aria-invalid={fieldState.invalid}
-                        onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>EUR</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
+                id="tx-eur"
+                label={t('transaction.modal.fields.amountInEur')}
+                currencySymbol="€"
+                trailingCurrencyCode="EUR"
               />
             )}
 
-            {/* Split Ratio */}
             {showSplitRatio && (
-              <Controller
+              <NumberField
+                control={control}
                 name="splitRatio"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-split">{t('transaction.modal.fields.splitRatio')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="tx-split"
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      placeholder={t('transaction.modal.fields.splitRatioPlaceholder')}
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    <FieldDescription>
-                      {t('transaction.modal.fields.splitRatioDescription')}
-                    </FieldDescription>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
+                id="tx-split"
+                label={t('transaction.modal.fields.splitRatio')}
+                placeholder={t('transaction.modal.fields.splitRatioPlaceholder')}
+                step="0.01"
+                min="0.01"
+                description={t('transaction.modal.fields.splitRatioDescription')}
               />
             )}
 
-            {/* FX Rate */}
             {showFxRate && (
-              <Controller
+              <NumberField
+                control={control}
                 name="fxRate"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-fx">{t('transaction.modal.fields.fxRate')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="tx-fx"
-                      type="number"
-                      step="0.0001"
-                      min="0.0001"
-                      placeholder={t('transaction.modal.fields.fxRatePlaceholder')}
-                      autoComplete="off"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    <FieldDescription>{t('transaction.modal.fields.fxRateDescription')}</FieldDescription>
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
+                id="tx-fx"
+                label={t('transaction.modal.fields.fxRate')}
+                placeholder={t('transaction.modal.fields.fxRatePlaceholder')}
+                step="0.0001"
+                min="0.0001"
+                description={t('transaction.modal.fields.fxRateDescription')}
               />
             )}
 

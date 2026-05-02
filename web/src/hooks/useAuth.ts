@@ -42,8 +42,8 @@ export const useUpdateProfile = () => {
   return useMutation({
     mutationFn: async (data: { name: string }) => {
       await updateUser({ name: data.name });
-      // Re-fetch via the custom GET /users/me so oauth_providers is always populated.
-      // The FastAPI Users PATCH response does not go through our custom handler.
+      // FastAPI Users PATCH response skips our custom handler, so re-fetch
+      // via GET /users/me to keep oauth_providers populated.
       return getCurrentUser();
     },
     onSuccess: (user) => {

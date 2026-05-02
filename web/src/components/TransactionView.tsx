@@ -70,11 +70,11 @@ export const TransactionView = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const transactions = paginatedData?.transactions || [];
-  const totalPages = paginatedData?.total_pages || 1;
-  const total = paginatedData?.total || 0;
-  const responsePage = paginatedData?.page || 1;
-  const responsePageSize = paginatedData?.page_size || DEFAULT_PAGE_SIZE;
+  const transactions = paginatedData?.transactions ?? [];
+  const totalPages = paginatedData?.total_pages ?? 1;
+  const total = paginatedData?.total ?? 0;
+  const responsePage = paginatedData?.page ?? 1;
+  const responsePageSize = paginatedData?.page_size ?? DEFAULT_PAGE_SIZE;
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -92,13 +92,12 @@ export const TransactionView = () => {
   };
 
   const handleExport = async () => {
-    if (!activePortfolioId) return;
+    if (activePortfolioId == null) return;
 
     setIsExporting(true);
     setExportError(null);
     try {
       const blob = await exportTransactionsCSV(activePortfolioId);
-
       const url = globalThis.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -191,7 +190,7 @@ export const TransactionView = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleExport}
-                  disabled={isExporting || !transactions || transactions.length === 0}
+                  disabled={isExporting || transactions.length === 0}
                 >
                   <DownloadIcon />
                   {isExporting ? t('transaction.view.exporting') : t('transaction.view.exportCsv')}

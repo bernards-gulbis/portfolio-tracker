@@ -8,13 +8,12 @@ import type {
   ViewMode,
 } from './types';
 
-/** Parse a YYYY-MM-DD string as a local date (avoids UTC shift in negative-offset timezones). */
+/** Parse YYYY-MM-DD as a local date — avoids UTC shift in negative-offset timezones. */
 export const parseYMD = (value: string): Date => {
   const [y, m, d] = value.split('-').map(Number);
   return new Date(y, m - 1, d);
 };
 
-/** Format a number as a signed percent string (e.g. "+12.34%" or "-5.67%"). */
 const formatPctDisplay = (pct: number): string =>
   `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
 
@@ -27,7 +26,6 @@ const EMPTY_VALUE_HEADER: ValueHeaderInfo = {
   isPositive: true,
 };
 
-/** Header values for absolute-value mode. */
 const getValueHeaderInfo = (
   point: ChartDataPoint,
   first: ChartDataPoint,
@@ -56,7 +54,6 @@ const getValueHeaderInfo = (
   };
 };
 
-/** Header values for percentage mode. */
 const getPctHeaderInfo = (point: ChartDataPoint): PctHeaderInfo => {
   const { returnPct: pct, sp500ReturnPct: sp500Pct } = point;
   if (pct == null) return { mode: 'pct', displayValue: '-', sp500Display: null, isPositive: true };
@@ -68,9 +65,8 @@ const getPctHeaderInfo = (point: ChartDataPoint): PctHeaderInfo => {
   };
 };
 
-/** Compute the header display values.
- *  Value-mode percent is money-weighted (diff / base) so it always agrees in sign with the
- *  absolute change shown next to it; pct-mode keeps the rebased TWR for benchmark comparison.
+/** Value-mode percent is money-weighted (diff / base) so its sign matches the absolute change;
+ *  pct-mode keeps the rebased TWR for benchmark comparison.
  *  Absolute change: "all" period uses value − principal; shorter periods use value − first value. */
 export const getHeaderValues = (
   point: ChartDataPoint,
@@ -80,8 +76,6 @@ export const getHeaderValues = (
   locale: string,
   isAllTime: boolean,
 ): HeaderInfo => {
-  if (viewMode === 'value') {
-    return getValueHeaderInfo(point, first, currency, locale, isAllTime);
-  }
+  if (viewMode === 'value') return getValueHeaderInfo(point, first, currency, locale, isAllTime);
   return getPctHeaderInfo(point);
 };

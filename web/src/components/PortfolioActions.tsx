@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { useNavigate } from 'react-router-dom';
 import { useDeletePortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
@@ -107,10 +106,7 @@ export const PortfolioActions = ({ portfolioId, portfolioName }: PortfolioAction
         portfolioName={portfolioName}
       />
 
-      <AlertDialog
-        open={isDeleteConfirmOpen}
-        onOpenChange={(open) => !open && setIsDeleteConfirmOpen(false)}
-      >
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">

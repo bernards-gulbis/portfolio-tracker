@@ -48,6 +48,9 @@ export const AccountSection = () => {
     }
   };
 
+  const isPending = closeAccountMutation.isPending;
+  const submitLabel = t('settings.account.submit');
+
   return (
     <div className="rounded-lg border border-destructive/50 p-4 space-y-4">
       <div>
@@ -80,9 +83,9 @@ export const AccountSection = () => {
                 <AlertDescription>{confirmForm.formState.errors.root.message}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" variant="destructive" disabled={closeAccountMutation.isPending}>
-              {closeAccountMutation.isPending && <Spinner />}
-              {t('settings.account.submit')}
+            <Button type="submit" variant="destructive" disabled={isPending}>
+              {isPending && <Spinner />}
+              {submitLabel}
             </Button>
           </FieldGroup>
         </form>
@@ -111,9 +114,9 @@ export const AccountSection = () => {
                 <AlertDescription>{passwordForm.formState.errors.root.message}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" variant="destructive" disabled={closeAccountMutation.isPending}>
-              {closeAccountMutation.isPending && <Spinner />}
-              {t('settings.account.submit')}
+            <Button type="submit" variant="destructive" disabled={isPending}>
+              {isPending && <Spinner />}
+              {submitLabel}
             </Button>
           </FieldGroup>
         </form>

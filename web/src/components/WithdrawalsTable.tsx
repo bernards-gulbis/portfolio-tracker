@@ -27,6 +27,26 @@ const formatEurOrDash = (value: number | null, locale: string): string =>
 const formatSignedEurOrDash = (value: number | null, locale: string): string =>
   value == null ? '-' : formatSignedCurrency(value, 'EUR', locale);
 
+interface TaxCellProps {
+  taxable: number;
+  taxRate: number;
+  locale: string;
+  label: string;
+  captionClassName?: string;
+}
+
+const TaxCell = ({ taxable, taxRate, locale, label, captionClassName }: TaxCellProps) => {
+  if (taxable <= 0) return <>-</>;
+  return (
+    <>
+      <span>{formatCurrency(taxable * taxRate, 'EUR', locale)}</span>
+      <span className={`block text-xs text-muted-foreground ${captionClassName ?? ''}`}>
+        {label} {formatCurrency(taxable, 'EUR', locale)}
+      </span>
+    </>
+  );
+};
+
 export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEur, dividendsEur, taxRate }: WithdrawalsTableProps) => {
   const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<string>('date');
@@ -53,12 +73,18 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
     const list = [...filteredWithdrawals];
     return list.sort((a, b) => {
       let diff: number;
-      if (sortKey === 'amount') diff = a.w.amount - b.w.amount;
-      else if (sortKey === 'fx_gain')
-        // Treat null FX gains as 0 for sort ordering — a missing-rate withdrawal
-        // shouldn't get a magnetised position at the top or bottom of the list.
-        diff = (a.w.realized_fx_gain ?? 0) - (b.w.realized_fx_gain ?? 0);
-      else diff = a.w.date.localeCompare(b.w.date);
+      switch (sortKey) {
+        case 'amount':
+          diff = a.w.amount - b.w.amount;
+          break;
+        case 'fx_gain':
+          // Treat null FX gains as 0 for sort ordering — a missing-rate withdrawal
+          // shouldn't get a magnetised position at the top or bottom of the list.
+          diff = (a.w.realized_fx_gain ?? 0) - (b.w.realized_fx_gain ?? 0);
+          break;
+        default:
+          diff = a.w.date.localeCompare(b.w.date);
+      }
       return sortAsc ? diff : -diff;
     });
   }, [filteredWithdrawals, sortKey, sortAsc]);
@@ -156,14 +182,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
                     {formatSignedEurOrDash(w.realized_fx_gain, locale)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {taxable > 0 ? (
-                      <>
-                        <span>{formatCurrency(taxable * taxRate, 'EUR', locale)}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {t('status.on')} {formatCurrency(taxable, 'EUR', locale)}
-                        </span>
-                      </>
-                    ) : '-'}
+                    <TaxCell taxable={taxable} taxRate={taxRate} locale={locale} label={t('status.on')} />
                   </TableCell>
                 </TableRow>
               );
@@ -178,14 +197,13 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
                   {formatSignedEurOrDash(withdrawalTotals.fxGain, locale)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {withdrawalTotals.taxable > 0 ? (
-                    <>
-                      <span>{formatCurrency(withdrawalTotals.taxable * taxRate, 'EUR', locale)}</span>
-                      <span className="block text-xs font-normal text-muted-foreground">
-                        {t('status.on')} {formatCurrency(withdrawalTotals.taxable, 'EUR', locale)}
-                      </span>
-                    </>
-                  ) : '-'}
+                  <TaxCell
+                    taxable={withdrawalTotals.taxable}
+                    taxRate={taxRate}
+                    locale={locale}
+                    label={t('status.on')}
+                    captionClassName="font-normal"
+                  />
                 </TableCell>
               </TableRow>
             )}

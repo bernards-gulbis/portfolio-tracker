@@ -4,6 +4,7 @@ const STORAGE_KEY = 'pt_currency';
 export type Currency = 'EUR' | 'USD';
 
 function readPreference(): Currency {
+  if (globalThis.window === undefined) return 'EUR';
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === 'USD' || stored === 'EUR') return stored;
@@ -30,9 +31,12 @@ export const CurrencyProvider: FC<{ children: ReactNode }> = ({ children }) => {
     } catch {
       // localStorage unavailable
     }
-  }, [setCurrency]);
+  }, []);
 
-  const value = useMemo(() => ({ currency, setCurrency: persistAndSetCurrency }), [currency, persistAndSetCurrency]);
+  const value = useMemo(
+    () => ({ currency, setCurrency: persistAndSetCurrency }),
+    [currency, persistAndSetCurrency],
+  );
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 };
@@ -40,7 +44,7 @@ export const CurrencyProvider: FC<{ children: ReactNode }> = ({ children }) => {
 // eslint-disable-next-line react-refresh/only-export-components
 export const useCurrencyPreference = (): CurrencyContextType => {
   const context = useContext(CurrencyContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useCurrencyPreference must be used within a CurrencyProvider');
   }
   return context;

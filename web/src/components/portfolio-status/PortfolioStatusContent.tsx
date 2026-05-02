@@ -39,13 +39,14 @@ import { formatCurrencyWithPercent } from './formatCurrencyWithPercent';
 import { useDerivedReturns } from './useDerivedReturns';
 
 const PerformanceChart = lazy(() =>
-  import('../PerformanceChart').then((m) => ({ default: m.PerformanceChart }))
+  import('../PerformanceChart').then((m) => ({ default: m.PerformanceChart })),
 );
 const HoldingsAllocationChart = lazy(() =>
-  import('../HoldingsAllocationChart').then((m) => ({ default: m.HoldingsAllocationChart }))
+  import('../HoldingsAllocationChart').then((m) => ({ default: m.HoldingsAllocationChart })),
 );
 
 const EMPTY_DATA_POINTS: PerformanceDataPoint[] = [];
+const chartFallback = <Skeleton className="h-[340px] w-full rounded-lg" />;
 
 export interface PortfolioStatusContentProps {
   status: PricedPortfolioStatus;
@@ -119,17 +120,46 @@ export const PortfolioStatusContent = ({
   const { netInvested, totalReturn, estimatedTax, afterTaxValue, fxImpact, fxImpactPct } =
     computeDisplayFigures(status, eur, currency);
   const eurRate = eur?.rate ?? null;
-  const taxRatePct = formatTaxRatePercent(status.capital_gains_tax_rate);
+
+  const fxCaption = fxImpact == null ? undefined : (
+    <p className={getValueClass(fxImpact)}>
+      {formatCurrencyWithPercent(fxImpact, fxImpactPct, 'EUR', locale)}
+      <span className="text-muted-foreground ml-1">{t('status.fxImpact')}</span>
+    </p>
+  );
+
+  const annualizedCaption = annualizedReturn == null ? undefined : (
+    <p className={`${getValueClass(annualizedReturn)} font-medium`}>
+      {formatSignedPercent(annualizedReturn)} {t('status.annualized').toLowerCase()}
+    </p>
+  );
+
+  const taxCaption = estimatedTax == null ? undefined : (
+    <p className="text-muted-foreground inline-flex items-center gap-1">
+      <span>
+        {t('status.estTax', { rate: formatTaxRatePercent(status.capital_gains_tax_rate) })}: −
+        {formatCurrency(estimatedTax, currency, locale)}
+      </span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <InfoIcon
+              aria-label={t('status.estTaxFlatTooltip')}
+              className="h-3.5 w-3.5 text-muted-foreground cursor-help"
+            />
+          </TooltipTrigger>
+          <TooltipContent className="max-w-72">
+            <p>{t('status.estTaxFlatTooltip')}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </p>
+  );
 
   return (
     <>
-      {/* Toolbar */}
       {toolbar && <div className="flex justify-end">{toolbar}</div>}
 
-      {/* EUR-incomplete banner — non-destructive: data is correct, just missing
-          some FX rates the user can supply by editing transactions. Both
-          conditions checked: defends against ``eur_incomplete=true`` with an
-          empty id list (would render "0 missing rates"). */}
       {status.eur_incomplete && status.fx_missing_tx_ids.length > 0 && (
         <EurIncompleteBanner
           missingCount={status.fx_missing_tx_ids.length}
@@ -137,64 +167,25 @@ export const PortfolioStatusContent = ({
         />
       )}
 
-      {/* One banner here instead of a row of "missing" chips on every ticker. */}
-      {providerUnavailable && (
-        <InfoBanner>{t('status.providerUnavailable')}</InfoBanner>
-      )}
+      {providerUnavailable && <InfoBanner>{t('status.providerUnavailable')}</InfoBanner>}
 
-      {/* Transaction Warnings */}
       <WarningsAlert warnings={status.warnings} locale={locale} />
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label={t('status.netInvested')}
           value={netInvested == null ? '-' : formatCurrency(netInvested, currency, locale)}
-          caption={
-            fxImpact == null ? undefined : (
-              <p className={getValueClass(fxImpact)}>
-                {formatCurrencyWithPercent(fxImpact, fxImpactPct, 'EUR', locale)}
-                <span className="text-muted-foreground ml-1">{t('status.fxImpact')}</span>
-              </p>
-            )
-          }
+          caption={fxCaption}
         />
         <StatCard
           label={t('status.totalReturn')}
           value={totalReturn == null ? '-' : formatSignedCurrency(totalReturn, currency, locale)}
-          caption={
-            annualizedReturn == null ? undefined : (
-              <p className={`${getValueClass(annualizedReturn)} font-medium`}>
-                {formatSignedPercent(annualizedReturn)} {t('status.annualized').toLowerCase()}
-              </p>
-            )
-          }
+          caption={annualizedCaption}
         />
         <StatCard
           label={t('status.afterTaxValue')}
           value={afterTaxValue == null ? '-' : formatCurrency(afterTaxValue, currency, locale)}
-          caption={
-            estimatedTax == null ? undefined : (
-              <p className="text-muted-foreground inline-flex items-center gap-1">
-                <span>
-                  {t('status.estTax', { rate: taxRatePct })}: −{formatCurrency(estimatedTax, currency, locale)}
-                </span>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <InfoIcon
-                        aria-label={t('status.estTaxFlatTooltip')}
-                        className="h-3.5 w-3.5 text-muted-foreground cursor-help"
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-72">
-                      <p>{t('status.estTaxFlatTooltip')}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </p>
-            )
-          }
+          caption={taxCaption}
         />
       </div>
 
@@ -208,10 +199,9 @@ export const PortfolioStatusContent = ({
         </InfoBanner>
       )}
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
         {performanceError == null ? (
-          <Suspense fallback={<Skeleton className="h-[340px] w-full rounded-lg" />}>
+          <Suspense fallback={chartFallback}>
             <PerformanceChart
               data={performance?.data_points ?? EMPTY_DATA_POINTS}
               isLoading={isPerformanceLoading}
@@ -231,7 +221,7 @@ export const PortfolioStatusContent = ({
             </CardContent>
           </Card>
         )}
-        <Suspense fallback={<Skeleton className="h-[340px] w-full rounded-lg" />}>
+        <Suspense fallback={chartFallback}>
           <HoldingsAllocationChart
             holdings={status.holdings}
             cash={status.cash}
@@ -242,7 +232,6 @@ export const PortfolioStatusContent = ({
         </Suspense>
       </div>
 
-      {/* Holdings Table */}
       <CollapsibleSection title={t('status.positions')} defaultOpen>
         <HoldingsTable
           holdings={status.holdings}
@@ -255,7 +244,6 @@ export const PortfolioStatusContent = ({
         />
       </CollapsibleSection>
 
-      {/* Realized Gains */}
       {status.realized_sales.length > 0 && (
         <CollapsibleSection
           title={t('status.realizedGains')}
@@ -265,7 +253,6 @@ export const PortfolioStatusContent = ({
         </CollapsibleSection>
       )}
 
-      {/* Dividends Received */}
       {status.dividends_received.length > 0 && (
         <CollapsibleSection title={t('status.dividendsReceived')}>
           <DividendsReceivedTable
@@ -276,7 +263,6 @@ export const PortfolioStatusContent = ({
         </CollapsibleSection>
       )}
 
-      {/* Withdrawals & Taxes */}
       {status.realized_withdrawals.length > 0 && (
         <CollapsibleSection title={t('status.withdrawals')}>
           <WithdrawalsTable

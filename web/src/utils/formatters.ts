@@ -1,50 +1,38 @@
-/** Cache for Intl.NumberFormat instances — avoids re-creating formatters on every call
- *  (e.g. during rapid mouse-hover updates on the performance chart). */
+/** Cached so rapid updates (e.g. chart hover) don't recreate Intl formatters. */
 const currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
 const getCurrencyFormatter = (locale: string, currency: string): Intl.NumberFormat => {
   const key = `${locale}:${currency}`;
-  let fmt = currencyFormatterCache.get(key);
-  if (!fmt) {
-    fmt = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    currencyFormatterCache.set(key, fmt);
-  }
+  const cached = currencyFormatterCache.get(key);
+  if (cached) return cached;
+  const fmt = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  currencyFormatterCache.set(key, fmt);
   return fmt;
 };
 
-/**
- * Format currency value. Pass the locale returned by useLocale() for reactive formatting.
- */
+/** Pass the locale returned by useLocale() for reactive formatting. */
 export const formatCurrency = (value: number, currency: string = 'USD', locale: string = 'en-US'): string => {
   return getCurrencyFormatter(locale, currency).format(value);
 };
 
-/**
- * Format currency with a sign prefix: '+' for positive values, nothing for zero/negative
- * (negative sign is already included by formatCurrency). Returns '-' for null/undefined.
- */
+/** Adds '+' for positive values; negatives keep their built-in sign. Returns '-' for null/undefined. */
 export const formatSignedCurrency = (value: number | null | undefined, currency: string = 'USD', locale: string = 'en-US'): string => {
   if (value == null) return '-';
   const sign = value > 0 ? '+' : '';
   return `${sign}${formatCurrency(value, currency, locale)}`;
 };
 
-/**
- * Format quantity — show up to 8 decimals but strip trailing zeros.
- */
+/** Up to 8 decimals, trailing zeros stripped. */
 export const formatQuantity = (value: number): string => {
-  const fixed = value.toFixed(8);
-  return fixed.replace(/\.?0+$/, '');
+  return value.toFixed(8).replace(/\.?0+$/, '');
 };
 
-/**
- * Format date. Pass the locale returned by useLocale() for reactive formatting.
- */
+/** Pass the locale returned by useLocale() for reactive formatting. */
 export const formatDateTime = (date: string, locale: string = 'en-US'): string => {
   return new Date(date).toLocaleDateString(locale, {
     year: 'numeric',
@@ -55,9 +43,7 @@ export const formatDateTime = (date: string, locale: string = 'en-US'): string =
   });
 };
 
-/**
- * Compact date format for tables — includes year, no time.
- */
+/** Compact date (no time) for tables. */
 export const formatDateCompact = (date: string, locale: string = 'en-US'): string => {
   return new Date(date).toLocaleDateString(locale, {
     year: 'numeric',
@@ -66,31 +52,25 @@ export const formatDateCompact = (date: string, locale: string = 'en-US'): strin
   });
 };
 
-/**
- * Format a percent value with ▲/▼ sign prefix. Returns '-' for null/undefined.
- */
+/** Percent value with ▲/▼ prefix; '-' for null/undefined. */
 export const formatSignedPercent = (value: number | null | undefined): string => {
   if (value == null) return '-';
-  const sign = value >= 0 ? '\u25B2' : '\u25BC';
+  const sign = value >= 0 ? '▲' : '▼';
   return `${sign}${Math.abs(value).toFixed(2)}%`;
 };
 
-/**
- * Returns a CSS class for positive/negative values (green/red).
- */
+/** CSS class for positive (green) / negative (red) values. */
 export const getValueClass = (value: number | null | undefined): string => {
   if (value == null) return '';
   return value >= 0 ? 'text-positive' : 'text-negative';
 };
 
-/**
- * Format a day count as a human-friendly duration string.
- * < 31 days  → "Xd"
- * 31–365     → "Xm Yd" (omit "0d")
- * > 365      → "Xy Xm" (omit "0m")
- */
 const defaultDaysHeldLabels: { d: string; m: string; y: string } = { d: 'd', m: 'm', y: 'y' };
 
+/**
+ * Day count → human duration:
+ * <31 → "Xd"; 31–365 → "Xm Yd" (omit "0d"); >365 → "Xy Xm" (omit "0m").
+ */
 export const formatDaysHeld = (
   days: number,
   labels = defaultDaysHeldLabels,
@@ -99,16 +79,16 @@ export const formatDaysHeld = (
   if (days <= 365) {
     const months = Math.floor(days / 30);
     const remainDays = days - months * 30;
-    return remainDays === 0 ? `${months}${labels.m}` : `${months}${labels.m} ${remainDays}${labels.d}`;
+    if (remainDays === 0) return `${months}${labels.m}`;
+    return `${months}${labels.m} ${remainDays}${labels.d}`;
   }
   const years = Math.floor(days / 365);
   const remainMonths = Math.floor((days - years * 365) / 30);
-  return remainMonths === 0 ? `${years}${labels.y}` : `${years}${labels.y} ${remainMonths}${labels.m}`;
+  if (remainMonths === 0) return `${years}${labels.y}`;
+  return `${years}${labels.y} ${remainMonths}${labels.m}`;
 };
 
-/**
- * Format a Date as YYYY-MM-DD using local time (avoids UTC shift from toISOString).
- */
+/** YYYY-MM-DD using local time (avoids UTC shift from toISOString). */
 export const toLocalDateStr = (d: Date): string => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -116,23 +96,15 @@ export const toLocalDateStr = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
-/**
- * Format a tax rate (a fraction in [0, 1]) as a percent string with up to
- * two decimal places, trimming trailing zeros. 0.215 → "21.5", 0.25 → "25".
- */
+/** Tax-rate fraction (0..1) → percent string with up to 2 decimals; trailing zeros trimmed. */
 export const formatTaxRatePercent = (rate: number): string => {
-  const pct = rate * 100;
-  return pct.toFixed(2).replace(/\.?0+$/, '');
+  return (rate * 100).toFixed(2).replace(/\.?0+$/, '');
 };
 
 /**
- * Whole-day count from a YYYY-MM-DD-prefixed date string to a reference
- * millisecond timestamp, using local-calendar semantics. Any time suffix on
- * the input is ignored.
- *
- * Local-calendar semantics avoid two bugs: parsing "YYYY-MM-DD" as UTC
- * (browser default) would shift by one day in negative-UTC timezones, and
- * simple millisecond arithmetic would be off across DST transitions.
+ * Whole-day count from a YYYY-MM-DD-prefixed date string to a reference timestamp,
+ * using local-calendar semantics. Avoids UTC-parse off-by-one in negative-UTC zones
+ * and DST drift from raw millisecond arithmetic.
  */
 export const daysSinceLocalDate = (dateStr: string, now: number): number => {
   const [yStr, mStr, dStr] = dateStr.slice(0, 10).split('-');
