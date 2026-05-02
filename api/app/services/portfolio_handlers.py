@@ -5,6 +5,12 @@ is the single source of truth for running balances (cash, principal, holdings,
 realized gains, warnings). Handlers never fetch prices or FX rates directly —
 they read whatever is already on the transaction or on the state.
 
+Cost basis is tracked per FIFO lot — each ``BUY`` appends a new ``_Lot`` to
+the holding's lot queue, and each ``SELL`` consumes lots from the head in
+chronological order. A sell that spans multiple lots produces multiple
+``_RealizedSale`` rows, each annotated with the consumed lot's acquisition
+date so tax reports can report gains lot-by-lot.
+
 Also includes ``_compute_forward_split_factors``, a pure transactions-list
 helper used by historical valuation to back out Yahoo's split-adjusted prices.
 """
@@ -21,12 +27,100 @@ from app.services.portfolio_types import (
     _DividendReceived,
     _eur_from_tx,
     _Holding,
+    _Lot,
     _RealizedSale,
     _to_decimal,
     _TxState,
     _Warning,
     _WithdrawalFx,
 )
+
+
+def _record_realized_sale(
+    state: _TxState,
+    *,
+    ticker: str,
+    tx_date_str: str,
+    quantity_before: Decimal,
+    consumed_qty: Decimal,
+    consumed_cost: Decimal,
+    proceeds: Decimal,
+    acquired_at_str: str,
+) -> None:
+    """Record one realized-gain row for a single FIFO lot consumption."""
+    realized_gain = proceeds - consumed_cost
+    state.realized_gains += realized_gain
+    state.realized_sales.append(
+        _RealizedSale(
+            ticker=ticker,
+            date=tx_date_str,
+            quantity=float(consumed_qty),
+            quantity_before=float(quantity_before),
+            proceeds=float(proceeds),
+            cost_basis=float(consumed_cost),
+            realized_gain=float(realized_gain),
+            first_buy_date=acquired_at_str,
+        )
+    )
+
+
+def _consume_lots_fifo(
+    state: _TxState,
+    h: _Holding,
+    *,
+    ticker: str,
+    tx_date_str: str,
+    effective_qty: Decimal,
+    effective_total: Decimal,
+    quantity_before: Decimal,
+) -> None:
+    """Consume *effective_qty* shares from the head of *h.lots* in FIFO order.
+
+    *effective_total* is the total proceeds and is split across consumed lots
+    in proportion to each lot's share of *effective_qty*. Emits one
+    ``_RealizedSale`` per lot touched.
+    """
+    if effective_qty <= 0:
+        return
+    remaining = effective_qty
+    while remaining > HOLDINGS_EPSILON and h.lots:
+        lot = h.lots[0]
+        if lot.quantity <= remaining + HOLDINGS_EPSILON:
+            consumed_qty = lot.quantity
+            consumed_cost = lot.cost
+            proceeds = effective_total * (consumed_qty / effective_qty)
+            _record_realized_sale(
+                state,
+                ticker=ticker,
+                tx_date_str=tx_date_str,
+                quantity_before=quantity_before,
+                consumed_qty=consumed_qty,
+                consumed_cost=consumed_cost,
+                proceeds=proceeds,
+                acquired_at_str=lot.acquired_at.strftime(_ISO_DATETIME_FMT),
+            )
+            h.lots.pop(0)
+            remaining -= consumed_qty
+        else:
+            consumed_qty = remaining
+            # Proportional cost for the consumed slice of this lot — leaves the
+            # remainder of the lot intact for any future sell.
+            consumed_cost = lot.cost * (consumed_qty / lot.quantity)
+            proceeds = effective_total * (consumed_qty / effective_qty)
+            _record_realized_sale(
+                state,
+                ticker=ticker,
+                tx_date_str=tx_date_str,
+                quantity_before=quantity_before,
+                consumed_qty=consumed_qty,
+                consumed_cost=consumed_cost,
+                proceeds=proceeds,
+                acquired_at_str=lot.acquired_at.strftime(_ISO_DATETIME_FMT),
+            )
+            lot.quantity -= consumed_qty
+            lot.cost -= consumed_cost
+            remaining = _ZERO
+
 
 # ================== Transaction handlers ==================
 
@@ -154,12 +248,10 @@ def _apply_buy(state: _TxState, tx: Transaction, strict: bool) -> None:
     if tx.ticker:
         quantity = _to_decimal(tx.quantity or 0)
         if tx.ticker not in state.holdings:
-            state.holdings[tx.ticker] = _Holding(
-                quantity=_ZERO, total_cost=_ZERO, first_buy_date=tx.date
-            )
-        h = state.holdings[tx.ticker]
-        h.quantity += quantity
-        h.total_cost += -total
+            state.holdings[tx.ticker] = _Holding()
+        state.holdings[tx.ticker].lots.append(
+            _Lot(quantity=quantity, cost=-total, acquired_at=tx.date)
+        )
 
 
 def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
@@ -184,60 +276,45 @@ def _apply_sell(state: _TxState, tx: Transaction, strict: bool) -> None:
         )
         return
     h = state.holdings[ticker]
-    if quantity > h.quantity + HOLDINGS_EPSILON:
+    held = h.quantity
+    tx_date_str = tx.date.strftime(_ISO_DATETIME_FMT)
+
+    if quantity > held + HOLDINGS_EPSILON:
         # Always emit: the partial-sell branch silently truncates the
         # quantity, which is dangerous when the underlying chart consumer
         # (perf replay) has no other signal. See ``sellNotInHoldings`` above.
         state.warnings.append(
             _Warning(
                 code="sellOversell",
-                date=tx.date.strftime(_ISO_DATETIME_FMT),
+                date=tx_date_str,
                 params={
                     "ticker": ticker,
                     "quantity": str(quantity),
-                    "available": str(h.quantity),
+                    "available": str(held),
                 },
             )
         )
-        # Partial sell: sell only what is held, with proportional total
-        held = h.quantity
-        partial_total = total * (held / quantity) if quantity > 0 else _ZERO
-        cost_basis = h.total_cost
-        state.cash += partial_total
-        state.realized_gains += partial_total - cost_basis
-        state.realized_sales.append(
-            _RealizedSale(
-                ticker=ticker,
-                date=tx.date.strftime(_ISO_DATETIME_FMT),
-                quantity=float(held),
-                quantity_before=float(held),
-                proceeds=float(partial_total),
-                cost_basis=float(cost_basis),
-                realized_gain=float(partial_total - cost_basis),
-                first_buy_date=h.first_buy_date.strftime(_ISO_DATETIME_FMT),
-            )
-        )
-        del state.holdings[ticker]
-        return
-    state.cash += total
-    # Proportional cost removal: avoids intermediate avg_cost rounding
-    cost_basis = h.total_cost * (quantity / h.quantity) if h.quantity > 0 else _ZERO
-    state.realized_gains += total - cost_basis
-    state.realized_sales.append(
-        _RealizedSale(
-            ticker=ticker,
-            date=tx.date.strftime(_ISO_DATETIME_FMT),
-            quantity=float(quantity),
-            quantity_before=float(h.quantity),
-            proceeds=float(total),
-            cost_basis=float(cost_basis),
-            realized_gain=float(total - cost_basis),
-            first_buy_date=h.first_buy_date.strftime(_ISO_DATETIME_FMT),
-        )
+        # Truncate to what's held; total proceeds scaled by held/requested.
+        effective_qty = held
+        effective_total = total * (held / quantity) if quantity > 0 else _ZERO
+    else:
+        effective_qty = quantity
+        effective_total = total
+
+    state.cash += effective_total
+    _consume_lots_fifo(
+        state,
+        h,
+        ticker=ticker,
+        tx_date_str=tx_date_str,
+        effective_qty=effective_qty,
+        effective_total=effective_total,
+        quantity_before=held,
     )
-    h.quantity -= quantity
-    h.total_cost -= cost_basis
-    if h.quantity < HOLDINGS_EPSILON:
+
+    # Drop empty lots and remove the holding entirely if everything is gone.
+    h.lots = [lot for lot in h.lots if lot.quantity > HOLDINGS_EPSILON]
+    if not h.lots:
         del state.holdings[ticker]
 
 
@@ -281,7 +358,10 @@ def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
             )
         return
     if tx.ticker and tx.ticker in state.holdings:
-        state.holdings[tx.ticker].quantity *= split_ratio
+        # Split adjusts share count per lot; cost basis is unchanged so
+        # cost-per-share scales inversely with the split ratio.
+        for lot in state.holdings[tx.ticker].lots:
+            lot.quantity *= split_ratio
 
 
 _TX_HANDLERS = {

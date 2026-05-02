@@ -22,7 +22,7 @@ from app.models.historical_price import (
 )
 from app.models.user import User
 from app.services.portfolio_handlers import _apply_transaction
-from app.services.portfolio_types import _Holding, _TxState
+from app.services.portfolio_types import _Holding, _Lot, _TxState
 from main import app
 
 
@@ -3041,9 +3041,13 @@ def test_sell_non_strict_oversell():
     state = _TxState()
     state.cash = Decimal("5000")
     state.holdings["AAPL"] = _Holding(
-        quantity=Decimal("5"),
-        total_cost=Decimal("500"),
-        first_buy_date=datetime(2024, 1, 1),
+        lots=[
+            _Lot(
+                quantity=Decimal("5"),
+                cost=Decimal("500"),
+                acquired_at=datetime(2024, 1, 1),
+            )
+        ]
     )
 
     tx = Transaction(
@@ -3856,9 +3860,13 @@ def test_warning_oversell_partial_strict():
     state = _TxState()
     state.cash = Decimal("5000")
     state.holdings["AAPL"] = _Holding(
-        quantity=Decimal("5"),
-        total_cost=Decimal("500"),
-        first_buy_date=datetime(2024, 1, 1),
+        lots=[
+            _Lot(
+                quantity=Decimal("5"),
+                cost=Decimal("500"),
+                acquired_at=datetime(2024, 1, 1),
+            )
+        ]
     )
 
     tx = Transaction(

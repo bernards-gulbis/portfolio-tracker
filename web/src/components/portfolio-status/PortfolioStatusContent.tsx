@@ -25,6 +25,7 @@ import {
   type PricedPortfolioStatus,
 } from '../../api';
 
+import { ErrorBoundary } from '../ErrorBoundary';
 import { HoldingsTable } from '../HoldingsTable';
 import { RealizedGainsTable, DividendsReceivedTable } from '../RealizedGainsTable';
 import { WithdrawalsTable } from '../WithdrawalsTable';
@@ -201,14 +202,16 @@ export const PortfolioStatusContent = ({
 
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
         {performanceError == null ? (
-          <Suspense fallback={chartFallback}>
-            <PerformanceChart
-              data={performance?.data_points ?? EMPTY_DATA_POINTS}
-              isLoading={isPerformanceLoading}
-              currency={currency}
-              liveLastPoint={liveLastPoint}
-            />
-          </Suspense>
+          <ErrorBoundary fullScreen={false}>
+            <Suspense fallback={chartFallback}>
+              <PerformanceChart
+                data={performance?.data_points ?? EMPTY_DATA_POINTS}
+                isLoading={isPerformanceLoading}
+                currency={currency}
+                liveLastPoint={liveLastPoint}
+              />
+            </Suspense>
+          </ErrorBoundary>
         ) : (
           <Card>
             <CardContent>
@@ -221,27 +224,31 @@ export const PortfolioStatusContent = ({
             </CardContent>
           </Card>
         )}
-        <Suspense fallback={chartFallback}>
-          <HoldingsAllocationChart
-            holdings={status.holdings}
-            cash={status.cash}
-            eurRate={eurRate}
-            displayCurrency={currency}
-            isLoading={isAllocationLoading}
-          />
-        </Suspense>
+        <ErrorBoundary fullScreen={false}>
+          <Suspense fallback={chartFallback}>
+            <HoldingsAllocationChart
+              holdings={status.holdings}
+              cash={status.cash}
+              eurRate={eurRate}
+              displayCurrency={currency}
+              isLoading={isAllocationLoading}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </div>
 
       <CollapsibleSection title={t('status.positions')} defaultOpen>
-        <HoldingsTable
-          holdings={status.holdings}
-          missingPrices={status.missing_prices}
-          cash={status.cash}
-          displayCurrency={currency}
-          showEur={showEur}
-          eurMetrics={eur}
-          locale={locale}
-        />
+        <ErrorBoundary fullScreen={false}>
+          <HoldingsTable
+            holdings={status.holdings}
+            missingPrices={status.missing_prices}
+            cash={status.cash}
+            displayCurrency={currency}
+            showEur={showEur}
+            eurMetrics={eur}
+            locale={locale}
+          />
+        </ErrorBoundary>
       </CollapsibleSection>
 
       {status.realized_sales.length > 0 && (
@@ -249,29 +256,35 @@ export const PortfolioStatusContent = ({
           title={t('status.realizedGains')}
           secondary={`(${t('status.realizedGainsMethod')})`}
         >
-          <RealizedGainsTable realizedSales={status.realized_sales} locale={locale} />
+          <ErrorBoundary fullScreen={false}>
+            <RealizedGainsTable realizedSales={status.realized_sales} locale={locale} />
+          </ErrorBoundary>
         </CollapsibleSection>
       )}
 
       {status.dividends_received.length > 0 && (
         <CollapsibleSection title={t('status.dividendsReceived')}>
-          <DividendsReceivedTable
-            dividendsReceived={status.dividends_received}
-            displayCurrency={currency}
-            locale={locale}
-          />
+          <ErrorBoundary fullScreen={false}>
+            <DividendsReceivedTable
+              dividendsReceived={status.dividends_received}
+              displayCurrency={currency}
+              locale={locale}
+            />
+          </ErrorBoundary>
         </CollapsibleSection>
       )}
 
       {status.realized_withdrawals.length > 0 && (
         <CollapsibleSection title={t('status.withdrawals')}>
-          <WithdrawalsTable
-            realizedWithdrawals={status.realized_withdrawals}
-            locale={locale}
-            principalEur={status.principal_eur}
-            dividendsEur={status.dividends_eur}
-            taxRate={status.capital_gains_tax_rate}
-          />
+          <ErrorBoundary fullScreen={false}>
+            <WithdrawalsTable
+              realizedWithdrawals={status.realized_withdrawals}
+              locale={locale}
+              principalEur={status.principal_eur}
+              dividendsEur={status.dividends_eur}
+              taxRate={status.capital_gains_tax_rate}
+            />
+          </ErrorBoundary>
         </CollapsibleSection>
       )}
     </>

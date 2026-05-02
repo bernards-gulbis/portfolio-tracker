@@ -114,8 +114,13 @@ class YahooFinanceClient:
                         400 <= resp.status_code < 500
                         and resp.status_code not in cls._TRANSIENT_4XX
                     ):
-                        # Permanent client error — surface immediately.
-                        resp.raise_for_status()
+                        # Permanent client error — release the connection
+                        # before surfacing the error so we don't pin it
+                        # to the pool until GC.
+                        try:
+                            resp.raise_for_status()
+                        finally:
+                            resp.close()
                     if (
                         resp.status_code >= 500
                         or resp.status_code in cls._TRANSIENT_4XX
@@ -131,6 +136,10 @@ class YahooFinanceClient:
                             resp.status_code,
                             resp.reason,
                         )
+                        # Release the connection — we won't read the body
+                        # before retrying, and leaving it hanging would
+                        # exhaust the pool under repeated retry storms.
+                        resp.close()
                         cls._sleep_before_retry(attempt)
                         continue
                     resp.raise_for_status()

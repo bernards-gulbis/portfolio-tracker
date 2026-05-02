@@ -4,10 +4,15 @@ In-memory TTL cache (``PRICE_CACHE_TTL_SECONDS``) shared across all
 threads, guarded by a single lock. ``get_last_known_price[_with_date]``
 read straight from the ``HistoricalPrice`` table for fallback when the
 live fetch returns nothing.
+
+Concurrent callers asking for the same ticker share a single in-flight
+fetch via a per-ticker ``Future`` registry — without it, N concurrent
+status requests for the same portfolio would fan out N identical Yahoo
+requests during the cache-miss window.
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import ClassVar
@@ -30,12 +35,19 @@ class LivePriceService:
     _price_cache: ClassVar[dict[str, tuple[float | None, datetime]]] = {}
     _cache_ttl: timedelta = timedelta(seconds=PRICE_CACHE_TTL_SECONDS)
     _cache_lock = Lock()
+    # Single-flight registry: per-ticker Future shared across concurrent
+    # cache-missers. The first caller registers a Future and runs the fetch;
+    # waiters await the same Future and read the resulting cache entry.
+    _in_flight: ClassVar[dict[str, "Future[float | None]"]] = {}
+    _in_flight_lock = Lock()
 
     @classmethod
     def clear_cache(cls) -> None:
         """Clear the in-memory price cache. Used by tests."""
         with cls._cache_lock:
             cls._price_cache.clear()
+        with cls._in_flight_lock:
+            cls._in_flight.clear()
 
     @classmethod
     def get_current_prices(
@@ -70,7 +82,8 @@ class LivePriceService:
         """Fetch the current price for a single ticker, with TTL cache.
 
         Returns ``None`` on permanent failure (4xx, parse error) or after
-        retry-exhaustion on the underlying HTTP client.
+        retry-exhaustion on the underlying HTTP client. Concurrent callers
+        for the same ticker share one fetch via the in-flight registry.
         """
         now = datetime.now(UTC)
         with cls._cache_lock:
@@ -80,24 +93,53 @@ class LivePriceService:
                     logger.debug("Cache hit for %s: %s", ticker, cached_price)
                     return cached_price
 
+        # Cache miss — register or join an in-flight fetch.
+        own_fetch = False
+        with cls._in_flight_lock:
+            existing = cls._in_flight.get(ticker)
+            if existing is not None:
+                fetch_future = existing
+            else:
+                fetch_future = Future()
+                cls._in_flight[ticker] = fetch_future
+                own_fetch = True
+
+        if not own_fetch:
+            # Another thread is already fetching this ticker. Wait on its
+            # Future — the result is identical to what we would have fetched.
+            try:
+                return fetch_future.result()
+            except Exception:
+                return None
+
+        try:
+            fetched_price = cls._fetch_from_yahoo(ticker)
+            with cls._cache_lock:
+                existing_entry = cls._price_cache.get(ticker)
+                if existing_entry is None or (now - existing_entry[1]) >= cls._cache_ttl:
+                    cls._price_cache[ticker] = (fetched_price, now)
+            fetch_future.set_result(fetched_price)
+            return fetched_price
+        finally:
+            with cls._in_flight_lock:
+                cls._in_flight.pop(ticker, None)
+
+    @classmethod
+    def _fetch_from_yahoo(cls, ticker: str) -> float | None:
+        """Inner fetch — error-swallowing to match the existing public
+        contract (``None`` on any failure)."""
         try:
             response = YahooFinanceClient.fetch_chart(
                 ticker, {"interval": "1d", "range": "1d"}
             )
             data = response.json()
             result = data.get("chart", {}).get("result", [])
-            fetched_price: float | None = None
             if result:
                 meta = result[0].get("meta", {})
                 current_price = meta.get("regularMarketPrice")
                 if current_price is not None:
-                    fetched_price = float(current_price)
-
-            with cls._cache_lock:
-                existing = cls._price_cache.get(ticker)
-                if existing is None or (now - existing[1]) >= cls._cache_ttl:
-                    cls._price_cache[ticker] = (fetched_price, now)
-            return fetched_price
+                    return float(current_price)
+            return None
         except requests.exceptions.RequestException as e:
             logger.warning("Network error fetching price for %s: %s", ticker, e)
             return None

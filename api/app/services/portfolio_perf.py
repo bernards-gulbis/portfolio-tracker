@@ -226,7 +226,12 @@ def _compute_perf_data_point(
     fx_rate = _bisect_lookup(sorted_fx_dates, fx_rates, date_str)
 
     # Time-Weighted Return: chain sub-period returns between cash-flow events.
-    return_pct = None
+    # When ``base <= 0`` (portfolio fully cashed out, or principal exactly
+    # offsets value), there is no defined return for the sub-period — we emit
+    # ``None`` rather than carrying the prior factor forward as a flat line,
+    # which the chart would visually misread as "no change" rather than
+    # "no holdings".
+    return_pct: float | None
     if not twr.started:
         if current_value > 0:
             twr.started = True
@@ -237,7 +242,9 @@ def _compute_perf_data_point(
         if base > 0:
             sub_return = current_value / base
             twr.twr_factor *= sub_return
-        return_pct = float((twr.twr_factor - _ONE) * Decimal("100"))
+            return_pct = float((twr.twr_factor - _ONE) * Decimal("100"))
+        else:
+            return_pct = None
 
     twr.prev_value = current_value
     twr.prev_principal = state.principal
