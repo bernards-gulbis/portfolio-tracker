@@ -435,7 +435,12 @@ export interface paths {
         get?: never;
         /**
          * Update Transaction
-         * @description Update a transaction
+         * @description Update a transaction.
+         *
+         *     Forwards only the fields the client actually sent. Omitted fields stay
+         *     unchanged; explicit ``null`` values flow through to the service so
+         *     nullable columns can be cleared. ``type`` is renamed to
+         *     ``transaction_type`` to match the service's kwarg.
          */
         put: operations["update_transaction_transactions__transaction_id__put"];
         post?: never;

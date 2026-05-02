@@ -1,20 +1,12 @@
 import * as z from 'zod';
 import i18n from '../../i18n/index';
+import { nameField } from '../../utils/portfolioNameSchema';
 
 export const SECTIONS = ['profile', 'password', 'tax', 'account'] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 
 export const profileSchema = z.object({
-  // ``.trim()`` runs before ``.superRefine()`` so the parsed/submitted value
-  // has no surrounding whitespace; previously we only validated the trimmed
-  // length but persisted the untrimmed string.
-  name: z.string().trim().superRefine((val, ctx) => {
-    if (val.length < 1) {
-      ctx.addIssue({ code: 'custom', message: i18n.t('settings.validation.nameRequired') });
-    } else if (val.length > 255) {
-      ctx.addIssue({ code: 'custom', message: i18n.t('settings.validation.nameTooLong') });
-    }
-  }),
+  name: nameField('settings.validation.nameRequired', 'settings.validation.nameTooLong'),
 });
 export type ProfileFormValues = z.infer<typeof profileSchema>;
 
