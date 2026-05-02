@@ -749,7 +749,7 @@ export interface components {
         };
         /**
          * PortfolioBase
-         * @description Base portfolio schema (used for both create and update).
+         * @description Base portfolio schema.
          */
         PortfolioBase: {
             /** Name */

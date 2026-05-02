@@ -1,5 +1,6 @@
 """Performance time-series calculation for portfolios."""
 
+import dataclasses
 import logging
 from bisect import bisect_right
 from dataclasses import dataclass
@@ -367,8 +368,5 @@ def calculate_performance(
         )
         performance_data.append(data_point_dict)
 
-    warnings = [
-        TransactionWarning(code=w.code, date=w.date, params=w.params)
-        for w in state.warnings
-    ]
+    warnings = [TransactionWarning(**dataclasses.asdict(w)) for w in state.warnings]
     return performance_data, sorted(cost_basis_fallback_tickers), warnings

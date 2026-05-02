@@ -1,5 +1,5 @@
-"""Tests for the portfolio calculation subsystem — handlers, valuation,
-status — and for portfolio_perf.py."""
+"""Tests for the portfolio calculation subsystem — handlers and status —
+and for portfolio_perf.py."""
 
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -19,7 +19,6 @@ from app.services.portfolio_status import (
     calculate_status,
 )
 from app.services.portfolio_types import _ZERO, _Holding, _TxState
-from app.services.portfolio_valuation import _resolve_usd_to_eur_rate
 
 
 def _make_tx(**kwargs) -> Transaction:
@@ -545,13 +544,12 @@ class TestCalculatePerformanceEdgeCases:
                 return_value=None,
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
+                "app.services.portfolio_status.FxRateService."
                 "get_historical_usd_to_eur_rates",
                 return_value={},
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
-                "get_usd_to_eur_rate_safe",
+                "app.services.portfolio_status.FxRateService.get_usd_to_eur_rate_safe",
                 return_value=0.9,
             ),
         ):
@@ -605,13 +603,12 @@ class TestCalculatePerformanceEdgeCases:
                 return_value=None,
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
+                "app.services.portfolio_status.FxRateService."
                 "get_historical_usd_to_eur_rates",
                 return_value={},
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
-                "get_usd_to_eur_rate_safe",
+                "app.services.portfolio_status.FxRateService.get_usd_to_eur_rate_safe",
                 return_value=0.9,
             ),
         ):
@@ -625,40 +622,6 @@ class TestCalculatePerformanceEdgeCases:
         assert any(w.code == "sellOversell" for w in warnings), (
             f"expected sellOversell warning, got {[w.code for w in warnings]}"
         )
-
-
-# ── portfolio_valuation: _resolve_usd_to_eur_rate ─────────────────────
-
-
-class TestResolveUsdToEurRate:
-    def test_fallback_to_live_rate_when_no_historical(self):
-        with (
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_historical_usd_to_eur_rates",
-                return_value={},
-            ),
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_usd_to_eur_rate_safe",
-                return_value=0.92,
-            ) as mock_live,
-        ):
-            rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
-        mock_live.assert_called_once()
-        assert rate == pytest.approx(0.92)
-
-    def test_returns_historical_rate_when_available(self):
-        with (
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_historical_usd_to_eur_rates",
-                return_value={"2024-06-15": 0.91},
-            ),
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_usd_to_eur_rate_safe",
-            ) as mock_live,
-        ):
-            rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
-        mock_live.assert_not_called()
-        assert rate == pytest.approx(0.91)
 
 
 # ==================== Decimal precision regression ====================

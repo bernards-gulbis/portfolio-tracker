@@ -14,7 +14,6 @@ app/
   services/
     portfolio_service.py         # Orchestration (delegates to status + perf)
     portfolio_handlers.py        # Per-type transaction handlers + dispatch
-    portfolio_valuation.py       # Price + FX resolution for historical dates
     portfolio_status.py          # calculate_status orchestrator
     portfolio_perf.py            # Time-series performance
     portfolio_types.py           # TypedDict definitions

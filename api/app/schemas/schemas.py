@@ -38,7 +38,7 @@ class CloseAccountRequest(BaseModel):
 
 
 class PortfolioBase(BaseModel):
-    """Base portfolio schema (used for both create and update)."""
+    """Base portfolio schema."""
 
     name: str = Field(min_length=1, max_length=255)
 

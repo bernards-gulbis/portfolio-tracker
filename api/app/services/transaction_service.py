@@ -48,6 +48,22 @@ MAX_CSV_ROWS = 5000
 
 _ERR_EUR_AMOUNT_SIGN_MISMATCH = "eur_amount sign must match total_amount sign"
 
+# Update fields requiring float→Decimal coercion before assignment to a
+# table=True model. SQLModel doesn't run Pydantic validation on assignment,
+# so a raw float would stay a float and mix with DB-loaded Decimals on
+# subsequent arithmetic.
+_NUMERIC_UPDATE_FIELDS = frozenset(
+    {
+        "quantity",
+        "price_per_share",
+        "fee",
+        "total_amount",
+        "eur_amount",
+        "split_ratio",
+        "fx_rate",
+    }
+)
+
 
 def _csv_field(value):
     """Convert None to empty string for CSV export."""
@@ -238,32 +254,27 @@ class TransactionService:
             val_fee,
         )
 
-        # Numeric fields must be coerced to Decimal before assignment — SQLModel
-        # table=True models don't run Pydantic validation on assignment, so a
-        # raw float would stay a float on the in-memory instance and mix with
-        # DB-loaded Decimals on subsequent arithmetic.
-        if date is not None:
-            transaction.date = date
-        if transaction_type is not None:
-            transaction.type = transaction_type
-        if ticker is not None:
-            transaction.ticker = ticker
-        if currency is not None:
-            transaction.currency = currency
-        if quantity is not None:
-            transaction.quantity = _to_decimal(quantity)
-        if price_per_share is not None:
-            transaction.price_per_share = _to_decimal(price_per_share)
-        if fee is not None:
-            transaction.fee = _to_decimal(fee)
-        if total_amount is not None:
-            transaction.total_amount = _to_decimal(total_amount)
-        if eur_amount is not None:
-            transaction.eur_amount = _to_decimal(eur_amount)
-        if split_ratio is not None:
-            transaction.split_ratio = _to_decimal(split_ratio)
-        if fx_rate is not None:
-            transaction.fx_rate = _to_decimal(fx_rate)
+        updates = {
+            "date": date,
+            "type": transaction_type,
+            "ticker": ticker,
+            "currency": currency,
+            "quantity": quantity,
+            "price_per_share": price_per_share,
+            "fee": fee,
+            "total_amount": total_amount,
+            "eur_amount": eur_amount,
+            "split_ratio": split_ratio,
+            "fx_rate": fx_rate,
+        }
+        for field, value in updates.items():
+            if value is None:
+                continue
+            setattr(
+                transaction,
+                field,
+                _to_decimal(value) if field in _NUMERIC_UPDATE_FIELDS else value,
+            )
 
         return self.transaction_repo.update(transaction)
 
@@ -332,12 +343,7 @@ class TransactionService:
         split_ratio: float | None,
         eur_amount: float | None,
     ) -> None:
-        """Validate fx_rate / split_ratio positivity and the eur_amount-vs-total_amount sign agreement.
-
-        Shared by ``create_transaction`` and ``update_transaction`` so the same
-        sign-mismatch rule applies to both — historically this block was
-        duplicated and could drift out of sync.
-        """
+        """Validate fx_rate / split_ratio positivity and the eur_amount-vs-total_amount sign agreement."""
         if fx_rate is not None and fx_rate <= 0:
             raise InvalidTransactionDataException("fx_rate must be positive")
         if split_ratio is not None and split_ratio <= 0:
