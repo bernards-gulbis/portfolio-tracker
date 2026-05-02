@@ -197,6 +197,29 @@ describe('useGainsTableData', () => {
     rerender({ viewMode: 'ungrouped' });
     expect(result.current.sortKey).toBe('date');
   });
+
+  it('toggles sort direction on the first date click after switching from grouped (count) to ungrouped', () => {
+    const sales = [
+      makeSale({ ticker: 'AAPL' }),
+      makeSale({ ticker: 'AAPL', date: '2025-05-01T10:00:00' }),
+      makeSale({ ticker: 'MSFT' }),
+    ];
+    const { result, rerender } = renderHook(
+      ({ viewMode }) => useGainsTableData({ realizedSales: sales, viewMode }),
+      { initialProps: { viewMode: 'grouped' as TableViewMode } },
+    );
+
+    act(() => { result.current.handleSort('count'); });
+    expect(result.current.sortAsc).toBe(false);
+
+    rerender({ viewMode: 'ungrouped' });
+    expect(result.current.sortKey).toBe('date');
+    expect(result.current.sortAsc).toBe(false);
+
+    act(() => { result.current.handleSort('date'); });
+    expect(result.current.sortKey).toBe('date');
+    expect(result.current.sortAsc).toBe(true);
+  });
 });
 
 describe('useDividendsTableData', () => {

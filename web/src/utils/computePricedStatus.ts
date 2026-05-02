@@ -68,7 +68,12 @@ export const computePricedStatus = (
   let unrealizedGains: number | null = null;
   let unrealizedGainsPct: number | null = null;
 
-  if (hasLivePrices) {
+  if (status.holdings.length === 0) {
+    // 100% cash: no prices needed, current value is exactly the cash balance.
+    holdingsValue = 0;
+    currentValue = status.cash;
+    unrealizedGains = 0;
+  } else if (hasLivePrices) {
     // Holdings with null current_value (missing price) are treated as zero.
     holdingsValue = pricedHoldings.reduce((sum, h) => sum + (h.current_value ?? 0), 0);
     currentValue = status.cash + holdingsValue;

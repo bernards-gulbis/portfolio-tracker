@@ -35,6 +35,7 @@ describe('RealizedGainsTable', () => {
   };
 
   it('renders gains table with grouped ticker rows', () => {
+    localStorage.setItem('pt_gains_view_mode', 'grouped');
     const sales: RealizedSale[] = [
       makeSale({ ticker: 'AAPL', realized_gain: 200 }),
       makeSale({ ticker: 'AAPL', date: '2025-05-01T10:00:00', realized_gain: 100 }),
@@ -48,6 +49,17 @@ describe('RealizedGainsTable', () => {
     expect(screen.getAllByText('MSFT').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('2 sells').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('1 sell').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('defaults to flat view when no preference is stored', () => {
+    const sales: RealizedSale[] = [
+      makeSale({ ticker: 'AAPL', realized_gain: 200 }),
+      makeSale({ ticker: 'MSFT', realized_gain: -50 }),
+    ];
+    render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
+
+    expect(screen.getByRole('tab', { name: 'Flat', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Grouped', selected: false })).toBeInTheDocument();
   });
 
   it('shows empty state message when no results after filter', async () => {
@@ -64,6 +76,7 @@ describe('RealizedGainsTable', () => {
   });
 
   it('expands ticker group to show individual sales on click', async () => {
+    localStorage.setItem('pt_gains_view_mode', 'grouped');
     const sales: RealizedSale[] = [
       makeSale({ ticker: 'AAPL', proceeds: 1000, cost_basis: 800 }),
     ];
@@ -152,7 +165,8 @@ describe('RealizedGainsTable', () => {
     expect(screen.getByRole('tab', { name: 'Flat' })).toBeInTheDocument();
   });
 
-  it('switches to flat view and shows one row per sale with the gain percentage', async () => {
+  it('switches from grouped to flat view and shows one row per sale with the gain percentage', async () => {
+    localStorage.setItem('pt_gains_view_mode', 'grouped');
     const sales: RealizedSale[] = [
       makeSale({ ticker: 'AAPL', proceeds: 1000, cost_basis: 800, realized_gain: 200 }),
       makeSale({ ticker: 'AAPL', date: '2025-05-01T10:00:00', proceeds: 600, cost_basis: 500, realized_gain: 100 }),
@@ -169,22 +183,22 @@ describe('RealizedGainsTable', () => {
     expect(screen.getAllByText('AAPL').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('persists the flat view choice to localStorage', async () => {
+  it('persists the grouped view choice to localStorage', async () => {
     const sales: RealizedSale[] = [makeSale({ ticker: 'AAPL' })];
     const user = userEvent.setup();
     render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
 
-    await user.click(screen.getByRole('tab', { name: 'Flat' }));
-    expect(localStorage.getItem('pt_gains_view_mode')).toBe('ungrouped');
+    await user.click(screen.getByRole('tab', { name: 'Grouped' }));
+    expect(localStorage.getItem('pt_gains_view_mode')).toBe('grouped');
   });
 
-  it('reads stored flat preference on initial render', () => {
-    localStorage.setItem('pt_gains_view_mode', 'ungrouped');
+  it('reads stored grouped preference on initial render', () => {
+    localStorage.setItem('pt_gains_view_mode', 'grouped');
     const sales: RealizedSale[] = [makeSale({ ticker: 'AAPL', realized_gain: 200 })];
     render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
-    // The Flat tab is selected
-    expect(screen.getByRole('tab', { name: 'Flat', selected: true })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Grouped', selected: false })).toBeInTheDocument();
+    // The Grouped tab is selected, overriding the flat default.
+    expect(screen.getByRole('tab', { name: 'Grouped', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Flat', selected: false })).toBeInTheDocument();
   });
 });
 
@@ -240,6 +254,7 @@ describe('DividendsReceivedTable', () => {
   });
 
   it('expands dividend group to show individual payments', async () => {
+    localStorage.setItem('pt_dividends_view_mode', 'grouped');
     const dividends: DividendReceived[] = [
       makeDividend({ ticker: 'AAPL', date: '2025-06-15T10:00:00', amount: 25 }),
       makeDividend({ ticker: 'AAPL', date: '2025-03-15T10:00:00', amount: 20 }),
@@ -258,7 +273,20 @@ describe('DividendsReceivedTable', () => {
     expect(screen.getAllByText('$20.00').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('switches to flat view and shows one row per payment', async () => {
+  it('defaults to flat view when no preference is stored', () => {
+    const dividends: DividendReceived[] = [
+      makeDividend({ ticker: 'AAPL', date: '2025-06-15T10:00:00', amount: 25 }),
+      makeDividend({ ticker: 'AAPL', date: '2025-03-15T10:00:00', amount: 20 }),
+    ];
+    render(<DividendsReceivedTable dividendsReceived={dividends} {...defaultProps} />);
+
+    expect(screen.getByRole('tab', { name: 'Flat', selected: true })).toBeInTheDocument();
+    // Both payments visible as separate rows without expanding.
+    expect(screen.getAllByText('AAPL').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('switches from grouped to flat view and shows one row per payment', async () => {
+    localStorage.setItem('pt_dividends_view_mode', 'grouped');
     const dividends: DividendReceived[] = [
       makeDividend({ ticker: 'AAPL', date: '2025-06-15T10:00:00', amount: 25 }),
       makeDividend({ ticker: 'AAPL', date: '2025-03-15T10:00:00', amount: 20 }),
@@ -274,13 +302,13 @@ describe('DividendsReceivedTable', () => {
     expect(screen.getAllByText('AAPL').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('persists dividend flat-view preference independently of gains', async () => {
+  it('persists dividend grouped-view preference independently of gains', async () => {
     const dividends: DividendReceived[] = [makeDividend({ ticker: 'AAPL' })];
     const user = userEvent.setup();
     render(<DividendsReceivedTable dividendsReceived={dividends} {...defaultProps} />);
 
-    await user.click(screen.getByRole('tab', { name: 'Flat' }));
-    expect(localStorage.getItem('pt_dividends_view_mode')).toBe('ungrouped');
+    await user.click(screen.getByRole('tab', { name: 'Grouped' }));
+    expect(localStorage.getItem('pt_dividends_view_mode')).toBe('grouped');
     expect(localStorage.getItem('pt_gains_view_mode')).toBeNull();
   });
 });

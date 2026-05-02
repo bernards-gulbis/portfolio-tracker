@@ -61,14 +61,12 @@ export const FilterControls = ({ availableYears, yearFilter, onYearChange, filte
         />
       )}
       {showViewModeToggle && (
-        <div className="ml-auto">
-          <Tabs value={viewMode} onValueChange={(v) => onViewModeChange(v as TableViewMode)}>
-            <TabsList aria-label={t('status.viewMode.aria')}>
-              <TabsTrigger value="grouped">{t('status.viewMode.grouped')}</TabsTrigger>
-              <TabsTrigger value="ungrouped">{t('status.viewMode.ungrouped')}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        <Tabs value={viewMode} onValueChange={(v) => onViewModeChange(v as TableViewMode)} className="ml-auto">
+          <TabsList aria-label={t('status.viewMode.aria')}>
+            <TabsTrigger value="grouped">{t('status.viewMode.grouped')}</TabsTrigger>
+            <TabsTrigger value="ungrouped">{t('status.viewMode.ungrouped')}</TabsTrigger>
+          </TabsList>
+        </Tabs>
       )}
     </div>
   );
@@ -98,8 +96,6 @@ function formatDividendAmount(
   }
   return formatCurrency(amountUsd, 'USD', locale);
 }
-
-// ================== Expandable Group Row ==================
 
 interface ExpandableGroupRowProps {
   ticker: string;
@@ -138,8 +134,6 @@ const ExpandableGroupRow = ({ ticker, isExpanded, onToggle, summaryColumns, expa
     )}
   </>
 );
-
-// ================== Sale Row (reused by grouped expansion + flat view) ==================
 
 interface GainsSaleRowProps {
   sale: RealizedSale;
@@ -204,7 +198,27 @@ const GainsSaleRow = ({ sale, locale, showTicker = false }: GainsSaleRowProps) =
   );
 };
 
-// ================== Dividend Payment Row (reused by grouped expansion + flat view) ==================
+const GainsSaleHeaderMiddleColumns = () => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <TableHead className="text-right">{t('status.columns.daysHeld')}</TableHead>
+      <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
+      <TableHead className="text-right">
+        <div className="flex flex-col">
+          <span>{t('status.columns.buyTotal')}</span>
+          <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+        </div>
+      </TableHead>
+      <TableHead className="text-right">
+        <div className="flex flex-col">
+          <span>{t('status.columns.sellTotal')}</span>
+          <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
+        </div>
+      </TableHead>
+    </>
+  );
+};
 
 interface DividendPaymentRowProps {
   payment: DividendReceived;
@@ -225,7 +239,57 @@ const DividendPaymentRow = ({ payment, displayCurrency, locale, showTicker = fal
   </TableRow>
 );
 
-// ================== Realized Gains Table ==================
+interface GainsTotalsRowProps {
+  isGrouped: boolean;
+  gain: number;
+  count: number;
+  locale: string;
+}
+
+const GainsTotalsRow = ({ isGrouped, gain, count, locale }: GainsTotalsRowProps) => {
+  const { t } = useTranslation();
+  return (
+    <TableRow className="bg-muted/30 font-semibold">
+      <TableCell colSpan={isGrouped ? 1 : 5} className="text-sm">{t('status.total')}</TableCell>
+      {isGrouped && <TableCell />}
+      <TableCell className={isGrouped ? '' : 'text-right'}>
+        <Badge variant="secondary" className="text-xs">
+          {t('status.sellCount', { count })}
+        </Badge>
+      </TableCell>
+      <TableCell className={`min-w-[7rem] text-right text-sm tabular-nums ${getValueClass(gain)}`}>
+        {formatSignedCurrency(gain, 'USD', locale)}
+      </TableCell>
+    </TableRow>
+  );
+};
+
+interface DividendsTotalsRowProps {
+  isGrouped: boolean;
+  totalUsd: number;
+  totalEur: number | null;
+  count: number;
+  displayCurrency: 'EUR' | 'USD';
+  locale: string;
+}
+
+const DividendsTotalsRow = ({ isGrouped, totalUsd, totalEur, count, displayCurrency, locale }: DividendsTotalsRowProps) => {
+  const { t } = useTranslation();
+  return (
+    <TableRow className="bg-muted/30 font-semibold">
+      <TableCell className="text-sm">{t('status.total')}</TableCell>
+      {isGrouped && <TableCell />}
+      <TableCell>
+        <Badge variant="secondary" className="text-xs">
+          {t('status.paymentCount', { count })}
+        </Badge>
+      </TableCell>
+      <TableCell className="min-w-[7rem] text-right text-sm tabular-nums">
+        {formatDividendAmount(totalUsd, totalEur, displayCurrency, locale)}
+      </TableCell>
+    </TableRow>
+  );
+};
 
 interface RealizedGainsTableProps {
   realizedSales: RealizedSale[];
@@ -234,7 +298,7 @@ interface RealizedGainsTableProps {
 
 export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGainsTableProps) => {
   const { t } = useTranslation();
-  const { viewMode, setViewMode } = useTableViewMode('pt_gains_view_mode');
+  const { viewMode, setViewMode } = useTableViewMode('pt_gains_view_mode', 'ungrouped');
   const {
     expandState, sortKey, sortAsc, filter, yearFilter,
     availableYears, filteredGains, pagedGains, gainsTotals,
@@ -283,18 +347,7 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
                     />
                   ))}
                   {filteredGains.length > 0 && (
-                    <TableRow className="bg-muted/30 font-semibold">
-                      <TableCell className="text-sm">{t('status.total')}</TableCell>
-                      <TableCell />
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs">
-                          {t('status.sellCount', { count: gainsTotals.count })}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={`min-w-[7rem] text-right text-sm tabular-nums ${getValueClass(gainsTotals.gain)}`}>
-                        {formatSignedCurrency(gainsTotals.gain, 'USD', locale)}
-                      </TableCell>
-                    </TableRow>
+                    <GainsTotalsRow isGrouped gain={gainsTotals.gain} count={gainsTotals.count} locale={locale} />
                   )}
                 </TableBody>
               </>
@@ -304,20 +357,7 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
                   <TableRow>
                     <SortableTableHead label={t('status.columns.ticker')} sortKey="ticker" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableTableHead label={t('status.columns.date')} sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                    <TableHead className="text-right">{t('status.columns.daysHeld')}</TableHead>
-                    <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
-                    <TableHead className="text-right">
-                      <div className="flex flex-col">
-                        <span>{t('status.columns.buyTotal')}</span>
-                        <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <div className="flex flex-col">
-                        <span>{t('status.columns.sellTotal')}</span>
-                        <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
-                      </div>
-                    </TableHead>
+                    <GainsSaleHeaderMiddleColumns />
                     <SortableTableHead label={t('status.columns.realizedGL')} sortKey="gain" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
                   </TableRow>
                 </TableHeader>
@@ -334,17 +374,7 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
                     />
                   ))}
                   {filteredGains.length > 0 && (
-                    <TableRow className="bg-muted/30 font-semibold">
-                      <TableCell colSpan={5} className="text-sm">{t('status.total')}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="secondary" className="text-xs">
-                          {t('status.sellCount', { count: gainsTotals.count })}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={`min-w-[7rem] text-right text-sm tabular-nums ${getValueClass(gainsTotals.gain)}`}>
-                        {formatSignedCurrency(gainsTotals.gain, 'USD', locale)}
-                      </TableCell>
-                    </TableRow>
+                    <GainsTotalsRow isGrouped={false} gain={gainsTotals.gain} count={gainsTotals.count} locale={locale} />
                   )}
                 </TableBody>
               </>
@@ -359,8 +389,6 @@ export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGains
 
 RealizedGainsTable.displayName = 'RealizedGainsTable';
 
-// ================== Dividends Received Table ==================
-
 interface DividendsReceivedTableProps {
   dividendsReceived: DividendReceived[];
   displayCurrency: 'EUR' | 'USD';
@@ -369,7 +397,7 @@ interface DividendsReceivedTableProps {
 
 export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency, locale }: DividendsReceivedTableProps) => {
   const { t } = useTranslation();
-  const { viewMode, setViewMode } = useTableViewMode('pt_dividends_view_mode');
+  const { viewMode, setViewMode } = useTableViewMode('pt_dividends_view_mode', 'ungrouped');
   const {
     expandState, sortKey, sortAsc, filter, yearFilter,
     availableYears, filteredDividends, pagedDividends, dividendTotals,
@@ -418,18 +446,14 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
                   />
                 ))}
                 {filteredDividends.length > 0 && (
-                  <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell className="text-sm">{t('status.total')}</TableCell>
-                    <TableCell />
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {t('status.paymentCount', { count: dividendTotals.count })}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="min-w-[7rem] text-right text-sm tabular-nums">
-                      {formatDividendAmount(dividendTotals.totalUsd, dividendTotals.totalEur, displayCurrency, locale)}
-                    </TableCell>
-                  </TableRow>
+                  <DividendsTotalsRow
+                    isGrouped
+                    totalUsd={dividendTotals.totalUsd}
+                    totalEur={dividendTotals.totalEur}
+                    count={dividendTotals.count}
+                    displayCurrency={displayCurrency}
+                    locale={locale}
+                  />
                 )}
               </TableBody>
             </>
@@ -456,17 +480,14 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
                   />
                 ))}
                 {filteredDividends.length > 0 && (
-                  <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell className="text-sm">{t('status.total')}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {t('status.paymentCount', { count: dividendTotals.count })}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="min-w-[7rem] text-right text-sm tabular-nums">
-                      {formatDividendAmount(dividendTotals.totalUsd, dividendTotals.totalEur, displayCurrency, locale)}
-                    </TableCell>
-                  </TableRow>
+                  <DividendsTotalsRow
+                    isGrouped={false}
+                    totalUsd={dividendTotals.totalUsd}
+                    totalEur={dividendTotals.totalEur}
+                    count={dividendTotals.count}
+                    displayCurrency={displayCurrency}
+                    locale={locale}
+                  />
                 )}
               </TableBody>
             </>
@@ -479,8 +500,6 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
 });
 
 DividendsReceivedTable.displayName = 'DividendsReceivedTable';
-
-// ================== Gains Group Row (grouped mode) ==================
 
 interface GainsTickerGroupRowProps {
   group: TickerGroup;
@@ -516,20 +535,7 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
           <TableHeader>
             <TableRow>
               <TableHead>{t('status.columns.date')}</TableHead>
-              <TableHead className="text-right">{t('status.columns.daysHeld')}</TableHead>
-              <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
-              <TableHead className="text-right">
-                <div className="flex flex-col">
-                  <span>{t('status.columns.buyTotal')}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
-                </div>
-              </TableHead>
-              <TableHead className="text-right">
-                <div className="flex flex-col">
-                  <span>{t('status.columns.sellTotal')}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{t('status.priceCaption')}</span>
-                </div>
-              </TableHead>
+              <GainsSaleHeaderMiddleColumns />
               <TableHead className="text-right">{t('status.columns.realizedGL')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -543,8 +549,6 @@ const GainsTickerGroupRow = ({ group, isExpanded, onToggle, locale }: GainsTicke
     />
   );
 };
-
-// ================== Dividends Group Row (grouped mode) ==================
 
 interface DividendTickerGroupRowProps {
   group: DividendTickerGroup;

@@ -89,6 +89,26 @@ describe('computeDisplayFigures', () => {
       expect(f.estimatedTax).toBeNull();
       expect(f.afterTaxValue).toBeNull();
     });
+
+    it('computes totalReturn from cash when 100% cash', () => {
+      const status: PricedPortfolioStatus = {
+        ...baseStatus,
+        holdings: [],
+        holdings_cost: 0,
+        holdings_value: 0,
+        cash: 1200,
+        principal: 1000,
+        current_value: 1200,
+        unrealized_gains: 0,
+        unrealized_gains_pct: null,
+      };
+      const f = computeDisplayFigures(status, baseEur, 'USD');
+      expect(f.totalValue).toBe(1200);
+      expect(f.netInvested).toBe(1000);
+      expect(f.totalReturn).toBe(200);
+      expect(f.estimatedTax).toBe(40); // (1200 - 1000 - 0) * 0.2
+      expect(f.afterTaxValue).toBe(1160);
+    });
   });
 
   describe('EUR mode', () => {
@@ -139,6 +159,43 @@ describe('computeDisplayFigures', () => {
       const f = computeDisplayFigures(baseStatus, eur, 'EUR');
       expect(f.totalValue).toBeNull();
       expect(f.totalReturn).toBeNull();
+    });
+
+    it('computes totalReturn from cash·rate when 100% cash', () => {
+      // 1200 USD cash @ 0.9 = 1080 EUR; principal_eur = 1000 (historical).
+      // Capital gains EUR = 1080 - 1000 - 0 = 80; tax = 80 * 0.2 = 16.
+      const status: PricedPortfolioStatus = {
+        ...baseStatus,
+        holdings: [],
+        holdings_cost: 0,
+        holdings_value: 0,
+        cash: 1200,
+        principal: 1000,
+        principal_eur: 1000,
+        principal_eur_avg: 1000,
+        current_value: 1200,
+        unrealized_gains: 0,
+        unrealized_gains_pct: null,
+      };
+      const eur: EurMetrics = {
+        rate: 0.9,
+        currentValueEur: 1080,
+        unrealizedGainsEur: 0,
+        currencyGainsEur: 80,
+        currencyGainsPct: 8,
+        capitalGainsEur: 80,
+        taxEur: 16,
+        totalReturnAfterTaxEur: 64,
+        totalReturnAfterTaxPct: 6.4,
+        currentValueAfterTaxEur: 1064,
+        cashEur: 1080,
+      };
+      const f = computeDisplayFigures(status, eur, 'EUR');
+      expect(f.totalValue).toBe(1080);
+      expect(f.netInvested).toBe(1000);
+      expect(f.totalReturn).toBe(80);
+      expect(f.estimatedTax).toBe(16);
+      expect(f.afterTaxValue).toBe(1064);
     });
   });
 });
