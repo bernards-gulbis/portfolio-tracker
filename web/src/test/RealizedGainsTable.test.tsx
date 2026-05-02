@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RealizedGainsTable, DividendsReceivedTable } from '../components/RealizedGainsTable';
 import type { RealizedSale, DividendReceived } from '../api';
+
+beforeEach(() => {
+  localStorage.removeItem('pt_gains_view_mode');
+  localStorage.removeItem('pt_dividends_view_mode');
+});
 
 const makeSale = (overrides: Partial<RealizedSale> = {}): RealizedSale => ({
   ticker: 'AAPL',
@@ -139,6 +144,48 @@ describe('RealizedGainsTable', () => {
     expect(screen.getByText('MSFT')).toBeInTheDocument();
     expect(screen.queryByText('AAPL')).not.toBeInTheDocument();
   });
+
+  it('renders the grouped/flat view toggle', () => {
+    const sales: RealizedSale[] = [makeSale({ ticker: 'AAPL' })];
+    render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
+    expect(screen.getByRole('tab', { name: 'Grouped' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Flat' })).toBeInTheDocument();
+  });
+
+  it('switches to flat view and shows one row per sale with the gain percentage', async () => {
+    const sales: RealizedSale[] = [
+      makeSale({ ticker: 'AAPL', proceeds: 1000, cost_basis: 800, realized_gain: 200 }),
+      makeSale({ ticker: 'AAPL', date: '2025-05-01T10:00:00', proceeds: 600, cost_basis: 500, realized_gain: 100 }),
+    ];
+    const user = userEvent.setup();
+    render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
+
+    await user.click(screen.getByRole('tab', { name: 'Flat' }));
+
+    // No expand chevrons in flat mode — sale detail values appear directly.
+    expect(screen.getByText('$800.00')).toBeInTheDocument();
+    expect(screen.getByText('$500.00')).toBeInTheDocument();
+    // Per-row percentage rendered in flat mode (one per sale, plus footer total)
+    expect(screen.getAllByText('AAPL').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('persists the flat view choice to localStorage', async () => {
+    const sales: RealizedSale[] = [makeSale({ ticker: 'AAPL' })];
+    const user = userEvent.setup();
+    render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
+
+    await user.click(screen.getByRole('tab', { name: 'Flat' }));
+    expect(localStorage.getItem('pt_gains_view_mode')).toBe('ungrouped');
+  });
+
+  it('reads stored flat preference on initial render', () => {
+    localStorage.setItem('pt_gains_view_mode', 'ungrouped');
+    const sales: RealizedSale[] = [makeSale({ ticker: 'AAPL', realized_gain: 200 })];
+    render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
+    // The Flat tab is selected
+    expect(screen.getByRole('tab', { name: 'Flat', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Grouped', selected: false })).toBeInTheDocument();
+  });
 });
 
 describe('DividendsReceivedTable', () => {
@@ -209,5 +256,31 @@ describe('DividendsReceivedTable', () => {
 
     expect(screen.getAllByText('$25.00').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('$20.00').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('switches to flat view and shows one row per payment', async () => {
+    const dividends: DividendReceived[] = [
+      makeDividend({ ticker: 'AAPL', date: '2025-06-15T10:00:00', amount: 25 }),
+      makeDividend({ ticker: 'AAPL', date: '2025-03-15T10:00:00', amount: 20 }),
+    ];
+    const user = userEvent.setup();
+    render(<DividendsReceivedTable dividendsReceived={dividends} {...defaultProps} />);
+
+    await user.click(screen.getByRole('tab', { name: 'Flat' }));
+
+    expect(screen.getAllByText('$25.00').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('$20.00').length).toBeGreaterThanOrEqual(1);
+    // Both rows show their ticker without expanding
+    expect(screen.getAllByText('AAPL').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('persists dividend flat-view preference independently of gains', async () => {
+    const dividends: DividendReceived[] = [makeDividend({ ticker: 'AAPL' })];
+    const user = userEvent.setup();
+    render(<DividendsReceivedTable dividendsReceived={dividends} {...defaultProps} />);
+
+    await user.click(screen.getByRole('tab', { name: 'Flat' }));
+    expect(localStorage.getItem('pt_dividends_view_mode')).toBe('ungrouped');
+    expect(localStorage.getItem('pt_gains_view_mode')).toBeNull();
   });
 });

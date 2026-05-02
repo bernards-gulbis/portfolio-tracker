@@ -343,6 +343,11 @@ const en = {
     sellCount_other: '{{count}} sells',
     paymentCount_one: '{{count}} payment',
     paymentCount_other: '{{count}} payments',
+    viewMode: {
+      grouped: 'Grouped',
+      ungrouped: 'Flat',
+      aria: 'View mode',
+    },
     partiallySold: '{{sold}} of {{total}} shares sold',
     priceCaption: 'price',
     currentPriceCaption: 'current price',

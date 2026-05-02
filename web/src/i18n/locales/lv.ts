@@ -345,6 +345,11 @@ const lv: Translation = {
     sellCount_other: '{{count}} pārdošanas',
     paymentCount_one: '{{count}} maksājums',
     paymentCount_other: '{{count}} maksājumi',
+    viewMode: {
+      grouped: 'Grupēts',
+      ungrouped: 'Plakans',
+      aria: 'Skats',
+    },
     partiallySold: '{{sold}} no {{total}} akcijām pārdotas',
     priceCaption: 'cena',
     currentPriceCaption: 'pašreizējā cena',

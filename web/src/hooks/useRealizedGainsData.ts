@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { RealizedSale, DividendReceived } from '../api';
+import type { TableViewMode } from './useTableViewMode';
 
 // ================== Types ==================
 
@@ -44,12 +45,14 @@ interface UseGroupedTableDataArgs<TItem extends { date: string }, TGroup extends
   items: TItem[];
   buildGroups: (filtered: TItem[]) => TGroup[];
   sortFn: (groups: TGroup[], sortKey: string, sortAsc: boolean) => TGroup[];
+  validSortKeys: ReadonlySet<string>;
 }
 
 function useGroupedTableData<TItem extends { date: string }, TGroup extends { ticker: string }>({
   items,
   buildGroups,
   sortFn,
+  validSortKeys,
 }: UseGroupedTableDataArgs<TItem, TGroup>) {
   const [expandState, setExpandState] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<string>('date');
@@ -57,6 +60,8 @@ function useGroupedTableData<TItem extends { date: string }, TGroup extends { ti
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
   const [yearFilter, setYearFilter] = useState<string>('all');
+
+  const effectiveSortKey = validSortKeys.has(sortKey) ? sortKey : 'date';
 
   const availableYears = useMemo(() => {
     const years = new Set(items.map((s) => s.date.slice(0, 4)));
@@ -73,8 +78,8 @@ function useGroupedTableData<TItem extends { date: string }, TGroup extends { ti
   const filteredGroups = useMemo(() => {
     const q = filter.trim().toUpperCase();
     const list = q ? groups.filter((g) => g.ticker.includes(q)) : groups;
-    return sortFn(list, sortKey, sortAsc);
-  }, [groups, filter, sortKey, sortAsc, sortFn]);
+    return sortFn(list, effectiveSortKey, sortAsc);
+  }, [groups, filter, effectiveSortKey, sortAsc, sortFn]);
 
   const totalPages = Math.max(1, Math.ceil(filteredGroups.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -91,11 +96,11 @@ function useGroupedTableData<TItem extends { date: string }, TGroup extends { ti
   };
 
   const handleSort = (key: string) => {
-    if (sortKey === key) {
+    if (effectiveSortKey === key) {
       setSortAsc((prev) => !prev);
     } else {
       setSortKey(key);
-      setSortAsc(false);
+      setSortAsc(key === 'ticker');
     }
     setPage(1);
   };
@@ -114,7 +119,7 @@ function useGroupedTableData<TItem extends { date: string }, TGroup extends { ti
 
   return {
     expandState,
-    sortKey,
+    sortKey: effectiveSortKey,
     sortAsc,
     filter,
     yearFilter,
@@ -135,6 +140,7 @@ function useGroupedTableData<TItem extends { date: string }, TGroup extends { ti
 
 interface UseGainsTableDataArgs {
   realizedSales: RealizedSale[];
+  viewMode?: TableViewMode;
 }
 
 const buildGainGroups = (filtered: RealizedSale[]): TickerGroup[] => {
@@ -150,6 +156,13 @@ const buildGainGroups = (filtered: RealizedSale[]): TickerGroup[] => {
   return result;
 };
 
+const buildGainGroupsFlat = (filtered: RealizedSale[]): TickerGroup[] =>
+  filtered.map((sale) => ({
+    ticker: sale.ticker,
+    sales: [sale],
+    totalGain: sale.realized_gain,
+  }));
+
 const sortGainGroups = (groups: TickerGroup[], sortKey: string, sortAsc: boolean): TickerGroup[] =>
   [...groups].sort((a, b) => {
     if (sortKey === 'date') {
@@ -162,15 +175,37 @@ const sortGainGroups = (groups: TickerGroup[], sortKey: string, sortAsc: boolean
     return sortAsc ? diff : -diff;
   });
 
-export function useGainsTableData({ realizedSales }: UseGainsTableDataArgs) {
+const sortGainGroupsFlat = (groups: TickerGroup[], sortKey: string, sortAsc: boolean): TickerGroup[] =>
+  [...groups].sort((a, b) => {
+    let diff: number;
+    if (sortKey === 'ticker') {
+      diff = a.ticker.localeCompare(b.ticker);
+    } else if (sortKey === 'gain') {
+      diff = a.totalGain - b.totalGain;
+    } else {
+      diff = a.sales[0].date.localeCompare(b.sales[0].date);
+    }
+    return sortAsc ? diff : -diff;
+  });
+
+const GAIN_GROUPED_KEYS: ReadonlySet<string> = new Set(['date', 'count', 'gain']);
+const GAIN_FLAT_KEYS: ReadonlySet<string> = new Set(['date', 'ticker', 'gain']);
+
+export function useGainsTableData({ realizedSales, viewMode = 'grouped' }: UseGainsTableDataArgs) {
+  const isGrouped = viewMode === 'grouped';
+  const buildGroups = isGrouped ? buildGainGroups : buildGainGroupsFlat;
+  const sortFn = isGrouped ? sortGainGroups : sortGainGroupsFlat;
+  const validSortKeys = isGrouped ? GAIN_GROUPED_KEYS : GAIN_FLAT_KEYS;
+
   const {
     filteredGroups: filteredGains,
     pagedGroups: pagedGains,
     ...rest
   } = useGroupedTableData({
     items: realizedSales,
-    buildGroups: buildGainGroups,
-    sortFn: sortGainGroups,
+    buildGroups,
+    sortFn,
+    validSortKeys,
   });
 
   const gainsTotals = useMemo(() => ({
@@ -180,6 +215,7 @@ export function useGainsTableData({ realizedSales }: UseGainsTableDataArgs) {
 
   return {
     ...rest,
+    viewMode,
     filteredGains,
     pagedGains,
     gainsTotals,
@@ -190,6 +226,7 @@ export function useGainsTableData({ realizedSales }: UseGainsTableDataArgs) {
 
 interface UseDividendsTableDataArgs {
   dividendsReceived: DividendReceived[];
+  viewMode?: TableViewMode;
 }
 
 const buildDividendGroups = (filtered: DividendReceived[]): DividendTickerGroup[] => {
@@ -209,6 +246,14 @@ const buildDividendGroups = (filtered: DividendReceived[]): DividendTickerGroup[
   return result;
 };
 
+const buildDividendGroupsFlat = (filtered: DividendReceived[]): DividendTickerGroup[] =>
+  filtered.map((p) => ({
+    ticker: p.ticker,
+    payments: [p],
+    totalAmount: p.amount,
+    totalAmountEur: p.amount_eur,
+  }));
+
 const sortDividendGroups = (groups: DividendTickerGroup[], sortKey: string, sortAsc: boolean): DividendTickerGroup[] =>
   [...groups].sort((a, b) => {
     if (sortKey === 'date') {
@@ -221,15 +266,37 @@ const sortDividendGroups = (groups: DividendTickerGroup[], sortKey: string, sort
     return sortAsc ? diff : -diff;
   });
 
-export function useDividendsTableData({ dividendsReceived }: UseDividendsTableDataArgs) {
+const sortDividendGroupsFlat = (groups: DividendTickerGroup[], sortKey: string, sortAsc: boolean): DividendTickerGroup[] =>
+  [...groups].sort((a, b) => {
+    let diff: number;
+    if (sortKey === 'ticker') {
+      diff = a.ticker.localeCompare(b.ticker);
+    } else if (sortKey === 'amount') {
+      diff = (a.totalAmountEur ?? a.totalAmount) - (b.totalAmountEur ?? b.totalAmount);
+    } else {
+      diff = a.payments[0].date.localeCompare(b.payments[0].date);
+    }
+    return sortAsc ? diff : -diff;
+  });
+
+const DIVIDEND_GROUPED_KEYS: ReadonlySet<string> = new Set(['date', 'count', 'amount']);
+const DIVIDEND_FLAT_KEYS: ReadonlySet<string> = new Set(['date', 'ticker', 'amount']);
+
+export function useDividendsTableData({ dividendsReceived, viewMode = 'grouped' }: UseDividendsTableDataArgs) {
+  const isGrouped = viewMode === 'grouped';
+  const buildGroups = isGrouped ? buildDividendGroups : buildDividendGroupsFlat;
+  const sortFn = isGrouped ? sortDividendGroups : sortDividendGroupsFlat;
+  const validSortKeys = isGrouped ? DIVIDEND_GROUPED_KEYS : DIVIDEND_FLAT_KEYS;
+
   const {
     filteredGroups: filteredDividends,
     pagedGroups: pagedDividends,
     ...rest
   } = useGroupedTableData({
     items: dividendsReceived,
-    buildGroups: buildDividendGroups,
-    sortFn: sortDividendGroups,
+    buildGroups,
+    sortFn,
+    validSortKeys,
   });
 
   const dividendTotals = useMemo(() => {
@@ -244,6 +311,7 @@ export function useDividendsTableData({ dividendsReceived }: UseDividendsTableDa
 
   return {
     ...rest,
+    viewMode,
     filteredDividends,
     pagedDividends,
     dividendTotals,

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGainsTableData, useDividendsTableData } from '../hooks/useRealizedGainsData';
+import type { TableViewMode } from '../hooks/useTableViewMode';
 import type { RealizedSale, DividendReceived } from '../api';
 
 const makeSale = (overrides: Partial<RealizedSale> = {}): RealizedSale => ({
@@ -129,6 +130,73 @@ describe('useGainsTableData', () => {
     expect(result.current.gainsTotals.gain).toBe(0);
     expect(result.current.gainsTotals.count).toBe(0);
   });
+
+  it('returns one row per sale in ungrouped view mode', () => {
+    const sales = [
+      makeSale({ ticker: 'AAPL', realized_gain: 200 }),
+      makeSale({ ticker: 'AAPL', date: '2025-05-01T10:00:00', realized_gain: 300 }),
+      makeSale({ ticker: 'MSFT', realized_gain: 100 }),
+    ];
+    const { result } = renderHook(() => useGainsTableData({ realizedSales: sales, viewMode: 'ungrouped' }));
+    expect(result.current.filteredGains).toHaveLength(3);
+    for (const group of result.current.filteredGains) {
+      expect(group.sales).toHaveLength(1);
+      expect(group.totalGain).toBe(group.sales[0].realized_gain);
+    }
+  });
+
+  it('preserves count totals across grouped and ungrouped modes', () => {
+    const sales = [
+      makeSale({ ticker: 'AAPL', realized_gain: 200 }),
+      makeSale({ ticker: 'AAPL', date: '2025-05-01T10:00:00', realized_gain: 300 }),
+      makeSale({ ticker: 'MSFT', realized_gain: 100 }),
+    ];
+    const grouped = renderHook(() => useGainsTableData({ realizedSales: sales, viewMode: 'grouped' }));
+    const ungrouped = renderHook(() => useGainsTableData({ realizedSales: sales, viewMode: 'ungrouped' }));
+
+    expect(grouped.result.current.gainsTotals.count).toBe(3);
+    expect(ungrouped.result.current.gainsTotals.count).toBe(3);
+    expect(grouped.result.current.gainsTotals.gain).toBe(600);
+    expect(ungrouped.result.current.gainsTotals.gain).toBe(600);
+  });
+
+  it('sorts by ticker alphabetically in ungrouped mode', () => {
+    const sales = [
+      makeSale({ ticker: 'TSLA' }),
+      makeSale({ ticker: 'AAPL' }),
+      makeSale({ ticker: 'MSFT' }),
+    ];
+    const { result, rerender } = renderHook(
+      ({ viewMode }) => useGainsTableData({ realizedSales: sales, viewMode }),
+      { initialProps: { viewMode: 'ungrouped' as const } },
+    );
+
+    act(() => { result.current.handleSort('ticker'); });
+    expect(result.current.filteredGains.map((g) => g.ticker)).toEqual(['AAPL', 'MSFT', 'TSLA']);
+
+    act(() => { result.current.handleSort('ticker'); });
+    expect(result.current.filteredGains.map((g) => g.ticker)).toEqual(['TSLA', 'MSFT', 'AAPL']);
+
+    rerender({ viewMode: 'ungrouped' });
+  });
+
+  it('resets sort key when switching from grouped (count) to ungrouped', () => {
+    const sales = [
+      makeSale({ ticker: 'AAPL' }),
+      makeSale({ ticker: 'AAPL', date: '2025-05-01T10:00:00' }),
+      makeSale({ ticker: 'MSFT' }),
+    ];
+    const { result, rerender } = renderHook(
+      ({ viewMode }) => useGainsTableData({ realizedSales: sales, viewMode }),
+      { initialProps: { viewMode: 'grouped' as TableViewMode } },
+    );
+
+    act(() => { result.current.handleSort('count'); });
+    expect(result.current.sortKey).toBe('count');
+
+    rerender({ viewMode: 'ungrouped' });
+    expect(result.current.sortKey).toBe('date');
+  });
 });
 
 describe('useDividendsTableData', () => {
@@ -253,5 +321,47 @@ describe('useDividendsTableData', () => {
     act(() => { result.current.handleSort('amount'); });
     // Ascending: AAPL first
     expect(result.current.filteredDividends[0].ticker).toBe('AAPL');
+  });
+
+  it('returns one row per payment in ungrouped view mode', () => {
+    const dividends = [
+      makeDividend({ ticker: 'MSFT', amount: 100 }),
+      makeDividend({ ticker: 'MSFT', date: '2025-05-01T10:00:00', amount: 80 }),
+      makeDividend({ ticker: 'AAPL', amount: 50 }),
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, viewMode: 'ungrouped' }));
+    expect(result.current.filteredDividends).toHaveLength(3);
+    for (const group of result.current.filteredDividends) {
+      expect(group.payments).toHaveLength(1);
+      expect(group.totalAmount).toBe(group.payments[0].amount);
+    }
+  });
+
+  it('sorts ungrouped dividends by ticker alphabetically', () => {
+    const dividends = [
+      makeDividend({ ticker: 'TSLA' }),
+      makeDividend({ ticker: 'AAPL' }),
+      makeDividend({ ticker: 'MSFT' }),
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, viewMode: 'ungrouped' }));
+    act(() => { result.current.handleSort('ticker'); });
+    expect(result.current.filteredDividends.map((g) => g.ticker)).toEqual(['AAPL', 'MSFT', 'TSLA']);
+  });
+
+  it('resets dividend sort key when switching from grouped (count) to ungrouped', () => {
+    const dividends = [
+      makeDividend({ ticker: 'AAPL' }),
+      makeDividend({ ticker: 'MSFT' }),
+    ];
+    const { result, rerender } = renderHook(
+      ({ viewMode }) => useDividendsTableData({ dividendsReceived: dividends, viewMode }),
+      { initialProps: { viewMode: 'grouped' as TableViewMode } },
+    );
+
+    act(() => { result.current.handleSort('count'); });
+    expect(result.current.sortKey).toBe('count');
+
+    rerender({ viewMode: 'ungrouped' });
+    expect(result.current.sortKey).toBe('date');
   });
 });
