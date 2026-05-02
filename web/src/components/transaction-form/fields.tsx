@@ -46,7 +46,7 @@ export function MoneyField({
   min,
   currency,
   onValueChange,
-}: MoneyFieldProps): ReactElement {
+}: Readonly<MoneyFieldProps>): ReactElement {
   return (
     <Controller
       name={name}
@@ -111,7 +111,7 @@ export function NumberField({
   step,
   min,
   description,
-}: NumberFieldProps): ReactElement {
+}: Readonly<NumberFieldProps>): ReactElement {
   return (
     <Controller
       name={name}
