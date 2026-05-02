@@ -116,7 +116,10 @@ class LivePriceService:
             fetched_price = cls._fetch_from_yahoo(ticker)
             with cls._cache_lock:
                 existing_entry = cls._price_cache.get(ticker)
-                if existing_entry is None or (now - existing_entry[1]) >= cls._cache_ttl:
+                if (
+                    existing_entry is None
+                    or (now - existing_entry[1]) >= cls._cache_ttl
+                ):
                     cls._price_cache[ticker] = (fetched_price, now)
             fetch_future.set_result(fetched_price)
             return fetched_price
