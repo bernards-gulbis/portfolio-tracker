@@ -29,9 +29,17 @@ export const formatSignedCurrency = (value: number | null | undefined, currency:
   return `${sign}${formatCurrency(value, currency, locale)}`;
 };
 
+/**
+ * Strips trailing zeros (and an orphaned decimal point) from a fixed-decimal
+ * string. Two anchored patterns are used instead of `/\.?0+$/` so the regex
+ * is unambiguously linear (SonarQube S5852).
+ */
+const trimTrailingZeros = (s: string): string =>
+  s.replace(/0+$/, '').replace(/\.$/, '');
+
 /** Up to 8 decimals, trailing zeros stripped. */
 export const formatQuantity = (value: number): string => {
-  return value.toFixed(8).replace(/\.?0+$/, '');
+  return trimTrailingZeros(value.toFixed(8));
 };
 
 /** Pass the locale returned by useLocale() for reactive formatting. */
@@ -100,7 +108,7 @@ export const toLocalDateStr = (d: Date): string => {
 
 /** Tax-rate fraction (0..1) → percent string with up to 2 decimals; trailing zeros trimmed. */
 export const formatTaxRatePercent = (rate: number): string => {
-  return (rate * 100).toFixed(2).replace(/\.?0+$/, '');
+  return trimTrailingZeros((rate * 100).toFixed(2));
 };
 
 /**

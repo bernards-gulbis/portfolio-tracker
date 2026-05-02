@@ -5,6 +5,7 @@ import {
   formatDateTime,
   formatSignedPercent,
   formatDaysHeld,
+  formatQuantity,
   getValueClass,
   toLocalDateStr,
   formatTaxRatePercent,
@@ -146,6 +147,24 @@ describe('Formatters', () => {
     it('pads single-digit month and day', () => {
       const d = new Date(2024, 2, 5); // Mar 5 2024
       expect(toLocalDateStr(d)).toBe('2024-03-05');
+    });
+  });
+
+  describe('formatQuantity', () => {
+    it('strips trailing zeros from whole and fractional values', () => {
+      expect(formatQuantity(0)).toBe('0');
+      expect(formatQuantity(5)).toBe('5');
+      expect(formatQuantity(1.5)).toBe('1.5');
+      expect(formatQuantity(-2.25)).toBe('-2.25');
+    });
+
+    it('keeps up to 8 decimals of precision', () => {
+      expect(formatQuantity(1.23456789)).toBe('1.23456789');
+      expect(formatQuantity(0.00000001)).toBe('0.00000001');
+    });
+
+    it('rounds to 8 decimals when input has more', () => {
+      expect(formatQuantity(1.123456789)).toBe('1.12345679');
     });
   });
 
