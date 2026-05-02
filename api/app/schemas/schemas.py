@@ -65,14 +65,6 @@ class PortfolioResponse(PortfolioBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PortfolioWithTransactions(PortfolioResponse):
-    """Schema for portfolio with transactions"""
-
-    transactions: list["TransactionResponse"] = []
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # ================== Transaction Schemas ==================
 
 
