@@ -183,22 +183,21 @@ def update_transaction(
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
 ):
-    """Update a transaction"""
+    """Update a transaction.
+
+    Forwards only the fields the client actually sent. Omitted fields stay
+    unchanged; explicit ``null`` values flow through to the service so
+    nullable columns can be cleared. ``type`` is renamed to
+    ``transaction_type`` to match the service's kwarg.
+    """
     service = TransactionService(session)
+    provided = transaction.model_dump(exclude_unset=True)
+    if "type" in provided:
+        provided["transaction_type"] = provided.pop("type")
     return service.update_transaction(
         transaction_id=transaction_id,
         user_id=user.id,
-        date=transaction.date,
-        transaction_type=transaction.type,
-        ticker=transaction.ticker,
-        quantity=transaction.quantity,
-        price_per_share=transaction.price_per_share,
-        fee=transaction.fee,
-        total_amount=transaction.total_amount,
-        eur_amount=transaction.eur_amount,
-        split_ratio=transaction.split_ratio,
-        currency=transaction.currency,
-        fx_rate=transaction.fx_rate,
+        **provided,
     )
 
 

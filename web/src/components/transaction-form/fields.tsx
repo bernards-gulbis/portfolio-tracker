@@ -71,7 +71,10 @@ export function MoneyField({
                 field.onChange(e);
                 onValueChange?.();
               }}
-              onBlur={() => roundCurrencyOnBlur(field.value, field.onChange)}
+              onBlur={() => {
+                field.onBlur();
+                roundCurrencyOnBlur(field.value, field.onChange);
+              }}
             />
             {currency === 'EUR' && (
               <InputGroupAddon align="inline-end">

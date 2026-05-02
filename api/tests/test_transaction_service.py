@@ -22,7 +22,7 @@ from app.core.exceptions import (
 from app.models import Portfolio, TransactionType
 from app.models.historical_price import FxRate, HistoricalPrice  # noqa: F401
 from app.models.user import User
-from app.services.transaction_service import TransactionService, _coalesce, _csv_field
+from app.services.transaction_service import TransactionService, _csv_field
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -85,12 +85,6 @@ class TestHelpers:
 
     def test_csv_field_value(self):
         assert _csv_field(42) == 42
-
-    def test_coalesce_new(self):
-        assert _coalesce(10, 5) == 10
-
-    def test_coalesce_existing(self):
-        assert _coalesce(None, 5) == 5
 
 
 # ── create_transaction validation ─────────────────────────────────────
@@ -490,6 +484,41 @@ class TestUpdateTransaction:
         )
         assert updated.total_amount == pytest.approx(2000)
         assert updated.eur_amount == pytest.approx(1800)
+
+    def test_explicit_none_clears_eur_amount(self, svc, user_id, portfolio_id):
+        """A PUT with ``eur_amount=None`` clears the column — distinct from
+        omitting the field, which preserves the prior value."""
+        tx = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 1, 1),
+            transaction_type=TransactionType.DEPOSIT,
+            total_amount=1000,
+            eur_amount=900,
+        )
+        assert tx.eur_amount == pytest.approx(900)
+
+        updated = svc.update_transaction(tx.id, user_id, eur_amount=None)
+        assert updated.eur_amount is None
+        # Other fields untouched.
+        assert updated.total_amount == pytest.approx(1000)
+
+    def test_omitted_field_preserves_existing(self, svc, user_id, portfolio_id):
+        """Omitting a kwarg leaves the prior column value alone."""
+        tx = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 1, 1),
+            transaction_type=TransactionType.DEPOSIT,
+            total_amount=1000,
+            eur_amount=900,
+            fee=5,
+        )
+        # Update only total_amount; fee and eur_amount must survive.
+        updated = svc.update_transaction(tx.id, user_id, total_amount=1500)
+        assert updated.total_amount == pytest.approx(1500)
+        assert updated.eur_amount == pytest.approx(900)
+        assert updated.fee == pytest.approx(5)
 
 
 # ── delete_transaction ────────────────────────────────────────────────

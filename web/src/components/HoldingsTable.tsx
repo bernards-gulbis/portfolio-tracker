@@ -31,10 +31,10 @@ function computeDaysHeld(holdings: PricedHolding[]): Record<string, number> {
 type EurVals = ReturnType<typeof applyRateToHolding>;
 
 function renderCurrentValue(holding: PricedHolding, eurVals: EurVals | null, locale: string): string {
-  if (eurVals != null) {
-    return eurVals.currentValueEur == null ? '-' : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
+  if (eurVals == null) {
+    return holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale);
   }
-  return holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale);
+  return eurVals.currentValueEur == null ? '-' : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
 }
 
 function renderUnrealizedGL(holding: PricedHolding, eurVals: EurVals | null, locale: string) {

@@ -101,12 +101,25 @@ async def get_live_prices(
 
     now = datetime.now(UTC)
     prices: dict[str, LivePriceInfo] = {}
+    fallback_tickers: list[str] = []
     for ticker in tickers:
         live = live_prices.get(ticker)
         if live is not None and live > 0:
             prices[ticker] = LivePriceInfo(price=float(live), source="live", as_of=now)
-            continue
-        fallback = LivePriceService.get_last_known_price_with_date(ticker)
+        else:
+            fallback_tickers.append(ticker)
+
+    # Batch the DB fallback for every missing ticker into one offloaded
+    # query so we don't hit the event loop with N synchronous SQLite reads.
+    fallbacks = (
+        await asyncio.to_thread(
+            LivePriceService.get_last_known_prices_batch, fallback_tickers
+        )
+        if fallback_tickers
+        else {}
+    )
+    for ticker in fallback_tickers:
+        fallback = fallbacks.get(ticker)
         if fallback is not None:
             price, date_str = fallback
             prices[ticker] = LivePriceInfo(

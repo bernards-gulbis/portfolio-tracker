@@ -18,6 +18,7 @@ from threading import Lock
 from typing import ClassVar
 
 import requests
+from sqlalchemy import and_, func
 from sqlmodel import Session, select
 
 from app.core.config import PRICE_CACHE_TTL_SECONDS
@@ -185,6 +186,49 @@ class LivePriceService:
             if row:
                 return float(row.price), row.date
             return None
+
+        if session is not None:
+            return _query(session)
+        with Session(engine) as s:
+            return _query(s)
+
+    @classmethod
+    def get_last_known_prices_batch(
+        cls, tickers: list[str], session: Session | None = None
+    ) -> dict[str, tuple[float, str] | None]:
+        """Batch variant of ``get_last_known_price_with_date``.
+
+        Returns a dict keyed by every requested ticker mapping to either
+        ``(price, date_str)`` for the most recent cached row or ``None``
+        when no row exists. Single SQL roundtrip — used by the live-prices
+        router so N missing tickers don't fan out into N event-loop blocks.
+        """
+        if not tickers:
+            return {}
+
+        def _query(s: Session) -> dict[str, tuple[float, str] | None]:
+            result: dict[str, tuple[float, str] | None] = dict.fromkeys(tickers)
+            # GROUP BY ticker → MAX(date) gives the latest-row coordinate per
+            # ticker; INNER JOIN back to HistoricalPrice picks up its price.
+            latest_per_ticker = (
+                select(
+                    HistoricalPrice.ticker.label("ticker"),
+                    func.max(HistoricalPrice.date).label("max_date"),
+                )
+                .where(HistoricalPrice.ticker.in_(tickers))
+                .group_by(HistoricalPrice.ticker)
+                .subquery()
+            )
+            statement = select(HistoricalPrice).join(
+                latest_per_ticker,
+                and_(
+                    HistoricalPrice.ticker == latest_per_ticker.c.ticker,
+                    HistoricalPrice.date == latest_per_ticker.c.max_date,
+                ),
+            )
+            for row in s.exec(statement).all():
+                result[row.ticker] = (float(row.price), row.date)
+            return result
 
         if session is not None:
             return _query(session)

@@ -70,9 +70,17 @@ def _csv_field(value):
     return value if value is not None else ""
 
 
-def _coalesce(new, existing):
-    """Return *new* if provided (not None), otherwise keep *existing*."""
-    return new if new is not None else existing
+class _UnsetType:
+    """Singleton sentinel type for ``update_transaction`` kwargs.
+
+    Distinguishes "field omitted by the client" (``_UNSET``) from "client
+    explicitly sent null to clear the field" (``None``). Without this,
+    ``None`` collapses both meanings and clients can never clear nullable
+    columns via PUT.
+    """
+
+
+_UNSET = _UnsetType()
 
 
 class TransactionService:
@@ -217,33 +225,46 @@ class TransactionService:
         self,
         transaction_id: int,
         user_id: uuid.UUID,
-        date: datetime | None = None,
-        transaction_type: TransactionType | None = None,
-        ticker: str | None = None,
-        quantity: float | None = None,
-        price_per_share: float | None = None,
-        fee: float | None = None,
-        total_amount: float | None = None,
-        eur_amount: float | None = None,
-        split_ratio: float | None = None,
-        currency: str | None = None,
-        fx_rate: float | None = None,
+        date: datetime | None | _UnsetType = _UNSET,
+        transaction_type: TransactionType | None | _UnsetType = _UNSET,
+        ticker: str | None | _UnsetType = _UNSET,
+        quantity: float | None | _UnsetType = _UNSET,
+        price_per_share: float | None | _UnsetType = _UNSET,
+        fee: float | None | _UnsetType = _UNSET,
+        total_amount: float | None | _UnsetType = _UNSET,
+        eur_amount: float | None | _UnsetType = _UNSET,
+        split_ratio: float | None | _UnsetType = _UNSET,
+        currency: str | None | _UnsetType = _UNSET,
+        fx_rate: float | None | _UnsetType = _UNSET,
     ) -> Transaction:
-        """Update a transaction (user-scoped via portfolio ownership)"""
+        """Update a transaction (user-scoped via portfolio ownership).
+
+        Each field has three states:
+          * ``_UNSET`` — caller did not pass the field; preserve current value.
+          * ``None`` — caller explicitly sent ``null`` to clear the column.
+          * any other value — overwrite with that value.
+        """
         transaction = self.transaction_repo.get_by_id_and_user(transaction_id, user_id)
         if not transaction:
             raise TransactionNotFoundException(transaction_id)
 
-        val_type = _coalesce(transaction_type, transaction.type)
-        val_ticker = _coalesce(ticker, transaction.ticker)
-        val_quantity = _coalesce(quantity, transaction.quantity)
-        val_price_per_share = _coalesce(price_per_share, transaction.price_per_share)
-        val_total_amount = _coalesce(total_amount, transaction.total_amount)
-        val_fee = _coalesce(fee, transaction.fee)
-        val_eur_amount = _coalesce(eur_amount, transaction.eur_amount)
+        def _resolve(new, existing):
+            """Return *existing* when *new* is _UNSET (omitted), else *new*
+            (which may be ``None`` to clear)."""
+            return existing if isinstance(new, _UnsetType) else new
+
+        val_type = _resolve(transaction_type, transaction.type)
+        val_ticker = _resolve(ticker, transaction.ticker)
+        val_quantity = _resolve(quantity, transaction.quantity)
+        val_price_per_share = _resolve(price_per_share, transaction.price_per_share)
+        val_total_amount = _resolve(total_amount, transaction.total_amount)
+        val_fee = _resolve(fee, transaction.fee)
+        val_eur_amount = _resolve(eur_amount, transaction.eur_amount)
+        val_fx_rate = _resolve(fx_rate, transaction.fx_rate)
+        val_split_ratio = _resolve(split_ratio, transaction.split_ratio)
 
         self._validate_numeric_constraints(
-            val_type, val_total_amount, fx_rate, split_ratio, val_eur_amount
+            val_type, val_total_amount, val_fx_rate, val_split_ratio, val_eur_amount
         )
         self._validate_transaction_data(
             val_type,
@@ -268,13 +289,12 @@ class TransactionService:
             "fx_rate": fx_rate,
         }
         for field, value in updates.items():
-            if value is None:
+            if isinstance(value, _UnsetType):
                 continue
-            setattr(
-                transaction,
-                field,
-                _to_decimal(value) if field in _NUMERIC_UPDATE_FIELDS else value,
-            )
+            if value is None or field not in _NUMERIC_UPDATE_FIELDS:
+                setattr(transaction, field, value)
+            else:
+                setattr(transaction, field, _to_decimal(value))
 
         return self.transaction_repo.update(transaction)
 
