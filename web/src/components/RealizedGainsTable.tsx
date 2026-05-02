@@ -63,8 +63,8 @@ export const FilterControls = ({ availableYears, yearFilter, onYearChange, filte
       {showViewModeToggle && (
         <Tabs value={viewMode} onValueChange={(v) => onViewModeChange(v as TableViewMode)} className="ml-auto">
           <TabsList aria-label={t('status.viewMode.aria')}>
-            <TabsTrigger value="grouped">{t('status.viewMode.grouped')}</TabsTrigger>
             <TabsTrigger value="ungrouped">{t('status.viewMode.ungrouped')}</TabsTrigger>
+            <TabsTrigger value="grouped">{t('status.viewMode.grouped')}</TabsTrigger>
           </TabsList>
         </Tabs>
       )}
