@@ -98,6 +98,12 @@ export const useDeleteTransaction = () => {
   });
 };
 
+interface ImportCSVVariables {
+  portfolioId: number;
+  file: File;
+  dryRun?: boolean;
+}
+
 /**
  * Hook to import CSV transactions. The ``dryRun`` flag (default false)
  * lets the wizard validate + dedup without persisting; on dry-run we skip
@@ -108,27 +114,21 @@ export const useImportTransactionsCSV = () => {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: ({
-      portfolioId,
-      file,
-      dryRun,
-    }: {
-      portfolioId: number;
-      file: File;
-      dryRun?: boolean;
-    }) => importTransactionsCSV(portfolioId, file, { dryRun }),
+    mutationFn: ({ portfolioId, file, dryRun }: ImportCSVVariables) =>
+      importTransactionsCSV(portfolioId, file, { dryRun }),
     onSuccess: (result, variables) => {
-      if (variables.dryRun) {
-        return;
-      }
+      if (variables.dryRun) return;
       queryClient.invalidateQueries({
         queryKey: ['transactions', variables.portfolioId],
-        exact: false
+        exact: false,
       });
       queryClient.invalidateQueries({ queryKey: ['portfolioStatus', variables.portfolioId] });
       queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', variables.portfolioId] });
       if (result.skipped_count > 0) {
-        toast.success(t('transaction.toasts.importedWithSkipped', { count: result.imported_count, skipped: result.skipped_count }));
+        toast.success(t('transaction.toasts.importedWithSkipped', {
+          count: result.imported_count,
+          skipped: result.skipped_count,
+        }));
       } else {
         toast.success(t('transaction.toasts.imported', { count: result.imported_count }));
       }
