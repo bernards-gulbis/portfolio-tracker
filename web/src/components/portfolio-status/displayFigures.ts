@@ -1,6 +1,6 @@
 import type { PricedPortfolioStatus } from '../../api';
-import type { EurMetrics } from '../../utils/eurMetrics';
 import type { Currency } from '../../hooks/useCurrencyPreference';
+import type { EurMetrics } from '../../utils/eurMetrics';
 
 export interface DisplayFigures {
   totalValue: number | null;
@@ -14,10 +14,14 @@ export interface DisplayFigures {
   fxImpactPct: number | null;
 }
 
+const computeUsdTax = (status: PricedPortfolioStatus, totalValue: number): number => {
+  const capitalGains = totalValue - status.principal - status.dividends;
+  return capitalGains > 0 ? capitalGains * status.capital_gains_tax_rate : 0;
+};
+
 /**
  * Resolve all summary-card figures from a status + EUR metrics + selected
- * display currency. Pure: no React, no hooks. Mirrors the original inline
- * computations from PortfolioStatusContent so the math is unchanged.
+ * display currency. Pure: no React, no hooks.
  */
 export const computeDisplayFigures = (
   status: PricedPortfolioStatus,
@@ -29,25 +33,16 @@ export const computeDisplayFigures = (
   const totalValue = showEur ? (eur?.currentValueEur ?? null) : status.current_value;
   const netInvested = showEur ? status.principal_eur : status.principal;
 
-  // Total return = current value - net invested. In EUR mode, principal_eur
-  // can be null (incomplete FX data) — show "—" rather than NaN.
   const totalReturn =
     totalValue == null || netInvested == null ? null : totalValue - netInvested;
 
-  // After-tax value: total value minus estimated capital gains tax. In EUR
-  // mode this depends on the EUR aggregates being complete; ``eur.taxEur`` is
-  // null when any of them are missing.
-  const estimatedTax = (() => {
-    if (totalValue == null) return null;
-    if (showEur) return eur?.taxEur ?? null;
-    const capitalGains = totalValue - status.principal - status.dividends;
-    return capitalGains > 0 ? capitalGains * status.capital_gains_tax_rate : 0;
-  })();
+  let estimatedTax: number | null = null;
+  if (totalValue != null) {
+    estimatedTax = showEur ? (eur?.taxEur ?? null) : computeUsdTax(status, totalValue);
+  }
+
   const afterTaxValue =
     totalValue != null && estimatedTax != null ? totalValue - estimatedTax : null;
-
-  const fxImpact = showEur ? (eur?.currencyGainsEur ?? null) : null;
-  const fxImpactPct = showEur ? (eur?.currencyGainsPct ?? null) : null;
 
   return {
     totalValue,
@@ -55,7 +50,7 @@ export const computeDisplayFigures = (
     totalReturn,
     estimatedTax,
     afterTaxValue,
-    fxImpact,
-    fxImpactPct,
+    fxImpact: showEur ? (eur?.currencyGainsEur ?? null) : null,
+    fxImpactPct: showEur ? (eur?.currencyGainsPct ?? null) : null,
   };
 };

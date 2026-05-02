@@ -48,15 +48,46 @@ MAX_CSV_ROWS = 5000
 
 _ERR_EUR_AMOUNT_SIGN_MISMATCH = "eur_amount sign must match total_amount sign"
 
+# Update fields requiring float→Decimal coercion before assignment to a
+# table=True model. SQLModel doesn't run Pydantic validation on assignment,
+# so a raw float would stay a float and mix with DB-loaded Decimals on
+# subsequent arithmetic.
+_NUMERIC_UPDATE_FIELDS = frozenset(
+    {
+        "quantity",
+        "price_per_share",
+        "fee",
+        "total_amount",
+        "eur_amount",
+        "split_ratio",
+        "fx_rate",
+    }
+)
+
+_NEGATIVE_TX_TYPES = frozenset(
+    {TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE}
+)
+_POSITIVE_TX_TYPES = frozenset(
+    {TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND}
+)
+
 
 def _csv_field(value):
     """Convert None to empty string for CSV export."""
     return value if value is not None else ""
 
 
-def _coalesce(new, existing):
-    """Return *new* if provided (not None), otherwise keep *existing*."""
-    return new if new is not None else existing
+class _UnsetType:
+    """Singleton sentinel type for ``update_transaction`` kwargs.
+
+    Distinguishes "field omitted by the client" (``_UNSET``) from "client
+    explicitly sent null to clear the field" (``None``). Without this,
+    ``None`` collapses both meanings and clients can never clear nullable
+    columns via PUT.
+    """
+
+
+_UNSET = _UnsetType()
 
 
 class TransactionService:
@@ -83,29 +114,12 @@ class TransactionService:
         fx_rate: float | None = None,
     ) -> Transaction:
         """Create a new transaction with validation"""
-        # Verify portfolio exists and belongs to user
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
             raise PortfolioNotFoundException(portfolio_id)
 
-        # Validate fx_rate
-        if fx_rate is not None and fx_rate <= 0:
-            raise InvalidTransactionDataException("fx_rate must be positive")
-
-        # Validate split_ratio
-        if split_ratio is not None and split_ratio <= 0:
-            raise InvalidTransactionDataException("split_ratio must be positive")
-
-        # Validate eur_amount sign matches total_amount sign
-        if (
-            eur_amount is not None
-            and transaction_type != TransactionType.SPLIT
-            and (
-                (total_amount > 0 and eur_amount < 0)
-                or (total_amount < 0 and eur_amount > 0)
-            )
-        ):
-            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
-
+        self._validate_numeric_constraints(
+            transaction_type, total_amount, fx_rate, split_ratio, eur_amount
+        )
         self._validate_transaction_data(
             transaction_type, ticker, quantity, price_per_share, total_amount, fee
         )
@@ -218,89 +232,71 @@ class TransactionService:
         self,
         transaction_id: int,
         user_id: uuid.UUID,
-        date: datetime | None = None,
-        transaction_type: TransactionType | None = None,
-        ticker: str | None = None,
-        quantity: float | None = None,
-        price_per_share: float | None = None,
-        fee: float | None = None,
-        total_amount: float | None = None,
-        eur_amount: float | None = None,
-        split_ratio: float | None = None,
-        currency: str | None = None,
-        fx_rate: float | None = None,
+        date: datetime | None | _UnsetType = _UNSET,
+        transaction_type: TransactionType | None | _UnsetType = _UNSET,
+        ticker: str | None | _UnsetType = _UNSET,
+        quantity: float | None | _UnsetType = _UNSET,
+        price_per_share: float | None | _UnsetType = _UNSET,
+        fee: float | None | _UnsetType = _UNSET,
+        total_amount: float | None | _UnsetType = _UNSET,
+        eur_amount: float | None | _UnsetType = _UNSET,
+        split_ratio: float | None | _UnsetType = _UNSET,
+        currency: str | None | _UnsetType = _UNSET,
+        fx_rate: float | None | _UnsetType = _UNSET,
     ) -> Transaction:
-        """Update a transaction (user-scoped via portfolio ownership)"""
+        """Update a transaction (user-scoped via portfolio ownership).
+
+        Each field has three states:
+          * ``_UNSET`` — caller did not pass the field; preserve current value.
+          * ``None`` — caller explicitly sent ``null`` to clear the column.
+          * any other value — overwrite with that value.
+        """
         transaction = self.transaction_repo.get_by_id_and_user(transaction_id, user_id)
         if not transaction:
             raise TransactionNotFoundException(transaction_id)
 
-        val_type = _coalesce(transaction_type, transaction.type)
-        val_ticker = _coalesce(ticker, transaction.ticker)
-        val_quantity = _coalesce(quantity, transaction.quantity)
-        val_price_per_share = _coalesce(price_per_share, transaction.price_per_share)
-        val_total_amount = _coalesce(total_amount, transaction.total_amount)
-        val_fee = _coalesce(fee, transaction.fee)
-        val_eur_amount = _coalesce(eur_amount, transaction.eur_amount)
-
-        if fx_rate is not None and fx_rate <= 0:
-            raise InvalidTransactionDataException("fx_rate must be positive")
-
-        if split_ratio is not None and split_ratio <= 0:
-            raise InvalidTransactionDataException("split_ratio must be positive")
-
-        # Validate eur_amount sign matches total_amount sign
-        if (
-            val_eur_amount is not None
-            and val_type != TransactionType.SPLIT
-            and (
-                (val_total_amount > 0 and val_eur_amount < 0)
-                or (val_total_amount < 0 and val_eur_amount > 0)
-            )
-        ):
-            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
-
-        self._validate_transaction_data(
-            val_type,
-            val_ticker,
-            val_quantity,
-            val_price_per_share,
-            val_total_amount,
-            val_fee,
-        )
-
-        # Numeric fields must be coerced to Decimal before setattr — SQLModel
-        # table=True models don't run Pydantic validation on assignment, so a
-        # raw float would stay a float on the in-memory instance and mix with
-        # DB-loaded Decimals on subsequent arithmetic.
-        _numeric_fields = {
-            "quantity",
-            "price_per_share",
-            "fee",
-            "total_amount",
-            "eur_amount",
-            "split_ratio",
-            "fx_rate",
-        }
-        provided = {
+        updates = {
             "date": date,
             "type": transaction_type,
             "ticker": ticker,
+            "currency": currency,
             "quantity": quantity,
             "price_per_share": price_per_share,
             "fee": fee,
             "total_amount": total_amount,
             "eur_amount": eur_amount,
             "split_ratio": split_ratio,
-            "currency": currency,
             "fx_rate": fx_rate,
         }
-        for field, value in provided.items():
-            if value is None:
+
+        def _effective(field: str, new):
+            """Existing value when *new* is _UNSET (omitted); otherwise *new*
+            (which may be ``None`` to clear the column)."""
+            return getattr(transaction, field) if isinstance(new, _UnsetType) else new
+
+        self._validate_numeric_constraints(
+            _effective("type", transaction_type),
+            _effective("total_amount", total_amount),
+            _effective("fx_rate", fx_rate),
+            _effective("split_ratio", split_ratio),
+            _effective("eur_amount", eur_amount),
+        )
+        self._validate_transaction_data(
+            _effective("type", transaction_type),
+            _effective("ticker", ticker),
+            _effective("quantity", quantity),
+            _effective("price_per_share", price_per_share),
+            _effective("total_amount", total_amount),
+            _effective("fee", fee),
+        )
+
+        for field, value in updates.items():
+            if isinstance(value, _UnsetType):
                 continue
-            if field in _numeric_fields:
-                value = _to_decimal(value)
-            setattr(transaction, field, value)
+            if value is None or field not in _NUMERIC_UPDATE_FIELDS:
+                setattr(transaction, field, value)
+            else:
+                setattr(transaction, field, _to_decimal(value))
 
         return self.transaction_repo.update(transaction)
 
@@ -360,6 +356,29 @@ class TransactionService:
 
         created = self.transaction_repo.bulk_create(new_transactions)
         return created, skipped_count
+
+    @staticmethod
+    def _validate_numeric_constraints(
+        transaction_type: TransactionType,
+        total_amount: float,
+        fx_rate: float | None,
+        split_ratio: float | None,
+        eur_amount: float | None,
+    ) -> None:
+        """Validate fx_rate / split_ratio positivity and the eur_amount-vs-total_amount sign agreement."""
+        if fx_rate is not None and fx_rate <= 0:
+            raise InvalidTransactionDataException("fx_rate must be positive")
+        if split_ratio is not None and split_ratio <= 0:
+            raise InvalidTransactionDataException("split_ratio must be positive")
+        if (
+            eur_amount is not None
+            and transaction_type != TransactionType.SPLIT
+            and (
+                (total_amount > 0 and eur_amount < 0)
+                or (total_amount < 0 and eur_amount > 0)
+            )
+        ):
+            raise InvalidTransactionDataException(_ERR_EUR_AMOUNT_SIGN_MISMATCH)
 
     def _validate_transaction_data(
         self,
@@ -564,20 +583,9 @@ class TransactionService:
         transaction_type: TransactionType, total_amount: float
     ) -> float:
         """Return total_amount with the correct sign for the transaction type."""
-        negative_types = {
-            TransactionType.BUY,
-            TransactionType.WITHDRAW,
-            TransactionType.FEE,
-        }
-        positive_types = {
-            TransactionType.DEPOSIT,
-            TransactionType.SELL,
-            TransactionType.DIVIDEND,
-        }
-
-        if transaction_type in negative_types:
+        if transaction_type in _NEGATIVE_TX_TYPES:
             return -abs(total_amount)
-        if transaction_type in positive_types:
+        if transaction_type in _POSITIVE_TX_TYPES:
             return abs(total_amount)
         if transaction_type == TransactionType.SPLIT and total_amount != 0:
             raise ValueError("SPLIT transactions must have total_amount of 0")

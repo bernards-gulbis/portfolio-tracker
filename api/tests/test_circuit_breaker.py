@@ -3,11 +3,9 @@
 import pytest
 
 from app.services.prices.circuit_breaker import (
-    STATE_CLOSED,
-    STATE_HALF_OPEN,
-    STATE_OPEN,
     CircuitBreaker,
     CircuitOpenError,
+    CircuitState,
     call_with_breaker,
 )
 
@@ -38,21 +36,21 @@ def _make_breaker(
 class TestCircuitBreakerStateTransitions:
     def test_starts_closed_and_acquires(self):
         breaker, _ = _make_breaker()
-        assert breaker.state == STATE_CLOSED
+        assert breaker.state == CircuitState.CLOSED
         assert breaker.acquire() is True
 
     def test_failures_below_threshold_keep_circuit_closed(self):
         breaker, _ = _make_breaker(threshold=3)
         breaker.record_failure()
         breaker.record_failure()
-        assert breaker.state == STATE_CLOSED
+        assert breaker.state == CircuitState.CLOSED
         assert breaker.acquire() is True
 
     def test_threshold_failures_open_circuit(self):
         breaker, _ = _make_breaker(threshold=3)
         for _ in range(3):
             breaker.record_failure()
-        assert breaker.state == STATE_OPEN
+        assert breaker.state == CircuitState.OPEN
         assert breaker.acquire() is False
 
     def test_success_resets_failure_counter(self):
@@ -63,16 +61,16 @@ class TestCircuitBreakerStateTransitions:
         breaker.record_failure()
         breaker.record_failure()
         # Counter reset by success → only 2 consecutive, not 4.
-        assert breaker.state == STATE_CLOSED
+        assert breaker.state == CircuitState.CLOSED
 
     def test_recovery_timeout_transitions_to_half_open(self):
         breaker, clock = _make_breaker(threshold=3, timeout=10.0)
         for _ in range(3):
             breaker.record_failure()
-        assert breaker.state == STATE_OPEN
+        assert breaker.state == CircuitState.OPEN
 
         clock.advance(11.0)
-        assert breaker.state == STATE_HALF_OPEN
+        assert breaker.state == CircuitState.HALF_OPEN
 
     def test_half_open_admits_one_probe_then_rejects(self):
         breaker, clock = _make_breaker(threshold=3, timeout=10.0)
@@ -92,7 +90,7 @@ class TestCircuitBreakerStateTransitions:
         clock.advance(11.0)
         assert breaker.acquire() is True
         breaker.record_success()
-        assert breaker.state == STATE_CLOSED
+        assert breaker.state == CircuitState.CLOSED
         # Subsequent calls flow normally.
         assert breaker.acquire() is True
 
@@ -105,11 +103,11 @@ class TestCircuitBreakerStateTransitions:
 
         breaker.record_failure()
         # Cooldown re-armed from now.
-        assert breaker.state == STATE_OPEN
+        assert breaker.state == CircuitState.OPEN
         clock.advance(5.0)
-        assert breaker.state == STATE_OPEN
+        assert breaker.state == CircuitState.OPEN
         clock.advance(6.0)
-        assert breaker.state == STATE_HALF_OPEN
+        assert breaker.state == CircuitState.HALF_OPEN
 
 
 class TestCallWithBreaker:
@@ -117,7 +115,7 @@ class TestCallWithBreaker:
         breaker, _ = _make_breaker()
         result = call_with_breaker(breaker, lambda: "ok")
         assert result == "ok"
-        assert breaker.state == STATE_CLOSED
+        assert breaker.state == CircuitState.CLOSED
 
     def test_raises_circuit_open_error_when_open(self):
         breaker, _ = _make_breaker(threshold=2)
@@ -140,7 +138,7 @@ class TestCallWithBreaker:
             with pytest.raises(RuntimeError):
                 call_with_breaker(breaker, _fail)
 
-        assert breaker.state == STATE_OPEN
+        assert breaker.state == CircuitState.OPEN
 
     def test_permanent_failure_does_not_trip(self):
         breaker, _ = _make_breaker(threshold=2)
@@ -156,7 +154,7 @@ class TestCallWithBreaker:
 
         # Even after 5 ValueErrors, breaker stays closed because they are
         # not classified as transient.
-        assert breaker.state == STATE_CLOSED
+        assert breaker.state == CircuitState.CLOSED
 
     def test_success_after_failures_keeps_closed(self):
         breaker, _ = _make_breaker(threshold=3)
@@ -174,7 +172,7 @@ class TestCallWithBreaker:
             with pytest.raises(RuntimeError):
                 call_with_breaker(breaker, _fail)
 
-        assert breaker.state == STATE_CLOSED
+        assert breaker.state == CircuitState.CLOSED
 
 
 class TestConstructorValidation:

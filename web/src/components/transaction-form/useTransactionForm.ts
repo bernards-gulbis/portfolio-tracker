@@ -7,8 +7,6 @@ import {
   Transaction,
   TransactionType,
   getErrorMessage,
-  type LivePrices,
-  type PortfolioStatus,
 } from '../../api';
 import { useLivePrices } from '../../hooks/useLivePrices';
 import { usePortfolioStatus } from '../../hooks/usePortfolioStatus';
@@ -35,22 +33,13 @@ interface UseTransactionFormOptions {
 
 export interface UseTransactionFormResult {
   form: UseFormReturn<FormValues>;
-
-  // Data
   holdings: Holding[];
-  livePrices: LivePrices | undefined;
-  portfolioStatus: PortfolioStatus | undefined;
   selectedHolding: Holding | undefined;
-  type: TransactionType;
-  watchedTicker: string | undefined;
 
-  // Mode flags
   isEdit: boolean;
   isSell: boolean;
-  isDividend: boolean;
   isPending: boolean;
 
-  // Which fields to render
   showTicker: boolean;
   showTickerCombobox: boolean;
   showQuantity: boolean;
@@ -61,7 +50,6 @@ export interface UseTransactionFormResult {
   showSplitRatio: boolean;
   showFxRate: boolean;
 
-  // Actions
   onSubmit: (values: FormValues) => Promise<void>;
   handleClose: () => void;
   /** Apply ticker-change side effects (auto-fill or clear price) after
@@ -192,19 +180,19 @@ export function useTransactionForm({
   const applyTickerSideEffects = (value: string) => {
     if (!isSell) return;
     const livePrice = livePrices?.prices[value]?.price ?? null;
-    if (livePrice == null) {
-      const belongsToOtherTicker =
-        priceOwnerTicker.current !== null && priceOwnerTicker.current !== value;
-      if (priceWasAutoFilled.current || belongsToOtherTicker) {
-        setValue('pricePerShare', '');
-        priceWasAutoFilled.current = false;
-      }
-      priceOwnerTicker.current = value;
-    } else {
+    if (livePrice != null) {
       setValue('pricePerShare', livePrice.toFixed(2));
       priceWasAutoFilled.current = true;
       priceOwnerTicker.current = value;
+      return;
     }
+    const belongsToOtherTicker =
+      priceOwnerTicker.current !== null && priceOwnerTicker.current !== value;
+    if (priceWasAutoFilled.current || belongsToOtherTicker) {
+      setValue('pricePerShare', '');
+      priceWasAutoFilled.current = false;
+    }
+    priceOwnerTicker.current = value;
   };
 
   const markPriceAsUserEdited = () => {
@@ -240,15 +228,10 @@ export function useTransactionForm({
   return {
     form,
     holdings,
-    livePrices,
-    portfolioStatus,
     selectedHolding,
-    type,
-    watchedTicker,
 
     isEdit,
     isSell,
-    isDividend,
     isPending,
 
     showTicker,

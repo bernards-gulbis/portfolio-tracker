@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { LivePrices, PricedPortfolioStatus } from '../api';
 import { computePricedStatus } from '../utils/computePricedStatus';
+
 import { useLivePrices } from './useLivePrices';
 import { usePortfolioPerformance } from './usePortfolioPerformance';
 import { usePortfolioStatus } from './usePortfolioStatus';
@@ -40,6 +41,16 @@ export interface PortfolioStatusViewResult {
   handleRefresh: () => Promise<void>;
 }
 
+const isEmpty = (s: PricedPortfolioStatus): boolean =>
+  s.holdings.length === 0 &&
+  s.principal === 0 &&
+  s.cash === 0 &&
+  s.dividends === 0 &&
+  s.realized_gains === 0 &&
+  s.realized_sales.length === 0 &&
+  s.dividends_received.length === 0 &&
+  s.realized_withdrawals.length === 0;
+
 /**
  * Compose `usePortfolioStatus`, `useLivePrices`, `usePortfolioPerformance`
  * into a single hook that the view can consume with one dependency.
@@ -55,25 +66,16 @@ export function usePortfolioStatusView(
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const {
-    data: status,
-    isLoading,
-    error,
-    dataUpdatedAt,
-  } = usePortfolioStatus(portfolioId);
+  const { data: status, isLoading, error, dataUpdatedAt } = usePortfolioStatus(portfolioId);
 
   const tickers = useMemo(
-    () =>
-      Array.from(new Set(status?.holdings.map((h) => h.ticker) ?? [])).sort(
-        (a, b) => a.localeCompare(b),
-      ),
+    () => status?.holdings.map((h) => h.ticker) ?? [],
     [status?.holdings],
   );
 
-  // Poll live prices even when the portfolio has no holdings: a
-  // cash-only portfolio still needs fresh USD→EUR rate for display.
-  // Gating on tickers.length would leave it stale until the status
-  // query revalidates (5 min default or window-focus).
+  // Poll live prices even when the portfolio has no holdings: a cash-only
+  // portfolio still needs fresh USD→EUR rate for display. Gating on
+  // tickers.length would leave it stale until the status query revalidates.
   const {
     data: livePrices,
     isFetching: isLivePricesFetching,
@@ -81,12 +83,12 @@ export function usePortfolioStatusView(
     error: livePricesError,
   } = useLivePrices(tickers, !!status);
 
-  const effectiveStatus = useMemo(() => {
-    if (status == null) return undefined;
-    return computePricedStatus(status, livePrices ?? EMPTY_LIVE);
-  }, [status, livePrices]);
+  const effectiveStatus = useMemo(
+    () => (status == null ? undefined : computePricedStatus(status, livePrices ?? EMPTY_LIVE)),
+    [status, livePrices],
+  );
 
-  // Fetch full history — period filtering happens client-side in PerformanceChart
+  // Fetch full history — period filtering happens client-side in PerformanceChart.
   const {
     data: performance,
     isLoading: isPerformanceLoading,
@@ -97,30 +99,14 @@ export function usePortfolioStatusView(
     setIsRefreshing(true);
     try {
       await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ['portfolioStatus', portfolioId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ['portfolioPerformance', portfolioId],
-        }),
+        queryClient.invalidateQueries({ queryKey: ['portfolioStatus', portfolioId] }),
+        queryClient.invalidateQueries({ queryKey: ['portfolioPerformance', portfolioId] }),
         queryClient.invalidateQueries({ queryKey: ['livePrices'] }),
       ]);
     } finally {
       setIsRefreshing(false);
     }
   }, [queryClient, portfolioId]);
-
-  const isEmptyPortfolio = !!effectiveStatus
-    && effectiveStatus.holdings.length === 0
-    && effectiveStatus.principal === 0
-    && effectiveStatus.cash === 0
-    && effectiveStatus.dividends === 0
-    && effectiveStatus.realized_gains === 0
-    && effectiveStatus.realized_sales.length === 0
-    && effectiveStatus.dividends_received.length === 0
-    && effectiveStatus.realized_withdrawals.length === 0;
-
-  const latestUpdateAt = Math.max(dataUpdatedAt, livePricesUpdatedAt || 0);
 
   return {
     effectiveStatus,
@@ -132,8 +118,8 @@ export function usePortfolioStatusView(
     livePricesError,
     performanceError,
     error,
-    latestUpdateAt,
-    isEmptyPortfolio,
+    latestUpdateAt: Math.max(dataUpdatedAt, livePricesUpdatedAt || 0),
+    isEmptyPortfolio: effectiveStatus != null && isEmpty(effectiveStatus),
     isRefreshing,
     handleRefresh,
   };

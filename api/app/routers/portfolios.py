@@ -1,5 +1,6 @@
 """Portfolio API routes"""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Annotated
@@ -14,13 +15,11 @@ from app.schemas import (
     LivePriceInfo,
     LivePricesResponse,
     PerformanceDataPoint,
+    PortfolioBase,
     PortfolioCopy,
-    PortfolioCreate,
     PortfolioPerformanceResponse,
     PortfolioResponse,
     PortfolioStatusResponse,
-    PortfolioUpdate,
-    TransactionWarning,
 )
 from app.services import PortfolioService
 from app.services.prices import (
@@ -39,7 +38,7 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 @router.post("/", response_model=PortfolioResponse, status_code=201)
 def create_portfolio(
-    portfolio: PortfolioCreate,
+    portfolio: PortfolioBase,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
 ):
@@ -63,7 +62,7 @@ def list_portfolios(
     response_model=LivePricesResponse,
     responses={400: {"description": "Too many tickers requested"}},
 )
-def get_live_prices(
+async def get_live_prices(
     _user: Annotated[User, Depends(current_active_user)],
     tickers: Annotated[list[str] | None, Query()] = None,
 ):
@@ -86,20 +85,41 @@ def get_live_prices(
     # ThreadPoolExecutor). Catching ``RuntimeError`` keeps the response
     # alive for those rare cases without swallowing genuine bugs that should
     # surface as 500s during development.
+    #
+    # ``LivePriceService.get_current_prices`` blocks (yfinance + thread pool);
+    # offload to a worker thread so the asyncio event loop stays free for
+    # other concurrent requests.
     try:
-        live_prices = LivePriceService.get_current_prices(tickers) if tickers else {}
+        live_prices = (
+            await asyncio.to_thread(LivePriceService.get_current_prices, tickers)
+            if tickers
+            else {}
+        )
     except RuntimeError as e:
         logger.error("Live price fetch infrastructure error: %s", e, exc_info=True)
         live_prices = dict.fromkeys(tickers)
 
     now = datetime.now(UTC)
     prices: dict[str, LivePriceInfo] = {}
+    fallback_tickers: list[str] = []
     for ticker in tickers:
         live = live_prices.get(ticker)
         if live is not None and live > 0:
             prices[ticker] = LivePriceInfo(price=float(live), source="live", as_of=now)
-            continue
-        fallback = LivePriceService.get_last_known_price_with_date(ticker)
+        else:
+            fallback_tickers.append(ticker)
+
+    # Batch the DB fallback for every missing ticker into one offloaded
+    # query so we don't hit the event loop with N synchronous SQLite reads.
+    fallbacks = (
+        await asyncio.to_thread(
+            LivePriceService.get_last_known_prices_batch, fallback_tickers
+        )
+        if fallback_tickers
+        else {}
+    )
+    for ticker in fallback_tickers:
+        fallback = fallbacks.get(ticker)
         if fallback is not None:
             price, date_str = fallback
             prices[ticker] = LivePriceInfo(
@@ -110,7 +130,9 @@ def get_live_prices(
         else:
             prices[ticker] = LivePriceInfo(price=None, source="missing", as_of=None)
 
-    usd_to_eur_rate = FxRateService.get_usd_to_eur_rate_safe()
+    # FxRateService.get_usd_to_eur_rate_safe also goes to Yahoo on a cache
+    # miss; offload it for the same reason.
+    usd_to_eur_rate = await asyncio.to_thread(FxRateService.get_usd_to_eur_rate_safe)
     return LivePricesResponse(
         prices=prices,
         usd_to_eur_rate=usd_to_eur_rate,
@@ -135,16 +157,22 @@ def get_portfolio(
     response_model=PortfolioStatusResponse,
     responses={400: {"description": "Invalid portfolio data"}},
 )
-def get_portfolio_status(
+async def get_portfolio_status(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
 ):
     """Get portfolio status with holdings, cash balance, and performance metrics"""
     service = PortfolioService(session)
+    # The full calculation does sync DB reads + Yahoo lookups for live FX
+    # and the per-ticker live prices it embeds. Offload to a worker thread
+    # so the event loop stays responsive while we wait on Yahoo.
     try:
-        return service.calculate_portfolio_status(
-            portfolio_id, user.id, tax_rate=user.tax_rate
+        return await asyncio.to_thread(
+            service.calculate_portfolio_status,
+            portfolio_id,
+            user.id,
+            tax_rate=user.tax_rate,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -153,7 +181,7 @@ def get_portfolio_status(
 @router.put("/{portfolio_id}", response_model=PortfolioResponse)
 def update_portfolio(
     portfolio_id: int,
-    portfolio: PortfolioUpdate,
+    portfolio: PortfolioBase,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
 ):
@@ -191,7 +219,7 @@ def delete_portfolio(
     response_model=PortfolioPerformanceResponse,
     responses={400: {"description": "Invalid date format or date range"}},
 )
-def get_portfolio_performance(
+async def get_portfolio_performance(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(current_active_user)],
@@ -229,13 +257,16 @@ def get_portfolio_performance(
     try:
         HistoricalPriceService.clear_session_cache()
         # get_portfolio_performance verifies ownership and returns
-        # (name, data_points, cost_basis_fallback_tickers, warnings)
+        # (name, data_points, cost_basis_fallback_tickers, warnings).
+        # The call does DB reads, batch Yahoo historical fetches, and the
+        # full transaction replay — keep it off the event loop.
         (
             portfolio_name,
             performance_data,
             cost_basis_fallback_tickers,
             warnings,
-        ) = service.get_portfolio_performance(
+        ) = await asyncio.to_thread(
+            service.get_portfolio_performance,
             portfolio_id,
             user_id=user.id,
             start_date=start_dt,
@@ -261,7 +292,7 @@ def get_portfolio_performance(
             portfolio_name=portfolio_name,
             data_points=data_points,
             cost_basis_fallback_tickers=cost_basis_fallback_tickers,
-            warnings=[TransactionWarning(**w) for w in warnings],
+            warnings=warnings,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None

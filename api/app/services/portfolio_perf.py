@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.models import Transaction, TransactionType
+from app.schemas.schemas import TransactionWarning
 from app.services.portfolio_handlers import (
     _apply_transaction,
     _compute_forward_split_factors,
@@ -225,7 +226,12 @@ def _compute_perf_data_point(
     fx_rate = _bisect_lookup(sorted_fx_dates, fx_rates, date_str)
 
     # Time-Weighted Return: chain sub-period returns between cash-flow events.
-    return_pct = None
+    # When ``base <= 0`` (portfolio fully cashed out, or principal exactly
+    # offsets value), there is no defined return for the sub-period — we emit
+    # ``None`` rather than carrying the prior factor forward as a flat line,
+    # which the chart would visually misread as "no change" rather than
+    # "no holdings".
+    return_pct: float | None
     if not twr.started:
         if current_value > 0:
             twr.started = True
@@ -236,7 +242,9 @@ def _compute_perf_data_point(
         if base > 0:
             sub_return = current_value / base
             twr.twr_factor *= sub_return
-        return_pct = float((twr.twr_factor - _ONE) * Decimal("100"))
+            return_pct = float((twr.twr_factor - _ONE) * Decimal("100"))
+        else:
+            return_pct = None
 
     twr.prev_value = current_value
     twr.prev_principal = state.principal
@@ -271,7 +279,7 @@ def calculate_performance(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     num_points: int = 60,
-) -> tuple[list[dict], list[str], list[dict]]:
+) -> tuple[list[dict], list[str], list[TransactionWarning]]:
     """Calculate portfolio performance time-series from transactions.
 
     Returns ``(data_points, cost_basis_fallback_tickers, warnings)``:
@@ -285,11 +293,10 @@ def calculate_performance(
       Surfacing this lets the UI warn the user that the chart is
       cost-basis-only for those symbols rather than silently drawing a flat
       line the user might read as "no change".
-    * ``warnings`` — transaction-replay warnings collected during the
-      historical reconstruction (oversell, sell-of-non-held). Each is a dict
-      with ``code`` / ``date`` / ``params`` matching ``TransactionWarning``.
-      Without this the chart would silently use a truncated quantity from a
-      data-quality issue (e.g. an undeclared split) and the user would see a
+    * ``warnings`` — :class:`TransactionWarning` instances collected during
+      historical replay (oversell, sell-of-non-held, etc.). Without this the
+      chart would silently use a truncated quantity from a data-quality
+      issue (e.g. an undeclared split) and the user would see a
       reasonable-looking line that doesn't reconcile with the broker.
     """
     if not transactions:
@@ -368,5 +375,5 @@ def calculate_performance(
         )
         performance_data.append(data_point_dict)
 
-    warnings = [dataclasses.asdict(w) for w in state.warnings]
+    warnings = [TransactionWarning(**dataclasses.asdict(w)) for w in state.warnings]
     return performance_data, sorted(cost_basis_fallback_tickers), warnings

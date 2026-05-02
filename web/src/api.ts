@@ -247,8 +247,7 @@ const GoogleAuthorizeUrlSchema = z.object({
 
 export type UserUpdate = schemas['UserUpdate'];
 export type CloseAccountRequest = schemas['CloseAccountRequest'];
-export type PortfolioCreate = schemas['PortfolioCreate'];
-export type PortfolioUpdate = schemas['PortfolioUpdate'];
+export type PortfolioBase = schemas['PortfolioBase'];
 export type PortfolioCopy = schemas['PortfolioCopy'];
 export type TransactionCreate = schemas['TransactionCreate'];
 export type TransactionUpdate = schemas['TransactionUpdate'];
@@ -270,18 +269,17 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Send httpOnly cookies automatically
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Tracks whether a session has been confirmed via getCurrentUser().
-// The 401 interceptor only fires auth:logout once a session is confirmed, preventing
-// spurious queryClient.clear() calls on the initial unauthenticated page probe.
+// Only fire ``auth:logout`` after the session has been confirmed via
+// getCurrentUser(); otherwise the initial unauthenticated probe would
+// trigger spurious queryClient.clear() calls.
 let sessionActive = false;
 
-// 401 interceptor — fires auth:logout event so AuthContext can react
 api.interceptors.response.use(
   (r) => r,
   (error) => {
@@ -296,7 +294,7 @@ api.interceptors.response.use(
 // ================== Auth API Functions ==================
 
 export const login = async (credentials: LoginCredentials): Promise<void> => {
-  // FastAPI Users login requires application/x-www-form-urlencoded with field "username"
+  // FastAPI Users login requires application/x-www-form-urlencoded with field "username".
   const params = new URLSearchParams();
   params.append('username', credentials.username);
   params.append('password', credentials.password);
@@ -311,14 +309,15 @@ export const register = async (credentials: RegisterCredentials): Promise<UserRe
 };
 
 export const logoutApi = async (): Promise<void> => {
-  sessionActive = false; // Clear before request so any 401 response doesn't re-trigger the event
+  // Clear before the request so a 401 response doesn't re-trigger the event.
+  sessionActive = false;
   await api.post('/auth/cookie/logout');
 };
 
 export const getCurrentUser = async (): Promise<UserRead> => {
   const response = await api.get('/users/me');
   const user = parseOrThrow(UserReadSchema, response.data, 'GET /users/me');
-  sessionActive = true; // Session confirmed
+  sessionActive = true;
   return user;
 };
 
@@ -343,28 +342,19 @@ export const closeAccount = async (data: CloseAccountRequest): Promise<void> => 
 
 // ================== Portfolio API Functions ==================
 
-/**
- * Get all portfolios
- */
 export const getPortfolios = async (): Promise<Portfolio[]> => {
   const response = await api.get('/portfolios/');
   return parseOrThrow(z.array(PortfolioSchema), response.data, 'GET /portfolios/');
 };
 
-/**
- * Create a new portfolio
- */
-export const createPortfolio = async (portfolio: PortfolioCreate): Promise<Portfolio> => {
+export const createPortfolio = async (portfolio: PortfolioBase): Promise<Portfolio> => {
   const response = await api.post('/portfolios/', portfolio);
   return parseOrThrow(PortfolioSchema, response.data, 'POST /portfolios/');
 };
 
-/**
- * Update a portfolio
- */
 export const updatePortfolio = async (
   portfolioId: number,
-  portfolio: PortfolioUpdate
+  portfolio: PortfolioBase
 ): Promise<Portfolio> => {
   const response = await api.put(`/portfolios/${portfolioId}`, portfolio);
   return parseOrThrow(
@@ -374,16 +364,10 @@ export const updatePortfolio = async (
   );
 };
 
-/**
- * Delete a portfolio
- */
 export const deletePortfolio = async (portfolioId: number): Promise<void> => {
   await api.delete(`/portfolios/${portfolioId}`);
 };
 
-/**
- * Copy a portfolio with all its transactions
- */
 export const copyPortfolio = async (
   portfolioId: number,
   data: PortfolioCopy
@@ -396,9 +380,6 @@ export const copyPortfolio = async (
   );
 };
 
-/**
- * Get portfolio status with holdings, cash balance, and performance metrics
- */
 export const getPortfolioStatus = async (portfolioId: number): Promise<PortfolioStatus> => {
   const response = await api.get(`/portfolios/${portfolioId}/status`);
   return parseOrThrow(
@@ -408,9 +389,6 @@ export const getPortfolioStatus = async (portfolioId: number): Promise<Portfolio
   );
 };
 
-/**
- * Get live prices and FX rate (lightweight, no transaction replay)
- */
 export const getLivePrices = async (tickers: string[]): Promise<LivePrices> => {
   const params = new URLSearchParams();
   tickers.forEach((t) => params.append('tickers', t));
@@ -424,9 +402,6 @@ interface PerformanceParams {
   num_points?: number;
 }
 
-/**
- * Get portfolio performance over time
- */
 export const getPortfolioPerformance = async (
   portfolioId: number,
   startDate?: string,
@@ -448,9 +423,6 @@ export const getPortfolioPerformance = async (
 
 // ================== Transaction API Functions ==================
 
-/**
- * Get paginated transactions for a portfolio
- */
 export const getTransactions = async (
   portfolioId: number,
   page: number = 1,
@@ -474,9 +446,6 @@ export const getTransactions = async (
   );
 };
 
-/**
- * Create a new transaction for a portfolio
- */
 export const createTransaction = async (
   portfolioId: number,
   transaction: TransactionCreate
@@ -492,9 +461,6 @@ export const createTransaction = async (
   );
 };
 
-/**
- * Update a transaction
- */
 export const updateTransaction = async (
   transactionId: number,
   transaction: TransactionUpdate
@@ -507,16 +473,10 @@ export const updateTransaction = async (
   );
 };
 
-/**
- * Delete a transaction
- */
 export const deleteTransaction = async (transactionId: number): Promise<void> => {
   await api.delete(`/transactions/${transactionId}`);
 };
 
-/**
- * Export transactions to CSV
- */
 export const exportTransactionsCSV = async (portfolioId: number): Promise<Blob> => {
   const response = await api.get(`/portfolios/${portfolioId}/transactions/export`, {
     responseType: 'blob',
@@ -559,16 +519,11 @@ export const importTransactionsCSV = async (
 
 // ================== Error Handling ==================
 
-/**
- * API Error type — matches FastAPI's 4xx/5xx error body shape.
- */
+/** Matches FastAPI's 4xx/5xx error body shape. */
 export interface ApiError {
   detail: string;
 }
 
-/**
- * Check if an error is an API error
- */
 export const isApiError = (error: unknown): error is { response: { data: ApiError } } => {
   return (
     axios.isAxiosError(error) &&
@@ -579,9 +534,6 @@ export const isApiError = (error: unknown): error is { response: { data: ApiErro
   );
 };
 
-/**
- * Extract error message from API error
- */
 export const getErrorMessage = (error: unknown): string => {
   if (isApiError(error)) {
     return error.response.data.detail;

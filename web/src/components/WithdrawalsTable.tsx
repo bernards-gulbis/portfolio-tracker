@@ -13,6 +13,8 @@ import { FilterControls } from './RealizedGainsTable';
 
 const PAGE_SIZE = 10;
 
+type SortKey = 'date' | 'amount' | 'fx_gain';
+
 interface WithdrawalsTableProps {
   realizedWithdrawals: WithdrawalFx[];
   locale: string;
@@ -27,12 +29,48 @@ const formatEurOrDash = (value: number | null, locale: string): string =>
 const formatSignedEurOrDash = (value: number | null, locale: string): string =>
   value == null ? '-' : formatSignedCurrency(value, 'EUR', locale);
 
+// Returns null if any contributing value is null — partial sums on display
+// would silently understate totals.
+const sumNullable = (values: (number | null)[]): number | null => {
+  let total = 0;
+  for (const v of values) {
+    if (v == null) return null;
+    total += v;
+  }
+  return total;
+};
+
+interface TaxCellProps {
+  taxable: number;
+  taxRate: number;
+  locale: string;
+  label: string;
+  captionClassName?: string;
+}
+
+const TaxCell = ({ taxable, taxRate, locale, label, captionClassName }: TaxCellProps) => {
+  if (taxable <= 0) return <>-</>;
+  return (
+    <>
+      <span>{formatCurrency(taxable * taxRate, 'EUR', locale)}</span>
+      <span className={`block text-xs text-muted-foreground ${captionClassName ?? ''}`}>
+        {label} {formatCurrency(taxable, 'EUR', locale)}
+      </span>
+    </>
+  );
+};
+
 export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEur, dividendsEur, taxRate }: WithdrawalsTableProps) => {
   const { t } = useTranslation();
-  const [sortKey, setSortKey] = useState<string>('date');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(1);
   const [yearFilter, setYearFilter] = useState<string>('all');
+
+  const taxRatePercent = useMemo(
+    () => new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(taxRate * 100),
+    [locale, taxRate],
+  );
 
   const availableYears = useMemo(() => {
     const years = new Set(realizedWithdrawals.map((w) => w.date.slice(0, 4)));
@@ -53,12 +91,18 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
     const list = [...filteredWithdrawals];
     return list.sort((a, b) => {
       let diff: number;
-      if (sortKey === 'amount') diff = a.w.amount - b.w.amount;
-      else if (sortKey === 'fx_gain')
-        // Treat null FX gains as 0 for sort ordering — a missing-rate withdrawal
-        // shouldn't get a magnetised position at the top or bottom of the list.
-        diff = (a.w.realized_fx_gain ?? 0) - (b.w.realized_fx_gain ?? 0);
-      else diff = a.w.date.localeCompare(b.w.date);
+      switch (sortKey) {
+        case 'amount':
+          diff = a.w.amount - b.w.amount;
+          break;
+        case 'fx_gain':
+          // Treat null FX gains as 0 for sort ordering — a missing-rate withdrawal
+          // shouldn't get a magnetised position at the top or bottom of the list.
+          diff = (a.w.realized_fx_gain ?? 0) - (b.w.realized_fx_gain ?? 0);
+          break;
+        default:
+          diff = a.w.date.localeCompare(b.w.date);
+      }
       return sortAsc ? diff : -diff;
     });
   }, [filteredWithdrawals, sortKey, sortAsc]);
@@ -71,11 +115,6 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
   const totalPages = Math.max(1, Math.ceil(sortedWithdrawals.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedWithdrawals = sortedWithdrawals.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  // Sum nullable EUR fields, returning null if any contributing value is null.
-  // Partial sums on display would silently understate totals.
-  const sumNullable = (values: (number | null)[]): number | null =>
-    values.some((v) => v == null) ? null : values.reduce((s: number, v) => s + (v as number), 0);
 
   const withdrawalTotals = useMemo(() => {
     let totalTaxable = 0;
@@ -95,7 +134,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
     if (sortKey === key) {
       setSortAsc((prev) => !prev);
     } else {
-      setSortKey(key);
+      setSortKey(key as SortKey);
       setSortAsc(false);
     }
     setPage(1);
@@ -127,7 +166,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
               <SortableTableHead label={t('status.columns.realizedFxGL')} sortKey="fx_gain" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="min-w-[7rem] text-right" />
               <TableHead className="text-right">
                 <span className="inline-flex items-center gap-1">
-                  {t('status.columns.tax')} ({new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(taxRate * 100)}%)
+                  {t('status.columns.tax')} ({taxRatePercent}%)
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -156,14 +195,7 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
                     {formatSignedEurOrDash(w.realized_fx_gain, locale)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {taxable > 0 ? (
-                      <>
-                        <span>{formatCurrency(taxable * taxRate, 'EUR', locale)}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {t('status.on')} {formatCurrency(taxable, 'EUR', locale)}
-                        </span>
-                      </>
-                    ) : '-'}
+                    <TaxCell taxable={taxable} taxRate={taxRate} locale={locale} label={t('status.on')} />
                   </TableCell>
                 </TableRow>
               );
@@ -178,14 +210,13 @@ export const WithdrawalsTable = memo(({ realizedWithdrawals, locale, principalEu
                   {formatSignedEurOrDash(withdrawalTotals.fxGain, locale)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {withdrawalTotals.taxable > 0 ? (
-                    <>
-                      <span>{formatCurrency(withdrawalTotals.taxable * taxRate, 'EUR', locale)}</span>
-                      <span className="block text-xs font-normal text-muted-foreground">
-                        {t('status.on')} {formatCurrency(withdrawalTotals.taxable, 'EUR', locale)}
-                      </span>
-                    </>
-                  ) : '-'}
+                  <TaxCell
+                    taxable={withdrawalTotals.taxable}
+                    taxRate={taxRate}
+                    locale={locale}
+                    label={t('status.on')}
+                    captionClassName="font-normal"
+                  />
                 </TableCell>
               </TableRow>
             )}

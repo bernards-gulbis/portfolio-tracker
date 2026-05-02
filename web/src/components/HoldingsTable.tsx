@@ -30,39 +30,29 @@ function computeDaysHeld(holdings: PricedHolding[]): Record<string, number> {
 
 type EurVals = ReturnType<typeof applyRateToHolding>;
 
-function renderCurrentValue(holding: PricedHolding, eurVals: EurVals | null, locale: string) {
-  if (eurVals != null) {
-    return eurVals.currentValueEur == null ? '-' : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
+function renderCurrentValue(holding: PricedHolding, eurVals: EurVals | null, locale: string): string {
+  if (eurVals == null) {
+    return holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale);
   }
-  return holding.current_value == null ? '-' : formatCurrency(holding.current_value, 'USD', locale);
+  return eurVals.currentValueEur == null ? '-' : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
 }
 
 function renderUnrealizedGL(holding: PricedHolding, eurVals: EurVals | null, locale: string) {
-  if (eurVals?.unrealizedGainLossEur != null && holding.unrealized_gain_loss_pct != null) {
-    return (
-      <div className="flex flex-col items-end">
-        <span className={`font-semibold ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
-          {formatSignedCurrency(eurVals.unrealizedGainLossEur, 'EUR', locale)}
-        </span>
-        <span className={`text-sm ${getValueClass(eurVals.unrealizedGainLossEur)}`}>
-          {formatSignedPercent(holding.unrealized_gain_loss_pct)}
-        </span>
-      </div>
-    );
-  }
-  if (holding.unrealized_gain_loss != null && holding.unrealized_gain_loss_pct != null) {
-    return (
-      <div className="flex flex-col items-end">
-        <span className={`font-semibold ${getValueClass(holding.unrealized_gain_loss)}`}>
-          {formatSignedCurrency(holding.unrealized_gain_loss, 'USD', locale)}
-        </span>
-        <span className={`text-sm ${getValueClass(holding.unrealized_gain_loss)}`}>
-          {formatSignedPercent(holding.unrealized_gain_loss_pct)}
-        </span>
-      </div>
-    );
-  }
-  return '-';
+  const pct = holding.unrealized_gain_loss_pct;
+  if (pct == null) return '-';
+
+  const eurValue = eurVals?.unrealizedGainLossEur;
+  const value = eurValue ?? holding.unrealized_gain_loss;
+  if (value == null) return '-';
+
+  const currency = eurValue == null ? 'USD' : 'EUR';
+  const valueClass = getValueClass(value);
+  return (
+    <div className="flex flex-col items-end">
+      <span className={`font-semibold ${valueClass}`}>{formatSignedCurrency(value, currency, locale)}</span>
+      <span className={`text-sm ${valueClass}`}>{formatSignedPercent(pct)}</span>
+    </div>
+  );
 }
 
 interface HoldingsTableProps {
@@ -93,54 +83,41 @@ export const HoldingsTable = memo(({
   const daysHeldMap = useMemo(() => computeDaysHeld(holdings), [holdings]);
 
   const holdingsWithEur = useMemo(() => {
-    if (showEur && eurAvailable) {
-      return holdings.map((h) => ({
-        holding: h,
-        eurVals: applyRateToHolding(h, eurMetrics.rate),
-      }));
-    }
-    return holdings.map((h) => ({ holding: h, eurVals: null }));
+    const rate = showEur && eurAvailable ? eurMetrics.rate : null;
+    return holdings.map((h) => ({
+      holding: h,
+      eurVals: rate == null ? null : applyRateToHolding(h, rate),
+    }));
   }, [holdings, showEur, eurAvailable, eurMetrics]);
 
-  // Total unrealized G/L across all holdings
-  const totalUnrealizedGL = useMemo(() => {
-    let sum = 0;
-    let hasValue = false;
+  const { totalUnrealizedGL, totalMarketValue, totalCost } = useMemo(() => {
+    let glSum = 0;
+    let glHasValue = false;
+    let marketSum = cashDisplay;
+    let costSum = 0;
     for (const { holding, eurVals } of holdingsWithEur) {
-      if (showEur && eurVals?.unrealizedGainLossEur != null) {
-        sum += eurVals.unrealizedGainLossEur;
-        hasValue = true;
+      const useEur = showEur && eurVals?.unrealizedGainLossEur != null;
+      if (useEur) {
+        glSum += eurVals.unrealizedGainLossEur as number;
+        glHasValue = true;
+        costSum += eurVals.totalCostEur;
       } else if (holding.unrealized_gain_loss != null) {
-        sum += holding.unrealized_gain_loss;
-        hasValue = true;
+        glSum += holding.unrealized_gain_loss;
+        glHasValue = true;
+        costSum += holding.total_cost;
       }
-    }
-    return hasValue ? sum : null;
-  }, [holdingsWithEur, showEur]);
-
-  const totalMarketValue = useMemo(() => {
-    let sum = cashDisplay;
-    for (const { holding, eurVals } of holdingsWithEur) {
       if (showEur && eurVals?.currentValueEur != null) {
-        sum += eurVals.currentValueEur;
+        marketSum += eurVals.currentValueEur;
       } else if (holding.current_value != null) {
-        sum += holding.current_value;
+        marketSum += holding.current_value;
       }
     }
-    return sum;
+    return {
+      totalUnrealizedGL: glHasValue ? glSum : null,
+      totalMarketValue: marketSum,
+      totalCost: costSum,
+    };
   }, [holdingsWithEur, showEur, cashDisplay]);
-
-  const totalCost = useMemo(() => {
-    let sum = 0;
-    for (const { holding, eurVals } of holdingsWithEur) {
-      if (showEur && eurVals?.unrealizedGainLossEur != null) {
-        sum += eurVals.totalCostEur;
-      } else if (holding.unrealized_gain_loss != null) {
-        sum += holding.total_cost;
-      }
-    }
-    return sum;
-  }, [holdingsWithEur, showEur]);
 
   const totalUnrealizedPct = totalUnrealizedGL == null || totalCost <= 0
     ? null
@@ -152,7 +129,7 @@ export const HoldingsTable = memo(({
   );
 
   const formatAsOf = (iso: string | null): string => {
-    if (!iso) return t('status.priceAsOfUnknown');
+    if (iso == null || iso === '') return t('status.priceAsOfUnknown');
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(locale);
   };
@@ -252,33 +229,29 @@ export const HoldingsTable = memo(({
                 </TableRow>
             ))}
           </TableBody>
-          {(totalUnrealizedGL != null || totalMarketValue != null) && (
-            <TableFooter>
-              <TableRow className="bg-muted/30 font-semibold">
-                <TableCell>{t('status.total')}</TableCell>
-                <TableCell />
-                <TableCell />
-                <TableCell />
-                <TableCell className="text-right tabular-nums">
-                  {totalMarketValue == null
-                    ? '-'
-                    : formatCurrency(totalMarketValue, effectiveCurrency, locale)}
-                </TableCell>
-                <TableCell className={`text-right tabular-nums ${totalUnrealizedGL == null ? '' : getValueClass(totalUnrealizedGL)}`}>
-                  {totalUnrealizedGL == null ? '-' : (
-                    <div className="flex flex-col items-end">
-                      <span>{formatSignedCurrency(totalUnrealizedGL, effectiveCurrency, locale)}</span>
-                      {totalUnrealizedPct != null && (
-                        <span className={`text-sm ${getValueClass(totalUnrealizedGL)}`}>
-                          {formatSignedPercent(totalUnrealizedPct)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          )}
+          <TableFooter>
+            <TableRow className="bg-muted/30 font-semibold">
+              <TableCell>{t('status.total')}</TableCell>
+              <TableCell />
+              <TableCell />
+              <TableCell />
+              <TableCell className="text-right tabular-nums">
+                {formatCurrency(totalMarketValue, effectiveCurrency, locale)}
+              </TableCell>
+              <TableCell className={`text-right tabular-nums ${totalUnrealizedGL == null ? '' : getValueClass(totalUnrealizedGL)}`}>
+                {totalUnrealizedGL == null ? '-' : (
+                  <div className="flex flex-col items-end">
+                    <span>{formatSignedCurrency(totalUnrealizedGL, effectiveCurrency, locale)}</span>
+                    {totalUnrealizedPct != null && (
+                      <span className={`text-sm ${getValueClass(totalUnrealizedGL)}`}>
+                        {formatSignedPercent(totalUnrealizedPct)}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
       </Card>
     </div>

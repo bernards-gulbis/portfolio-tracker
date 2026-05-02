@@ -1,27 +1,18 @@
 import * as z from 'zod';
 import i18n from '../../i18n/index';
+import { nameField } from '../../utils/portfolioNameSchema';
 
 export const SECTIONS = ['profile', 'password', 'tax', 'account'] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 
 export const profileSchema = z.object({
-  name: z.string().superRefine((val, ctx) => {
-    if (val.trim().length < 1) {
-      ctx.addIssue({ code: 'custom', message: i18n.t('settings.validation.nameRequired') });
-    } else if (val.trim().length > 255) {
-      ctx.addIssue({ code: 'custom', message: i18n.t('settings.validation.nameTooLong') });
-    }
-  }),
+  name: nameField('settings.validation.nameRequired', 'settings.validation.nameTooLong'),
 });
 export type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export const passwordSchema = z
   .object({
-    newPassword: z.string().superRefine((val, ctx) => {
-      if (val.length < 8) {
-        ctx.addIssue({ code: 'custom', message: i18n.t('settings.validation.passwordMinLength') });
-      }
-    }),
+    newPassword: z.string().min(8, { message: i18n.t('settings.validation.passwordMinLength') }),
     confirmPassword: z.string(),
   })
   .superRefine((data, ctx) => {
@@ -44,11 +35,7 @@ export const taxSchema = z.object({
 export type TaxFormValues = z.infer<typeof taxSchema>;
 
 export const closeAccountPasswordSchema = z.object({
-  password: z.string().superRefine((val, ctx) => {
-    if (val.length < 1) {
-      ctx.addIssue({ code: 'custom', message: i18n.t('settings.validation.passwordRequired') });
-    }
-  }),
+  password: z.string().min(1, { message: i18n.t('settings.validation.passwordRequired') }),
 });
 export type CloseAccountPasswordValues = z.infer<typeof closeAccountPasswordSchema>;
 

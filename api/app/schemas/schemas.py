@@ -38,7 +38,7 @@ class CloseAccountRequest(BaseModel):
 
 
 class PortfolioBase(BaseModel):
-    """Base portfolio schema"""
+    """Base portfolio schema."""
 
     name: str = Field(min_length=1, max_length=255)
 
@@ -49,18 +49,6 @@ class PortfolioBase(BaseModel):
         if not v or not v.strip():
             raise ValueError("Portfolio name cannot be empty or whitespace")
         return v.strip()
-
-
-class PortfolioCreate(PortfolioBase):
-    """Schema for creating a portfolio"""
-
-    pass
-
-
-class PortfolioUpdate(PortfolioBase):
-    """Schema for updating a portfolio"""
-
-    pass
 
 
 class PortfolioCopy(BaseModel):
@@ -77,15 +65,35 @@ class PortfolioResponse(PortfolioBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PortfolioWithTransactions(PortfolioResponse):
-    """Schema for portfolio with transactions"""
-
-    transactions: list["TransactionResponse"] = []
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # ================== Transaction Schemas ==================
+
+
+def _validate_ticker(v: str | None) -> str | None:
+    """Validate and normalize ticker symbol (alphanumeric, ``.``, ``-``)."""
+    if v is None:
+        return None
+    v = v.strip().upper()
+    if not v:
+        return None
+    if not all(c.isalnum() or c in ".-" for c in v):
+        raise ValueError(
+            "Ticker must contain only alphanumeric characters, dots, or hyphens"
+        )
+    return v
+
+
+def _validate_split_ratio(v: float | None) -> float | None:
+    """Validate split ratio is positive."""
+    if v is not None and v <= 0:
+        raise ValueError("Split ratio must be greater than 0")
+    return v
+
+
+def _validate_fee(v: float | None) -> float | None:
+    """Validate fee is non-negative."""
+    if v is not None and v < 0:
+        raise ValueError("Fee must be positive")
+    return v
 
 
 class TransactionBase(BaseModel):
@@ -114,36 +122,9 @@ class TransactionBase(BaseModel):
             return v.replace(tzinfo=UTC)
         return v
 
-    @field_validator("ticker")
-    @classmethod
-    def validate_ticker(cls, v: str | None) -> str | None:
-        """Validate and normalize ticker symbol"""
-        if v is not None:
-            v = v.strip().upper()
-            if not v:
-                return None
-            # Basic ticker validation: alphanumeric and common symbols
-            if not all(c.isalnum() or c in ".-" for c in v):
-                raise ValueError(
-                    "Ticker must contain only alphanumeric characters, dots, or hyphens"
-                )
-        return v
-
-    @field_validator("split_ratio")
-    @classmethod
-    def validate_split_ratio(cls, v: float | None) -> float | None:
-        """Validate split ratio is positive"""
-        if v is not None and v <= 0:
-            raise ValueError("Split ratio must be greater than 0")
-        return v
-
-    @field_validator("fee")
-    @classmethod
-    def validate_fee(cls, v: float | None) -> float | None:
-        """Validate fee is positive"""
-        if v is not None and v < 0:
-            raise ValueError("Fee must be positive")
-        return v
+    validate_ticker = field_validator("ticker")(_validate_ticker)
+    validate_split_ratio = field_validator("split_ratio")(_validate_split_ratio)
+    validate_fee = field_validator("fee")(_validate_fee)
 
 
 class TransactionCreate(TransactionBase):
@@ -151,30 +132,25 @@ class TransactionCreate(TransactionBase):
 
     @model_validator(mode="after")
     def validate_total_amount_sign(self):
-        """Validate total_amount has correct sign based on transaction type"""
+        """Validate total_amount has correct sign based on transaction type."""
         tx_type = self.type
         amount = self.total_amount
 
-        # Split must have exactly 0 amount
         if tx_type == TransactionType.SPLIT:
             if amount != 0:
                 raise ValueError("Split transactions must have total_amount of 0")
-
-        # Buy, Withdraw, Fee must be negative (money leaving account)
-        elif tx_type in [
+        elif tx_type in (
             TransactionType.BUY,
             TransactionType.WITHDRAW,
             TransactionType.FEE,
-        ]:
+        ):
             if amount >= 0:
                 raise ValueError(
                     f"{tx_type.value} transactions must have negative total_amount (money leaving account)"
                 )
-
-        # Deposit, Sell, Dividend must be positive (money entering account)
         elif (
             tx_type
-            in [TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND]
+            in (TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND)
             and amount <= 0
         ):
             raise ValueError(
@@ -210,32 +186,9 @@ class TransactionUpdate(BaseModel):
             return v
         return v.replace(tzinfo=UTC)
 
-    @field_validator("ticker")
-    @classmethod
-    def validate_ticker(cls, v: str | None) -> str | None:
-        if v is not None:
-            v = v.strip().upper()
-            if not v:
-                return None
-            if not all(c.isalnum() or c in ".-" for c in v):
-                raise ValueError(
-                    "Ticker must contain only alphanumeric characters, dots, or hyphens"
-                )
-        return v
-
-    @field_validator("split_ratio")
-    @classmethod
-    def validate_split_ratio(cls, v: float | None) -> float | None:
-        if v is not None and v <= 0:
-            raise ValueError("Split ratio must be greater than 0")
-        return v
-
-    @field_validator("fee")
-    @classmethod
-    def validate_fee(cls, v: float | None) -> float | None:
-        if v is not None and v < 0:
-            raise ValueError("Fee must be positive")
-        return v
+    validate_ticker = field_validator("ticker")(_validate_ticker)
+    validate_split_ratio = field_validator("split_ratio")(_validate_split_ratio)
+    validate_fee = field_validator("fee")(_validate_fee)
 
 
 class TransactionResponse(TransactionBase):

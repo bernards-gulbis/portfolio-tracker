@@ -47,6 +47,17 @@ import {
 import { toast } from 'sonner';
 import { SortableTableHead } from './SortableTableHead';
 import { PaginationControls } from './PaginationControls';
+import { TRANSACTION_TYPE_ORDER } from './transaction-form/schema';
+
+const TYPE_BADGE_CLASSES: Record<TransactionType, string> = {
+  [TransactionType.BUY]: 'bg-badge-buy-bg text-badge-buy-fg',
+  [TransactionType.SELL]: 'bg-badge-sell-bg text-badge-sell-fg',
+  [TransactionType.DEPOSIT]: 'bg-badge-deposit-bg text-badge-deposit-fg',
+  [TransactionType.WITHDRAW]: 'bg-badge-withdraw-bg text-badge-withdraw-fg',
+  [TransactionType.DIVIDEND]: 'bg-badge-dividend-bg text-badge-dividend-fg',
+  [TransactionType.FEE]: 'bg-badge-fee-bg text-badge-fee-fg',
+  [TransactionType.SPLIT]: 'bg-badge-split-bg text-badge-split-fg',
+};
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -66,7 +77,6 @@ interface TransactionTableProps {
   onSortOrderChange: (value: 'asc' | 'desc') => void;
   fxMissingTxIds?: number[];
 }
-
 
 export const TransactionTable = ({
   transactions,
@@ -103,12 +113,8 @@ export const TransactionTable = ({
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; transactionId: number | null }>({ open: false, transactionId: null });
 
-  const closeMenu = () => {
-    setOpenMenuId(null);
-  };
-
   const handleDeleteClick = (transactionId: number) => {
-    closeMenu();
+    setOpenMenuId(null);
     setDeleteConfirm({ open: true, transactionId });
   };
 
@@ -147,25 +153,12 @@ export const TransactionTable = ({
     return '-';
   };
 
-  const getTypeBadgeClass = (type: TransactionType): string => {
-    switch (type) {
-      case TransactionType.BUY: return 'bg-badge-buy-bg text-badge-buy-fg';
-      case TransactionType.SELL: return 'bg-badge-sell-bg text-badge-sell-fg';
-      case TransactionType.DEPOSIT: return 'bg-badge-deposit-bg text-badge-deposit-fg';
-      case TransactionType.WITHDRAW: return 'bg-badge-withdraw-bg text-badge-withdraw-fg';
-      case TransactionType.DIVIDEND: return 'bg-badge-dividend-bg text-badge-dividend-fg';
-      case TransactionType.FEE: return 'bg-badge-fee-bg text-badge-fee-fg';
-      case TransactionType.SPLIT: return 'bg-badge-split-bg text-badge-split-fg';
-      default: return '';
-    }
-  };
-
   const fxMissingSet = useMemo(() => new Set(fxMissingTxIds), [fxMissingTxIds]);
 
   const hasActiveFilters = tickerSearch !== '' || typeFilter.length > 0;
 
   const startIndex = (responsePage - 1) * responsePageSize;
-  const endIndex = Math.min(startIndex + (transactions.length || 0), total);
+  const endIndex = Math.min(startIndex + transactions.length, total);
 
   let typeFilterLabel: string;
   if (typeFilter.length === 0) {
@@ -197,15 +190,7 @@ export const TransactionTable = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          {[
-            TransactionType.DEPOSIT,
-            TransactionType.WITHDRAW,
-            TransactionType.BUY,
-            TransactionType.SELL,
-            TransactionType.DIVIDEND,
-            TransactionType.FEE,
-            TransactionType.SPLIT,
-          ].map((type) => (
+          {TRANSACTION_TYPE_ORDER.map((type) => (
             <DropdownMenuCheckboxItem
               key={type}
               checked={typeFilter.includes(type)}
@@ -283,7 +268,7 @@ export const TransactionTable = ({
               <TableRow key={transaction.id} data-testid="transaction-row">
                 <TableCell>{formatDateCompact(transaction.date, locale)}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary" className={getTypeBadgeClass(transaction.type)}>
+                  <Badge variant="secondary" className={TYPE_BADGE_CLASSES[transaction.type]}>
                     {transactionTypeLabels[transaction.type]}
                   </Badge>
                 </TableCell>
@@ -325,7 +310,7 @@ export const TransactionTable = ({
                     <DropdownMenuContent align="end">
                       <DropdownMenuGroup>
                         <DropdownMenuItem
-                          onClick={() => { onEdit(transaction); closeMenu(); }}
+                          onClick={() => { onEdit(transaction); setOpenMenuId(null); }}
                           disabled={deletingId === transaction.id}
                         >
                           <PencilIcon />

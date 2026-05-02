@@ -7,6 +7,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empt
 import { getErrorMessage } from '../../api';
 import { useLocale } from '../../hooks/useLocale';
 import { usePortfolioStatusView } from '../../hooks/usePortfolioStatusView';
+import { parsePortfolioId } from '../../utils/parsePortfolioId';
 
 import { PortfolioStatusContent } from './PortfolioStatusContent';
 import { PortfolioStatusSkeleton } from './PortfolioStatusSkeleton';
@@ -14,7 +15,7 @@ import { StatusToolbar } from './StatusToolbar';
 
 export const PortfolioStatusView = () => {
   const { id } = useParams<{ id: string }>();
-  const portfolioId = id != null && /^\d+$/.test(id) ? Number(id) : null;
+  const portfolioId = parsePortfolioId(id);
   const { t } = useTranslation();
   const locale = useLocale();
 

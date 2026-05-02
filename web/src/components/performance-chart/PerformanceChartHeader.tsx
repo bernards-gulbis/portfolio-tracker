@@ -7,7 +7,6 @@ interface Props {
   headerInfo: (HeaderInfo & { date: string; isHovering: boolean }) | null;
 }
 
-/** Renders the title + the headline value/change/principal/sp500 mini-rows. */
 export const PerformanceChartHeader = ({ viewMode, headerInfo }: Props) => {
   const { t } = useTranslation();
 

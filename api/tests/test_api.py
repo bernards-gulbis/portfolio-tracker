@@ -22,7 +22,7 @@ from app.models.historical_price import (
 )
 from app.models.user import User
 from app.services.portfolio_handlers import _apply_transaction
-from app.services.portfolio_types import _Holding, _TxState
+from app.services.portfolio_types import _Holding, _Lot, _TxState
 from main import app
 
 
@@ -464,6 +464,39 @@ def test_update_transaction(client: TestClient):
     data = response.json()
     assert data["total_amount"] == pytest.approx(3500.00)
     assert data["fee"] == pytest.approx(10.0)
+
+
+def test_update_transaction_explicit_null_clears_field(client: TestClient):
+    """PUT with an explicit ``null`` clears the column; omitting a field
+    preserves its existing value. Regression for the prior `_coalesce`
+    behaviour that collapsed both into "leave alone"."""
+    portfolio_id = client.post("/portfolios/", json={"name": "Clear Test"}).json()["id"]
+    create_resp = client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2020-12-02T20:14:40",
+            "type": "Deposit",
+            "total_amount": 1000.00,
+            "eur_amount": 900.00,
+        },
+    )
+    tx_id = create_resp.json()["id"]
+    assert create_resp.json()["eur_amount"] == pytest.approx(900.00)
+
+    # Explicit null clears.
+    cleared = client.put(f"/transactions/{tx_id}", json={"eur_amount": None})
+    assert cleared.status_code == 200
+    assert cleared.json()["eur_amount"] is None
+    # Untouched fields stay.
+    assert cleared.json()["total_amount"] == pytest.approx(1000.00)
+
+    # Repopulate, then PUT empty body — nothing changes.
+    repop = client.put(f"/transactions/{tx_id}", json={"eur_amount": 850.00})
+    assert repop.status_code == 200
+    noop = client.put(f"/transactions/{tx_id}", json={})
+    assert noop.status_code == 200
+    assert noop.json()["eur_amount"] == pytest.approx(850.00)
+    assert noop.json()["total_amount"] == pytest.approx(1000.00)
 
 
 def test_delete_transaction(client: TestClient):
@@ -3041,9 +3074,13 @@ def test_sell_non_strict_oversell():
     state = _TxState()
     state.cash = Decimal("5000")
     state.holdings["AAPL"] = _Holding(
-        quantity=Decimal("5"),
-        total_cost=Decimal("500"),
-        first_buy_date=datetime(2024, 1, 1),
+        lots=[
+            _Lot(
+                quantity=Decimal("5"),
+                cost=Decimal("500"),
+                acquired_at=datetime(2024, 1, 1),
+            )
+        ]
     )
 
     tx = Transaction(
@@ -3856,9 +3893,13 @@ def test_warning_oversell_partial_strict():
     state = _TxState()
     state.cash = Decimal("5000")
     state.holdings["AAPL"] = _Holding(
-        quantity=Decimal("5"),
-        total_cost=Decimal("500"),
-        first_buy_date=datetime(2024, 1, 1),
+        lots=[
+            _Lot(
+                quantity=Decimal("5"),
+                cost=Decimal("500"),
+                acquired_at=datetime(2024, 1, 1),
+            )
+        ]
     )
 
     tx = Transaction(
@@ -4008,7 +4049,7 @@ def test_live_prices_price_fetch_error_returns_none_prices(client: TestClient):
         patch("app.routers.portfolios.FxRateService") as mock_fx,
     ):
         mock_live.get_current_prices.side_effect = RuntimeError("yfinance down")
-        mock_live.get_last_known_price_with_date.return_value = None
+        mock_live.get_last_known_prices_batch.return_value = {"AAPL": None}
         mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
         response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
@@ -4032,7 +4073,7 @@ def test_live_prices_provider_unavailable_flag(client: TestClient):
         ),
     ):
         mock_live.get_current_prices.return_value = {"AAPL": None}
-        mock_live.get_last_known_price_with_date.return_value = None
+        mock_live.get_last_known_prices_batch.return_value = {"AAPL": None}
         mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
         response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
@@ -4280,8 +4321,8 @@ class TestLivePricesEndpoint:
                 side_effect=RuntimeError("yahoo down"),
             ),
             patch(
-                "app.routers.portfolios.LivePriceService.get_last_known_price_with_date",
-                return_value=None,
+                "app.routers.portfolios.LivePriceService.get_last_known_prices_batch",
+                return_value={"AAPL": None},
             ),
             patch(
                 "app.routers.portfolios.FxRateService.get_usd_to_eur_rate_safe",
@@ -4302,8 +4343,8 @@ class TestLivePricesEndpoint:
                 side_effect=RuntimeError("yahoo down"),
             ),
             patch(
-                "app.routers.portfolios.LivePriceService.get_last_known_price_with_date",
-                return_value=(150.25, "2026-04-10"),
+                "app.routers.portfolios.LivePriceService.get_last_known_prices_batch",
+                return_value={"AAPL": (150.25, "2026-04-10")},
             ),
             patch(
                 "app.routers.portfolios.FxRateService.get_usd_to_eur_rate_safe",

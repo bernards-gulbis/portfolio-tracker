@@ -1,5 +1,5 @@
-"""Tests for the portfolio calculation subsystem — handlers, valuation,
-status — and for portfolio_perf.py."""
+"""Tests for the portfolio calculation subsystem — handlers and status —
+and for portfolio_perf.py."""
 
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -18,12 +18,26 @@ from app.services.portfolio_status import (
     _build_holdings_list,
     calculate_status,
 )
-from app.services.portfolio_types import _ZERO, _Holding, _TxState
-from app.services.portfolio_valuation import (
-    _fetch_historical_prices,
-    _resolve_nearest_date_value,
-    _resolve_usd_to_eur_rate,
-)
+from app.services.portfolio_types import _ZERO, _Holding, _Lot, _TxState
+
+
+def _holding_from_aggregate(
+    quantity: Decimal | int | float,
+    total_cost: Decimal | int | float,
+    first_buy_date: datetime,
+) -> _Holding:
+    """Build a ``_Holding`` containing a single lot. Convenience for tests
+    that don't care about per-lot detail and just want a position with a
+    given total quantity and cost basis."""
+    return _Holding(
+        lots=[
+            _Lot(
+                quantity=Decimal(str(quantity)),
+                cost=Decimal(str(total_cost)),
+                acquired_at=first_buy_date,
+            )
+        ]
+    )
 
 
 def _make_tx(**kwargs) -> Transaction:
@@ -45,26 +59,6 @@ def _make_tx(**kwargs) -> Transaction:
     )
     defaults.update(kwargs)
     return Transaction(**defaults)
-
-
-# ==================== _resolve_nearest_date_value ====================
-
-
-class TestResolveNearestDateValue:
-    def test_returns_none_for_empty_dict(self):
-        assert _resolve_nearest_date_value({}, "2025-01-15") is None
-
-    def test_exact_match(self):
-        prices = {"2025-01-14": 100.0, "2025-01-15": 105.0}
-        assert _resolve_nearest_date_value(prices, "2025-01-15") == 105.0
-
-    def test_nearest_earlier_date(self):
-        prices = {"2025-01-13": 99.0, "2025-01-14": 100.0}
-        assert _resolve_nearest_date_value(prices, "2025-01-15") == 100.0
-
-    def test_returns_none_when_all_dates_after(self):
-        prices = {"2025-01-16": 110.0, "2025-01-17": 115.0}
-        assert _resolve_nearest_date_value(prices, "2025-01-15") is None
 
 
 # ==================== _compute_forward_split_factors ====================
@@ -146,51 +140,6 @@ class TestComputeForwardSplitFactors:
         assert "AAPL" not in factors
 
 
-# ==================== _fetch_historical_prices ====================
-
-
-class TestFetchHistoricalPrices:
-    def test_returns_empty_dict_for_no_tickers(self):
-        result = _fetch_historical_prices([], datetime(2025, 6, 15))
-        assert result == {}
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_returns_empty_dict_when_no_prices_available(self, mock_ps):
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {}
-        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert result == {}
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_returns_price_for_nearest_earlier_date(self, mock_ps):
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
-            "AAPL": {"2025-06-13": 190.0, "2025-06-14": 195.0}
-        }
-        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert result["AAPL"] == 195.0
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_omits_ticker_when_all_dates_after_target(self, mock_ps):
-        """If every available date is AFTER target_date, omit the ticker so
-        the caller falls back to DB last-known or cost basis. Using a
-        future price to value a historical date is a silent correctness
-        bug — not a "best guess"."""
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
-            "AAPL": {"2025-06-17": 200.0, "2025-06-18": 205.0}
-        }
-        result = _fetch_historical_prices(["AAPL"], datetime(2025, 6, 15))
-        assert "AAPL" not in result
-
-    @patch("app.services.portfolio_valuation.HistoricalPriceService")
-    def test_skips_ticker_with_empty_date_prices(self, mock_ps):
-        mock_ps.get_historical_prices_for_multiple_tickers.return_value = {
-            "AAPL": {},
-            "MSFT": {"2025-06-14": 410.0},
-        }
-        result = _fetch_historical_prices(["AAPL", "MSFT"], datetime(2025, 6, 15))
-        assert "AAPL" not in result
-        assert result["MSFT"] == 410.0
-
-
 # ==================== Transaction handlers edge cases ====================
 
 
@@ -213,11 +162,7 @@ class TestTransactionHandlers:
 
     def test_sell_oversell_produces_warning(self):
         state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("5"),
-            total_cost=Decimal("750"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
+        state.holdings["AAPL"] = _holding_from_aggregate(5, 750, datetime(2025, 1, 1))
         tx = _make_tx(
             type=TransactionType.SELL, ticker="AAPL", quantity=10, total_amount=2000.0
         )
@@ -229,11 +174,7 @@ class TestTransactionHandlers:
 
     def test_split_with_negative_ratio_warns(self):
         state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1500"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
+        state.holdings["AAPL"] = _holding_from_aggregate(10, 1500, datetime(2025, 1, 1))
         tx = _make_tx(type=TransactionType.SPLIT, ticker="AAPL", split_ratio=-2)
         _apply_transaction(state, tx, strict=True)
         assert len(state.warnings) == 1
@@ -243,11 +184,7 @@ class TestTransactionHandlers:
     def test_split_with_zero_ratio_treated_as_one(self):
         """split_ratio=0 is falsy, so it falls back to 1 — no change to holdings."""
         state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1500"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
+        state.holdings["AAPL"] = _holding_from_aggregate(10, 1500, datetime(2025, 1, 1))
         tx = _make_tx(type=TransactionType.SPLIT, ticker="AAPL", split_ratio=0)
         _apply_transaction(state, tx, strict=True)
         # 0 is falsy → treated as "no ratio provided" → defaults to 1:1
@@ -300,11 +237,7 @@ class TestTransactionHandlers:
 
     def test_sell_removes_holding_when_fully_sold(self):
         state = _TxState()
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("1000"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
+        state.holdings["AAPL"] = _holding_from_aggregate(10, 1000, datetime(2025, 1, 1))
         tx = _make_tx(
             type=TransactionType.SELL, ticker="AAPL", quantity=10, total_amount=1500.0
         )
@@ -331,11 +264,7 @@ class TestTransactionHandlers:
     def test_buy_adds_to_existing_holding(self):
         state = _TxState()
         state.cash = Decimal("10000")
-        state.holdings["GOOG"] = _Holding(
-            quantity=Decimal("5"),
-            total_cost=Decimal("1000"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
+        state.holdings["GOOG"] = _holding_from_aggregate(5, 1000, datetime(2025, 1, 1))
         tx = _make_tx(
             type=TransactionType.BUY,
             ticker="GOOG",
@@ -345,6 +274,8 @@ class TestTransactionHandlers:
         _apply_transaction(state, tx, strict=True)
         assert state.holdings["GOOG"].quantity == Decimal("8")
         assert state.holdings["GOOG"].total_cost == Decimal("1600")
+        # New BUY appends a separate FIFO lot — not merged with the prior one.
+        assert len(state.holdings["GOOG"].lots) == 2
 
     def test_sell_oversell_nonstrict_reconciles_with_warning(self):
         """Oversell still reconciles in non-strict mode, AND emits a warning.
@@ -356,11 +287,7 @@ class TestTransactionHandlers:
         """
         state = _TxState()
         state.cash = Decimal("0")
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("5"),
-            total_cost=Decimal("750"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
+        state.holdings["AAPL"] = _holding_from_aggregate(5, 750, datetime(2025, 1, 1))
         tx = _make_tx(
             type=TransactionType.SELL, ticker="AAPL", quantity=10, total_amount=2000.0
         )
@@ -382,16 +309,8 @@ class TestTransactionHandlers:
 class TestBuildHoldingsList:
     def test_sorts_by_ticker(self):
         state = _TxState()
-        state.holdings["MSFT"] = _Holding(
-            quantity=Decimal("5"),
-            total_cost=Decimal("1500"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
-        state.holdings["AAPL"] = _Holding(
-            quantity=Decimal("10"),
-            total_cost=Decimal("2000"),
-            first_buy_date=datetime(2025, 1, 1),
-        )
+        state.holdings["MSFT"] = _holding_from_aggregate(5, 1500, datetime(2025, 1, 1))
+        state.holdings["AAPL"] = _holding_from_aggregate(10, 2000, datetime(2025, 1, 1))
         holdings_list, cost = _build_holdings_list(state)
         assert holdings_list[0].ticker == "AAPL"
         assert holdings_list[1].ticker == "MSFT"
@@ -614,13 +533,12 @@ class TestCalculatePerformanceEdgeCases:
                 return_value=None,
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
+                "app.services.portfolio_status.FxRateService."
                 "get_historical_usd_to_eur_rates",
                 return_value={},
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
-                "get_usd_to_eur_rate_safe",
+                "app.services.portfolio_status.FxRateService.get_usd_to_eur_rate_safe",
                 return_value=0.9,
             ),
         ):
@@ -674,13 +592,12 @@ class TestCalculatePerformanceEdgeCases:
                 return_value=None,
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
+                "app.services.portfolio_status.FxRateService."
                 "get_historical_usd_to_eur_rates",
                 return_value={},
             ),
             patch(
-                "app.services.portfolio_valuation.FxRateService."
-                "get_usd_to_eur_rate_safe",
+                "app.services.portfolio_status.FxRateService.get_usd_to_eur_rate_safe",
                 return_value=0.9,
             ),
         ):
@@ -691,43 +608,9 @@ class TestCalculatePerformanceEdgeCases:
                 num_points=5,
             )
 
-        assert any(w["code"] == "sellOversell" for w in warnings), (
-            f"expected sellOversell warning, got {[w['code'] for w in warnings]}"
+        assert any(w.code == "sellOversell" for w in warnings), (
+            f"expected sellOversell warning, got {[w.code for w in warnings]}"
         )
-
-
-# ── portfolio_valuation: _resolve_usd_to_eur_rate ─────────────────────
-
-
-class TestResolveUsdToEurRate:
-    def test_fallback_to_live_rate_when_no_historical(self):
-        with (
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_historical_usd_to_eur_rates",
-                return_value={},
-            ),
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_usd_to_eur_rate_safe",
-                return_value=0.92,
-            ) as mock_live,
-        ):
-            rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
-        mock_live.assert_called_once()
-        assert rate == pytest.approx(0.92)
-
-    def test_returns_historical_rate_when_available(self):
-        with (
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_historical_usd_to_eur_rates",
-                return_value={"2024-06-15": 0.91},
-            ),
-            patch(
-                "app.services.portfolio_valuation.FxRateService.get_usd_to_eur_rate_safe",
-            ) as mock_live,
-        ):
-            rate = _resolve_usd_to_eur_rate(datetime(2024, 6, 15))
-        mock_live.assert_not_called()
-        assert rate == pytest.approx(0.91)
 
 
 # ==================== Decimal precision regression ====================
@@ -1195,3 +1078,247 @@ class TestCalculatePerformanceComplexity:
             f"the monotonic tx_index cursor), got {spy.call_count}. "
             f"Likely a complexity regression — per-point full replay?"
         )
+
+
+# ==================== FIFO cost basis ====================
+
+
+class TestFifoCostBasis:
+    """Realized gains use FIFO, not average cost. Latvian capital-gains tax
+    requires FIFO; the previous proportional-cost-removal logic averaged the
+    basis when a position was built from multiple buys at different prices.
+    """
+
+    def test_partial_sell_consumes_oldest_lot_first(self):
+        """100@$10 then 100@$20, sell 50 → realized gain uses the $10 lot,
+        not the average of $15."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2025, 1, 1),
+                total_amount=10000.0,
+                eur_amount=9000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 2),
+                ticker="AAPL",
+                quantity=100,
+                total_amount=-1000.0,  # 100 @ $10
+            ),
+            _make_tx(
+                id=3,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 3),
+                ticker="AAPL",
+                quantity=100,
+                total_amount=-2000.0,  # 100 @ $20
+            ),
+            _make_tx(
+                id=4,
+                type=TransactionType.SELL,
+                date=datetime(2025, 1, 4),
+                ticker="AAPL",
+                quantity=50,
+                total_amount=900.0,  # 50 @ $18 → proceeds 900
+            ),
+        ]
+        result = calculate_status(txs, None, Decimal("0.20"), 1, "FIFO partial")
+        # Cost basis for the consumed slice = 50 × $10 (FIFO from oldest lot)
+        # = $500. Realized gain = 900 − 500 = 400.
+        # (Average-cost would have given 50 × $15 = $750 → gain = 150 — wrong.)
+        assert len(result.realized_sales) == 1
+        sale = result.realized_sales[0]
+        assert sale.quantity == 50.0
+        assert sale.cost_basis == 500.0
+        assert sale.proceeds == 900.0
+        assert sale.realized_gain == 400.0
+        assert sale.first_buy_date == "2025-01-02T00:00:00"
+        assert result.realized_gains == 400.0
+        # 150 shares left: 50 from the $10 lot + 100 from the $20 lot.
+        # Total cost basis remaining = 50×10 + 100×20 = $2500.
+        held = next(h for h in result.holdings if h.ticker == "AAPL")
+        assert held.quantity == 150.0
+        assert held.total_cost == 2500.0
+
+    def test_sell_spanning_multiple_lots_emits_one_row_per_lot(self):
+        """Selling across two lots produces two ``RealizedSale`` rows, each
+        with the consumed lot's acquisition date in ``first_buy_date``."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2025, 1, 1),
+                total_amount=10000.0,
+                eur_amount=9000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 2),
+                ticker="AAPL",
+                quantity=100,
+                total_amount=-1000.0,
+            ),
+            _make_tx(
+                id=3,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 5),
+                ticker="AAPL",
+                quantity=100,
+                total_amount=-2000.0,
+            ),
+            _make_tx(
+                id=4,
+                type=TransactionType.SELL,
+                date=datetime(2025, 1, 10),
+                ticker="AAPL",
+                quantity=150,
+                total_amount=2700.0,  # proceeds 2700, $18/share
+            ),
+        ]
+        result = calculate_status(txs, None, Decimal("0.20"), 1, "FIFO span")
+        assert len(result.realized_sales) == 2
+        first, second = result.realized_sales
+        # First row consumes the entire 100-share oldest lot.
+        assert first.quantity == 100.0
+        assert first.cost_basis == 1000.0
+        # Proceeds split proportionally: 100/150 of 2700 = 1800.
+        assert first.proceeds == 1800.0
+        assert first.realized_gain == 800.0
+        assert first.first_buy_date == "2025-01-02T00:00:00"
+        # Second row consumes 50 of 100 from the second lot ($20 each).
+        assert second.quantity == 50.0
+        assert second.cost_basis == 1000.0  # 50 × $20
+        assert second.proceeds == 900.0  # 50/150 of 2700
+        assert second.realized_gain == -100.0
+        assert second.first_buy_date == "2025-01-05T00:00:00"
+        # Total realized gain across both rows.
+        assert result.realized_gains == 700.0
+
+    def test_split_preserves_per_lot_cost_basis(self):
+        """A 2:1 split doubles each lot's quantity but leaves total cost
+        unchanged — cost-per-share halves, FIFO ordering preserved."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2025, 1, 1),
+                total_amount=10000.0,
+                eur_amount=9000.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 2),
+                ticker="AAPL",
+                quantity=100,
+                total_amount=-1000.0,  # 100 @ $10
+            ),
+            _make_tx(
+                id=3,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 3),
+                ticker="AAPL",
+                quantity=100,
+                total_amount=-2000.0,  # 100 @ $20
+            ),
+            _make_tx(
+                id=4,
+                type=TransactionType.SPLIT,
+                date=datetime(2025, 2, 1),
+                ticker="AAPL",
+                split_ratio=2,
+                total_amount=0.0,
+            ),
+            _make_tx(
+                id=5,
+                type=TransactionType.SELL,
+                date=datetime(2025, 2, 2),
+                ticker="AAPL",
+                quantity=200,
+                total_amount=2000.0,  # post-split: 200 shares @ $10
+            ),
+        ]
+        result = calculate_status(txs, None, Decimal("0.20"), 1, "Split")
+        # Pre-split lots: 100@$10 and 100@$20.
+        # After 2:1 split: 200@$5 and 200@$10 (cost unchanged).
+        # Sell of 200 consumes the entire oldest 200-share lot at $1000 cost.
+        assert len(result.realized_sales) == 1
+        sale = result.realized_sales[0]
+        assert sale.quantity == 200.0
+        assert sale.cost_basis == 1000.0
+        assert sale.realized_gain == 1000.0
+        assert sale.first_buy_date == "2025-01-02T00:00:00"
+
+
+# ==================== TWR edge cases ====================
+
+
+class TestTwrEdgeCases:
+    """Time-Weighted Return must report ``None`` (not the prior factor) for
+    points where the sub-period base is non-positive — e.g. after a full
+    cash-out — so the chart doesn't render a misleading flat line."""
+
+    def test_returns_none_after_full_cashout(self):
+        """Deposit, buy, sell everything, withdraw all cash — the next
+        data point's base is 0, return_pct should be None."""
+        txs = [
+            _make_tx(
+                id=1,
+                type=TransactionType.DEPOSIT,
+                date=datetime(2025, 1, 1),
+                total_amount=1000.0,
+                eur_amount=900.0,
+            ),
+            _make_tx(
+                id=2,
+                type=TransactionType.BUY,
+                date=datetime(2025, 1, 5),
+                ticker="AAPL",
+                quantity=10,
+                total_amount=-500.0,
+            ),
+            _make_tx(
+                id=3,
+                type=TransactionType.SELL,
+                date=datetime(2025, 1, 15),
+                ticker="AAPL",
+                quantity=10,
+                total_amount=600.0,  # +100 realized
+            ),
+            _make_tx(
+                id=4,
+                type=TransactionType.WITHDRAW,
+                date=datetime(2025, 1, 20),
+                total_amount=-1100.0,  # full cash-out
+            ),
+        ]
+        with (
+            patch(
+                "app.services.portfolio_perf.HistoricalPriceService."
+                "get_historical_prices_for_multiple_tickers",
+                return_value={},
+            ),
+            patch(
+                "app.services.portfolio_perf.LivePriceService.get_last_known_price",
+                return_value=None,
+            ),
+            patch(
+                "app.services.portfolio_status.FxRateService."
+                "get_historical_usd_to_eur_rates",
+                return_value={},
+            ),
+        ):
+            data_points, _, _ = calculate_performance(
+                txs,
+                start_date=datetime(2025, 1, 1),
+                end_date=datetime(2025, 2, 1),
+                num_points=10,
+            )
+        # The final point is after the full cash-out — base is 0 so the TWR
+        # is undefined for that sub-period. Must be None, not a stale prior
+        # factor that would render as "no change".
+        assert data_points[-1]["return_pct"] is None

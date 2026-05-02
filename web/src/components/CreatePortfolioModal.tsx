@@ -1,12 +1,11 @@
 import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import * as z from 'zod';
-import i18n from '../i18n/index';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useCreatePortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
+import { portfolioNameSchema, PortfolioNameValues } from '../utils/portfolioNameSchema';
 import {
   Dialog,
   DialogContent,
@@ -21,18 +20,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
 
-const schema = z.object({
-  name: z.string().superRefine((val, ctx) => {
-    if (val.trim().length < 1) {
-      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameRequired') });
-    } else if (val.trim().length > 255) {
-      ctx.addIssue({ code: "custom", message: i18n.t('portfolio.validation.nameTooLong') });
-    }
-  }),
-});
-
-type FormValues = z.infer<typeof schema>;
-
 interface CreatePortfolioModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -42,8 +29,8 @@ export const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalPr
   const { t } = useTranslation();
   const navigate = useNavigate();
   const createPortfolio = useCreatePortfolio();
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const form = useForm<PortfolioNameValues>({
+    resolver: zodResolver(portfolioNameSchema),
     defaultValues: { name: '' },
   });
 
@@ -53,7 +40,7 @@ export const CreatePortfolioModal = ({ isOpen, onClose }: CreatePortfolioModalPr
     if (!isOpen) reset();
   }, [isOpen, reset]);
 
-  const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (values: PortfolioNameValues) => {
     try {
       const portfolio = await createPortfolio.mutateAsync({ name: values.name.trim() });
       onClose();

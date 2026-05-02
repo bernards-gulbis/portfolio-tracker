@@ -27,10 +27,6 @@ export const PasswordSection = () => {
   useWarnUnsavedChanges(form.formState.isDirty);
 
   const onSubmit = async (values: PasswordFormValues) => {
-    if (isOauthUser) {
-      form.setError('root', { message: t('settings.password.oauthNotApplicable') });
-      return;
-    }
     try {
       await changePassword.mutateAsync({ password: values.newPassword });
       form.reset({ newPassword: '', confirmPassword: '' });

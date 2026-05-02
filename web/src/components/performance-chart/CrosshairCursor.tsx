@@ -1,11 +1,9 @@
-/** Vertical crosshair cursor rendered on hover. */
-export const CrosshairCursor = ({
-  points,
-  height,
-}: {
+interface Props {
   points?: { x: number; y: number }[];
   height?: number;
-}) => {
+}
+
+export const CrosshairCursor = ({ points, height }: Props) => {
   if (points == null || points.length === 0) return null;
   const { x } = points[0];
   return (

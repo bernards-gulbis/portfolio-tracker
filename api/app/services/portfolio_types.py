@@ -80,10 +80,50 @@ class EurAccumulator:
 
 
 @dataclass
-class _Holding:
+class _Lot:
+    """A single tax lot from one BUY transaction.
+
+    Lots are kept FIFO inside ``_Holding.lots``: oldest first, so partial
+    sells consume from the head. The ``cost`` field is the original
+    purchase cost in the transaction's native currency — splits do not
+    change it (a split adjusts ``quantity`` but the basis is unchanged).
+    """
+
     quantity: Decimal
-    total_cost: Decimal
-    first_buy_date: datetime
+    cost: Decimal
+    acquired_at: datetime
+
+
+@dataclass
+class _Holding:
+    """A position in a single ticker, modeled as a FIFO queue of tax lots.
+
+    ``quantity``, ``total_cost`` and ``first_buy_date`` are derived from
+    ``lots`` so the lot queue is the single source of truth — no risk of
+    aggregate fields drifting from the underlying lots.
+    """
+
+    lots: list[_Lot] = dc_field(default_factory=list)
+
+    @property
+    def quantity(self) -> Decimal:
+        total = _ZERO
+        for lot in self.lots:
+            total += lot.quantity
+        return total
+
+    @property
+    def total_cost(self) -> Decimal:
+        total = _ZERO
+        for lot in self.lots:
+            total += lot.cost
+        return total
+
+    @property
+    def first_buy_date(self) -> datetime:
+        # Lots are appended in chronological order (transactions are sorted
+        # before replay), so lots[0] is the earliest buy.
+        return self.lots[0].acquired_at
 
 
 @dataclass

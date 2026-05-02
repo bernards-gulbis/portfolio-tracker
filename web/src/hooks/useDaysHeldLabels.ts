@@ -1,7 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { useMemo } from 'react';
 
-export const useDaysHeldLabels = () => {
+interface DaysHeldLabels {
+  d: string;
+  m: string;
+  y: string;
+}
+
+export const useDaysHeldLabels = (): DaysHeldLabels => {
   const { t } = useTranslation();
   return useMemo(() => ({
     d: t('common.daysShort'),
