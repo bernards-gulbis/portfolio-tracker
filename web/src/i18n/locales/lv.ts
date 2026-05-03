@@ -168,6 +168,7 @@ const lv: Translation = {
       pricePositive: 'Cenai par akciju jābūt lielākai par 0',
       splitRatioPositive: 'Sadalīšanas koeficientam jābūt lielākam par 0',
       totalAmountPositive: 'Kopējai summai jābūt lielākai par 0',
+      fxRatePositive: 'Valūtas kursam jābūt lielākam par 0',
     },
     view: {
       noPortfolio: {
@@ -246,7 +247,7 @@ const lv: Translation = {
         splitRatioDescription: 'Ievadiet sadalīšanas koeficientu (piem., 2 par 2-pret-1 sadalīšanu)',
         fxRate: 'Valūtas kurss',
         fxRatePlaceholder: 'piem., 1.0850',
-        fxRateDescription: 'Valūtas konvertēšanai izmantotais kurss',
+        fxRateDescription: 'USD par 1 EUR (piem., 1.0850 nozīmē 1 EUR = 1.0850 USD)',
         sellTickerPlaceholder: 'Izvēlēties turējumu...',
         noHoldings: 'Nav pieejamu turējumu',
         sellAll: 'Pārdot visu',

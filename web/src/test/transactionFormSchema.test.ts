@@ -110,4 +110,54 @@ describe('transaction-form schema — numeric validation', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it.each([
+    TransactionType.DEPOSIT,
+    TransactionType.WITHDRAW,
+    TransactionType.BUY,
+    TransactionType.SELL,
+    TransactionType.FEE,
+    TransactionType.DIVIDEND,
+  ])('accepts a valid fxRate on %s', (type) => {
+    const result = schema.safeParse({
+      ...validBuy,
+      type,
+      ticker: type === TransactionType.DEPOSIT || type === TransactionType.WITHDRAW || type === TransactionType.FEE ? '' : 'AAPL',
+      quantity: type === TransactionType.BUY || type === TransactionType.SELL ? '5' : '',
+      pricePerShare: type === TransactionType.BUY || type === TransactionType.SELL ? '100' : '',
+      totalAmount: '500',
+      fxRate: '1.0871',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it.each(['abc', 'Infinity', '0', '-1.5'])(
+    'rejects fxRate=%s on DEPOSIT',
+    (value) => {
+      const result = schema.safeParse({
+        ...validBuy,
+        type: TransactionType.DEPOSIT,
+        ticker: '',
+        quantity: '',
+        pricePerShare: '',
+        totalAmount: '500',
+        fxRate: value,
+      });
+      expect(result.success).toBe(false);
+      expect(pathsWithIssue(result)).toContain('fxRate');
+    },
+  );
+
+  it('accepts an empty fxRate (field is optional)', () => {
+    const result = schema.safeParse({
+      ...validBuy,
+      type: TransactionType.DEPOSIT,
+      ticker: '',
+      quantity: '',
+      pricePerShare: '',
+      totalAmount: '500',
+      fxRate: '',
+    });
+    expect(result.success).toBe(true);
+  });
 });

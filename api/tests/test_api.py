@@ -222,6 +222,58 @@ def test_create_transaction_with_all_fields(client: TestClient):
     assert data["total_amount"] == pytest.approx(-2755.35)
 
 
+def test_create_transaction_persists_fx_rate_for_buy_sell_fee(client: TestClient):
+    """The transaction modal now exposes ``fx_rate`` on every cash-flow type.
+
+    For BUY/SELL/FEE the rate is store-only — the EUR cost-basis handlers do
+    not consume it. This test pins the round-trip so the column does not
+    silently get dropped from the API surface.
+    """
+    portfolio_id = client.post("/portfolios/", json={"name": "FX persist"}).json()["id"]
+
+    cases = [
+        {
+            "date": "2024-03-01T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10,
+            "price_per_share": 175.0,
+            "fee": 1.0,
+            "total_amount": -1751.0,
+            "fx_rate": 1.0871,
+        },
+        {
+            "date": "2024-03-02T10:00:00",
+            "type": "Sell",
+            "ticker": "AAPL",
+            "quantity": 5,
+            "price_per_share": 180.0,
+            "fee": 1.0,
+            "total_amount": 899.0,
+            "fx_rate": 1.0900,
+        },
+        {
+            "date": "2024-03-03T10:00:00",
+            "type": "Fee",
+            "total_amount": -12.50,
+            "fx_rate": 1.0850,
+        },
+    ]
+
+    for payload in cases:
+        response = client.post(
+            f"/portfolios/{portfolio_id}/transactions/", json=payload
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["fx_rate"] == pytest.approx(payload["fx_rate"])
+
+    listed = client.get(f"/portfolios/{portfolio_id}/transactions").json()
+    by_type = {t["type"]: t for t in listed["transactions"]}
+    assert by_type["Buy"]["fx_rate"] == pytest.approx(1.0871)
+    assert by_type["Sell"]["fx_rate"] == pytest.approx(1.0900)
+    assert by_type["Fee"]["fx_rate"] == pytest.approx(1.0850)
+
+
 def test_list_transactions(client: TestClient):
     """Test listing transactions for a portfolio"""
     # Create portfolio

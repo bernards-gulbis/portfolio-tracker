@@ -294,15 +294,19 @@ describe('TransactionModal — sell suggestions', () => {
     expect(screen.getByRole('combobox', { name: 'Asset' })).toHaveTextContent('GOOG');
   });
 
-  it('auto-fills FX rate with usd_to_eur_rate for Dividend type', async () => {
+  it('auto-fills FX rate with USD-per-EUR (inverse of usd_to_eur_rate) for Dividend type', async () => {
     const user = userEvent.setup();
     renderModal();
 
     await selectType(user, 'Dividend');
 
+    // Backend stores fx_rate as USD per EUR (computes EUR via total / fx_rate),
+    // while usd_to_eur_rate (0.92) is EUR per USD. We invert at the UI boundary,
+    // so the auto-filled value is 1/0.92 ≈ 1.0870, not 0.9200. A regression here
+    // would inflate every saved EUR equivalent by ~17% (the old bug).
     await waitFor(() => {
       const fxInput = screen.getByLabelText('FX Rate') as HTMLInputElement;
-      expect(fxInput.value).toBe('0.9200');
+      expect(fxInput.value).toBe('1.0870');
     });
   });
 });
@@ -646,9 +650,116 @@ describe('TransactionModal — validation & create', () => {
             ticker: 'AAPL',
             total_amount: 50,
             fee: 2.5,
-            fx_rate: 0.92,
+            // Auto-filled fxRate is "1.0870" (= 1 / 0.92, USD per EUR);
+            // parseFloat drops the trailing zero.
+            fx_rate: 1.087,
           }),
         })
+      );
+    });
+  });
+
+  it.each([
+    ['Deposit', /^Add Transaction$/],
+    ['Withdraw', /^Add Transaction$/],
+    ['Buy', /^Add Transaction$/],
+    ['Sell', /^Add Transaction$/],
+    ['Fee', /^Add Transaction$/],
+    ['Dividend', /^Add Transaction$/],
+  ])('shows FX Rate field for %s', async (typeLabel) => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, typeLabel);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('FX Rate')).toBeInTheDocument();
+    });
+  });
+
+  it('does not show FX Rate field for Split', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Split');
+
+    expect(screen.queryByLabelText('FX Rate')).not.toBeInTheDocument();
+  });
+
+  it('sends fx_rate for BUY (auto-filled, no EUR plumbing on backend yet)', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
+    await user.type(tickerInput, 'AAPL');
+
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Buy',
+            fx_rate: 1.087,
+          }),
+        }),
+      );
+    });
+  });
+
+  it('sends fx_rate for FEE', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Fee');
+    await user.type(screen.getByLabelText('Total Amount'), '12.50');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Fee',
+            total_amount: -12.5,
+            fx_rate: 1.087,
+          }),
+        }),
+      );
+    });
+  });
+
+  it('sends fx_rate alongside eur_amount for DEPOSIT (backend cascade prefers eur_amount)', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    // Deposit is the default type
+    await user.type(screen.getByLabelText('Total Amount'), '1000');
+
+    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Deposit',
+            total_amount: 1000,
+            // valueEur auto-derives from total * usd_to_eur_rate = 1000 * 0.92 = 920
+            eur_amount: 920,
+            fx_rate: 1.087,
+          }),
+        }),
       );
     });
   });

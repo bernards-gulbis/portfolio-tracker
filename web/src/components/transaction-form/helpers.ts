@@ -100,14 +100,17 @@ export const buildTransactionData = (values: FormValues): TransactionCreate => {
       base.total_amount = Math.abs(Number.parseFloat(values.totalAmount || '0'));
       if (values.valueEur?.trim())
         base.eur_amount = Math.abs(Number.parseFloat(values.valueEur));
+      if (values.fxRate?.trim()) base.fx_rate = Number.parseFloat(values.fxRate);
       break;
     case TransactionType.WITHDRAW:
       base.total_amount = -Math.abs(Number.parseFloat(values.totalAmount || '0'));
       if (values.valueEur?.trim())
         base.eur_amount = -Math.abs(Number.parseFloat(values.valueEur));
+      if (values.fxRate?.trim()) base.fx_rate = Number.parseFloat(values.fxRate);
       break;
     case TransactionType.FEE:
       base.total_amount = -Math.abs(Number.parseFloat(values.totalAmount || '0'));
+      if (values.fxRate?.trim()) base.fx_rate = Number.parseFloat(values.fxRate);
       break;
     case TransactionType.BUY:
       base.ticker = values.ticker;
@@ -115,6 +118,7 @@ export const buildTransactionData = (values: FormValues): TransactionCreate => {
       base.price_per_share = Number.parseFloat(values.pricePerShare || '0');
       base.fee = Math.abs(Number.parseFloat(values.fee || '0'));
       base.total_amount = -Math.abs(Number.parseFloat(values.totalAmount || '0'));
+      if (values.fxRate?.trim()) base.fx_rate = Number.parseFloat(values.fxRate);
       break;
     case TransactionType.SELL:
       base.ticker = values.ticker;
@@ -122,6 +126,7 @@ export const buildTransactionData = (values: FormValues): TransactionCreate => {
       base.price_per_share = Number.parseFloat(values.pricePerShare || '0');
       base.fee = Math.abs(Number.parseFloat(values.fee || '0'));
       base.total_amount = Math.abs(Number.parseFloat(values.totalAmount || '0'));
+      if (values.fxRate?.trim()) base.fx_rate = Number.parseFloat(values.fxRate);
       break;
     case TransactionType.DIVIDEND:
       base.ticker = values.ticker;

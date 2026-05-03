@@ -300,6 +300,77 @@ describe('buildTransactionData', () => {
     expect(data.total_amount).toBe(899);
   });
 
+  it.each([
+    [TransactionType.DEPOSIT, { totalAmount: '1000', valueEur: '920' }],
+    [TransactionType.WITHDRAW, { totalAmount: '500', valueEur: '460' }],
+    [TransactionType.FEE, { totalAmount: '12.50' }],
+    [
+      TransactionType.BUY,
+      {
+        ticker: 'AAPL',
+        quantity: '10',
+        pricePerShare: '150',
+        fee: '1',
+        totalAmount: '1501',
+      },
+    ],
+    [
+      TransactionType.SELL,
+      {
+        ticker: 'AAPL',
+        quantity: '5',
+        pricePerShare: '180',
+        fee: '1',
+        totalAmount: '899',
+      },
+    ],
+  ])('sends fx_rate=1.0871 for %s', (type, fields) => {
+    const data = buildTransactionData({
+      ...baseValues,
+      type,
+      fxRate: '1.0871',
+      ...fields,
+    });
+    expect(data.fx_rate).toBe(1.0871);
+  });
+
+  it.each([
+    TransactionType.DEPOSIT,
+    TransactionType.WITHDRAW,
+    TransactionType.BUY,
+    TransactionType.SELL,
+    TransactionType.FEE,
+  ])('omits fx_rate when blank on %s', (type) => {
+    const fields: Partial<FormValues> =
+      type === TransactionType.BUY || type === TransactionType.SELL
+        ? {
+            ticker: 'AAPL',
+            quantity: '1',
+            pricePerShare: '100',
+            fee: '0',
+            totalAmount: '100',
+          }
+        : { totalAmount: '100' };
+    const data = buildTransactionData({
+      ...baseValues,
+      ...fields,
+      type,
+      fxRate: '   ',
+    });
+    expect(data.fx_rate).toBeUndefined();
+  });
+
+  it('does not send fx_rate for SPLIT (field not shown in UI)', () => {
+    const data = buildTransactionData({
+      ...baseValues,
+      type: TransactionType.SPLIT,
+      ticker: 'AAPL',
+      splitRatio: '4',
+      fxRate: '1.0871',
+    });
+    expect(data.fx_rate).toBeUndefined();
+  });
+
   it('builds DIVIDEND data with optional fee and fxRate', () => {
     const data = buildTransactionData({
       ...baseValues,

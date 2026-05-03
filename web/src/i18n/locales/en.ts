@@ -166,6 +166,7 @@ const en = {
       pricePositive: 'Price per share must be greater than 0',
       splitRatioPositive: 'Split ratio must be greater than 0',
       totalAmountPositive: 'Total amount must be greater than 0',
+      fxRatePositive: 'FX rate must be greater than 0',
     },
     view: {
       noPortfolio: {
@@ -244,7 +245,7 @@ const en = {
         splitRatioDescription: 'Enter the split ratio (e.g., 2 for a 2-for-1 split)',
         fxRate: 'FX Rate',
         fxRatePlaceholder: 'e.g., 1.0850',
-        fxRateDescription: 'Exchange rate used for currency conversion',
+        fxRateDescription: 'USD per 1 EUR (e.g., 1.0850 means 1 EUR = 1.0850 USD)',
         sellTickerPlaceholder: 'Select holding...',
         noHoldings: 'No holdings available',
         sellAll: 'Sell All',

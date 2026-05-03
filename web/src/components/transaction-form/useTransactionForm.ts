@@ -18,6 +18,7 @@ import {
   BUY_SELL_TYPES,
   EUR_TYPES,
   FEE_TYPES,
+  FX_RATE_TYPES,
   TICKER_TYPES,
   schema,
   type FormValues,
@@ -109,7 +110,7 @@ export function useTransactionForm({
   const showTotalAmount = type !== TransactionType.SPLIT;
   const showValueEur = EUR_TYPES.has(type);
   const showSplitRatio = type === TransactionType.SPLIT;
-  const showFxRate = type === TransactionType.DIVIDEND;
+  const showFxRate = FX_RATE_TYPES.has(type);
 
   const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
   const { data: livePrices } = useLivePrices(
@@ -158,13 +159,19 @@ export function useTransactionForm({
     }
   }, [isSell, watchedTicker, livePrices, form, setValue]);
 
-  // Auto-fill FX rate for DIVIDEND when empty.
+  // Auto-fill FX rate when empty for any FX-rate-bearing type.
+  //
+  // Convention: ``Transaction.fx_rate`` is stored as USD per EUR (e.g. 1.0870 means
+  // 1 EUR = 1.0870 USD), and the backend computes EUR via ``total_usd / fx_rate``.
+  // ``portfolioStatus.usd_to_eur_rate`` is the inverse (EUR per USD, ~0.92), so we
+  // invert at the boundary. Storing the raw ``usd_to_eur_rate`` here would be a
+  // unit error and the saved EUR equivalent would come out ~17% too high.
   const eurRate = portfolioStatus?.usd_to_eur_rate;
   useEffect(() => {
-    if (isDividend && !form.getValues('fxRate') && eurRate != null) {
-      setValue('fxRate', eurRate.toFixed(4));
-    }
-  }, [isDividend, eurRate, form, setValue]);
+    if (!showFxRate || form.getValues('fxRate')) return;
+    if (eurRate == null || eurRate <= 0) return;
+    setValue('fxRate', (1 / eurRate).toFixed(4));
+  }, [showFxRate, eurRate, form, setValue]);
 
   // Auto-calculate EUR amount for DEPOSIT/WITHDRAW when totalAmount changes.
   useEffect(() => {
