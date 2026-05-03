@@ -34,42 +34,43 @@ export const FilterControls = ({ availableYears, yearFilter, onYearChange, filte
   const showTickerFilter = filter !== undefined && onFilterChange !== undefined;
   const showViewModeToggle = viewMode !== undefined && onViewModeChange !== undefined;
 
-  if (!showYearSelect && !showTickerFilter && !showViewModeToggle) return null;
-
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      {showYearSelect && (
-        <Select value={yearFilter} onValueChange={onYearChange}>
-          <SelectTrigger className="w-32 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('status.allYears')}</SelectItem>
-            {availableYears.map((year) => (
-              <SelectItem key={year} value={year}>{year}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-      {showTickerFilter && (
-        <Input
-          name="ticker-filter"
-          placeholder={t('status.columns.ticker')}
-          value={filter}
-          onChange={(e) => onFilterChange(e.target.value)}
-          className="w-40 h-8 text-sm"
-        />
-      )}
-      {showViewModeToggle && (
-        <Tabs value={viewMode} onValueChange={(v) => onViewModeChange(v as TableViewMode)} className="ml-auto">
-          <TabsList aria-label={t('status.viewMode.aria')}>
-            <TabsTrigger value="ungrouped">{t('status.viewMode.ungrouped')}</TabsTrigger>
-            <TabsTrigger value="grouped">{t('status.viewMode.grouped')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      )}
-    </div>
-  );
+  if (showYearSelect || showTickerFilter || showViewModeToggle) {
+    return (
+      <div className="flex items-center gap-2 mb-3">
+        {showYearSelect && (
+          <Select value={yearFilter} onValueChange={onYearChange}>
+            <SelectTrigger className="w-32 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('status.allYears')}</SelectItem>
+              {availableYears.map((year) => (
+                <SelectItem key={year} value={year}>{year}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {showTickerFilter && (
+          <Input
+            name="ticker-filter"
+            placeholder={t('status.columns.ticker')}
+            value={filter}
+            onChange={(e) => onFilterChange(e.target.value)}
+            className="w-40 h-8 text-sm"
+          />
+        )}
+        {showViewModeToggle && (
+          <Tabs value={viewMode} onValueChange={(v) => onViewModeChange(v as TableViewMode)} className="ml-auto">
+            <TabsList aria-label={t('status.viewMode.aria')}>
+              <TabsTrigger value="ungrouped">{t('status.viewMode.ungrouped')}</TabsTrigger>
+              <TabsTrigger value="grouped">{t('status.viewMode.grouped')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+      </div>
+    );
+  }
+  return null;
 };
 
 interface EmptyTableRowProps {

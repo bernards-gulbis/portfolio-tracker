@@ -85,12 +85,12 @@ export const TransactionModal = ({
 
   const totalAmount = Number.parseFloat(watchedTotalAmount || '0');
   const totalAmountEurHint =
-    eurRate != null && eurRate > 0 && totalAmount > 0
-      ? t('transaction.modal.fields.totalAmountEurHint', {
+    eurRate == null || eurRate <= 0 || totalAmount <= 0
+      ? null
+      : t('transaction.modal.fields.totalAmountEurHint', {
           eur: (totalAmount * eurRate).toFixed(2),
           rate: (1 / eurRate).toFixed(4),
-        })
-      : null;
+        });
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>

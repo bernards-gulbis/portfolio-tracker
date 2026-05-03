@@ -111,40 +111,46 @@ describe('transaction-form schema — numeric validation', () => {
     expect(result.success).toBe(true);
   });
 
-  it.each([
-    [TransactionType.DEPOSIT, { ticker: '', quantity: '', pricePerShare: '' }],
-    [TransactionType.WITHDRAW, { ticker: '', quantity: '', pricePerShare: '' }],
-    [TransactionType.FEE, { ticker: '', quantity: '', pricePerShare: '' }],
-    [TransactionType.BUY, { ticker: 'AAPL', quantity: '5', pricePerShare: '100' }],
-    [TransactionType.SELL, { ticker: 'AAPL', quantity: '5', pricePerShare: '100' }],
-    [TransactionType.DIVIDEND, { ticker: 'AAPL', quantity: '', pricePerShare: '' }],
-  ])('accepts a valid fxRate on %s', (type, overrides) => {
+  // Each row provides the per-type field overrides needed so the schema
+  // would otherwise validate cleanly — the only variable left is fxRate.
+  // Covers every member of FX_RATE_TYPES (in transaction-form/schema.ts).
+  const fxRateTypeOverrides: Array<[TransactionType, Partial<typeof validBuy>]> = [
+    [TransactionType.DEPOSIT, { ticker: '', quantity: '', pricePerShare: '', totalAmount: '500' }],
+    [TransactionType.WITHDRAW, { ticker: '', quantity: '', pricePerShare: '', totalAmount: '500' }],
+    [TransactionType.FEE, { ticker: '', quantity: '', pricePerShare: '', totalAmount: '500' }],
+    [TransactionType.BUY, { ticker: 'AAPL', quantity: '5', pricePerShare: '100', totalAmount: '500' }],
+    [TransactionType.SELL, { ticker: 'AAPL', quantity: '5', pricePerShare: '100', totalAmount: '500' }],
+    [TransactionType.DIVIDEND, { ticker: 'AAPL', quantity: '', pricePerShare: '', totalAmount: '500' }],
+    [TransactionType.SPLIT, { ticker: 'AAPL', quantity: '', pricePerShare: '', fee: '', totalAmount: '0', splitRatio: '4' }],
+  ];
+
+  it.each(fxRateTypeOverrides)('accepts a valid fxRate on %s', (type, overrides) => {
     const result = schema.safeParse({
       ...validBuy,
       ...overrides,
       type,
-      totalAmount: '500',
       fxRate: '1.0871',
     });
     expect(result.success).toBe(true);
   });
 
-  it.each(['abc', 'Infinity', '0', '-1.5'])(
-    'rejects fxRate=%s on DEPOSIT',
-    (value) => {
-      const result = schema.safeParse({
-        ...validBuy,
-        type: TransactionType.DEPOSIT,
-        ticker: '',
-        quantity: '',
-        pricePerShare: '',
-        totalAmount: '500',
-        fxRate: value,
-      });
-      expect(result.success).toBe(false);
-      expect(pathsWithIssue(result)).toContain('fxRate');
-    },
-  );
+  const invalidFxRates = ['abc', 'Infinity', '0', '-1.5'];
+  it.each(
+    fxRateTypeOverrides.flatMap(([type, overrides]) =>
+      invalidFxRates.map(
+        (fxRate) => [fxRate, type, overrides] as [string, TransactionType, Partial<typeof validBuy>],
+      ),
+    ),
+  )('rejects fxRate=%s on %s', (fxRate, type, overrides) => {
+    const result = schema.safeParse({
+      ...validBuy,
+      ...overrides,
+      type,
+      fxRate,
+    });
+    expect(result.success).toBe(false);
+    expect(pathsWithIssue(result)).toContain('fxRate');
+  });
 
   it('accepts an empty fxRate (field is optional)', () => {
     const result = schema.safeParse({

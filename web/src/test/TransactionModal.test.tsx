@@ -957,8 +957,7 @@ describe('TransactionModal — validation & create', () => {
     await user.clear(feeInput);
     await user.type(feeInput, '2');
 
-    await new Promise((r) => setTimeout(r, 50));
-    expect(Number.parseFloat(totalInput.value)).toBe(1505);
+    await waitFor(() => expect(Number.parseFloat(totalInput.value)).toBe(1505));
   });
 
   it('preserves user-typed valueEur on DEPOSIT when totalAmount changes', async () => {
@@ -978,8 +977,7 @@ describe('TransactionModal — validation & create', () => {
     // Append a digit to totalAmount; auto-derive must NOT clobber valueEur.
     await user.type(totalInput, '1');
 
-    await new Promise((r) => setTimeout(r, 50));
-    expect(Number.parseFloat(eurInput.value)).toBe(918.5);
+    await waitFor(() => expect(Number.parseFloat(eurInput.value)).toBe(918.5));
   });
 
   it('resets user-edit flag on type change', async () => {

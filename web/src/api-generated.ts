@@ -1550,6 +1550,20 @@ export interface operations {
                     "application/json": components["schemas"]["FxRateResponse"];
                 };
             };
+            /** @description Invalid date format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No FX rate available within lookback window */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1920,14 +1934,12 @@ export interface operations {
                     "application/json": components["schemas"]["PaginatedTransactionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description date_from must be on or before date_to */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };
