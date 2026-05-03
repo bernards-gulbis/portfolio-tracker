@@ -180,6 +180,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fx-rates/{date_str}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fx Rate
+         * @description Return the USD→EUR rate (EUR per USD) for the given date.
+         *
+         *     Today/future → live rate. Past → historical, with up to 7 days of
+         *     back-padding for weekends and exchange holidays. ``404`` if no rate
+         *     is available within the lookback window.
+         */
+        get: operations["get_fx_rate_fx_rates__date_str__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -606,6 +630,18 @@ export interface components {
             detail: string | {
                 [key: string]: string;
             };
+        };
+        /** FxRateResponse */
+        FxRateResponse: {
+            /** Date */
+            date: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "live" | "historical";
+            /** Usd To Eur Rate */
+            usd_to_eur_rate: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1481,6 +1517,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fx_rate_fx_rates__date_str__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date_str: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxRateResponse"];
                 };
             };
             /** @description Validation Error */

@@ -8,6 +8,7 @@ import {
   TransactionType,
   getErrorMessage,
 } from '../../api';
+import { useFxRate } from '../../hooks/useFxRate';
 import { useLivePrices } from '../../hooks/useLivePrices';
 import { usePortfolioStatus } from '../../hooks/usePortfolioStatus';
 import {
@@ -162,13 +163,16 @@ export function useTransactionForm({
 
   // Once the user types into totalAmount or valueEur, the corresponding auto-calc
   // backs off so subsequent dependency changes don't silently overwrite the
-  // user's value. Flags reset on reopen and on type change.
+  // user's value. In edit mode, saved values count as user-authored from the
+  // moment the modal opens — the bank-statement EUR (saved as eur_amount) and
+  // the original total are both intentional records that the auto-derive must
+  // not overwrite on initial mount. Flags reset on reopen and on type change.
   const totalAmountUserEdited = useRef(false);
   const valueEurUserEdited = useRef(false);
   useEffect(() => {
-    totalAmountUserEdited.current = false;
-    valueEurUserEdited.current = false;
-  }, [isOpen, type]);
+    totalAmountUserEdited.current = isEdit;
+    valueEurUserEdited.current = isEdit && transaction?.eur_amount != null;
+  }, [isOpen, type, isEdit, transaction]);
 
   // Auto-calculate totalAmount for BUY/SELL from quantity × price ± fee.
   useEffect(() => {
@@ -204,25 +208,32 @@ export function useTransactionForm({
     }
   }, [isSell, watchedTicker, livePrices, form, setValue]);
 
-  // Auto-fill FX rate, but only when adding: an empty fxRate on an existing
-  // transaction means the user saved it that way, and substituting today's rate
-  // would distort the historical record.
+  // Date-aware USD→EUR rate. The hook returns the historical rate when
+  // ``watchedDate`` is in the past, or the live rate for today/future. Falling
+  // back to ``portfolioStatus.usd_to_eur_rate`` keeps a sensible default while
+  // the per-date query is loading or if the lookup 404s for an out-of-range date.
+  const watchedDate = watch('date');
+  const { data: dateRate } = useFxRate(watchedDate);
+  const eurRate = dateRate?.usd_to_eur_rate ?? portfolioStatus?.usd_to_eur_rate;
+
+  // Auto-fill FX rate when empty. With date-aware ``eurRate``, this is correct
+  // for both new and edit cases — saved fx_rate already populates the field via
+  // getDefaultValues, so the auto-fill only kicks in when there's no saved rate.
   //
-  // Unit conversion: Transaction.fx_rate is stored as USD per EUR (backend computes
-  // EUR via total_usd / fx_rate), while usd_to_eur_rate is EUR per USD (~0.92), so
-  // we invert at the boundary. Forwarding the raw rate would inflate the saved EUR
-  // equivalent by ~17%.
+  // Unit conversion: Transaction.fx_rate is stored as USD per EUR (backend
+  // computes EUR via total_usd / fx_rate), while usd_to_eur_rate is EUR per USD
+  // (~0.92), so we invert at the boundary. Forwarding the raw rate would inflate
+  // the saved EUR equivalent by ~17%.
   //
   // ``isOpen`` and ``transaction`` are deps so the effect re-fires after each
   // ``reset()`` on reopen — the modal stays mounted across opens (see
   // TransactionView).
-  const eurRate = portfolioStatus?.usd_to_eur_rate;
   useEffect(() => {
-    if (!isOpen || !showFxRate || isEdit) return;
+    if (!isOpen || !showFxRate) return;
     if (form.getValues('fxRate')) return;
     if (eurRate == null || eurRate <= 0) return;
     setValue('fxRate', (1 / eurRate).toFixed(4));
-  }, [isOpen, transaction, showFxRate, isEdit, eurRate, form, setValue]);
+  }, [isOpen, transaction, showFxRate, eurRate, form, setValue]);
 
   // Auto-calculate EUR amount for DEPOSIT/WITHDRAW when totalAmount changes.
   useEffect(() => {

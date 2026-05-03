@@ -18,9 +18,14 @@ vi.mock('../hooks/useLivePrices', () => ({
   useLivePrices: vi.fn(),
 }));
 
+vi.mock('../hooks/useFxRate', () => ({
+  useFxRate: vi.fn(),
+}));
+
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { useLivePrices } from '../hooks/useLivePrices';
+import { useFxRate } from '../hooks/useFxRate';
 
 const mockHoldings: Holding[] = [
   {
@@ -112,6 +117,14 @@ describe('TransactionModal — sell suggestions', () => {
     vi.mocked(useLivePrices).mockReturnValue(
       buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
     );
+
+    // Default: no per-date rate available (e.g. modal showing today's date).
+    // The hook returning ``null`` makes ``useTransactionForm`` fall back to
+    // ``portfolioStatus.usd_to_eur_rate`` (0.92), which is what the existing
+    // tests rely on. Tests exercising historical rates override this per-test.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: null,
+    } as unknown as ReturnType<typeof useFxRate>);
   });
 
   it('renders Select dropdown for ticker when type is SELL', async () => {
@@ -356,6 +369,14 @@ describe('TransactionModal — edit mode', () => {
     vi.mocked(useLivePrices).mockReturnValue(
       buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
     );
+
+    // Default: no per-date rate available (e.g. modal showing today's date).
+    // The hook returning ``null`` makes ``useTransactionForm`` fall back to
+    // ``portfolioStatus.usd_to_eur_rate`` (0.92), which is what the existing
+    // tests rely on. Tests exercising historical rates override this per-test.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: null,
+    } as unknown as ReturnType<typeof useFxRate>);
   });
 
   it('shows edit title when transaction is provided', () => {
@@ -461,6 +482,14 @@ describe('TransactionModal — validation & create', () => {
     vi.mocked(useLivePrices).mockReturnValue(
       buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
     );
+
+    // Default: no per-date rate available (e.g. modal showing today's date).
+    // The hook returning ``null`` makes ``useTransactionForm`` fall back to
+    // ``portfolioStatus.usd_to_eur_rate`` (0.92), which is what the existing
+    // tests rely on. Tests exercising historical rates override this per-test.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: null,
+    } as unknown as ReturnType<typeof useFxRate>);
   });
 
   it('shows ticker required error for BUY with empty ticker', async () => {
@@ -765,10 +794,15 @@ describe('TransactionModal — validation & create', () => {
     });
   });
 
-  it('leaves FX Rate empty when editing a transaction without fx_rate', () => {
-    // Auto-fill must NOT substitute today's rate for an old transaction that was
-    // saved with no FX rate — that would distort the historical record. The user
-    // can manually fill the field via the (auto-expanded) Advanced section.
+  it('auto-fills FX Rate from the historical rate when editing a transaction with no saved fx_rate', () => {
+    // The earlier "skip auto-fill in edit mode" rule was driven by fear of
+    // substituting today's rate for an old transaction. With date-aware
+    // ``useFxRate``, the auto-filled value is the historical rate for the
+    // transaction's date — no longer a hazard, so we re-enable it here.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: { date: '2022-04-15', usd_to_eur_rate: 0.95, source: 'historical' },
+    } as unknown as ReturnType<typeof useFxRate>);
+
     const tx: Transaction = {
       id: 200,
       portfolio_id: 1,
@@ -785,9 +819,53 @@ describe('TransactionModal — validation & create', () => {
     };
     renderModal({ ...defaultProps, transaction: tx });
 
-    // Advanced is auto-expanded in edit mode, so the input is in the DOM —
-    // it just must not be auto-filled.
-    expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('');
+    // Advanced is auto-expanded in edit mode; FX Rate auto-fills with 1/0.95 ≈ 1.0526.
+    const fxInput = screen.getByLabelText('FX Rate') as HTMLInputElement;
+    expect(Number.parseFloat(fxInput.value)).toBeCloseTo(1.0526, 4);
+  });
+
+  it('preserves saved eur_amount in edit mode (does not overwrite with today-rate-derived)', () => {
+    // The bug: previously the valueEur auto-derive ran on mount and replaced
+    // the saved 918.50 with 1000 * today_rate. Fix: edit mode flags the saved
+    // value as user-authored, so the auto-derive backs off.
+    const tx: Transaction = {
+      id: 201,
+      portfolio_id: 1,
+      date: '2022-04-15T10:00:00',
+      type: TransactionType.DEPOSIT,
+      ticker: null,
+      quantity: null,
+      price_per_share: null,
+      fee: null,
+      total_amount: 1000,
+      eur_amount: 918.5,
+      split_ratio: null,
+      fx_rate: null,
+    };
+    renderModal({ ...defaultProps, transaction: tx });
+
+    const eurInput = screen.getByLabelText('Amount in EUR') as HTMLInputElement;
+    expect(Number.parseFloat(eurInput.value)).toBe(918.5);
+  });
+
+  it('uses the historical rate for backdated DEPOSIT auto-derive (Add mode)', async () => {
+    // When the user picks a past date, ``useFxRate`` returns the historical
+    // rate. valueEur should derive from that, not from today's live rate.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: { date: '2024-03-15', usd_to_eur_rate: 0.85, source: 'historical' },
+    } as unknown as ReturnType<typeof useFxRate>);
+
+    const user = userEvent.setup();
+    renderModal();
+
+    // Default type is DEPOSIT; user enters a total. valueEur should derive
+    // from the *historical* rate (0.85), not today's (0.92).
+    await user.type(screen.getByLabelText('Total Amount'), '1000');
+
+    const eurInput = screen.getByLabelText('Amount in EUR') as HTMLInputElement;
+    await waitFor(() => {
+      expect(Number.parseFloat(eurInput.value)).toBeCloseTo(850, 1);
+    });
   });
 
   it('auto-expands Advanced in edit mode so prior values are visible', () => {

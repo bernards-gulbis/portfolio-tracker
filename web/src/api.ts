@@ -396,6 +396,17 @@ export const getLivePrices = async (tickers: string[]): Promise<LivePrices> => {
   return parseOrThrow(LivePricesSchema, response.data, 'GET /portfolios/prices/live');
 };
 
+export interface FxRate {
+  date: string;
+  usd_to_eur_rate: number;
+  source: 'live' | 'historical';
+}
+
+export const getFxRate = async (date: string): Promise<FxRate> => {
+  const response = await api.get(`/fx-rates/${date}`);
+  return response.data as FxRate;
+};
+
 interface PerformanceParams {
   start_date?: string;
   end_date?: string;

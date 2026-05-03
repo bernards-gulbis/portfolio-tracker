@@ -3,7 +3,7 @@ Comprehensive test suite for Portfolio Tracker API
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
 from unittest.mock import patch
@@ -4556,3 +4556,47 @@ class TestPortfolioServiceEdgeCases:
     ):
         r = client.get("/portfolios/99999/performance")
         assert r.status_code == 404
+
+
+class TestFxRateEndpoint:
+    """``GET /fx-rates/{date}`` — single-date USD→EUR rate lookup."""
+
+    def test_today_uses_live_rate(self, client: TestClient):
+        with patch(
+            "app.routers.fx_rates.FxRateService.get_usd_to_eur_rate_safe",
+            return_value=0.92,
+        ):
+            today = date.today().isoformat()
+            response = client.get(f"/fx-rates/{today}")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["date"] == today
+        assert body["usd_to_eur_rate"] == pytest.approx(0.92)
+        assert body["source"] == "live"
+
+    def test_past_date_uses_historical_with_nearest_prior_fallback(
+        self, client: TestClient
+    ):
+        # Target Sat 2024-03-16 → prior trading day Fri 2024-03-15.
+        sample_rates = {"2024-03-15": 0.918, "2024-03-14": 0.917}
+        with patch(
+            "app.routers.fx_rates.FxRateService.get_historical_usd_to_eur_rates",
+            return_value=sample_rates,
+        ):
+            response = client.get("/fx-rates/2024-03-16")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["usd_to_eur_rate"] == pytest.approx(0.918)
+        assert body["source"] == "historical"
+
+    def test_unavailable_returns_404(self, client: TestClient):
+        with patch(
+            "app.routers.fx_rates.FxRateService.get_historical_usd_to_eur_rates",
+            return_value={},
+        ):
+            response = client.get("/fx-rates/2010-01-01")
+        assert response.status_code == 404
+
+    def test_invalid_date_returns_400(self, client: TestClient):
+        response = client.get("/fx-rates/not-a-date")
+        assert response.status_code == 400
