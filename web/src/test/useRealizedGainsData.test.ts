@@ -229,7 +229,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'MSFT', date: '2025-05-01T10:00:00', amount: 80 }),
       makeDividend({ ticker: 'AAPL', amount: 50 }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     expect(result.current.filteredDividends).toHaveLength(2);
     const msftGroup = result.current.filteredDividends.find(g => g.ticker === 'MSFT');
     expect(msftGroup?.totalAmount).toBe(180);
@@ -241,7 +241,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
       makeDividend({ ticker: 'MSFT', date: '2025-05-01T10:00:00', amount: 80, amount_eur: 74 }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     const msft = result.current.filteredDividends[0];
     expect(msft.totalAmountEur).toBe(166);
   });
@@ -251,7 +251,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
       makeDividend({ ticker: 'MSFT', date: '2025-05-01T10:00:00', amount: 80, amount_eur: null }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     const msft = result.current.filteredDividends[0];
     expect(msft.totalAmountEur).toBeNull();
   });
@@ -261,19 +261,19 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
       makeDividend({ ticker: 'AAPL', amount: 50, amount_eur: 46 }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     expect(result.current.dividendTotals.totalUsd).toBe(150);
     expect(result.current.dividendTotals.totalEur).toBe(138);
     expect(result.current.dividendTotals.count).toBe(2);
   });
 
-  it('sorts by amount (EUR when available, USD otherwise)', () => {
+  it('sorts by amount in EUR mode (EUR when available, USD otherwise)', () => {
     const dividends = [
       makeDividend({ ticker: 'AAPL', amount: 50, amount_eur: 46 }),
       makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
       makeDividend({ ticker: 'TSLA', amount: 200, amount_eur: null }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     // Sort by amount descending (default after clicking 'amount')
     act(() => {
       result.current.handleSort('amount');
@@ -285,12 +285,32 @@ describe('useDividendsTableData', () => {
     expect(result.current.filteredDividends[2].ticker).toBe('AAPL');
   });
 
+  // Regression: previously, sortDividendGroups used (totalAmountEur ?? totalAmount)
+  // regardless of displayCurrency, so a USD-displayed table could sort by EUR
+  // values whose ratio to USD differed across rows, producing visible misorder.
+  it('sorts by USD amount in USD mode even when EUR is available', () => {
+    // Dates intentionally span periods where the historical USD/EUR rate
+    // differs enough that sorting by EUR vs USD gives different orderings.
+    const dividends = [
+      makeDividend({ ticker: 'AAPL', amount: 100, amount_eur: 110 }), // weak USD: 1 USD = 1.1 EUR
+      makeDividend({ ticker: 'MSFT', amount: 105, amount_eur: 90 }), // strong USD: 1 USD = ~0.86 EUR
+    ];
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'USD' }));
+    act(() => {
+      result.current.handleSort('amount');
+    });
+    // By USD amount desc: MSFT(105) > AAPL(100). The old code would have used
+    // EUR (110 > 90), producing AAPL > MSFT, which contradicts the rendered USD.
+    expect(result.current.filteredDividends[0].ticker).toBe('MSFT');
+    expect(result.current.filteredDividends[1].ticker).toBe('AAPL');
+  });
+
   it('returns null totalEur when some groups lack EUR', () => {
     const dividends = [
       makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
       makeDividend({ ticker: 'AAPL', amount: 50, amount_eur: null }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     expect(result.current.dividendTotals.totalEur).toBeNull();
   });
 
@@ -299,7 +319,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'AAPL', date: '2025-01-01T10:00:00' }),
       makeDividend({ ticker: 'MSFT', date: '2025-06-01T10:00:00' }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     // Default sort is 'date' descending — MSFT (Jun) should come first
     expect(result.current.filteredDividends[0].ticker).toBe('MSFT');
   });
@@ -309,7 +329,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'AAPL', date: '2025-01-01T10:00:00' }),
       makeDividend({ ticker: 'MSFT', date: '2025-06-01T10:00:00' }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     // Default is 'date' descending. First click on 'date' toggles to ascending.
     act(() => {
       result.current.handleSort('date');
@@ -324,7 +344,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'MSFT', amount: 100 }),
       makeDividend({ ticker: 'MSFT', date: '2025-05-01T10:00:00', amount: 80 }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     act(() => {
       result.current.handleSort('count');
     });
@@ -337,7 +357,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'AAPL', amount: 50, amount_eur: 46 }),
       makeDividend({ ticker: 'MSFT', amount: 100, amount_eur: 92 }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, displayCurrency: 'EUR' }));
     act(() => { result.current.handleSort('amount'); });
     // Descending: MSFT first
     expect(result.current.filteredDividends[0].ticker).toBe('MSFT');
@@ -352,7 +372,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'MSFT', date: '2025-05-01T10:00:00', amount: 80 }),
       makeDividend({ ticker: 'AAPL', amount: 50 }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, viewMode: 'ungrouped' }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, viewMode: 'ungrouped', displayCurrency: 'EUR' }));
     expect(result.current.filteredDividends).toHaveLength(3);
     for (const group of result.current.filteredDividends) {
       expect(group.payments).toHaveLength(1);
@@ -366,7 +386,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'AAPL' }),
       makeDividend({ ticker: 'MSFT' }),
     ];
-    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, viewMode: 'ungrouped' }));
+    const { result } = renderHook(() => useDividendsTableData({ dividendsReceived: dividends, viewMode: 'ungrouped', displayCurrency: 'EUR' }));
     act(() => { result.current.handleSort('ticker'); });
     expect(result.current.filteredDividends.map((g) => g.ticker)).toEqual(['AAPL', 'MSFT', 'TSLA']);
   });
@@ -377,7 +397,7 @@ describe('useDividendsTableData', () => {
       makeDividend({ ticker: 'MSFT' }),
     ];
     const { result, rerender } = renderHook(
-      ({ viewMode }) => useDividendsTableData({ dividendsReceived: dividends, viewMode }),
+      ({ viewMode }) => useDividendsTableData({ dividendsReceived: dividends, viewMode, displayCurrency: 'EUR' }),
       { initialProps: { viewMode: 'grouped' as TableViewMode } },
     );
 
