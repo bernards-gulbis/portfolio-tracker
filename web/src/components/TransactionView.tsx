@@ -33,6 +33,8 @@ export const TransactionView = () => {
   const [tickerSearch, setTickerSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   // Track previous portfolio id as state so React can reset filters synchronously
   const [prevPortfolioId, setPrevPortfolioId] = useState(activePortfolioId);
@@ -42,24 +44,44 @@ export const TransactionView = () => {
     setTickerSearch('');
     setTypeFilter([]);
     setSortOrder('desc');
+    setDateFrom('');
+    setDateTo('');
   }
 
   const debouncedTicker = useDebounce(tickerSearch, 150);
+  const debouncedDateFrom = useDebounce(dateFrom, 150);
+  const debouncedDateTo = useDebounce(dateTo, 150);
   const typeFilterKey = [...typeFilter].sort((a, b) => a.localeCompare(b)).join(',');
 
+  // Only fully-formed YYYY-MM-DD strings are sent to the backend; partial
+  // typing in the date inputs (e.g. "2026-05") would otherwise produce 422s.
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const isValidDate = (s: string) => ISO_DATE.test(s);
+  const queryDateFrom = isValidDate(debouncedDateFrom) ? debouncedDateFrom : '';
+  const queryDateTo = isValidDate(debouncedDateTo) ? debouncedDateTo : '';
+  const dateRangeInverted =
+    queryDateFrom !== '' && queryDateTo !== '' && queryDateFrom > queryDateTo;
+  // Don't fire a query for an inverted range — the backend would 422 anyway.
+  const effectiveDateFrom = dateRangeInverted ? '' : queryDateFrom;
+  const effectiveDateTo = dateRangeInverted ? '' : queryDateTo;
+
   // Track previous filter key as state to reset page when filters change
-  const filterToken = `${debouncedTicker}|${typeFilterKey}|${sortOrder}`;
+  const filterToken = `${debouncedTicker}|${typeFilterKey}|${sortOrder}|${effectiveDateFrom}|${effectiveDateTo}`;
   const [prevFilterToken, setPrevFilterToken] = useState(filterToken);
   if (prevFilterToken !== filterToken) {
     setPrevFilterToken(filterToken);
     setCurrentPage(1);
   }
 
-  const { data: paginatedData, isLoading, error } = useTransactions(
-    activePortfolioId, currentPage, DEFAULT_PAGE_SIZE,
-    debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
-    sortOrder
-  );
+  const { data: paginatedData, isLoading, error } = useTransactions(activePortfolioId, {
+    page: currentPage,
+    pageSize: DEFAULT_PAGE_SIZE,
+    ticker: debouncedTicker || undefined,
+    types: typeFilter.length > 0 ? typeFilter : undefined,
+    sortOrder,
+    dateFrom: effectiveDateFrom || undefined,
+    dateTo: effectiveDateTo || undefined,
+  });
   // Status carries the list of transactions the backend could not convert
   // to EUR (no eur_amount, no fx_rate, no historical rate). Surfacing them
   // here lets the user fix the offending row directly from the table.
@@ -225,6 +247,11 @@ export const TransactionView = () => {
           onTypeFilterChange={setTypeFilter}
           sortOrder={sortOrder}
           onSortOrderChange={setSortOrder}
+          dateFrom={dateFrom}
+          onDateFromChange={setDateFrom}
+          dateTo={dateTo}
+          onDateToChange={setDateTo}
+          dateRangeInverted={dateRangeInverted}
           fxMissingTxIds={fxMissingTxIds}
         />
       </CardContent>

@@ -236,6 +236,13 @@ const LivePricesSchema = z.object({
 });
 export type LivePrices = z.infer<typeof LivePricesSchema>;
 
+const FxRateSchema = z.object({
+  date: z.string(),
+  usd_to_eur_rate: z.number(),
+  source: z.enum(['live', 'historical']),
+});
+export type FxRate = z.infer<typeof FxRateSchema>;
+
 const GoogleAuthorizeUrlSchema = z.object({
   authorization_url: z.string(),
 });
@@ -396,6 +403,11 @@ export const getLivePrices = async (tickers: string[]): Promise<LivePrices> => {
   return parseOrThrow(LivePricesSchema, response.data, 'GET /portfolios/prices/live');
 };
 
+export const getFxRate = async (date: string): Promise<FxRate> => {
+  const response = await api.get(`/fx-rates/${date}`);
+  return parseOrThrow(FxRateSchema, response.data, `GET /fx-rates/${date}`);
+};
+
 interface PerformanceParams {
   start_date?: string;
   end_date?: string;
@@ -423,20 +435,38 @@ export const getPortfolioPerformance = async (
 
 // ================== Transaction API Functions ==================
 
+export interface TransactionListOptions {
+  page?: number;
+  pageSize?: number;
+  ticker?: string;
+  types?: string[];
+  sortOrder?: 'asc' | 'desc';
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export const getTransactions = async (
   portfolioId: number,
-  page: number = 1,
-  pageSize: number = 20,
-  ticker?: string,
-  types?: string[],
-  sortOrder: 'asc' | 'desc' = 'desc'
+  options: TransactionListOptions = {},
 ): Promise<PaginatedTransactionResponse> => {
+  const {
+    page = 1,
+    pageSize = 20,
+    ticker,
+    types,
+    sortOrder = 'desc',
+    dateFrom,
+    dateTo,
+  } = options;
+
   const params = new URLSearchParams();
   params.append('page', String(page));
   params.append('page_size', String(pageSize));
   if (ticker) params.append('ticker', ticker);
   if (types) types.forEach((t) => params.append('type', t));
   if (sortOrder !== 'desc') params.append('sort_order', sortOrder);
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
 
   const response = await api.get(`/portfolios/${portfolioId}/transactions`, { params });
   return parseOrThrow(

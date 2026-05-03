@@ -9,6 +9,9 @@ Historical rates: fetched in batch via ``HistoricalPriceService`` for
 """
 
 import logging
+from datetime import date as date_type
+from datetime import timedelta
+from typing import Literal
 
 import requests
 
@@ -17,9 +20,34 @@ from .live_price_service import LivePriceService
 
 logger = logging.getLogger(__name__)
 
+FxRateSource = Literal["live", "historical", "unavailable"]
+
 
 class FxRateService:
     """USD→EUR exchange rate (EUR per USD)."""
+
+    @classmethod
+    def get_rate_for_date(cls, target: date_type) -> tuple[float | None, FxRateSource]:
+        """Return ``(rate, source)`` for ``target`` (USD→EUR; EUR per USD).
+
+        For today and future dates, returns the current live rate. For past
+        dates, looks up the historical rate with up to 7 days of back-padding
+        to absorb weekends and exchange holidays. Returns
+        ``(None, "unavailable")`` if no rate can be determined — callers
+        should treat that as a soft 404 rather than a hard error.
+        """
+        today = date_type.today()
+        if target >= today:
+            rate = cls.get_usd_to_eur_rate_safe()
+            return (rate, "live") if rate else (None, "unavailable")
+
+        start = target - timedelta(days=7)
+        rates = cls.get_historical_usd_to_eur_rates(start, target)
+        target_str = target.strftime("%Y-%m-%d")
+        for d in sorted(rates.keys(), reverse=True):
+            if d <= target_str and rates[d] > 0:
+                return rates[d], "historical"
+        return None, "unavailable"
 
     @classmethod
     def get_usd_to_eur_rate(cls) -> float | None:

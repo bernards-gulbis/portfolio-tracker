@@ -180,6 +180,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fx-rates/{date_str}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fx Rate
+         * @description Return the USD→EUR rate (EUR per USD) for the given date.
+         *
+         *     Today/future → live rate. Past → historical, with up to 7 days of
+         *     back-padding for weekends and exchange holidays. ``404`` if no rate
+         *     is available within the lookback window.
+         */
+        get: operations["get_fx_rate_fx_rates__date_str__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -606,6 +630,18 @@ export interface components {
             detail: string | {
                 [key: string]: string;
             };
+        };
+        /** FxRateResponse */
+        FxRateResponse: {
+            /** Date */
+            date: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "live" | "historical";
+            /** Usd To Eur Rate */
+            usd_to_eur_rate: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1494,6 +1530,51 @@ export interface operations {
             };
         };
     };
+    get_fx_rate_fx_rates__date_str__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date_str: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxRateResponse"];
+                };
+            };
+            /** @description Invalid date format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No FX rate available within lookback window */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_check_health_get: {
         parameters: {
             query?: never;
@@ -1831,6 +1912,10 @@ export interface operations {
                 type?: string[] | null;
                 /** @description Sort by date: asc or desc */
                 sort_order?: string;
+                /** @description Filter to transactions on or after this date (inclusive) */
+                date_from?: string | null;
+                /** @description Filter to transactions on or before this date (inclusive) */
+                date_to?: string | null;
             };
             header?: never;
             path: {
@@ -1849,14 +1934,12 @@ export interface operations {
                     "application/json": components["schemas"]["PaginatedTransactionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description date_from must be on or before date_to */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };

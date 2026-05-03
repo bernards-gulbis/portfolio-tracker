@@ -3,7 +3,7 @@ Comprehensive test suite for Portfolio Tracker API
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
 from unittest.mock import patch
@@ -222,6 +222,58 @@ def test_create_transaction_with_all_fields(client: TestClient):
     assert data["total_amount"] == pytest.approx(-2755.35)
 
 
+def test_create_transaction_persists_fx_rate_for_buy_sell_fee(client: TestClient):
+    """The transaction modal now exposes ``fx_rate`` on every cash-flow type.
+
+    For BUY/SELL/FEE the rate is store-only — the EUR cost-basis handlers do
+    not consume it. This test pins the round-trip so the column does not
+    silently get dropped from the API surface.
+    """
+    portfolio_id = client.post("/portfolios/", json={"name": "FX persist"}).json()["id"]
+
+    cases = [
+        {
+            "date": "2024-03-01T10:00:00",
+            "type": "Buy",
+            "ticker": "AAPL",
+            "quantity": 10,
+            "price_per_share": 175.0,
+            "fee": 1.0,
+            "total_amount": -1751.0,
+            "fx_rate": 1.0871,
+        },
+        {
+            "date": "2024-03-02T10:00:00",
+            "type": "Sell",
+            "ticker": "AAPL",
+            "quantity": 5,
+            "price_per_share": 180.0,
+            "fee": 1.0,
+            "total_amount": 899.0,
+            "fx_rate": 1.0900,
+        },
+        {
+            "date": "2024-03-03T10:00:00",
+            "type": "Fee",
+            "total_amount": -12.50,
+            "fx_rate": 1.0850,
+        },
+    ]
+
+    for payload in cases:
+        response = client.post(
+            f"/portfolios/{portfolio_id}/transactions/", json=payload
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["fx_rate"] == pytest.approx(payload["fx_rate"])
+
+    listed = client.get(f"/portfolios/{portfolio_id}/transactions").json()
+    by_type = {t["type"]: t for t in listed["transactions"]}
+    assert by_type["Buy"]["fx_rate"] == pytest.approx(1.0871)
+    assert by_type["Sell"]["fx_rate"] == pytest.approx(1.0900)
+    assert by_type["Fee"]["fx_rate"] == pytest.approx(1.0850)
+
+
 def test_list_transactions(client: TestClient):
     """Test listing transactions for a portfolio"""
     # Create portfolio
@@ -437,6 +489,69 @@ def test_list_transactions_filter_combined(client: TestClient):
     )
     data = response.json()
     assert data["total"] == 2
+
+
+def test_list_transactions_filter_by_date_range(client: TestClient):
+    """Filter transactions by date_from / date_to (inclusive)."""
+    portfolio_id = client.post(
+        "/portfolios/", json={"name": "Date Range Filter Test"}
+    ).json()["id"]
+
+    # Three deposits across three different months
+    for date_iso, amount in [
+        ("2020-01-10T12:00:00", 100),
+        ("2020-02-15T12:00:00", 200),
+        ("2020-03-20T12:00:00", 300),
+    ]:
+        client.post(
+            f"/portfolios/{portfolio_id}/transactions/",
+            json={
+                "date": date_iso,
+                "type": "Deposit",
+                "total_amount": amount,
+                "fee": 0,
+            },
+        )
+
+    # date_from only
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "2020-02-01"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 2
+
+    # date_to only
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_to": "2020-02-28"},
+    )
+    data = response.json()
+    assert data["total"] == 2
+
+    # Both — single-day window
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "2020-02-15", "date_to": "2020-02-15"},
+    )
+    data = response.json()
+    assert data["total"] == 1
+    assert data["transactions"][0]["total_amount"] == pytest.approx(200)
+
+    # Inverted range → 422
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "2020-03-01", "date_to": "2020-02-01"},
+    )
+    assert response.status_code == 422
+
+    # Malformed date string → 422 from FastAPI's auto-validation
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "not-a-date"},
+    )
+    assert response.status_code == 422
 
 
 def test_update_transaction(client: TestClient):
@@ -4441,3 +4556,47 @@ class TestPortfolioServiceEdgeCases:
     ):
         r = client.get("/portfolios/99999/performance")
         assert r.status_code == 404
+
+
+class TestFxRateEndpoint:
+    """``GET /fx-rates/{date}`` — single-date USD→EUR rate lookup."""
+
+    def test_today_uses_live_rate(self, client: TestClient):
+        with patch(
+            "app.routers.fx_rates.FxRateService.get_usd_to_eur_rate_safe",
+            return_value=0.92,
+        ):
+            today = date.today().isoformat()
+            response = client.get(f"/fx-rates/{today}")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["date"] == today
+        assert body["usd_to_eur_rate"] == pytest.approx(0.92)
+        assert body["source"] == "live"
+
+    def test_past_date_uses_historical_with_nearest_prior_fallback(
+        self, client: TestClient
+    ):
+        # Target Sat 2024-03-16 → prior trading day Fri 2024-03-15.
+        sample_rates = {"2024-03-15": 0.918, "2024-03-14": 0.917}
+        with patch(
+            "app.routers.fx_rates.FxRateService.get_historical_usd_to_eur_rates",
+            return_value=sample_rates,
+        ):
+            response = client.get("/fx-rates/2024-03-16")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["usd_to_eur_rate"] == pytest.approx(0.918)
+        assert body["source"] == "historical"
+
+    def test_unavailable_returns_404(self, client: TestClient):
+        with patch(
+            "app.routers.fx_rates.FxRateService.get_historical_usd_to_eur_rates",
+            return_value={},
+        ):
+            response = client.get("/fx-rates/2010-01-01")
+        assert response.status_code == 404
+
+    def test_invalid_date_returns_400(self, client: TestClient):
+        response = client.get("/fx-rates/not-a-date")
+        assert response.status_code == 400

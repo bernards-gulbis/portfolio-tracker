@@ -7,6 +7,7 @@ import { useLocale } from '../hooks/useLocale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePickerField } from './transaction-form/DatePickerField';
 import {
   Table,
   TableBody,
@@ -75,6 +76,11 @@ interface TransactionTableProps {
   onTypeFilterChange: (value: string[]) => void;
   sortOrder: 'asc' | 'desc';
   onSortOrderChange: (value: 'asc' | 'desc') => void;
+  dateFrom: string;
+  onDateFromChange: (value: string) => void;
+  dateTo: string;
+  onDateToChange: (value: string) => void;
+  dateRangeInverted: boolean;
   fxMissingTxIds?: number[];
 }
 
@@ -94,6 +100,11 @@ export const TransactionTable = ({
   onTypeFilterChange,
   sortOrder,
   onSortOrderChange,
+  dateFrom,
+  onDateFromChange,
+  dateTo,
+  onDateToChange,
+  dateRangeInverted,
   fxMissingTxIds = [],
 }: TransactionTableProps) => {
   const { t } = useTranslation();
@@ -155,7 +166,8 @@ export const TransactionTable = ({
 
   const fxMissingSet = useMemo(() => new Set(fxMissingTxIds), [fxMissingTxIds]);
 
-  const hasActiveFilters = tickerSearch !== '' || typeFilter.length > 0;
+  const hasActiveFilters =
+    tickerSearch !== '' || typeFilter.length > 0 || dateFrom !== '' || dateTo !== '';
 
   const startIndex = (responsePage - 1) * responsePageSize;
   const endIndex = Math.min(startIndex + transactions.length, total);
@@ -170,7 +182,7 @@ export const TransactionTable = ({
   }
 
   const filterBar = (
-    <div className="flex items-center gap-3 mb-3">
+    <div className="flex items-center flex-wrap gap-3 mb-3">
       <div className="relative max-w-xs">
         <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -208,6 +220,30 @@ export const TransactionTable = ({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      <div className="w-[160px]">
+        <DatePickerField
+          id="tx-date-from"
+          value={dateFrom}
+          onChange={onDateFromChange}
+          locale={locale}
+          pickerAriaLabel={t('transaction.table.filters.dateFromLabel')}
+        />
+      </div>
+      <div className="w-[160px]">
+        <DatePickerField
+          id="tx-date-to"
+          value={dateTo}
+          onChange={onDateToChange}
+          invalid={dateRangeInverted}
+          locale={locale}
+          pickerAriaLabel={t('transaction.table.filters.dateToLabel')}
+        />
+      </div>
+      {dateRangeInverted && (
+        <p className="text-sm text-destructive whitespace-nowrap" role="alert">
+          {t('transaction.table.filters.dateRangeInvalid')}
+        </p>
+      )}
       {total > 0 && (
         <p className="ml-auto text-sm text-muted-foreground whitespace-nowrap">
           {t('transaction.table.showing', { from: startIndex + 1, to: endIndex, total })}

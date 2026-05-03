@@ -47,6 +47,10 @@ export const DatePickerField = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typed = e.target.value;
     setDisplayValue(typed);
+    if (typed === '') {
+      onChange('');
+      return;
+    }
     const parsed = parseLocalDate(typed);
     if (parsed) {
       onChange(toLocalDate(parsed));

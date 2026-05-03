@@ -84,11 +84,22 @@ describe('useTransactions', () => {
   it('fetches paginated data with page and pageSize params', async () => {
     vi.mocked(api.getTransactions).mockResolvedValueOnce(mockPaginatedResponse);
 
-    const { result } = renderHook(() => useTransactions(1, 2, 10), { wrapper: createWrapper() });
+    const { result } = renderHook(
+      () => useTransactions(1, { page: 2, pageSize: 10 }),
+      { wrapper: createWrapper() },
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.getTransactions).toHaveBeenCalledWith(1, 2, 10, undefined, [], 'desc');
+    expect(api.getTransactions).toHaveBeenCalledWith(1, {
+      page: 2,
+      pageSize: 10,
+      ticker: undefined,
+      types: [],
+      sortOrder: 'desc',
+      dateFrom: undefined,
+      dateTo: undefined,
+    });
     expect(result.current.data).toEqual(mockPaginatedResponse);
   });
 
@@ -99,7 +110,15 @@ describe('useTransactions', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.getTransactions).toHaveBeenCalledWith(1, 1, expect.any(Number), undefined, [], 'desc');
+    expect(api.getTransactions).toHaveBeenCalledWith(1, {
+      page: 1,
+      pageSize: expect.any(Number),
+      ticker: undefined,
+      types: [],
+      sortOrder: 'desc',
+      dateFrom: undefined,
+      dateTo: undefined,
+    });
   });
 });
 

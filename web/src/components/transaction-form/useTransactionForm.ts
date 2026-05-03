@@ -8,6 +8,7 @@ import {
   TransactionType,
   getErrorMessage,
 } from '../../api';
+import { useFxRate } from '../../hooks/useFxRate';
 import { useLivePrices } from '../../hooks/useLivePrices';
 import { usePortfolioStatus } from '../../hooks/usePortfolioStatus';
 import {
@@ -50,6 +51,10 @@ export interface UseTransactionFormResult {
   showSplitRatio: boolean;
   showFxRate: boolean;
 
+  /** Current USD→EUR rate (EUR per USD) used for the inline rate hint and
+   *  auto-fill effects. ``null`` while loading or if the live fetch failed. */
+  eurRate: number | null;
+
   onSubmit: (values: FormValues) => Promise<void>;
   handleClose: () => void;
   /** Apply ticker-change side effects (auto-fill or clear price) after
@@ -57,6 +62,12 @@ export interface UseTransactionFormResult {
   applyTickerSideEffects: (value: string) => void;
   /** Mark the price-per-share field as user-edited (call from its onChange). */
   markPriceAsUserEdited: () => void;
+  /** Mark the totalAmount field as user-edited so the BUY/SELL auto-calc
+   *  (qty × price ± fee) stops overwriting it. */
+  markTotalAsUserEdited: () => void;
+  /** Mark the valueEur field as user-edited so the DEPOSIT/WITHDRAW
+   *  auto-derive (total × usd_to_eur_rate) stops overwriting it. */
+  markValueEurAsUserEdited: () => void;
 }
 
 /**
@@ -109,7 +120,9 @@ export function useTransactionForm({
   const showTotalAmount = type !== TransactionType.SPLIT;
   const showValueEur = EUR_TYPES.has(type);
   const showSplitRatio = type === TransactionType.SPLIT;
-  const showFxRate = type === TransactionType.DIVIDEND;
+  // FX rate is shown for every transaction type — preserved as a flag for the
+  // modal's render gate even though it's always true.
+  const showFxRate = true;
 
   const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
   const { data: livePrices } = useLivePrices(
@@ -125,9 +138,47 @@ export function useTransactionForm({
     if (isOpen) reset(getDefaultValues(transaction));
   }, [isOpen, transaction, reset]);
 
+  // When the user switches transaction type, clear fields the new type doesn't
+  // display so stale data from the previous type can't leak into submission.
+  // Skipped on initial open (the reset effect above already loaded defaults).
+  const prevTypeRef = useRef<TransactionType | null>(null);
+  useEffect(() => {
+    if (!isOpen) {
+      prevTypeRef.current = null;
+      return;
+    }
+    const prevType = prevTypeRef.current;
+    prevTypeRef.current = type;
+    const typeChanged = prevType !== null && prevType !== type;
+    if (!typeChanged) return;
+
+    if (!TICKER_TYPES.has(type)) setValue('ticker', '');
+    if (!BUY_SELL_TYPES.has(type)) {
+      setValue('quantity', '');
+      setValue('pricePerShare', '');
+    }
+    if (!FEE_TYPES.has(type)) setValue('fee', '0.00');
+    if (!EUR_TYPES.has(type)) setValue('valueEur', '');
+    if (type !== TransactionType.SPLIT) setValue('splitRatio', '');
+  }, [isOpen, type, setValue]);
+
+  // Once the user types into totalAmount or valueEur, the corresponding auto-calc
+  // backs off so subsequent dependency changes don't silently overwrite the
+  // user's value. In edit mode, saved values count as user-authored from the
+  // moment the modal opens — the bank-statement EUR (saved as eur_amount) and
+  // the original total are both intentional records that the auto-derive must
+  // not overwrite on initial mount. Flags reset on reopen and on type change.
+  const totalAmountUserEdited = useRef(false);
+  const valueEurUserEdited = useRef(false);
+  useEffect(() => {
+    totalAmountUserEdited.current = isEdit;
+    valueEurUserEdited.current = isEdit && transaction?.eur_amount != null;
+  }, [isOpen, type, isEdit, transaction]);
+
   // Auto-calculate totalAmount for BUY/SELL from quantity × price ± fee.
   useEffect(() => {
     if (!BUY_SELL_TYPES.has(type)) return;
+    if (totalAmountUserEdited.current) return;
     const qty = Number.parseFloat(watchedQuantity || '0');
     const price = Number.parseFloat(watchedPrice || '0');
     const fee = Math.abs(Number.parseFloat(watchedFee || '0'));
@@ -158,17 +209,37 @@ export function useTransactionForm({
     }
   }, [isSell, watchedTicker, livePrices, form, setValue]);
 
-  // Auto-fill FX rate for DIVIDEND when empty.
-  const eurRate = portfolioStatus?.usd_to_eur_rate;
+  // Date-aware USD→EUR rate. The hook returns the historical rate when
+  // ``watchedDate`` is in the past, or the live rate for today/future. Falling
+  // back to ``portfolioStatus.usd_to_eur_rate`` keeps a sensible default while
+  // the per-date query is loading or if the lookup 404s for an out-of-range date.
+  const watchedDate = watch('date');
+  const { data: dateRate } = useFxRate(watchedDate);
+  const eurRate = dateRate?.usd_to_eur_rate ?? portfolioStatus?.usd_to_eur_rate;
+
+  // Auto-fill FX rate when empty. With date-aware ``eurRate``, this is correct
+  // for both new and edit cases — saved fx_rate already populates the field via
+  // getDefaultValues, so the auto-fill only kicks in when there's no saved rate.
+  //
+  // Unit conversion: Transaction.fx_rate is stored as USD per EUR (backend
+  // computes EUR via total_usd / fx_rate), while usd_to_eur_rate is EUR per USD
+  // (~0.92), so we invert at the boundary. Forwarding the raw rate would inflate
+  // the saved EUR equivalent by ~17%.
+  //
+  // ``isOpen`` and ``transaction`` are deps so the effect re-fires after each
+  // ``reset()`` on reopen — the modal stays mounted across opens (see
+  // TransactionView).
   useEffect(() => {
-    if (isDividend && !form.getValues('fxRate') && eurRate != null) {
-      setValue('fxRate', eurRate.toFixed(4));
-    }
-  }, [isDividend, eurRate, form, setValue]);
+    if (!isOpen || !showFxRate) return;
+    if (form.getValues('fxRate')) return;
+    if (eurRate == null || eurRate <= 0) return;
+    setValue('fxRate', (1 / eurRate).toFixed(4));
+  }, [isOpen, transaction, showFxRate, eurRate, form, setValue]);
 
   // Auto-calculate EUR amount for DEPOSIT/WITHDRAW when totalAmount changes.
   useEffect(() => {
     if (!showValueEur || eurRate == null) return;
+    if (valueEurUserEdited.current) return;
     const total = Number.parseFloat(watchedTotal || '0');
     if (total > 0) {
       setValue('valueEur', (total * eurRate).toFixed(2));
@@ -198,6 +269,14 @@ export function useTransactionForm({
   const markPriceAsUserEdited = () => {
     priceWasAutoFilled.current = false;
     priceOwnerTicker.current = watchedTicker || null;
+  };
+
+  const markTotalAsUserEdited = () => {
+    totalAmountUserEdited.current = true;
+  };
+
+  const markValueEurAsUserEdited = () => {
+    valueEurUserEdited.current = true;
   };
 
   const onSubmit = async (values: FormValues) => {
@@ -244,9 +323,13 @@ export function useTransactionForm({
     showSplitRatio,
     showFxRate,
 
+    eurRate: eurRate ?? null,
+
     onSubmit,
     handleClose,
     applyTickerSideEffects,
     markPriceAsUserEdited,
+    markTotalAsUserEdited,
+    markValueEurAsUserEdited,
   };
 }

@@ -18,9 +18,14 @@ vi.mock('../hooks/useLivePrices', () => ({
   useLivePrices: vi.fn(),
 }));
 
+vi.mock('../hooks/useFxRate', () => ({
+  useFxRate: vi.fn(),
+}));
+
 import { useCreateTransaction, useUpdateTransaction } from '../hooks/useTransactions';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { useLivePrices } from '../hooks/useLivePrices';
+import { useFxRate } from '../hooks/useFxRate';
 
 const mockHoldings: Holding[] = [
   {
@@ -82,6 +87,12 @@ const selectType = async (user: ReturnType<typeof userEvent.setup>, label: strin
   await user.click(option);
 };
 
+/** Toggle the Advanced section open or closed. */
+const expandAdvanced = async (user: ReturnType<typeof userEvent.setup>) => {
+  const trigger = screen.getByRole('button', { name: 'Advanced' });
+  await user.click(trigger);
+};
+
 describe('TransactionModal — sell suggestions', () => {
   const mockCreateMutateAsync = vi.fn();
   const mockUpdateMutateAsync = vi.fn();
@@ -106,6 +117,14 @@ describe('TransactionModal — sell suggestions', () => {
     vi.mocked(useLivePrices).mockReturnValue(
       buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
     );
+
+    // Default: no per-date rate available (e.g. modal showing today's date).
+    // The hook returning ``null`` makes ``useTransactionForm`` fall back to
+    // ``portfolioStatus.usd_to_eur_rate`` (0.92), which is what the existing
+    // tests rely on. Tests exercising historical rates override this per-test.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: null,
+    } as unknown as ReturnType<typeof useFxRate>);
   });
 
   it('renders Select dropdown for ticker when type is SELL', async () => {
@@ -294,15 +313,20 @@ describe('TransactionModal — sell suggestions', () => {
     expect(screen.getByRole('combobox', { name: 'Asset' })).toHaveTextContent('GOOG');
   });
 
-  it('auto-fills FX rate with usd_to_eur_rate for Dividend type', async () => {
+  it('auto-fills FX rate with USD-per-EUR (inverse of usd_to_eur_rate) for Dividend type', async () => {
     const user = userEvent.setup();
     renderModal();
 
     await selectType(user, 'Dividend');
+    await expandAdvanced(user);
 
+    // Backend stores fx_rate as USD per EUR (computes EUR via total / fx_rate),
+    // while usd_to_eur_rate (0.92) is EUR per USD. We invert at the UI boundary,
+    // so the auto-filled value is 1/0.92 ≈ 1.0870, not 0.9200. A regression here
+    // would inflate every saved EUR equivalent by ~17% (the old bug).
     await waitFor(() => {
       const fxInput = screen.getByLabelText('FX Rate') as HTMLInputElement;
-      expect(fxInput.value).toBe('0.9200');
+      expect(fxInput.value).toBe('1.0870');
     });
   });
 });
@@ -345,6 +369,14 @@ describe('TransactionModal — edit mode', () => {
     vi.mocked(useLivePrices).mockReturnValue(
       buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
     );
+
+    // Default: no per-date rate available (e.g. modal showing today's date).
+    // The hook returning ``null`` makes ``useTransactionForm`` fall back to
+    // ``portfolioStatus.usd_to_eur_rate`` (0.92), which is what the existing
+    // tests rely on. Tests exercising historical rates override this per-test.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: null,
+    } as unknown as ReturnType<typeof useFxRate>);
   });
 
   it('shows edit title when transaction is provided', () => {
@@ -375,7 +407,7 @@ describe('TransactionModal — edit mode', () => {
     const user = userEvent.setup();
     renderModal({ ...defaultProps, transaction: editTransaction });
 
-    const submitBtn = screen.getByRole('button', { name: 'Update' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Changes' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -417,7 +449,7 @@ describe('TransactionModal — edit mode', () => {
     renderModal();
 
     // Submit without filling total amount (required for Deposit)
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -450,6 +482,14 @@ describe('TransactionModal — validation & create', () => {
     vi.mocked(useLivePrices).mockReturnValue(
       buildLivePricesMock() as unknown as ReturnType<typeof useLivePrices>,
     );
+
+    // Default: no per-date rate available (e.g. modal showing today's date).
+    // The hook returning ``null`` makes ``useTransactionForm`` fall back to
+    // ``portfolioStatus.usd_to_eur_rate`` (0.92), which is what the existing
+    // tests rely on. Tests exercising historical rates override this per-test.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: null,
+    } as unknown as ReturnType<typeof useFxRate>);
   });
 
   it('shows ticker required error for BUY with empty ticker', async () => {
@@ -458,7 +498,7 @@ describe('TransactionModal — validation & create', () => {
 
     await selectType(user, 'Buy');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -475,7 +515,7 @@ describe('TransactionModal — validation & create', () => {
     const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
     await user.type(tickerInput, 'AAPL');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -493,7 +533,7 @@ describe('TransactionModal — validation & create', () => {
     const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
     await user.type(tickerInput, 'AAPL');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -513,7 +553,7 @@ describe('TransactionModal — validation & create', () => {
     const aaplOption = await screen.findByRole('option', { name: 'AAPL (10 shares)' });
     await user.click(aaplOption);
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -530,7 +570,7 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '5000');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -554,7 +594,7 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '5000');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -572,7 +612,7 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '2000');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -630,12 +670,13 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '50');
 
-    // Fill fee
+    // Open Advanced to access the Fee input
+    await expandAdvanced(user);
     const feeInput = screen.getByLabelText('Fee');
     await user.clear(feeInput);
     await user.type(feeInput, '2.50');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -646,10 +687,385 @@ describe('TransactionModal — validation & create', () => {
             ticker: 'AAPL',
             total_amount: 50,
             fee: 2.5,
-            fx_rate: 0.92,
+            // Auto-filled fxRate is "1.0870" (= 1 / 0.92, USD per EUR);
+            // parseFloat drops the trailing zero.
+            fx_rate: 1.087,
           }),
         })
       );
+    });
+  });
+
+  it.each([
+    'Deposit',
+    'Withdraw',
+    'Buy',
+    'Sell',
+    'Fee',
+    'Dividend',
+    'Split',
+  ])('shows FX Rate field for %s (inside Advanced)', async (typeLabel) => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, typeLabel);
+    await expandAdvanced(user);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('FX Rate')).toBeInTheDocument();
+    });
+  });
+
+  it('sends fx_rate for BUY (auto-filled, no EUR plumbing on backend yet)', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
+    await user.type(tickerInput, 'AAPL');
+
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Buy',
+            fx_rate: 1.087,
+          }),
+        }),
+      );
+    });
+  });
+
+  it('sends fx_rate for FEE', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Fee');
+    await user.type(screen.getByLabelText('Total Amount'), '12.50');
+
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Fee',
+            total_amount: -12.5,
+            fx_rate: 1.087,
+          }),
+        }),
+      );
+    });
+  });
+
+  it('sends fx_rate alongside eur_amount for DEPOSIT (backend cascade prefers eur_amount)', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    // Deposit is the default type
+    await user.type(screen.getByLabelText('Total Amount'), '1000');
+
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Deposit',
+            total_amount: 1000,
+            // valueEur auto-derives from total * usd_to_eur_rate = 1000 * 0.92 = 920
+            eur_amount: 920,
+            fx_rate: 1.087,
+          }),
+        }),
+      );
+    });
+  });
+
+  it('auto-fills FX Rate from the historical rate when editing a transaction with no saved fx_rate', () => {
+    // The earlier "skip auto-fill in edit mode" rule was driven by fear of
+    // substituting today's rate for an old transaction. With date-aware
+    // ``useFxRate``, the auto-filled value is the historical rate for the
+    // transaction's date — no longer a hazard, so we re-enable it here.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: { date: '2022-04-15', usd_to_eur_rate: 0.95, source: 'historical' },
+    } as unknown as ReturnType<typeof useFxRate>);
+
+    const tx: Transaction = {
+      id: 200,
+      portfolio_id: 1,
+      date: '2022-04-15T10:00:00',
+      type: TransactionType.DEPOSIT,
+      ticker: null,
+      quantity: null,
+      price_per_share: null,
+      fee: null,
+      total_amount: 1000,
+      eur_amount: null,
+      split_ratio: null,
+      fx_rate: null,
+    };
+    renderModal({ ...defaultProps, transaction: tx });
+
+    // Advanced is auto-expanded in edit mode; FX Rate auto-fills with 1/0.95 ≈ 1.0526.
+    const fxInput = screen.getByLabelText('FX Rate') as HTMLInputElement;
+    expect(Number.parseFloat(fxInput.value)).toBeCloseTo(1.0526, 4);
+  });
+
+  it('preserves saved eur_amount in edit mode (does not overwrite with today-rate-derived)', () => {
+    // The bug: previously the valueEur auto-derive ran on mount and replaced
+    // the saved 918.50 with 1000 * today_rate. Fix: edit mode flags the saved
+    // value as user-authored, so the auto-derive backs off.
+    const tx: Transaction = {
+      id: 201,
+      portfolio_id: 1,
+      date: '2022-04-15T10:00:00',
+      type: TransactionType.DEPOSIT,
+      ticker: null,
+      quantity: null,
+      price_per_share: null,
+      fee: null,
+      total_amount: 1000,
+      eur_amount: 918.5,
+      split_ratio: null,
+      fx_rate: null,
+    };
+    renderModal({ ...defaultProps, transaction: tx });
+
+    const eurInput = screen.getByLabelText('Amount in EUR') as HTMLInputElement;
+    expect(Number.parseFloat(eurInput.value)).toBe(918.5);
+  });
+
+  it('uses the historical rate for backdated DEPOSIT auto-derive (Add mode)', async () => {
+    // When the user picks a past date, ``useFxRate`` returns the historical
+    // rate. valueEur should derive from that, not from today's live rate.
+    vi.mocked(useFxRate).mockReturnValue({
+      data: { date: '2024-03-15', usd_to_eur_rate: 0.85, source: 'historical' },
+    } as unknown as ReturnType<typeof useFxRate>);
+
+    const user = userEvent.setup();
+    renderModal();
+
+    // Default type is DEPOSIT; user enters a total. valueEur should derive
+    // from the *historical* rate (0.85), not today's (0.92).
+    await user.type(screen.getByLabelText('Total Amount'), '1000');
+
+    const eurInput = screen.getByLabelText('Amount in EUR') as HTMLInputElement;
+    await waitFor(() => {
+      expect(Number.parseFloat(eurInput.value)).toBeCloseTo(850, 1);
+    });
+  });
+
+  it('auto-expands Advanced in edit mode so prior values are visible', () => {
+    const tx: Transaction = {
+      id: 100,
+      portfolio_id: 1,
+      date: '2024-06-15T14:30:00',
+      type: TransactionType.BUY,
+      ticker: 'AAPL',
+      quantity: 10,
+      price_per_share: 150,
+      fee: 1,
+      total_amount: -1501,
+      eur_amount: null,
+      split_ratio: null,
+      fx_rate: 1.1234,
+    };
+    renderModal({ ...defaultProps, transaction: tx });
+
+    // No user interaction needed: Advanced is open in edit mode.
+    expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('1.1234');
+    expect((screen.getByLabelText('Time') as HTMLInputElement).value).toBe('14:30:00');
+    expect((screen.getByLabelText('Fee') as HTMLInputElement).value).toBe('1.00');
+  });
+
+  it('hides Time/Fee/FX Rate by default in add mode for a BUY', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    expect(screen.queryByLabelText('Time')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Fee')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('FX Rate')).not.toBeInTheDocument();
+
+    await expandAdvanced(user);
+
+    expect(screen.getByLabelText('Time')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fee')).toBeInTheDocument();
+    expect(screen.getByLabelText('FX Rate')).toBeInTheDocument();
+  });
+
+  it('re-fills FX rate with current rate when modal is reopened', async () => {
+    // The modal stays mounted in TransactionView; only the `isOpen` prop toggles.
+    // After ``reset()`` clears fxRate on each open, the auto-fill effect must re-fire
+    // — otherwise the second open shows an empty FX Rate field.
+    const user = userEvent.setup();
+    const { rerender } = renderModal();
+
+    await expandAdvanced(user);
+    expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('1.0870');
+
+    // Simulate close + reopen on the same mounted instance.
+    rerender(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <TransactionModal {...defaultProps} isOpen={false} />
+      </QueryClientProvider>,
+    );
+    rerender(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <TransactionModal {...defaultProps} isOpen={true} />
+      </QueryClientProvider>,
+    );
+
+    await expandAdvanced(user);
+    await waitFor(() => {
+      expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('1.0870');
+    });
+  });
+
+  it('preserves user-typed totalAmount on BUY when fee changes', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    // Auto-calc has set totalAmount to 1500. User overrides it.
+    const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+    await waitFor(() => expect(Number.parseFloat(totalInput.value)).toBe(1500));
+    await user.clear(totalInput);
+    await user.type(totalInput, '1505');
+
+    // Bump the fee inside Advanced. Auto-calc must NOT clobber 1505.
+    await expandAdvanced(user);
+    const feeInput = screen.getByLabelText('Fee');
+    await user.clear(feeInput);
+    await user.type(feeInput, '2');
+
+    await waitFor(() => expect(Number.parseFloat(totalInput.value)).toBe(1505));
+  });
+
+  it('preserves user-typed valueEur on DEPOSIT when totalAmount changes', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    // Default type is DEPOSIT.
+    const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+    await user.type(totalInput, '1000');
+    const eurInput = screen.getByLabelText('Amount in EUR') as HTMLInputElement;
+    await waitFor(() => expect(Number.parseFloat(eurInput.value)).toBe(920));
+
+    // User overrides with the actual bank amount.
+    await user.clear(eurInput);
+    await user.type(eurInput, '918.50');
+
+    // Append a digit to totalAmount; auto-derive must NOT clobber valueEur.
+    await user.type(totalInput, '1');
+
+    await waitFor(() => expect(Number.parseFloat(eurInput.value)).toBe(918.5));
+  });
+
+  it('resets user-edit flag on type change', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+    await waitFor(() => expect(Number.parseFloat(totalInput.value)).toBe(1500));
+    await user.clear(totalInput);
+    await user.type(totalInput, '1505');
+    expect(Number.parseFloat(totalInput.value)).toBe(1505);
+
+    // Switch to SELL; the flag resets and auto-calc takes over again.
+    await selectType(user, 'Sell');
+    await waitFor(() => {
+      expect(
+        Number.parseFloat(
+          (screen.getByLabelText('Total Amount') as HTMLInputElement).value,
+        ),
+      ).toBe(1500);
+    });
+  });
+
+  it('clears type-specific fields when switching from BUY to DEPOSIT and back', async () => {
+    // Stale ticker / qty / price from a previous type must not leak when the
+    // user switches to a type that doesn't display them, then back.
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    await selectType(user, 'Deposit');
+    // BUY-only fields are no longer in the DOM; verify the form state was
+    // cleared by switching back to BUY and checking the inputs are empty.
+    await selectType(user, 'Buy');
+
+    expect((screen.getByRole('textbox', { name: 'Asset' }) as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Quantity') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Price per Share') as HTMLInputElement).value).toBe('');
+  });
+
+  it('preserves totalAmount across type change when both types display it', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    // Default DEPOSIT.
+    await user.type(screen.getByLabelText('Total Amount'), '1000');
+
+    await selectType(user, 'Withdraw');
+
+    // WITHDRAW also shows totalAmount; user's value should survive.
+    expect(
+      Number.parseFloat(
+        (screen.getByLabelText('Total Amount') as HTMLInputElement).value,
+      ),
+    ).toBe(1000);
+  });
+
+  it('totalAmount auto-calc reflects fee even while Advanced is closed', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    // Open Advanced once to set a non-zero fee, then close it.
+    await expandAdvanced(user);
+    const feeInput = screen.getByLabelText('Fee');
+    await user.clear(feeInput);
+    await user.type(feeInput, '5');
+    await expandAdvanced(user); // toggle closed
+
+    // Fill the visible BUY fields.
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '100');
+
+    await waitFor(() => {
+      const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+      // 10 * 100 + 5 = 1005
+      expect(totalInput.value).toBe('1005.00');
     });
   });
 });

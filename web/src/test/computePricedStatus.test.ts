@@ -129,6 +129,34 @@ describe('computePricedStatus', () => {
     expect(status.holdings).toEqual(originalHoldings);
   });
 
+  it('computes current_value as cash when there are no holdings (100% cash)', () => {
+    const status = makeStatus({ holdings: [], holdings_cost: 0, cash: 1_500 });
+    const livePrices: LivePrices = {
+      prices: {},
+      usd_to_eur_rate: 0.91,
+      timestamp: '2026-03-03T12:00:00Z',
+      provider_unavailable: false,
+    };
+    const result = computePricedStatus(status, livePrices);
+
+    expect(result.current_value).toBe(1_500);
+    expect(result.holdings_value).toBe(0);
+    expect(result.unrealized_gains).toBe(0);
+    expect(result.unrealized_gains_pct).toBeNull();
+    expect(result.missing_prices).toEqual([]);
+  });
+
+  it('uses cash for current_value with no holdings even when prices map has entries', () => {
+    // Stale ticker entries from a previous fetch must not block the cash-only path.
+    const status = makeStatus({ holdings: [], holdings_cost: 0, cash: 750 });
+    const result = computePricedStatus(status, makeLivePrices());
+
+    expect(result.current_value).toBe(750);
+    expect(result.holdings_value).toBe(0);
+    expect(result.unrealized_gains).toBe(0);
+    expect(result.unrealized_gains_pct).toBeNull();
+  });
+
   it('returns null unrealized_gain_loss_pct when total_cost is 0', () => {
     const status = makeStatus({
       holdings: [{ ticker: 'FREE', quantity: 5, average_cost: 0, total_cost: 0, first_buy_date: '2024-01-01' }],

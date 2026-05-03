@@ -6,7 +6,7 @@ import csv
 import math
 import uuid
 from collections import Counter
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from io import StringIO
 
@@ -170,6 +170,8 @@ class TransactionService:
         ticker: str | None = None,
         transaction_types: list[str] | None = None,
         sort_order: str = "desc",
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> tuple[list[Transaction], int]:
         """Get paginated transactions for a portfolio (user-scoped)"""
         if not self.portfolio_repo.exists_for_user(portfolio_id, user_id):
@@ -181,6 +183,8 @@ class TransactionService:
             ticker=ticker,
             transaction_types=transaction_types,
             sort_order=sort_order,
+            date_from=date_from,
+            date_to=date_to,
         )
 
     def export_transactions_to_csv(self, portfolio_id: int, user_id: uuid.UUID) -> str:

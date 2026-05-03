@@ -87,6 +87,11 @@ describe('TransactionTable', () => {
     onTypeFilterChange: mockOnTypeFilterChange,
     sortOrder: 'desc' as const,
     onSortOrderChange: vi.fn(),
+    dateFrom: '',
+    onDateFromChange: vi.fn(),
+    dateTo: '',
+    onDateToChange: vi.fn(),
+    dateRangeInverted: false,
   };
 
   beforeEach(() => {

@@ -47,6 +47,17 @@ const parsePositive = (value: string | undefined): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+const requirePositive = (
+  ctx: z.RefinementCtx,
+  path: 'quantity' | 'pricePerShare' | 'splitRatio' | 'totalAmount' | 'fxRate',
+  value: string | undefined,
+  message: string,
+) => {
+  if (parsePositive(value) == null) {
+    ctx.addIssue({ code: 'custom', path: [path], message });
+  }
+};
+
 export const schema = z
   .object({
     date: z.string().superRefine((val, ctx) => {
@@ -76,51 +87,29 @@ export const schema = z
   .superRefine((data, ctx) => {
     const { type } = data;
 
-    if (TICKER_TYPES.has(type)) {
-      if (!data.ticker?.trim()) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['ticker'],
-          message: i18n.t('transaction.validation.tickerRequired'),
-        });
-      }
+    if (TICKER_TYPES.has(type) && !data.ticker?.trim()) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ticker'],
+        message: i18n.t('transaction.validation.tickerRequired'),
+      });
     }
 
     if (BUY_SELL_TYPES.has(type)) {
-      if (parsePositive(data.quantity) == null) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['quantity'],
-          message: i18n.t('transaction.validation.quantityPositive'),
-        });
-      }
-      if (parsePositive(data.pricePerShare) == null) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['pricePerShare'],
-          message: i18n.t('transaction.validation.pricePositive'),
-        });
-      }
+      requirePositive(ctx, 'quantity', data.quantity, i18n.t('transaction.validation.quantityPositive'));
+      requirePositive(ctx, 'pricePerShare', data.pricePerShare, i18n.t('transaction.validation.pricePositive'));
     }
 
     if (type === TransactionType.SPLIT) {
-      if (parsePositive(data.splitRatio) == null) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['splitRatio'],
-          message: i18n.t('transaction.validation.splitRatioPositive'),
-        });
-      }
+      requirePositive(ctx, 'splitRatio', data.splitRatio, i18n.t('transaction.validation.splitRatioPositive'));
     }
 
     if (type !== TransactionType.SPLIT) {
-      if (parsePositive(data.totalAmount) == null) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['totalAmount'],
-          message: i18n.t('transaction.validation.totalAmountPositive'),
-        });
-      }
+      requirePositive(ctx, 'totalAmount', data.totalAmount, i18n.t('transaction.validation.totalAmountPositive'));
+    }
+
+    if (data.fxRate?.trim()) {
+      requirePositive(ctx, 'fxRate', data.fxRate, i18n.t('transaction.validation.fxRatePositive'));
     }
   });
 

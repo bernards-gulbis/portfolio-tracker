@@ -3,7 +3,7 @@ Transaction repository for data access
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, func, select
@@ -119,6 +119,8 @@ class TransactionRepository:
         ticker: str | None = None,
         transaction_types: list[str] | None = None,
         sort_order: str = "desc",
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> tuple[list[Transaction], int]:
         """Get paginated live transactions for a portfolio."""
         conditions = [
@@ -129,6 +131,14 @@ class TransactionRepository:
             conditions.append(Transaction.ticker.ilike(f"%{ticker}%"))
         if transaction_types:
             conditions.append(Transaction.type.in_(transaction_types))
+        # ``Transaction.date`` is stored as datetime; the filter is whole-day
+        # inclusive. Widen ``date_to`` to end-of-day so a row at 23:59:59 on
+        # the chosen day still matches, and convert ``date_from`` to start-of-
+        # day for symmetry / explicitness.
+        if date_from is not None:
+            conditions.append(Transaction.date >= datetime.combine(date_from, time.min))
+        if date_to is not None:
+            conditions.append(Transaction.date <= datetime.combine(date_to, time.max))
 
         count_statement = (
             select(func.count()).select_from(Transaction).where(*conditions)

@@ -8,6 +8,7 @@ import {
   deleteTransaction,
   importTransactionsCSV,
   TransactionCreate,
+  TransactionListOptions,
   TransactionUpdate,
 } from '../api';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
@@ -17,16 +18,40 @@ import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
  */
 export const useTransactions = (
   portfolioId: number | null,
-  page: number = 1,
-  pageSize: number = DEFAULT_PAGE_SIZE,
-  ticker?: string,
-  types?: string[],
-  sortOrder: 'asc' | 'desc' = 'desc'
+  options: TransactionListOptions = {},
 ) => {
+  const {
+    page = 1,
+    pageSize = DEFAULT_PAGE_SIZE,
+    ticker,
+    types,
+    sortOrder = 'desc',
+    dateFrom,
+    dateTo,
+  } = options;
   const normalizedTypes = types ? [...types].sort((a, b) => a.localeCompare(b)) : [];
   return useQuery({
-    queryKey: ['transactions', portfolioId, page, pageSize, ticker ?? '', normalizedTypes, sortOrder],
-    queryFn: () => getTransactions(portfolioId!, page, pageSize, ticker, normalizedTypes, sortOrder),
+    queryKey: [
+      'transactions',
+      portfolioId,
+      page,
+      pageSize,
+      ticker ?? '',
+      normalizedTypes,
+      sortOrder,
+      dateFrom ?? '',
+      dateTo ?? '',
+    ],
+    queryFn: () =>
+      getTransactions(portfolioId!, {
+        page,
+        pageSize,
+        ticker,
+        types: normalizedTypes,
+        sortOrder,
+        dateFrom,
+        dateTo,
+      }),
     enabled: portfolioId !== null,
     placeholderData: keepPreviousData,
   });

@@ -50,7 +50,12 @@ from app.core.database import (
 from app.core.rate_limit import rate_limit
 from app.models.oauth_account import OAuthAccount
 from app.models.user import User
-from app.routers import portfolios_router, transaction_router, transactions_router
+from app.routers import (
+    fx_rates_router,
+    portfolios_router,
+    transaction_router,
+    transactions_router,
+)
 from app.schemas import (
     CloseAccountRequest,
     HealthResponse,
@@ -179,6 +184,7 @@ async def oauth_callback_error_handler(
 app.include_router(portfolios_router)
 app.include_router(transactions_router)
 app.include_router(transaction_router)
+app.include_router(fx_rates_router)
 
 # Auth routers — each gets a per-(IP, path) rate-limit dependency to throttle
 # brute-force attempts. Limits are deliberately conservative; legitimate users
