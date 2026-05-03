@@ -67,6 +67,7 @@ export const TransactionModal = ({
     showValueEur,
     showSplitRatio,
     showFxRate,
+    eurRate,
     onSubmit,
     handleClose,
     applyTickerSideEffects,
@@ -76,6 +77,24 @@ export const TransactionModal = ({
   } = useTransactionForm({ isOpen, portfolioId, transaction, onClose });
 
   const { control, clearErrors } = form;
+  const watchedDate = form.watch('date');
+  const watchedTotalAmount = form.watch('totalAmount');
+
+  const todayLocal = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const isFutureDate = watchedDate > todayLocal;
+
+  const totalAmountEurHint = (() => {
+    if (eurRate == null || eurRate <= 0) return null;
+    const total = Number.parseFloat(watchedTotalAmount || '0');
+    if (!(total > 0)) return null;
+    return t('transaction.modal.fields.totalAmountEurHint', {
+      eur: (total * eurRate).toFixed(2),
+      rate: (1 / eurRate).toFixed(4),
+    });
+  })();
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -103,6 +122,11 @@ export const TransactionModal = ({
                     id="tx-date"
                     pickerAriaLabel={t('transaction.modal.fields.datePickerLabel')}
                   />
+                  {isFutureDate && (
+                    <FieldDescription>
+                      {t('transaction.modal.fields.futureDateWarning')}
+                    </FieldDescription>
+                  )}
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -236,15 +260,22 @@ export const TransactionModal = ({
             )}
 
             {showTotalAmount && (
-              <MoneyField
-                control={control}
-                name="totalAmount"
-                id="tx-total"
-                label={t('transaction.modal.fields.totalAmount')}
-                min="0.01"
-                currency="USD"
-                onValueChange={markTotalAsUserEdited}
-              />
+              <>
+                <MoneyField
+                  control={control}
+                  name="totalAmount"
+                  id="tx-total"
+                  label={t('transaction.modal.fields.totalAmount')}
+                  min="0.01"
+                  currency="USD"
+                  onValueChange={markTotalAsUserEdited}
+                />
+                {totalAmountEurHint && (
+                  <FieldDescription className="-mt-2">
+                    {totalAmountEurHint}
+                  </FieldDescription>
+                )}
+              </>
             )}
 
             {showValueEur && (

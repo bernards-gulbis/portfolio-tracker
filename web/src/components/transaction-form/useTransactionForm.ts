@@ -51,6 +51,10 @@ export interface UseTransactionFormResult {
   showSplitRatio: boolean;
   showFxRate: boolean;
 
+  /** Current USD→EUR rate (EUR per USD) used for the inline rate hint and
+   *  auto-fill effects. ``null`` while loading or if the live fetch failed. */
+  eurRate: number | null;
+
   onSubmit: (values: FormValues) => Promise<void>;
   handleClose: () => void;
   /** Apply ticker-change side effects (auto-fill or clear price) after
@@ -131,6 +135,30 @@ export function useTransactionForm({
   useEffect(() => {
     if (isOpen) reset(getDefaultValues(transaction));
   }, [isOpen, transaction, reset]);
+
+  // When the user switches transaction type, clear fields the new type doesn't
+  // display so stale data from the previous type can't leak into submission.
+  // Skipped on initial open (the reset effect above already loaded defaults).
+  const prevTypeRef = useRef<TransactionType | null>(null);
+  useEffect(() => {
+    if (!isOpen) {
+      prevTypeRef.current = null;
+      return;
+    }
+    if (prevTypeRef.current === null || prevTypeRef.current === type) {
+      prevTypeRef.current = type;
+      return;
+    }
+    if (!TICKER_TYPES.has(type)) setValue('ticker', '');
+    if (!BUY_SELL_TYPES.has(type)) {
+      setValue('quantity', '');
+      setValue('pricePerShare', '');
+    }
+    if (!FEE_TYPES.has(type)) setValue('fee', '0.00');
+    if (!EUR_TYPES.has(type)) setValue('valueEur', '');
+    if (type !== TransactionType.SPLIT) setValue('splitRatio', '');
+    prevTypeRef.current = type;
+  }, [isOpen, type, setValue]);
 
   // Once the user types into totalAmount or valueEur, the corresponding auto-calc
   // backs off so subsequent dependency changes don't silently overwrite the
@@ -282,6 +310,8 @@ export function useTransactionForm({
     showValueEur,
     showSplitRatio,
     showFxRate,
+
+    eurRate: eurRate ?? null,
 
     onSubmit,
     handleClose,

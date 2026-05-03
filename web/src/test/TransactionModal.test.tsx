@@ -386,7 +386,7 @@ describe('TransactionModal — edit mode', () => {
     const user = userEvent.setup();
     renderModal({ ...defaultProps, transaction: editTransaction });
 
-    const submitBtn = screen.getByRole('button', { name: 'Update' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Changes' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -428,7 +428,7 @@ describe('TransactionModal — edit mode', () => {
     renderModal();
 
     // Submit without filling total amount (required for Deposit)
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -469,7 +469,7 @@ describe('TransactionModal — validation & create', () => {
 
     await selectType(user, 'Buy');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -486,7 +486,7 @@ describe('TransactionModal — validation & create', () => {
     const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
     await user.type(tickerInput, 'AAPL');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -504,7 +504,7 @@ describe('TransactionModal — validation & create', () => {
     const tickerInput = screen.getByRole('textbox', { name: 'Asset' });
     await user.type(tickerInput, 'AAPL');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -524,7 +524,7 @@ describe('TransactionModal — validation & create', () => {
     const aaplOption = await screen.findByRole('option', { name: 'AAPL (10 shares)' });
     await user.click(aaplOption);
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -541,7 +541,7 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '5000');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -565,7 +565,7 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '5000');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -583,7 +583,7 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '2000');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -647,7 +647,7 @@ describe('TransactionModal — validation & create', () => {
     await user.clear(feeInput);
     await user.type(feeInput, '2.50');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -700,7 +700,7 @@ describe('TransactionModal — validation & create', () => {
     await user.type(screen.getByLabelText('Quantity'), '10');
     await user.type(screen.getByLabelText('Price per Share'), '150');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -723,7 +723,7 @@ describe('TransactionModal — validation & create', () => {
     await selectType(user, 'Fee');
     await user.type(screen.getByLabelText('Total Amount'), '12.50');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -747,7 +747,7 @@ describe('TransactionModal — validation & create', () => {
     // Deposit is the default type
     await user.type(screen.getByLabelText('Total Amount'), '1000');
 
-    const submitBtn = screen.getByRole('button', { name: 'Add Transaction' });
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
     await user.click(submitBtn);
 
     await waitFor(() => {
@@ -928,6 +928,44 @@ describe('TransactionModal — validation & create', () => {
         ),
       ).toBe(1500);
     });
+  });
+
+  it('clears type-specific fields when switching from BUY to DEPOSIT and back', async () => {
+    // Stale ticker / qty / price from a previous type must not leak when the
+    // user switches to a type that doesn't display them, then back.
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    await selectType(user, 'Deposit');
+    // BUY-only fields are no longer in the DOM; verify the form state was
+    // cleared by switching back to BUY and checking the inputs are empty.
+    await selectType(user, 'Buy');
+
+    expect((screen.getByRole('textbox', { name: 'Asset' }) as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Quantity') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Price per Share') as HTMLInputElement).value).toBe('');
+  });
+
+  it('preserves totalAmount across type change when both types display it', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    // Default DEPOSIT.
+    await user.type(screen.getByLabelText('Total Amount'), '1000');
+
+    await selectType(user, 'Withdraw');
+
+    // WITHDRAW also shows totalAmount; user's value should survive.
+    expect(
+      Number.parseFloat(
+        (screen.getByLabelText('Total Amount') as HTMLInputElement).value,
+      ),
+    ).toBe(1000);
   });
 
   it('totalAmount auto-calc reflects fee even while Advanced is closed', async () => {
