@@ -58,6 +58,12 @@ export interface UseTransactionFormResult {
   applyTickerSideEffects: (value: string) => void;
   /** Mark the price-per-share field as user-edited (call from its onChange). */
   markPriceAsUserEdited: () => void;
+  /** Mark the totalAmount field as user-edited so the BUY/SELL auto-calc
+   *  (qty × price ± fee) stops overwriting it. */
+  markTotalAsUserEdited: () => void;
+  /** Mark the valueEur field as user-edited so the DEPOSIT/WITHDRAW
+   *  auto-derive (total × usd_to_eur_rate) stops overwriting it. */
+  markValueEurAsUserEdited: () => void;
 }
 
 /**
@@ -126,9 +132,20 @@ export function useTransactionForm({
     if (isOpen) reset(getDefaultValues(transaction));
   }, [isOpen, transaction, reset]);
 
+  // Once the user types into totalAmount or valueEur, the corresponding auto-calc
+  // backs off so subsequent dependency changes don't silently overwrite the
+  // user's value. Flags reset on reopen and on type change.
+  const totalAmountUserEdited = useRef(false);
+  const valueEurUserEdited = useRef(false);
+  useEffect(() => {
+    totalAmountUserEdited.current = false;
+    valueEurUserEdited.current = false;
+  }, [isOpen, type]);
+
   // Auto-calculate totalAmount for BUY/SELL from quantity × price ± fee.
   useEffect(() => {
     if (!BUY_SELL_TYPES.has(type)) return;
+    if (totalAmountUserEdited.current) return;
     const qty = Number.parseFloat(watchedQuantity || '0');
     const price = Number.parseFloat(watchedPrice || '0');
     const fee = Math.abs(Number.parseFloat(watchedFee || '0'));
@@ -159,23 +176,30 @@ export function useTransactionForm({
     }
   }, [isSell, watchedTicker, livePrices, form, setValue]);
 
-  // Auto-fill FX rate when empty for any FX-rate-bearing type.
+  // Auto-fill FX rate, but only when adding: an empty fxRate on an existing
+  // transaction means the user saved it that way, and substituting today's rate
+  // would distort the historical record.
   //
-  // Convention: ``Transaction.fx_rate`` is stored as USD per EUR (e.g. 1.0870 means
-  // 1 EUR = 1.0870 USD), and the backend computes EUR via ``total_usd / fx_rate``.
-  // ``portfolioStatus.usd_to_eur_rate`` is the inverse (EUR per USD, ~0.92), so we
-  // invert at the boundary. Storing the raw ``usd_to_eur_rate`` here would be a
-  // unit error and the saved EUR equivalent would come out ~17% too high.
+  // Unit conversion: Transaction.fx_rate is stored as USD per EUR (backend computes
+  // EUR via total_usd / fx_rate), while usd_to_eur_rate is EUR per USD (~0.92), so
+  // we invert at the boundary. Forwarding the raw rate would inflate the saved EUR
+  // equivalent by ~17%.
+  //
+  // ``isOpen`` and ``transaction`` are deps so the effect re-fires after each
+  // ``reset()`` on reopen — the modal stays mounted across opens (see
+  // TransactionView).
   const eurRate = portfolioStatus?.usd_to_eur_rate;
   useEffect(() => {
-    if (!showFxRate || form.getValues('fxRate')) return;
+    if (!isOpen || !showFxRate || isEdit) return;
+    if (form.getValues('fxRate')) return;
     if (eurRate == null || eurRate <= 0) return;
     setValue('fxRate', (1 / eurRate).toFixed(4));
-  }, [showFxRate, eurRate, form, setValue]);
+  }, [isOpen, transaction, showFxRate, isEdit, eurRate, form, setValue]);
 
   // Auto-calculate EUR amount for DEPOSIT/WITHDRAW when totalAmount changes.
   useEffect(() => {
     if (!showValueEur || eurRate == null) return;
+    if (valueEurUserEdited.current) return;
     const total = Number.parseFloat(watchedTotal || '0');
     if (total > 0) {
       setValue('valueEur', (total * eurRate).toFixed(2));
@@ -205,6 +229,14 @@ export function useTransactionForm({
   const markPriceAsUserEdited = () => {
     priceWasAutoFilled.current = false;
     priceOwnerTicker.current = watchedTicker || null;
+  };
+
+  const markTotalAsUserEdited = () => {
+    totalAmountUserEdited.current = true;
+  };
+
+  const markValueEurAsUserEdited = () => {
+    valueEurUserEdited.current = true;
   };
 
   const onSubmit = async (values: FormValues) => {
@@ -255,5 +287,7 @@ export function useTransactionForm({
     handleClose,
     applyTickerSideEffects,
     markPriceAsUserEdited,
+    markTotalAsUserEdited,
+    markValueEurAsUserEdited,
   };
 }

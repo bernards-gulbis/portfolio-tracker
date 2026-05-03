@@ -765,6 +765,31 @@ describe('TransactionModal — validation & create', () => {
     });
   });
 
+  it('leaves FX Rate empty when editing a transaction without fx_rate', () => {
+    // Auto-fill must NOT substitute today's rate for an old transaction that was
+    // saved with no FX rate — that would distort the historical record. The user
+    // can manually fill the field via the (auto-expanded) Advanced section.
+    const tx: Transaction = {
+      id: 200,
+      portfolio_id: 1,
+      date: '2022-04-15T10:00:00',
+      type: TransactionType.DEPOSIT,
+      ticker: null,
+      quantity: null,
+      price_per_share: null,
+      fee: null,
+      total_amount: 1000,
+      eur_amount: null,
+      split_ratio: null,
+      fx_rate: null,
+    };
+    renderModal({ ...defaultProps, transaction: tx });
+
+    // Advanced is auto-expanded in edit mode, so the input is in the DOM —
+    // it just must not be auto-filled.
+    expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('');
+  });
+
   it('auto-expands Advanced in edit mode so prior values are visible', () => {
     const tx: Transaction = {
       id: 100,
@@ -803,6 +828,106 @@ describe('TransactionModal — validation & create', () => {
     expect(screen.getByLabelText('Time')).toBeInTheDocument();
     expect(screen.getByLabelText('Fee')).toBeInTheDocument();
     expect(screen.getByLabelText('FX Rate')).toBeInTheDocument();
+  });
+
+  it('re-fills FX rate with current rate when modal is reopened', async () => {
+    // The modal stays mounted in TransactionView; only the `isOpen` prop toggles.
+    // After ``reset()`` clears fxRate on each open, the auto-fill effect must re-fire
+    // — otherwise the second open shows an empty FX Rate field.
+    const user = userEvent.setup();
+    const { rerender } = renderModal();
+
+    await expandAdvanced(user);
+    expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('1.0870');
+
+    // Simulate close + reopen on the same mounted instance.
+    rerender(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <TransactionModal {...defaultProps} isOpen={false} />
+      </QueryClientProvider>,
+    );
+    rerender(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <TransactionModal {...defaultProps} isOpen={true} />
+      </QueryClientProvider>,
+    );
+
+    await expandAdvanced(user);
+    await waitFor(() => {
+      expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('1.0870');
+    });
+  });
+
+  it('preserves user-typed totalAmount on BUY when fee changes', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    // Auto-calc has set totalAmount to 1500. User overrides it.
+    const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+    await waitFor(() => expect(Number.parseFloat(totalInput.value)).toBe(1500));
+    await user.clear(totalInput);
+    await user.type(totalInput, '1505');
+
+    // Bump the fee inside Advanced. Auto-calc must NOT clobber 1505.
+    await expandAdvanced(user);
+    const feeInput = screen.getByLabelText('Fee');
+    await user.clear(feeInput);
+    await user.type(feeInput, '2');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Number.parseFloat(totalInput.value)).toBe(1505);
+  });
+
+  it('preserves user-typed valueEur on DEPOSIT when totalAmount changes', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    // Default type is DEPOSIT.
+    const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+    await user.type(totalInput, '1000');
+    const eurInput = screen.getByLabelText('Amount in EUR') as HTMLInputElement;
+    await waitFor(() => expect(Number.parseFloat(eurInput.value)).toBe(920));
+
+    // User overrides with the actual bank amount.
+    await user.clear(eurInput);
+    await user.type(eurInput, '918.50');
+
+    // Append a digit to totalAmount; auto-derive must NOT clobber valueEur.
+    await user.type(totalInput, '1');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Number.parseFloat(eurInput.value)).toBe(918.5);
+  });
+
+  it('resets user-edit flag on type change', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '150');
+
+    const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+    await waitFor(() => expect(Number.parseFloat(totalInput.value)).toBe(1500));
+    await user.clear(totalInput);
+    await user.type(totalInput, '1505');
+    expect(Number.parseFloat(totalInput.value)).toBe(1505);
+
+    // Switch to SELL; the flag resets and auto-calc takes over again.
+    await selectType(user, 'Sell');
+    await waitFor(() => {
+      expect(
+        Number.parseFloat(
+          (screen.getByLabelText('Total Amount') as HTMLInputElement).value,
+        ),
+      ).toBe(1500);
+    });
   });
 
   it('totalAmount auto-calc reflects fee even while Advanced is closed', async () => {

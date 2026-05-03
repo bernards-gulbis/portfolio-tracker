@@ -112,19 +112,17 @@ describe('transaction-form schema — numeric validation', () => {
   });
 
   it.each([
-    TransactionType.DEPOSIT,
-    TransactionType.WITHDRAW,
-    TransactionType.BUY,
-    TransactionType.SELL,
-    TransactionType.FEE,
-    TransactionType.DIVIDEND,
-  ])('accepts a valid fxRate on %s', (type) => {
+    [TransactionType.DEPOSIT, { ticker: '', quantity: '', pricePerShare: '' }],
+    [TransactionType.WITHDRAW, { ticker: '', quantity: '', pricePerShare: '' }],
+    [TransactionType.FEE, { ticker: '', quantity: '', pricePerShare: '' }],
+    [TransactionType.BUY, { ticker: 'AAPL', quantity: '5', pricePerShare: '100' }],
+    [TransactionType.SELL, { ticker: 'AAPL', quantity: '5', pricePerShare: '100' }],
+    [TransactionType.DIVIDEND, { ticker: 'AAPL', quantity: '', pricePerShare: '' }],
+  ])('accepts a valid fxRate on %s', (type, overrides) => {
     const result = schema.safeParse({
       ...validBuy,
+      ...overrides,
       type,
-      ticker: type === TransactionType.DEPOSIT || type === TransactionType.WITHDRAW || type === TransactionType.FEE ? '' : 'AAPL',
-      quantity: type === TransactionType.BUY || type === TransactionType.SELL ? '5' : '',
-      pricePerShare: type === TransactionType.BUY || type === TransactionType.SELL ? '100' : '',
       totalAmount: '500',
       fxRate: '1.0871',
     });

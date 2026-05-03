@@ -71,6 +71,8 @@ export const TransactionModal = ({
     handleClose,
     applyTickerSideEffects,
     markPriceAsUserEdited,
+    markTotalAsUserEdited,
+    markValueEurAsUserEdited,
   } = useTransactionForm({ isOpen, portfolioId, transaction, onClose });
 
   const { control, clearErrors } = form;
@@ -241,6 +243,7 @@ export const TransactionModal = ({
                 label={t('transaction.modal.fields.totalAmount')}
                 min="0.01"
                 currency="USD"
+                onValueChange={markTotalAsUserEdited}
               />
             )}
 
@@ -251,6 +254,7 @@ export const TransactionModal = ({
                 id="tx-eur"
                 label={t('transaction.modal.fields.amountInEur')}
                 currency="EUR"
+                onValueChange={markValueEurAsUserEdited}
               />
             )}
 
