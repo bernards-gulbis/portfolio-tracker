@@ -360,13 +360,25 @@ describe('buildTransactionData', () => {
     expect(data.fx_rate).toBeUndefined();
   });
 
-  it('does not send fx_rate for SPLIT (field not shown in UI)', () => {
+  it('sends fx_rate for SPLIT when provided', () => {
     const data = buildTransactionData({
       ...baseValues,
       type: TransactionType.SPLIT,
       ticker: 'AAPL',
       splitRatio: '4',
       fxRate: '1.0871',
+    });
+    expect(data.fx_rate).toBe(1.0871);
+    expect(data.total_amount).toBe(0);
+  });
+
+  it('omits fx_rate on SPLIT when blank', () => {
+    const data = buildTransactionData({
+      ...baseValues,
+      type: TransactionType.SPLIT,
+      ticker: 'AAPL',
+      splitRatio: '4',
+      fxRate: '',
     });
     expect(data.fx_rate).toBeUndefined();
   });

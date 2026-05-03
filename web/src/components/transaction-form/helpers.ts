@@ -138,6 +138,7 @@ export const buildTransactionData = (values: FormValues): TransactionCreate => {
       base.ticker = values.ticker;
       base.split_ratio = Number.parseFloat(values.splitRatio || '1');
       base.total_amount = 0;
+      if (values.fxRate?.trim()) base.fx_rate = Number.parseFloat(values.fxRate);
       break;
     default:
       throw new Error(`Unknown transaction type: ${values.type}`);

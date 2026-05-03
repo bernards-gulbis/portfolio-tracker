@@ -82,6 +82,12 @@ const selectType = async (user: ReturnType<typeof userEvent.setup>, label: strin
   await user.click(option);
 };
 
+/** Toggle the Advanced section open or closed. */
+const expandAdvanced = async (user: ReturnType<typeof userEvent.setup>) => {
+  const trigger = screen.getByRole('button', { name: 'Advanced' });
+  await user.click(trigger);
+};
+
 describe('TransactionModal — sell suggestions', () => {
   const mockCreateMutateAsync = vi.fn();
   const mockUpdateMutateAsync = vi.fn();
@@ -299,6 +305,7 @@ describe('TransactionModal — sell suggestions', () => {
     renderModal();
 
     await selectType(user, 'Dividend');
+    await expandAdvanced(user);
 
     // Backend stores fx_rate as USD per EUR (computes EUR via total / fx_rate),
     // while usd_to_eur_rate (0.92) is EUR per USD. We invert at the UI boundary,
@@ -634,7 +641,8 @@ describe('TransactionModal — validation & create', () => {
     const totalInput = screen.getByLabelText('Total Amount');
     await user.type(totalInput, '50');
 
-    // Fill fee
+    // Open Advanced to access the Fee input
+    await expandAdvanced(user);
     const feeInput = screen.getByLabelText('Fee');
     await user.clear(feeInput);
     await user.type(feeInput, '2.50');
@@ -660,30 +668,23 @@ describe('TransactionModal — validation & create', () => {
   });
 
   it.each([
-    ['Deposit', /^Add Transaction$/],
-    ['Withdraw', /^Add Transaction$/],
-    ['Buy', /^Add Transaction$/],
-    ['Sell', /^Add Transaction$/],
-    ['Fee', /^Add Transaction$/],
-    ['Dividend', /^Add Transaction$/],
-  ])('shows FX Rate field for %s', async (typeLabel) => {
+    'Deposit',
+    'Withdraw',
+    'Buy',
+    'Sell',
+    'Fee',
+    'Dividend',
+    'Split',
+  ])('shows FX Rate field for %s (inside Advanced)', async (typeLabel) => {
     const user = userEvent.setup();
     renderModal();
 
     await selectType(user, typeLabel);
+    await expandAdvanced(user);
 
     await waitFor(() => {
       expect(screen.getByLabelText('FX Rate')).toBeInTheDocument();
     });
-  });
-
-  it('does not show FX Rate field for Split', async () => {
-    const user = userEvent.setup();
-    renderModal();
-
-    await selectType(user, 'Split');
-
-    expect(screen.queryByLabelText('FX Rate')).not.toBeInTheDocument();
   });
 
   it('sends fx_rate for BUY (auto-filled, no EUR plumbing on backend yet)', async () => {
@@ -761,6 +762,71 @@ describe('TransactionModal — validation & create', () => {
           }),
         }),
       );
+    });
+  });
+
+  it('auto-expands Advanced in edit mode so prior values are visible', () => {
+    const tx: Transaction = {
+      id: 100,
+      portfolio_id: 1,
+      date: '2024-06-15T14:30:00',
+      type: TransactionType.BUY,
+      ticker: 'AAPL',
+      quantity: 10,
+      price_per_share: 150,
+      fee: 1,
+      total_amount: -1501,
+      eur_amount: null,
+      split_ratio: null,
+      fx_rate: 1.1234,
+    };
+    renderModal({ ...defaultProps, transaction: tx });
+
+    // No user interaction needed: Advanced is open in edit mode.
+    expect((screen.getByLabelText('FX Rate') as HTMLInputElement).value).toBe('1.1234');
+    expect((screen.getByLabelText('Time') as HTMLInputElement).value).toBe('14:30:00');
+    expect((screen.getByLabelText('Fee') as HTMLInputElement).value).toBe('1.00');
+  });
+
+  it('hides Time/Fee/FX Rate by default in add mode for a BUY', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    expect(screen.queryByLabelText('Time')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Fee')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('FX Rate')).not.toBeInTheDocument();
+
+    await expandAdvanced(user);
+
+    expect(screen.getByLabelText('Time')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fee')).toBeInTheDocument();
+    expect(screen.getByLabelText('FX Rate')).toBeInTheDocument();
+  });
+
+  it('totalAmount auto-calc reflects fee even while Advanced is closed', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Buy');
+
+    // Open Advanced once to set a non-zero fee, then close it.
+    await expandAdvanced(user);
+    const feeInput = screen.getByLabelText('Fee');
+    await user.clear(feeInput);
+    await user.type(feeInput, '5');
+    await expandAdvanced(user); // toggle closed
+
+    // Fill the visible BUY fields.
+    await user.type(screen.getByRole('textbox', { name: 'Asset' }), 'AAPL');
+    await user.type(screen.getByLabelText('Quantity'), '10');
+    await user.type(screen.getByLabelText('Price per Share'), '100');
+
+    await waitFor(() => {
+      const totalInput = screen.getByLabelText('Total Amount') as HTMLInputElement;
+      // 10 * 100 + 5 = 1005
+      expect(totalInput.value).toBe('1005.00');
     });
   });
 });

@@ -248,6 +248,7 @@ const lv: Translation = {
         fxRate: 'Valūtas kurss',
         fxRatePlaceholder: 'piem., 1.0850',
         fxRateDescription: 'USD par 1 EUR (piem., 1.0850 nozīmē 1 EUR = 1.0850 USD)',
+        advanced: 'Papildu',
         sellTickerPlaceholder: 'Izvēlēties turējumu...',
         noHoldings: 'Nav pieejamu turējumu',
         sellAll: 'Pārdot visu',

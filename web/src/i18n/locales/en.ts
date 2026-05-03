@@ -246,6 +246,7 @@ const en = {
         fxRate: 'FX Rate',
         fxRatePlaceholder: 'e.g., 1.0850',
         fxRateDescription: 'USD per 1 EUR (e.g., 1.0850 means 1 EUR = 1.0850 USD)',
+        advanced: 'Advanced',
         sellTickerPlaceholder: 'Select holding...',
         noHoldings: 'No holdings available',
         sellAll: 'Sell All',

@@ -44,6 +44,7 @@ export const FX_RATE_TYPES = new Set<TransactionType>([
   TransactionType.SELL,
   TransactionType.FEE,
   TransactionType.DIVIDEND,
+  TransactionType.SPLIT,
 ]);
 
 /** Return the parsed value when it is a strictly positive finite number,

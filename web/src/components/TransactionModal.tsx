@@ -33,6 +33,7 @@ import { TickerCombobox } from './transaction-form/TickerCombobox';
 import { MoneyField, NumberField } from './transaction-form/fields';
 import { TRANSACTION_TYPE_ORDER } from './transaction-form/schema';
 import { useTransactionForm } from './transaction-form/useTransactionForm';
+import { CollapsibleSection } from './portfolio-status/CollapsibleSection';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -86,45 +87,24 @@ export const TransactionModal = ({
 
         <form id="transaction-form" onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup className="py-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Controller
-                name="date"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-date">{t('transaction.modal.fields.date')}</FieldLabel>
-                    <DatePickerField
-                      value={field.value}
-                      onChange={field.onChange}
-                      invalid={fieldState.invalid}
-                      locale={locale}
-                      id="tx-date"
-                      pickerAriaLabel={t('transaction.modal.fields.datePickerLabel')}
-                    />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-
-              <Controller
-                name="time"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid || undefined}>
-                    <FieldLabel htmlFor="tx-time">{t('transaction.modal.fields.time')}</FieldLabel>
-                    <Input
-                      {...field}
-                      id="tx-time"
-                      type="time"
-                      step="1"
-                      className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-            </div>
+            <Controller
+              name="date"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid || undefined}>
+                  <FieldLabel htmlFor="tx-date">{t('transaction.modal.fields.date')}</FieldLabel>
+                  <DatePickerField
+                    value={field.value}
+                    onChange={field.onChange}
+                    invalid={fieldState.invalid}
+                    locale={locale}
+                    id="tx-date"
+                    pickerAriaLabel={t('transaction.modal.fields.datePickerLabel')}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
 
             <Controller
               name="type"
@@ -253,16 +233,6 @@ export const TransactionModal = ({
               />
             )}
 
-            {showFee && (
-              <MoneyField
-                control={control}
-                name="fee"
-                id="tx-fee"
-                label={t('transaction.modal.fields.fee')}
-                currency="USD"
-              />
-            )}
-
             {showTotalAmount && (
               <MoneyField
                 control={control}
@@ -297,18 +267,54 @@ export const TransactionModal = ({
               />
             )}
 
-            {showFxRate && (
-              <NumberField
-                control={control}
-                name="fxRate"
-                id="tx-fx"
-                label={t('transaction.modal.fields.fxRate')}
-                placeholder={t('transaction.modal.fields.fxRatePlaceholder')}
-                step="0.0001"
-                min="0.0001"
-                description={t('transaction.modal.fields.fxRateDescription')}
-              />
-            )}
+            <CollapsibleSection
+              title={t('transaction.modal.fields.advanced')}
+              defaultOpen={isEdit}
+            >
+              <div className="space-y-4">
+                <Controller
+                  name="time"
+                  control={control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid || undefined}>
+                      <FieldLabel htmlFor="tx-time">{t('transaction.modal.fields.time')}</FieldLabel>
+                      <Input
+                        {...field}
+                        id="tx-time"
+                        type="time"
+                        step="1"
+                        className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+
+                {showFee && (
+                  <MoneyField
+                    control={control}
+                    name="fee"
+                    id="tx-fee"
+                    label={t('transaction.modal.fields.fee')}
+                    currency="USD"
+                  />
+                )}
+
+                {showFxRate && (
+                  <NumberField
+                    control={control}
+                    name="fxRate"
+                    id="tx-fx"
+                    label={t('transaction.modal.fields.fxRate')}
+                    placeholder={t('transaction.modal.fields.fxRatePlaceholder')}
+                    step="0.0001"
+                    min="0.0001"
+                    description={t('transaction.modal.fields.fxRateDescription')}
+                  />
+                )}
+              </div>
+            </CollapsibleSection>
 
             {form.formState.errors.root && (
               <Alert variant="destructive">
