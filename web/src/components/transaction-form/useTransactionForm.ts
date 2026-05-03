@@ -19,7 +19,6 @@ import {
   BUY_SELL_TYPES,
   EUR_TYPES,
   FEE_TYPES,
-  FX_RATE_TYPES,
   TICKER_TYPES,
   schema,
   type FormValues,
@@ -121,7 +120,9 @@ export function useTransactionForm({
   const showTotalAmount = type !== TransactionType.SPLIT;
   const showValueEur = EUR_TYPES.has(type);
   const showSplitRatio = type === TransactionType.SPLIT;
-  const showFxRate = FX_RATE_TYPES.has(type);
+  // FX rate is shown for every transaction type — preserved as a flag for the
+  // modal's render gate even though it's always true.
+  const showFxRate = true;
 
   const tickers = useMemo(() => holdings.map((h) => h.ticker), [holdings]);
   const { data: livePrices } = useLivePrices(

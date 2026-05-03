@@ -37,16 +37,6 @@ export const EUR_TYPES = new Set<TransactionType>([
   TransactionType.WITHDRAW,
 ]);
 
-export const FX_RATE_TYPES = new Set<TransactionType>([
-  TransactionType.DEPOSIT,
-  TransactionType.WITHDRAW,
-  TransactionType.BUY,
-  TransactionType.SELL,
-  TransactionType.FEE,
-  TransactionType.DIVIDEND,
-  TransactionType.SPLIT,
-]);
-
 /** Return the parsed value when it is a strictly positive finite number,
  *  null otherwise. Rejects NaN ("abc"), ±Infinity, empty/undefined, zero,
  *  and negative inputs — the bare ``parseFloat(x) <= 0`` check would let
@@ -118,7 +108,7 @@ export const schema = z
       requirePositive(ctx, 'totalAmount', data.totalAmount, i18n.t('transaction.validation.totalAmountPositive'));
     }
 
-    if (FX_RATE_TYPES.has(type) && data.fxRate?.trim()) {
+    if (data.fxRate?.trim()) {
       requirePositive(ctx, 'fxRate', data.fxRate, i18n.t('transaction.validation.fxRatePositive'));
     }
   });

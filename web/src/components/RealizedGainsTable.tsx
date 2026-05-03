@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass, MS_PER_DAY } from '../utils/formatters';
 import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
-import { useGainsTableData, useDividendsTableData } from '../hooks/useRealizedGainsData';
+import { dividendDisplayValue, useGainsTableData, useDividendsTableData } from '../hooks/useRealizedGainsData';
 import type { TickerGroup, DividendTickerGroup } from '../hooks/useRealizedGainsData';
 import type { RealizedSale, DividendReceived } from '../api';
 import { useTableViewMode, type TableViewMode } from '../hooks/useTableViewMode';
@@ -92,10 +92,8 @@ function formatDividendAmount(
   displayCurrency: 'EUR' | 'USD',
   locale: string,
 ): string {
-  if (displayCurrency === 'EUR' && amountEur != null) {
-    return formatCurrency(amountEur, 'EUR', locale);
-  }
-  return formatCurrency(amountUsd, 'USD', locale);
+  const { amount, currency } = dividendDisplayValue(amountUsd, amountEur, displayCurrency);
+  return formatCurrency(amount, currency, locale);
 }
 
 interface ExpandableGroupRowProps {
@@ -404,7 +402,7 @@ export const DividendsReceivedTable = memo(({ dividendsReceived, displayCurrency
     availableYears, filteredDividends, pagedDividends, dividendTotals,
     safePage, totalPages, setPage,
     handleYearChange, handleFilterChange, handleSort, toggleExpand,
-  } = useDividendsTableData({ dividendsReceived, viewMode });
+  } = useDividendsTableData({ dividendsReceived, viewMode, displayCurrency });
 
   const isGrouped = viewMode === 'grouped';
 

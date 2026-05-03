@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { RealizedSale, DividendReceived } from '../api';
 import type { TableViewMode } from './useTableViewMode';
 
@@ -14,6 +14,18 @@ export interface DividendTickerGroup {
   totalAmount: number;
   totalAmountEur: number | null;
 }
+
+/** Picks the same numeric value the dividend table renders for a given
+ *  ``displayCurrency``. Used by ``sortDividendGroups`` and the formatter so
+ *  the sort key and the rendered amount can never drift apart. */
+export const dividendDisplayValue = (
+  amountUsd: number,
+  amountEur: number | null,
+  displayCurrency: 'EUR' | 'USD',
+): { amount: number; currency: 'EUR' | 'USD' } =>
+  displayCurrency === 'EUR' && amountEur != null
+    ? { amount: amountEur, currency: 'EUR' }
+    : { amount: amountUsd, currency: 'USD' };
 
 const PAGE_SIZE = 10;
 
@@ -219,6 +231,7 @@ export function useGainsTableData({ realizedSales, viewMode = 'grouped' }: UseGa
 interface UseDividendsTableDataArgs {
   dividendsReceived: DividendReceived[];
   viewMode?: TableViewMode;
+  displayCurrency: 'EUR' | 'USD';
 }
 
 const buildDividendGroups = (filtered: DividendReceived[]): DividendTickerGroup[] => {
@@ -246,7 +259,15 @@ const buildDividendGroupsFlat = (filtered: DividendReceived[]): DividendTickerGr
     totalAmountEur: p.amount_eur,
   }));
 
-const sortDividendGroups = (groups: DividendTickerGroup[], sortKey: string, sortAsc: boolean): DividendTickerGroup[] =>
+// Sort by the same numeric basis the table renders. ``displayCurrency='USD'``
+// with EUR-bearing rows used to sort by raw EUR while displaying USD, which
+// produced visible misordering when historical FX rates differed across rows.
+const sortDividendGroups = (
+  groups: DividendTickerGroup[],
+  sortKey: string,
+  sortAsc: boolean,
+  displayCurrency: 'EUR' | 'USD',
+): DividendTickerGroup[] =>
   [...groups].sort((a, b) => {
     let diff: number;
     if (sortKey === 'ticker') {
@@ -254,7 +275,9 @@ const sortDividendGroups = (groups: DividendTickerGroup[], sortKey: string, sort
     } else if (sortKey === 'count') {
       diff = a.payments.length - b.payments.length;
     } else if (sortKey === 'amount') {
-      diff = (a.totalAmountEur ?? a.totalAmount) - (b.totalAmountEur ?? b.totalAmount);
+      const aValue = dividendDisplayValue(a.totalAmount, a.totalAmountEur, displayCurrency).amount;
+      const bValue = dividendDisplayValue(b.totalAmount, b.totalAmountEur, displayCurrency).amount;
+      diff = aValue - bValue;
     } else {
       diff = a.payments[0].date.localeCompare(b.payments[0].date);
     }
@@ -264,10 +287,20 @@ const sortDividendGroups = (groups: DividendTickerGroup[], sortKey: string, sort
 const DIVIDEND_GROUPED_KEYS: ReadonlySet<string> = new Set(['date', 'count', 'amount']);
 const DIVIDEND_FLAT_KEYS: ReadonlySet<string> = new Set(['date', 'ticker', 'amount']);
 
-export function useDividendsTableData({ dividendsReceived, viewMode = 'grouped' }: UseDividendsTableDataArgs) {
+export function useDividendsTableData({
+  dividendsReceived,
+  viewMode = 'grouped',
+  displayCurrency,
+}: UseDividendsTableDataArgs) {
   const isGrouped = viewMode === 'grouped';
   const buildGroups = isGrouped ? buildDividendGroups : buildDividendGroupsFlat;
   const validSortKeys = isGrouped ? DIVIDEND_GROUPED_KEYS : DIVIDEND_FLAT_KEYS;
+
+  const sortFn = useCallback(
+    (groups: DividendTickerGroup[], sortKey: string, sortAsc: boolean) =>
+      sortDividendGroups(groups, sortKey, sortAsc, displayCurrency),
+    [displayCurrency],
+  );
 
   const {
     filteredGroups: filteredDividends,
@@ -276,7 +309,7 @@ export function useDividendsTableData({ dividendsReceived, viewMode = 'grouped' 
   } = useGroupedTableData({
     items: dividendsReceived,
     buildGroups,
-    sortFn: sortDividendGroups,
+    sortFn,
     validSortKeys,
     ascOnSelect: ascOnTickerSelect,
   });

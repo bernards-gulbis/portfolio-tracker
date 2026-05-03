@@ -113,7 +113,8 @@ describe('transaction-form schema — numeric validation', () => {
 
   // Each row provides the per-type field overrides needed so the schema
   // would otherwise validate cleanly — the only variable left is fxRate.
-  // Covers every member of FX_RATE_TYPES (in transaction-form/schema.ts).
+  // fxRate validation runs for any non-empty value, so this covers every
+  // transaction type.
   const fxRateTypeOverrides: Array<[TransactionType, Partial<typeof validBuy>]> = [
     [TransactionType.DEPOSIT, { ticker: '', quantity: '', pricePerShare: '', totalAmount: '500' }],
     [TransactionType.WITHDRAW, { ticker: '', quantity: '', pricePerShare: '', totalAmount: '500' }],
