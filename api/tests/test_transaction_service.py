@@ -415,6 +415,105 @@ class TestPaginated:
             svc.get_transactions_by_portfolio_paginated(999, user_id)
 
 
+class TestPaginatedDateFilter:
+    """Tests for the optional date_from / date_to range filter."""
+
+    @pytest.fixture
+    def _seeded(self, svc, user_id, portfolio_id):
+        """Three deposits on Jan 10, Feb 15, Mar 20 — one per month."""
+        for day, month, amount in [
+            (10, 1, 100),
+            (15, 2, 200),
+            (20, 3, 300),
+        ]:
+            svc.create_transaction(
+                portfolio_id=portfolio_id,
+                user_id=user_id,
+                date=datetime(2024, month, day),
+                transaction_type=TransactionType.DEPOSIT,
+                total_amount=amount,
+            )
+        return portfolio_id
+
+    def test_date_from_only(self, svc, user_id, _seeded):
+        from datetime import date as _date
+
+        result, total = svc.get_transactions_by_portfolio_paginated(
+            _seeded, user_id, date_from=_date(2024, 2, 1)
+        )
+        assert total == 2
+        assert {tx.date.month for tx in result} == {2, 3}
+
+    def test_date_to_only(self, svc, user_id, _seeded):
+        from datetime import date as _date
+
+        result, total = svc.get_transactions_by_portfolio_paginated(
+            _seeded, user_id, date_to=_date(2024, 2, 28)
+        )
+        assert total == 2
+        assert {tx.date.month for tx in result} == {1, 2}
+
+    def test_both_inclusive(self, svc, user_id, _seeded):
+        from datetime import date as _date
+
+        result, total = svc.get_transactions_by_portfolio_paginated(
+            _seeded,
+            user_id,
+            date_from=_date(2024, 2, 15),
+            date_to=_date(2024, 2, 15),
+        )
+        assert total == 1
+        assert result[0].date.month == 2
+        assert result[0].date.day == 15
+
+    def test_combined_with_ticker_and_type(self, svc, user_id, portfolio_id):
+        """Date range AND-combines with ticker and type filters."""
+        from datetime import date as _date
+
+        # Two deposits in Feb (one matches ticker filter, one doesn't via type)
+        svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 2, 10),
+            transaction_type=TransactionType.DEPOSIT,
+            total_amount=500,
+        )
+        # A BUY of MSFT in Feb that should match a (Feb, BUY, MSFT) triple-filter.
+        svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 2, 12),
+            transaction_type=TransactionType.BUY,
+            ticker="MSFT",
+            quantity=1,
+            price_per_share=100,
+            total_amount=-100,
+        )
+        # A BUY of MSFT in March — same ticker/type, different month.
+        svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 3, 5),
+            transaction_type=TransactionType.BUY,
+            ticker="MSFT",
+            quantity=1,
+            price_per_share=100,
+            total_amount=-100,
+        )
+
+        result, total = svc.get_transactions_by_portfolio_paginated(
+            portfolio_id,
+            user_id,
+            ticker="msft",
+            transaction_types=["Buy"],
+            date_from=_date(2024, 2, 1),
+            date_to=_date(2024, 2, 28),
+        )
+        assert total == 1
+        assert result[0].date.month == 2
+        assert result[0].ticker == "MSFT"
+
+
 # ── update_transaction ────────────────────────────────────────────────
 
 

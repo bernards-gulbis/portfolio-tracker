@@ -1831,6 +1831,10 @@ export interface operations {
                 type?: string[] | null;
                 /** @description Sort by date: asc or desc */
                 sort_order?: string;
+                /** @description Filter to transactions on or after this date (inclusive) */
+                date_from?: string | null;
+                /** @description Filter to transactions on or before this date (inclusive) */
+                date_to?: string | null;
             };
             header?: never;
             path: {

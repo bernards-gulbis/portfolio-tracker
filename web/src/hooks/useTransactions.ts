@@ -21,12 +21,25 @@ export const useTransactions = (
   pageSize: number = DEFAULT_PAGE_SIZE,
   ticker?: string,
   types?: string[],
-  sortOrder: 'asc' | 'desc' = 'desc'
+  sortOrder: 'asc' | 'desc' = 'desc',
+  dateFrom?: string,
+  dateTo?: string,
 ) => {
   const normalizedTypes = types ? [...types].sort((a, b) => a.localeCompare(b)) : [];
   return useQuery({
-    queryKey: ['transactions', portfolioId, page, pageSize, ticker ?? '', normalizedTypes, sortOrder],
-    queryFn: () => getTransactions(portfolioId!, page, pageSize, ticker, normalizedTypes, sortOrder),
+    queryKey: [
+      'transactions',
+      portfolioId,
+      page,
+      pageSize,
+      ticker ?? '',
+      normalizedTypes,
+      sortOrder,
+      dateFrom ?? '',
+      dateTo ?? '',
+    ],
+    queryFn: () =>
+      getTransactions(portfolioId!, page, pageSize, ticker, normalizedTypes, sortOrder, dateFrom, dateTo),
     enabled: portfolioId !== null,
     placeholderData: keepPreviousData,
   });

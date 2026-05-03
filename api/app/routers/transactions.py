@@ -1,10 +1,11 @@
 """Transaction API routes"""
 
 import math
+from datetime import date
 from io import BytesIO
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 
@@ -66,8 +67,21 @@ def list_transactions(
     sort_order: Annotated[
         str, Query(pattern="^(asc|desc)$", description="Sort by date: asc or desc")
     ] = "desc",
+    date_from: Annotated[
+        date | None,
+        Query(description="Filter to transactions on or after this date (inclusive)"),
+    ] = None,
+    date_to: Annotated[
+        date | None,
+        Query(description="Filter to transactions on or before this date (inclusive)"),
+    ] = None,
 ):
     """Get paginated transactions for a specific portfolio"""
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(
+            status_code=422,
+            detail="date_from must be on or before date_to",
+        )
     service = TransactionService(session)
     transactions, total = service.get_transactions_by_portfolio_paginated(
         portfolio_id,
@@ -77,6 +91,8 @@ def list_transactions(
         ticker=ticker,
         transaction_types=type,
         sort_order=sort_order,
+        date_from=date_from,
+        date_to=date_to,
     )
     total_pages = math.ceil(total / page_size) if total > 0 else 1
 

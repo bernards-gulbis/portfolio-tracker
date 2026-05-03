@@ -346,6 +346,22 @@ describe('Transaction API functions', () => {
     expect(params.get('sort_order')).toBeNull();
   });
 
+  it('getTransactions passes date_from and date_to when provided', async () => {
+    const spy = vi.spyOn(apiInstance, 'get').mockResolvedValueOnce({ data: mockPaginatedResponse });
+    await getTransactions(1, 1, 20, undefined, undefined, 'desc', '2024-02-01', '2024-02-28');
+    const params = spy.mock.calls[0][1]?.params as URLSearchParams;
+    expect(params.get('date_from')).toBe('2024-02-01');
+    expect(params.get('date_to')).toBe('2024-02-28');
+  });
+
+  it('getTransactions omits date params when not provided', async () => {
+    const spy = vi.spyOn(apiInstance, 'get').mockResolvedValueOnce({ data: mockPaginatedResponse });
+    await getTransactions(1);
+    const params = spy.mock.calls[0][1]?.params as URLSearchParams;
+    expect(params.get('date_from')).toBeNull();
+    expect(params.get('date_to')).toBeNull();
+  });
+
   it('createTransaction posts and returns new transaction', async () => {
     const spy = vi.spyOn(apiInstance, 'post').mockResolvedValueOnce({ data: mockTransaction });
     const result = await createTransaction(1, {

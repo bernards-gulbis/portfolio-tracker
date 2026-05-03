@@ -187,6 +187,9 @@ const en = {
         tickerPlaceholder: 'Search asset...',
         typeAll: 'All types',
         typeCount: '{{count}} types',
+        dateFromLabel: 'From',
+        dateToLabel: 'To',
+        dateRangeInvalid: 'End date must be on or after start date',
       },
       empty: {
         title: 'No Transactions Yet',

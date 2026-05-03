@@ -491,6 +491,69 @@ def test_list_transactions_filter_combined(client: TestClient):
     assert data["total"] == 2
 
 
+def test_list_transactions_filter_by_date_range(client: TestClient):
+    """Filter transactions by date_from / date_to (inclusive)."""
+    portfolio_id = client.post(
+        "/portfolios/", json={"name": "Date Range Filter Test"}
+    ).json()["id"]
+
+    # Three deposits across three different months
+    for date_iso, amount in [
+        ("2020-01-10T12:00:00", 100),
+        ("2020-02-15T12:00:00", 200),
+        ("2020-03-20T12:00:00", 300),
+    ]:
+        client.post(
+            f"/portfolios/{portfolio_id}/transactions/",
+            json={
+                "date": date_iso,
+                "type": "Deposit",
+                "total_amount": amount,
+                "fee": 0,
+            },
+        )
+
+    # date_from only
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "2020-02-01"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 2
+
+    # date_to only
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_to": "2020-02-28"},
+    )
+    data = response.json()
+    assert data["total"] == 2
+
+    # Both — single-day window
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "2020-02-15", "date_to": "2020-02-15"},
+    )
+    data = response.json()
+    assert data["total"] == 1
+    assert data["transactions"][0]["total_amount"] == pytest.approx(200)
+
+    # Inverted range → 422
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "2020-03-01", "date_to": "2020-02-01"},
+    )
+    assert response.status_code == 422
+
+    # Malformed date string → 422 from FastAPI's auto-validation
+    response = client.get(
+        f"/portfolios/{portfolio_id}/transactions",
+        params={"date_from": "not-a-date"},
+    )
+    assert response.status_code == 422
+
+
 def test_update_transaction(client: TestClient):
     """Test updating a transaction"""
     # Create portfolio and transaction

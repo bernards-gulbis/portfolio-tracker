@@ -189,6 +189,9 @@ const lv: Translation = {
         tickerPlaceholder: 'Meklēt aktīvu...',
         typeAll: 'Visi veidi',
         typeCount: '{{count}} veidi',
+        dateFromLabel: 'No',
+        dateToLabel: 'Līdz',
+        dateRangeInvalid: 'Beigu datumam jābūt vēlāk vai vienādam ar sākuma datumu',
       },
       empty: {
         title: 'Vēl nav darījumu',

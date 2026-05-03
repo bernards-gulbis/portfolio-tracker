@@ -429,7 +429,9 @@ export const getTransactions = async (
   pageSize: number = 20,
   ticker?: string,
   types?: string[],
-  sortOrder: 'asc' | 'desc' = 'desc'
+  sortOrder: 'asc' | 'desc' = 'desc',
+  dateFrom?: string,
+  dateTo?: string,
 ): Promise<PaginatedTransactionResponse> => {
   const params = new URLSearchParams();
   params.append('page', String(page));
@@ -437,6 +439,8 @@ export const getTransactions = async (
   if (ticker) params.append('ticker', ticker);
   if (types) types.forEach((t) => params.append('type', t));
   if (sortOrder !== 'desc') params.append('sort_order', sortOrder);
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
 
   const response = await api.get(`/portfolios/${portfolioId}/transactions`, { params });
   return parseOrThrow(

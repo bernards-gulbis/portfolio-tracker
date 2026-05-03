@@ -292,7 +292,7 @@ describe('TransactionView', () => {
     // Drive the component to page 2 so the page=1 reset has something observable to undo.
     await userEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, undefined, undefined, 'desc');
+      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, undefined, undefined, 'desc', undefined, undefined);
     });
 
     const searchInput = screen.getByPlaceholderText('Search asset...');
@@ -303,7 +303,7 @@ describe('TransactionView', () => {
     // Pre-reset the page was 2; assertion's page=1 proves the reset fired.
     await waitFor(
       () => {
-        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc');
+        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc', undefined, undefined);
       },
       { timeout: 1000 }
     );
@@ -351,13 +351,13 @@ describe('TransactionView', () => {
     await userEvent.type(screen.getByPlaceholderText('Search asset...'), 'AAPL');
     await waitFor(
       () => {
-        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc');
+        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc', undefined, undefined);
       },
       { timeout: 1000 }
     );
     await userEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, 'AAPL', undefined, 'desc');
+      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, 'AAPL', undefined, 'desc', undefined, undefined);
     });
 
     // Switch to a different portfolio — the prev-id reset block should fire,
@@ -368,9 +368,73 @@ describe('TransactionView', () => {
 
     await waitFor(
       () => {
-        expect(useTransactions).toHaveBeenLastCalledWith(2, 1, 20, undefined, undefined, 'desc');
+        expect(useTransactions).toHaveBeenLastCalledWith(2, 1, 20, undefined, undefined, 'desc', undefined, undefined);
       },
       { timeout: 1000 }
     );
+  });
+
+  it('passes date_from and date_to to the transactions query', async () => {
+    const transaction = {
+      id: 1, portfolio_id: 1, date: '2024-02-15T10:00:00',
+      type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+      price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+    };
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { transactions: [transaction], total: 1, page: 1, page_size: 20, total_pages: 1 },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderView(1);
+
+    const fromInput = document.getElementById('tx-date-from') as HTMLInputElement;
+    const toInput = document.getElementById('tx-date-to') as HTMLInputElement;
+    vi.mocked(useTransactions).mockClear();
+
+    await userEvent.type(fromInput, '2024-02-01');
+    await userEvent.type(toInput, '2024-02-28');
+
+    await waitFor(
+      () => {
+        expect(useTransactions).toHaveBeenLastCalledWith(
+          1, 1, 20, undefined, undefined, 'desc', '2024-02-01', '2024-02-28'
+        );
+      },
+      { timeout: 1000 }
+    );
+  });
+
+  it('skips the query and marks the to-field invalid when date range is inverted', async () => {
+    const transaction = {
+      id: 1, portfolio_id: 1, date: '2024-02-15T10:00:00',
+      type: TransactionType.DEPOSIT, ticker: null, quantity: null,
+      price_per_share: null, fee: 0, total_amount: 1000, eur_amount: null, split_ratio: null,
+    };
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { transactions: [transaction], total: 1, page: 1, page_size: 20, total_pages: 1 },
+      isLoading: false, isFetching: false, error: null,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderView(1);
+
+    const fromInput = document.getElementById('tx-date-from') as HTMLInputElement;
+    const toInput = document.getElementById('tx-date-to') as HTMLInputElement;
+
+    // From > To — should mark To invalid and not pass dates to the query.
+    await userEvent.type(fromInput, '2024-03-01');
+    await userEvent.type(toInput, '2024-02-01');
+
+    await waitFor(() => {
+      expect(toInput).toHaveAttribute('aria-invalid', 'true');
+      // Inline error message visible.
+      expect(screen.getByRole('alert')).toHaveTextContent(/end date must be on or after start date/i);
+    }, { timeout: 1000 });
+
+    // The query was called but with undefined dates (the invalid range gets nulled).
+    await waitFor(() => {
+      expect(useTransactions).toHaveBeenLastCalledWith(
+        1, 1, 20, undefined, undefined, 'desc', undefined, undefined
+      );
+    });
   });
 });
