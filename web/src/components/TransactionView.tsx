@@ -73,13 +73,15 @@ export const TransactionView = () => {
     setCurrentPage(1);
   }
 
-  const { data: paginatedData, isLoading, error } = useTransactions(
-    activePortfolioId, currentPage, DEFAULT_PAGE_SIZE,
-    debouncedTicker || undefined, typeFilter.length > 0 ? typeFilter : undefined,
+  const { data: paginatedData, isLoading, error } = useTransactions(activePortfolioId, {
+    page: currentPage,
+    pageSize: DEFAULT_PAGE_SIZE,
+    ticker: debouncedTicker || undefined,
+    types: typeFilter.length > 0 ? typeFilter : undefined,
     sortOrder,
-    effectiveDateFrom || undefined,
-    effectiveDateTo || undefined,
-  );
+    dateFrom: effectiveDateFrom || undefined,
+    dateTo: effectiveDateTo || undefined,
+  });
   // Status carries the list of transactions the backend could not convert
   // to EUR (no eur_amount, no fx_rate, no historical rate). Surfacing them
   // here lets the user fix the offending row directly from the table.

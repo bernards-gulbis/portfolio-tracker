@@ -434,16 +434,30 @@ export const getPortfolioPerformance = async (
 
 // ================== Transaction API Functions ==================
 
+export interface TransactionListOptions {
+  page?: number;
+  pageSize?: number;
+  ticker?: string;
+  types?: string[];
+  sortOrder?: 'asc' | 'desc';
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export const getTransactions = async (
   portfolioId: number,
-  page: number = 1,
-  pageSize: number = 20,
-  ticker?: string,
-  types?: string[],
-  sortOrder: 'asc' | 'desc' = 'desc',
-  dateFrom?: string,
-  dateTo?: string,
+  options: TransactionListOptions = {},
 ): Promise<PaginatedTransactionResponse> => {
+  const {
+    page = 1,
+    pageSize = 20,
+    ticker,
+    types,
+    sortOrder = 'desc',
+    dateFrom,
+    dateTo,
+  } = options;
+
   const params = new URLSearchParams();
   params.append('page', String(page));
   params.append('page_size', String(pageSize));

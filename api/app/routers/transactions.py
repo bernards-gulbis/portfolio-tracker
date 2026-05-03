@@ -51,7 +51,11 @@ def create_transaction(
     )
 
 
-@router.get("/transactions", response_model=PaginatedTransactionResponse)
+@router.get(
+    "/transactions",
+    response_model=PaginatedTransactionResponse,
+    responses={422: {"description": "date_from must be on or before date_to"}},
+)
 def list_transactions(
     portfolio_id: int,
     session: Annotated[Session, Depends(get_session)],

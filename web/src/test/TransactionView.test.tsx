@@ -292,7 +292,10 @@ describe('TransactionView', () => {
     // Drive the component to page 2 so the page=1 reset has something observable to undo.
     await userEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, undefined, undefined, 'desc', undefined, undefined);
+      expect(useTransactions).toHaveBeenLastCalledWith(1, expect.objectContaining({
+        page: 2, pageSize: 20, ticker: undefined, types: undefined, sortOrder: 'desc',
+        dateFrom: undefined, dateTo: undefined,
+      }));
     });
 
     const searchInput = screen.getByPlaceholderText('Search asset...');
@@ -303,7 +306,10 @@ describe('TransactionView', () => {
     // Pre-reset the page was 2; assertion's page=1 proves the reset fired.
     await waitFor(
       () => {
-        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc', undefined, undefined);
+        expect(useTransactions).toHaveBeenLastCalledWith(1, expect.objectContaining({
+          page: 1, pageSize: 20, ticker: 'AAPL', types: undefined, sortOrder: 'desc',
+          dateFrom: undefined, dateTo: undefined,
+        }));
       },
       { timeout: 1000 }
     );
@@ -351,13 +357,19 @@ describe('TransactionView', () => {
     await userEvent.type(screen.getByPlaceholderText('Search asset...'), 'AAPL');
     await waitFor(
       () => {
-        expect(useTransactions).toHaveBeenLastCalledWith(1, 1, 20, 'AAPL', undefined, 'desc', undefined, undefined);
+        expect(useTransactions).toHaveBeenLastCalledWith(1, expect.objectContaining({
+          page: 1, pageSize: 20, ticker: 'AAPL', types: undefined, sortOrder: 'desc',
+          dateFrom: undefined, dateTo: undefined,
+        }));
       },
       { timeout: 1000 }
     );
     await userEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(useTransactions).toHaveBeenLastCalledWith(1, 2, 20, 'AAPL', undefined, 'desc', undefined, undefined);
+      expect(useTransactions).toHaveBeenLastCalledWith(1, expect.objectContaining({
+        page: 2, pageSize: 20, ticker: 'AAPL', types: undefined, sortOrder: 'desc',
+        dateFrom: undefined, dateTo: undefined,
+      }));
     });
 
     // Switch to a different portfolio — the prev-id reset block should fire,
@@ -368,7 +380,10 @@ describe('TransactionView', () => {
 
     await waitFor(
       () => {
-        expect(useTransactions).toHaveBeenLastCalledWith(2, 1, 20, undefined, undefined, 'desc', undefined, undefined);
+        expect(useTransactions).toHaveBeenLastCalledWith(2, expect.objectContaining({
+          page: 1, pageSize: 20, ticker: undefined, types: undefined, sortOrder: 'desc',
+          dateFrom: undefined, dateTo: undefined,
+        }));
       },
       { timeout: 1000 }
     );
@@ -396,9 +411,10 @@ describe('TransactionView', () => {
 
     await waitFor(
       () => {
-        expect(useTransactions).toHaveBeenLastCalledWith(
-          1, 1, 20, undefined, undefined, 'desc', '2024-02-01', '2024-02-28'
-        );
+        expect(useTransactions).toHaveBeenLastCalledWith(1, expect.objectContaining({
+          page: 1, pageSize: 20, ticker: undefined, types: undefined, sortOrder: 'desc',
+          dateFrom: '2024-02-01', dateTo: '2024-02-28',
+        }));
       },
       { timeout: 1000 }
     );
@@ -432,9 +448,10 @@ describe('TransactionView', () => {
 
     // The query was called but with undefined dates (the invalid range gets nulled).
     await waitFor(() => {
-      expect(useTransactions).toHaveBeenLastCalledWith(
-        1, 1, 20, undefined, undefined, 'desc', undefined, undefined
-      );
+      expect(useTransactions).toHaveBeenLastCalledWith(1, expect.objectContaining({
+        page: 1, pageSize: 20, ticker: undefined, types: undefined, sortOrder: 'desc',
+        dateFrom: undefined, dateTo: undefined,
+      }));
     });
   });
 });

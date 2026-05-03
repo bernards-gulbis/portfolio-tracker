@@ -332,7 +332,7 @@ describe('Transaction API functions', () => {
 
   it('getTransactions passes ticker and type filters', async () => {
     const spy = vi.spyOn(apiInstance, 'get').mockResolvedValueOnce({ data: mockPaginatedResponse });
-    await getTransactions(1, 1, 20, 'AAPL', ['Buy'], 'asc');
+    await getTransactions(1, { ticker: 'AAPL', types: ['Buy'], sortOrder: 'asc' });
     const params = spy.mock.calls[0][1]?.params as URLSearchParams;
     expect(params.get('ticker')).toBe('AAPL');
     expect(params.getAll('type')).toContain('Buy');
@@ -341,14 +341,14 @@ describe('Transaction API functions', () => {
 
   it('getTransactions omits sort_order param when desc (default)', async () => {
     const spy = vi.spyOn(apiInstance, 'get').mockResolvedValueOnce({ data: mockPaginatedResponse });
-    await getTransactions(1, 1, 20, undefined, undefined, 'desc');
+    await getTransactions(1, { sortOrder: 'desc' });
     const params = spy.mock.calls[0][1]?.params as URLSearchParams;
     expect(params.get('sort_order')).toBeNull();
   });
 
   it('getTransactions passes date_from and date_to when provided', async () => {
     const spy = vi.spyOn(apiInstance, 'get').mockResolvedValueOnce({ data: mockPaginatedResponse });
-    await getTransactions(1, 1, 20, undefined, undefined, 'desc', '2024-02-01', '2024-02-28');
+    await getTransactions(1, { dateFrom: '2024-02-01', dateTo: '2024-02-28' });
     const params = spy.mock.calls[0][1]?.params as URLSearchParams;
     expect(params.get('date_from')).toBe('2024-02-01');
     expect(params.get('date_to')).toBe('2024-02-28');

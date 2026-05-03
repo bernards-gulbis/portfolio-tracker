@@ -19,7 +19,14 @@ class FxRateResponse(BaseModel):
     source: Literal["live", "historical"]
 
 
-@router.get("/{date_str}", response_model=FxRateResponse)
+@router.get(
+    "/{date_str}",
+    response_model=FxRateResponse,
+    responses={
+        400: {"description": "Invalid date format"},
+        404: {"description": "No FX rate available within lookback window"},
+    },
+)
 def get_fx_rate(
     date_str: str,
     _user: Annotated[User, Depends(current_active_user)],
