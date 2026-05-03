@@ -2,6 +2,7 @@ import { useLocale } from '../hooks/useLocale';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Transaction } from '../api';
+import { toLocalDateStr } from '../utils/formatters';
 import {
   Dialog,
   DialogContent,
@@ -80,21 +81,16 @@ export const TransactionModal = ({
   const watchedDate = form.watch('date');
   const watchedTotalAmount = form.watch('totalAmount');
 
-  const todayLocal = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  })();
-  const isFutureDate = watchedDate > todayLocal;
+  const isFutureDate = watchedDate > toLocalDateStr(new Date());
 
-  const totalAmountEurHint = (() => {
-    if (eurRate == null || eurRate <= 0) return null;
-    const total = Number.parseFloat(watchedTotalAmount || '0');
-    if (!(total > 0)) return null;
-    return t('transaction.modal.fields.totalAmountEurHint', {
-      eur: (total * eurRate).toFixed(2),
-      rate: (1 / eurRate).toFixed(4),
-    });
-  })();
+  const totalAmount = Number.parseFloat(watchedTotalAmount || '0');
+  const totalAmountEurHint =
+    eurRate != null && eurRate > 0 && totalAmount > 0
+      ? t('transaction.modal.fields.totalAmountEurHint', {
+          eur: (totalAmount * eurRate).toFixed(2),
+          rate: (1 / eurRate).toFixed(4),
+        })
+      : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>

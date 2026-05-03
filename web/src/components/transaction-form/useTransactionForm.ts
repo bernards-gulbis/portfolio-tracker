@@ -145,10 +145,11 @@ export function useTransactionForm({
       prevTypeRef.current = null;
       return;
     }
-    if (prevTypeRef.current === null || prevTypeRef.current === type) {
-      prevTypeRef.current = type;
-      return;
-    }
+    const prevType = prevTypeRef.current;
+    prevTypeRef.current = type;
+    const typeChanged = prevType !== null && prevType !== type;
+    if (!typeChanged) return;
+
     if (!TICKER_TYPES.has(type)) setValue('ticker', '');
     if (!BUY_SELL_TYPES.has(type)) {
       setValue('quantity', '');
@@ -157,7 +158,6 @@ export function useTransactionForm({
     if (!FEE_TYPES.has(type)) setValue('fee', '0.00');
     if (!EUR_TYPES.has(type)) setValue('valueEur', '');
     if (type !== TransactionType.SPLIT) setValue('splitRatio', '');
-    prevTypeRef.current = type;
   }, [isOpen, type, setValue]);
 
   // Once the user types into totalAmount or valueEur, the corresponding auto-calc
