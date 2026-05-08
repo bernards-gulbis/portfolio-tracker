@@ -30,6 +30,8 @@ import { HoldingsTable } from '../HoldingsTable';
 import { RealizedGainsTable, DividendsReceivedTable } from '../RealizedGainsTable';
 import { WithdrawalsTable } from '../WithdrawalsTable';
 
+import { useDismissedCostBasisWarning } from '../../hooks/useDismissedCostBasisWarning';
+
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
 import { InfoBanner } from './InfoBanner';
@@ -92,6 +94,12 @@ export const PortfolioStatusContent = ({
   );
 
   const { annualizedReturn } = useDerivedReturns(performance, status, showEur);
+
+  const { shouldShow: showCostBasisWarning, dismiss: dismissCostBasisWarning } =
+    useDismissedCostBasisWarning(
+      performance?.portfolio_id ?? 0,
+      performance?.cost_basis_fallback_tickers ?? [],
+    );
 
   if (isEmptyPortfolio) {
     return (
@@ -190,12 +198,10 @@ export const PortfolioStatusContent = ({
         />
       </div>
 
-      {/* Without this the user sees a flat chart segment and assumes stable
-          performance — actually we just had no price data for those tickers. */}
-      {performance && performance.cost_basis_fallback_tickers.length > 0 && (
-        <InfoBanner>
+      {showCostBasisWarning && (
+        <InfoBanner onDismiss={dismissCostBasisWarning}>
           {t('status.chartCostBasisFallback', {
-            tickers: performance.cost_basis_fallback_tickers.join(', '),
+            tickers: performance!.cost_basis_fallback_tickers.join(', '),
           })}
         </InfoBanner>
       )}
