@@ -114,3 +114,17 @@ class TestTransactionUpdateTimezoneAware:
         tolerate ``None`` (field omitted)."""
         tx = TransactionUpdate(total_amount=100.0)
         assert tx.date is None
+
+
+class TestTransactionUpdateValidator:
+    """Cover schemas.py line 186: coerce_naive_to_utc when value already has tzinfo."""
+
+    def test_coerce_naive_to_utc_already_aware_returns_unchanged(self):
+        """Passing a tz-aware datetime returns it unchanged (line 185: if v.tzinfo is not None)."""
+        from app.schemas.schemas import TransactionUpdate
+
+        aware_dt = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
+        update = TransactionUpdate(date=aware_dt)
+        assert update.date == aware_dt
+        assert update.date.tzinfo is not None
+

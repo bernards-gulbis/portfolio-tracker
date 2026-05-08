@@ -1,11 +1,17 @@
 """Unit tests for LivePriceService."""
 
+from concurrent.futures import Future
 from datetime import UTC, datetime, timedelta
-from unittest.mock import Mock, patch
+from decimal import Decimal
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import requests
+from sqlalchemy import event
+from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel.pool import StaticPool
 
+import app.models  # noqa: F401
 from app.services.prices.live_price_service import LivePriceService
 
 
@@ -15,6 +21,25 @@ def _ok_response(payload: dict) -> Mock:
     resp.json.return_value = payload
     resp.raise_for_status = Mock()
     return resp
+
+
+@pytest.fixture(name="mem_session")
+def mem_session_fixture():
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
 
 
 class TestGetCurrentPrice:
@@ -233,8 +258,6 @@ class TestGetLastKnownPriceWithDate:
     """
 
     def test_returns_none_when_ticker_not_in_cache(self):
-        from sqlmodel import Session, SQLModel, create_engine
-        from sqlmodel.pool import StaticPool
 
         engine = create_engine(
             "sqlite:///:memory:",
@@ -248,10 +271,8 @@ class TestGetLastKnownPriceWithDate:
 
     def test_returns_most_recent_date_tuple(self):
         from datetime import datetime as _dt
-        from decimal import Decimal
 
         from sqlmodel import Session, SQLModel, create_engine
-        from sqlmodel.pool import StaticPool
 
         from app.models import HistoricalPrice
 
@@ -295,8 +316,6 @@ class TestGetLastKnownPricesBatch:
         assert LivePriceService.get_last_known_prices_batch([]) == {}
 
     def test_unknown_tickers_map_to_none(self):
-        from sqlmodel import Session, SQLModel, create_engine
-        from sqlmodel.pool import StaticPool
 
         engine = create_engine(
             "sqlite:///:memory:",
@@ -312,10 +331,8 @@ class TestGetLastKnownPricesBatch:
 
     def test_returns_latest_row_per_ticker(self):
         from datetime import datetime as _dt
-        from decimal import Decimal
 
         from sqlmodel import Session, SQLModel, create_engine
-        from sqlmodel.pool import StaticPool
 
         from app.models import HistoricalPrice
 
@@ -355,3 +372,123 @@ class TestGetLastKnownPricesBatch:
         assert result["AAPL"] == (pytest.approx(152.00), "2026-04-11")
         assert result["GOOGL"] == (pytest.approx(2800.50), "2026-04-09")
         assert result["MISSING"] is None
+
+
+# ── Extra coverage paths ─────────────────────────────────────────
+
+
+class TestLivePriceServiceExtraPaths:
+    """Cover live_price_service.py lines 102, 111-114, 153-160, 167-168, 192-193, 235-236."""
+
+    def setup_method(self):
+        LivePriceService.clear_cache()
+
+    def test_in_flight_deduplication(self):
+        """Second caller for same ticker shares the in-flight Future (lines 101-102, 111-112)."""
+        f: Future[float | None] = Future()
+        f.set_result(99.5)
+        LivePriceService._in_flight["DEDUP"] = f
+
+        price = LivePriceService.get_current_price("DEDUP")
+        assert price == pytest.approx(99.5)
+
+    def test_in_flight_deduplication_exception_returns_none(self):
+        """If the shared Future raised, the waiter returns None (lines 111-114)."""
+        f: Future[float | None] = Future()
+        f.set_exception(RuntimeError("fetch failed"))
+        LivePriceService._in_flight["ERRDUP"] = f
+
+        price = LivePriceService.get_current_price("ERRDUP")
+        assert price is None
+
+    def test_fetch_from_yahoo_unexpected_exception_returns_none(self):
+        """An unexpected exception in _fetch_from_yahoo returns None (lines 153-160)."""
+        with patch(
+            "app.services.prices.live_price_service.YahooFinanceClient.fetch_chart",
+            side_effect=RuntimeError("unexpected boom"),
+        ):
+            result = LivePriceService._fetch_from_yahoo("BOOM")
+        assert result is None
+
+    def test_get_last_known_price_returns_none_when_no_data(self, mem_session: Session):
+        """get_last_known_price returns None when no data exists (lines 167-168)."""
+        result = LivePriceService.get_last_known_price("NOTEXISTS", mem_session)
+        assert result is None
+
+    def test_get_last_known_price_returns_price_when_data_exists(
+        self, mem_session: Session
+    ):
+        """get_last_known_price returns the float price (exercises the return result[0] branch)."""
+        from app.models.historical_price import HistoricalPrice
+
+        mem_session.add(
+            HistoricalPrice(
+                ticker="LPRICE",
+                date="2024-06-01",
+                price=Decimal("123.45"),
+                created_at=datetime.now(UTC),
+            )
+        )
+        mem_session.commit()
+
+        result = LivePriceService.get_last_known_price("LPRICE", mem_session)
+        assert result == pytest.approx(123.45)
+
+    def test_get_last_known_prices_batch_uses_own_session_when_none(self):
+        """get_last_known_prices_batch with session=None uses its own session (lines 235-236)."""
+        from sqlmodel import Session as SqSession
+
+        mock_session = MagicMock(spec=SqSession)
+        mock_session.__enter__ = MagicMock(return_value=mock_session)
+        mock_session.__exit__ = MagicMock(return_value=False)
+        mock_session.exec.return_value.all.return_value = []
+
+        with patch(
+            "app.services.prices.live_price_service.Session",
+            return_value=mock_session,
+        ):
+            result = LivePriceService.get_last_known_prices_batch(["AAPL"])
+        assert result == {"AAPL": None}
+
+    def test_get_last_known_price_with_date_uses_own_session_when_none(self):
+        """get_last_known_price_with_date with session=None uses its own session (lines 192-193)."""
+        from sqlmodel import Session as SqSession
+
+        mock_session = MagicMock(spec=SqSession)
+        mock_session.__enter__ = MagicMock(return_value=mock_session)
+        mock_session.__exit__ = MagicMock(return_value=False)
+        mock_session.exec.return_value.first.return_value = None
+
+        with patch(
+            "app.services.prices.live_price_service.Session",
+            return_value=mock_session,
+        ):
+            result = LivePriceService.get_last_known_price_with_date("AAPL")
+        assert result is None
+
+
+class TestBulkUpsertWithSession:
+    """Cover _db_helpers.py line 51: _execute(session) when session is provided."""
+
+    def test_bulk_upsert_uses_provided_session(self, mem_session: Session):
+        """When a session is passed, bulk_upsert executes within that session (line 51)."""
+        from app.models.historical_price import FxRate
+        from app.services.prices._db_helpers import bulk_upsert
+
+        values = [
+            {
+                "date": "2024-01-01",
+                "usd_to_eur_rate": Decimal("0.9200"),
+                "created_at": datetime.now(UTC),
+            }
+        ]
+
+        result = bulk_upsert(
+            FxRate,
+            values,
+            index_elements=["date"],
+            update_fields=["usd_to_eur_rate", "created_at"],
+            label="FxRate",
+            session=mem_session,
+        )
+        assert result is True

@@ -192,4 +192,74 @@ describe('ImportCSVModal', () => {
     });
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
+
+  it('shows confirm import error on the preview step and returns to step 1', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      imported_count: 2,
+      skipped_count: 0,
+      transactions: [],
+      dry_run: true,
+    });
+    renderModal();
+
+    const input = screen.getByLabelText('CSV File');
+    const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
+    setFileOnInput(input, file);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Confirm import' }));
+
+    mockMutateAsync.mockRejectedValueOnce(new Error('Server error during import'));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Server error during import')).toBeInTheDocument();
+    });
+    // Dropped back to step 1 — Preview button visible again
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument();
+  });
+
+  it('disables Confirm import button when imported_count is 0', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      imported_count: 0,
+      skipped_count: 3,
+      transactions: [],
+      dry_run: true,
+    });
+    renderModal();
+
+    const input = screen.getByLabelText('CSV File');
+    const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
+    setFileOnInput(input, file);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => screen.getByRole('button', { name: 'Confirm import' }));
+    expect(screen.getByRole('button', { name: 'Confirm import' })).toBeDisabled();
+  });
+
+  it('resets form when modal is closed via isOpen going false and then re-opened', () => {
+    const queryClient = createTestQueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <ImportCSVModal isOpen={true} onClose={mockOnClose} portfolioId={1} />
+      </QueryClientProvider>,
+    );
+
+    // Close by toggling isOpen to false
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ImportCSVModal isOpen={false} onClose={mockOnClose} portfolioId={1} />
+      </QueryClientProvider>,
+    );
+
+    // Re-open and confirm the form is reset (no preview step)
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ImportCSVModal isOpen={true} onClose={mockOnClose} portfolioId={1} />
+      </QueryClientProvider>,
+    );
+
+    // Should be on step 1 (file selection), not preview
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument();
+  });
 });
