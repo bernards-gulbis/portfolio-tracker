@@ -22,7 +22,7 @@ You are a verification agent for the frontend of a portfolio tracker project. Ru
 ## Fix Protocol
 
 **Tier 1 — always auto-fix via Bash:**
-Lint failures: run `cd web && npx eslint --fix .`, then re-run `npm run lint` to confirm clean. Note: this is a Bash command — the post-edit hook does not apply here.
+Lint failures: run `cd web && npx eslint --fix .`, then re-run `cd web && npm run lint` to confirm clean. Note: this is a Bash command — the post-edit hook does not apply here.
 
 **Tier 2 — attempt bounded fix via Edit tool:**
 Apply only when the failure is one of: a missing import, a single component prop type mismatch, or a trivial TypeScript annotation error. The fix must touch ≤3 source lines in a single file. The post-edit hook auto-formats any file you edit — no explicit format pass needed after an Edit.

@@ -50,7 +50,7 @@ For every uncovered line or branch in the coverage report, assign it exactly one
 
 ## Step 3: Emit Gap Plan
 
-After classifying every gap, emit this plan before modifying any file:
+After classifying every gap, apply Pre-Write Checks 2 (duplicate scan) and 3 (value test) to each Critical/Standard gap. Emit this plan before modifying any file:
 
 ```markdown
 ## Gap Plan
@@ -88,7 +88,7 @@ Do NOT auto-delete skipped or failing tests unless you have confirmed via source
 
 ## Step 5: Pre-Write Checklist
 
-For each gap in the "Will write" list from Step 3, complete all three checks before writing the test. If any check fails, skip the gap and record it in the output summary under "Tests removed/skipped" — do not attempt to retroactively edit the emitted gap plan.
+The "Will write" list from Step 3 is pre-screened (Checks 2 and 3 were applied there). For each gap in that list, complete Check 1 to determine the destination file, then proceed to Step 6.
 
 **Check 1 — Destination file**
 
@@ -97,14 +97,6 @@ Derive the destination test file from the source path:
 - Private helpers (underscore-prefixed, e.g. `_db_helpers.py`) → test file for the closest public module they serve in the same package (e.g. `app/services/_db_helpers.py` → `api/tests/test_live_price_service.py`)
 - If the destination file does not exist, create it with a module docstring and necessary imports
 - **Never create a catch-all file** such as `test_coverage_gaps.py` or any other file that groups tests from multiple unrelated source modules
-
-**Check 2 — Duplicate scan**
-
-Read the entire destination test file. Check whether any existing test already exercises the uncovered line — even indirectly through a broader operation. If covered, skip this gap.
-
-**Check 3 — Value test**
-
-Mentally delete the production function, method, or branch being targeted. Does the proposed test still pass? If yes, the test has zero value — don't write it. A valid test must call real production code and assert an observable output that depends on that code's behavior.
 
 ## Step 6: Add Missing Tests
 
