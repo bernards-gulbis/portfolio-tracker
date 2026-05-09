@@ -11,6 +11,7 @@ const en = {
     actions: {
       cancel: 'Cancel',
       delete: 'Delete',
+      dismiss: 'Dismiss',
     },
   },
   errorBoundary: {

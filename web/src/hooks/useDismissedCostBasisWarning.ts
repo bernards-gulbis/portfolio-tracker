@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 const storageKey = (portfolioId: number) => `pt_cost_basis_dismissed_${portfolioId}`;
 
@@ -25,27 +25,26 @@ export function useDismissedCostBasisWarning(
   portfolioId: number,
   currentTickers: string[],
 ): { shouldShow: boolean; dismiss: () => void } {
-  const [cached, setCached] = useState(() => ({
+  const [state, setState] = useState(() => ({
     portfolioId,
     tickers: readDismissed(portfolioId),
   }));
 
-  // When the user navigates to a different portfolio, read fresh from storage
-  // rather than using stale cached tickers from the previous portfolio.
-  const dismissedTickers =
-    cached.portfolioId === portfolioId ? cached.tickers : readDismissed(portfolioId);
+  if (state.portfolioId !== portfolioId) {
+    setState({ portfolioId, tickers: readDismissed(portfolioId) });
+  }
 
-  const shouldShow = currentTickers.some((t) => !dismissedTickers.includes(t));
+  const dismissedTickers = state.portfolioId === portfolioId ? state.tickers : [];
+  const shouldShow = currentTickers.some((ticker) => !dismissedTickers.includes(ticker));
 
-  const dismiss = () => {
-    setCached((prev) => {
-      const existing =
-        prev.portfolioId === portfolioId ? prev.tickers : readDismissed(portfolioId);
+  const dismiss = useCallback(() => {
+    setState((prev) => {
+      const existing = prev.portfolioId === portfolioId ? prev.tickers : readDismissed(portfolioId);
       const merged = Array.from(new Set([...existing, ...currentTickers]));
       writeDismissed(portfolioId, merged);
       return { portfolioId, tickers: merged };
     });
-  };
+  }, [portfolioId, currentTickers]);
 
   return { shouldShow, dismiss };
 }

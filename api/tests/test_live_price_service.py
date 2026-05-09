@@ -257,50 +257,32 @@ class TestGetLastKnownPriceWithDate:
     silent regression here breaks every "last known" UI badge.
     """
 
-    def test_returns_none_when_ticker_not_in_cache(self):
-
-        engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-        )
-        SQLModel.metadata.create_all(engine)
-        with Session(engine) as session:
-            result = LivePriceService.get_last_known_price_with_date("UNKNOWN", session)
+    def test_returns_none_when_ticker_not_in_cache(self, mem_session: Session):
+        result = LivePriceService.get_last_known_price_with_date("UNKNOWN", mem_session)
         assert result is None
 
-    def test_returns_most_recent_date_tuple(self):
-        from datetime import datetime as _dt
-
-        from sqlmodel import Session, SQLModel, create_engine
-
+    def test_returns_most_recent_date_tuple(self, mem_session: Session):
         from app.models import HistoricalPrice
 
-        engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
+        mem_session.add(
+            HistoricalPrice(
+                ticker="AAPL",
+                date="2026-04-10",
+                price=Decimal("150.25"),
+                created_at=datetime.now(UTC),
+            )
         )
-        SQLModel.metadata.create_all(engine)
-        with Session(engine) as session:
-            session.add(
-                HistoricalPrice(
-                    ticker="AAPL",
-                    date="2026-04-10",
-                    price=Decimal("150.25"),
-                    created_at=_dt.now(UTC),
-                )
+        mem_session.add(
+            HistoricalPrice(
+                ticker="AAPL",
+                date="2026-04-11",
+                price=Decimal("152.00"),
+                created_at=datetime.now(UTC),
             )
-            session.add(
-                HistoricalPrice(
-                    ticker="AAPL",
-                    date="2026-04-11",
-                    price=Decimal("152.00"),
-                    created_at=_dt.now(UTC),
-                )
-            )
-            session.commit()
-            result = LivePriceService.get_last_known_price_with_date("AAPL", session)
+        )
+        mem_session.commit()
+        result = LivePriceService.get_last_known_price_with_date("AAPL", mem_session)
+
         assert result is not None
         price, date_str = result
         assert price == pytest.approx(152.00)
@@ -315,60 +297,42 @@ class TestGetLastKnownPricesBatch:
     def test_returns_empty_dict_for_empty_input(self):
         assert LivePriceService.get_last_known_prices_batch([]) == {}
 
-    def test_unknown_tickers_map_to_none(self):
-
-        engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
+    def test_unknown_tickers_map_to_none(self, mem_session: Session):
+        result = LivePriceService.get_last_known_prices_batch(
+            ["AAPL", "GOOGL"], mem_session
         )
-        SQLModel.metadata.create_all(engine)
-        with Session(engine) as session:
-            result = LivePriceService.get_last_known_prices_batch(
-                ["AAPL", "GOOGL"], session
-            )
         assert result == {"AAPL": None, "GOOGL": None}
 
-    def test_returns_latest_row_per_ticker(self):
-        from datetime import datetime as _dt
-
-        from sqlmodel import Session, SQLModel, create_engine
-
+    def test_returns_latest_row_per_ticker(self, mem_session: Session):
         from app.models import HistoricalPrice
 
-        engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
+        mem_session.add_all(
+            [
+                HistoricalPrice(
+                    ticker="AAPL",
+                    date="2026-04-10",
+                    price=Decimal("150.25"),
+                    created_at=datetime.now(UTC),
+                ),
+                HistoricalPrice(
+                    ticker="AAPL",
+                    date="2026-04-11",
+                    price=Decimal("152.00"),
+                    created_at=datetime.now(UTC),
+                ),
+                HistoricalPrice(
+                    ticker="GOOGL",
+                    date="2026-04-09",
+                    price=Decimal("2800.50"),
+                    created_at=datetime.now(UTC),
+                ),
+            ]
         )
-        SQLModel.metadata.create_all(engine)
-        with Session(engine) as session:
-            session.add_all(
-                [
-                    HistoricalPrice(
-                        ticker="AAPL",
-                        date="2026-04-10",
-                        price=Decimal("150.25"),
-                        created_at=_dt.now(UTC),
-                    ),
-                    HistoricalPrice(
-                        ticker="AAPL",
-                        date="2026-04-11",
-                        price=Decimal("152.00"),
-                        created_at=_dt.now(UTC),
-                    ),
-                    HistoricalPrice(
-                        ticker="GOOGL",
-                        date="2026-04-09",
-                        price=Decimal("2800.50"),
-                        created_at=_dt.now(UTC),
-                    ),
-                ]
-            )
-            session.commit()
-            result = LivePriceService.get_last_known_prices_batch(
-                ["AAPL", "GOOGL", "MISSING"], session
-            )
+        mem_session.commit()
+        result = LivePriceService.get_last_known_prices_batch(
+            ["AAPL", "GOOGL", "MISSING"], mem_session
+        )
+
         assert result["AAPL"] == (pytest.approx(152.00), "2026-04-11")
         assert result["GOOGL"] == (pytest.approx(2800.50), "2026-04-09")
         assert result["MISSING"] is None

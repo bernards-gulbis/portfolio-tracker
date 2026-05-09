@@ -913,13 +913,14 @@ class TestLogHttpErrorBranches:
         resp_mock.status_code = 500
         http_err = requests.exceptions.HTTPError(response=resp_mock)
 
-        with patch.object(
-            HistoricalPriceService,
-            "_fetch_yahoo_range",
-            side_effect=http_err,
-        ), patch(
-            "app.services.prices.historical_price_service.logger"
-        ) as mock_logger:
+        with (
+            patch.object(
+                HistoricalPriceService,
+                "_fetch_yahoo_range",
+                side_effect=http_err,
+            ),
+            patch("app.services.prices.historical_price_service.logger") as mock_logger,
+        ):
             HistoricalPriceService._fetch_single_range(
                 "AAPL",
                 datetime(2025, 1, 10),
@@ -934,13 +935,14 @@ class TestLogHttpErrorBranches:
         """An HTTPError with no response object (status=None) also goes to ERROR."""
         http_err = requests.exceptions.HTTPError(response=None)
 
-        with patch.object(
-            HistoricalPriceService,
-            "_fetch_yahoo_range",
-            side_effect=http_err,
-        ), patch(
-            "app.services.prices.historical_price_service.logger"
-        ) as mock_logger:
+        with (
+            patch.object(
+                HistoricalPriceService,
+                "_fetch_yahoo_range",
+                side_effect=http_err,
+            ),
+            patch("app.services.prices.historical_price_service.logger") as mock_logger,
+        ):
             HistoricalPriceService._fetch_single_range(
                 "AAPL",
                 datetime(2025, 1, 10),

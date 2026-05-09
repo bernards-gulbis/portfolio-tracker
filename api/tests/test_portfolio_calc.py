@@ -1332,10 +1332,7 @@ class TestConsumeLotsFifoEdgeCases:
 
     def test_consume_lots_fifo_noop_when_qty_zero(self):
         """_consume_lots_fifo does nothing when effective_qty is 0 (line 84)."""
-        from decimal import Decimal
-
         from app.services.portfolio_handlers import _consume_lots_fifo
-        from app.services.portfolio_types import _Holding, _Lot, _TxState
 
         state = _TxState()
         h = _Holding()
@@ -1362,10 +1359,7 @@ class TestConsumeLotsFifoEdgeCases:
 
     def test_consume_lots_fifo_noop_when_qty_negative(self):
         """_consume_lots_fifo does nothing when effective_qty is negative."""
-        from decimal import Decimal
-
         from app.services.portfolio_handlers import _consume_lots_fifo
-        from app.services.portfolio_types import _Holding, _Lot, _TxState
 
         state = _TxState()
         h = _Holding()
@@ -1397,8 +1391,6 @@ class TestApplyWithdrawIncompleteAccumulator:
     def test_withdraw_with_incomplete_eur_avg_accumulator(self):
         """When principal > 0 but the EUR avg accumulator is incomplete,
         eur_avg_cost and avg_delta are set to None (lines 198-199)."""
-        from decimal import Decimal
-
         state = _TxState()
 
         deposit = Transaction(
@@ -1426,4 +1418,3 @@ class TestApplyWithdrawIncompleteAccumulator:
         assert state.principal == Decimal("800")
         assert len(state.realized_withdrawals) == 1
         assert state.realized_withdrawals[0].amount_eur_avg is None
-
