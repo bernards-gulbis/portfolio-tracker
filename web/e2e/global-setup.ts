@@ -39,12 +39,24 @@ export default async function globalSetup(config: FullConfig) {
       await page.goto(baseURL, { waitUntil: 'networkidle', timeout: 60_000 });
       await page.goto(baseURL, { waitUntil: 'networkidle', timeout: 60_000 });
 
-      // Register shared test user (ignored if already exists — DB is wiped before each run).
-      await fetch(`${API_BASE}/auth/register`, {
+      // Register shared test user. The DB is wiped before each run, so a 200
+      // is the normal path. If the wipe was skipped (e.g. an aborted previous
+      // run), FastAPI-Users returns 400 with REGISTER_USER_ALREADY_EXISTS —
+      // treat that as success since login still works. Anything else (5xx,
+      // schema mismatch, network error) must fail the setup loudly.
+      const registerRes = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: E2E_EMAIL, password: E2E_PASSWORD, name: E2E_NAME }),
       });
+      if (!registerRes.ok) {
+        const body = await registerRes.text().catch(() => '');
+        if (registerRes.status !== 400 || !body.includes('REGISTER_USER_ALREADY_EXISTS')) {
+          throw new Error(
+            `auth/register failed: ${registerRes.status} ${registerRes.statusText} ${body}`,
+          );
+        }
+      }
 
       // The second goto lands on the login form — log in via UI so the browser
       // sets the auth cookie natively (correct domain, SameSite handling, etc.).

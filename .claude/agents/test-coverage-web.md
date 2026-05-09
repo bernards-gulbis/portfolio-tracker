@@ -96,7 +96,7 @@ Derive the destination test file from the source path:
 
 ## Step 6: Add Missing Tests
 
-Write new tests for gaps that passed all three checks in Step 5. Follow these conventions:
+Write new tests for the gaps remaining after all Pre-Write Checks (Checks 2 and 3 applied in Step 3, Check 1 applied in Step 5). Follow these conventions:
 
 - Use `describe`/`it` blocks
 - Mock API calls and hooks as needed

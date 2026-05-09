@@ -1,4 +1,4 @@
-import type { APIRequestContext } from '@playwright/test';
+import type { APIRequestContext, APIResponse } from '@playwright/test';
 import * as fs from 'node:fs';
 
 // Must be localhost (not 127.0.0.1): the pt_auth cookie domain is 'localhost'
@@ -11,11 +11,20 @@ export interface Portfolio {
   name: string;
 }
 
+async function ensureOk(resp: APIResponse, target: string): Promise<APIResponse> {
+  if (resp.ok()) return resp;
+  const body = await resp.text().catch(() => '');
+  throw new Error(`${target} -> ${resp.status()} ${resp.statusText()}: ${body}`);
+}
+
 export async function createPortfolio(
   request: APIRequestContext,
   name = 'Test Portfolio',
 ): Promise<Portfolio> {
-  const resp = await request.post(`${API}/portfolios/`, { data: { name } });
+  const resp = await ensureOk(
+    await request.post(`${API}/portfolios/`, { data: { name } }),
+    'POST /portfolios/',
+  );
   return resp.json();
 }
 
@@ -24,7 +33,10 @@ export async function createTransaction(
   portfolioId: number,
   data: Record<string, unknown>,
 ): Promise<unknown> {
-  const resp = await request.post(`${API}/portfolios/${portfolioId}/transactions/`, { data });
+  const resp = await ensureOk(
+    await request.post(`${API}/portfolios/${portfolioId}/transactions/`, { data }),
+    `POST /portfolios/${portfolioId}/transactions/`,
+  );
   return resp.json();
 }
 
@@ -34,8 +46,11 @@ export async function importCSV(
   csvPath: string,
 ): Promise<void> {
   const buffer = fs.readFileSync(csvPath);
-  await request.post(`${API}/portfolios/${portfolioId}/transactions/import`, {
-    multipart: { file: { name: 'transactions.csv', mimeType: 'text/csv', buffer } },
-    params: { dry_run: 'false' },
-  });
+  await ensureOk(
+    await request.post(`${API}/portfolios/${portfolioId}/transactions/import`, {
+      multipart: { file: { name: 'transactions.csv', mimeType: 'text/csv', buffer } },
+      params: { dry_run: 'false' },
+    }),
+    `POST /portfolios/${portfolioId}/transactions/import`,
+  );
 }

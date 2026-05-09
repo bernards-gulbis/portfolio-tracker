@@ -36,6 +36,7 @@ test('transaction CRUD — add Deposit, edit, delete', async ({ page }) => {
   await page.getByRole('dialog', { name: 'Edit Transaction' }).waitFor({ state: 'hidden' });
 
   await expect(page.locator('[data-testid="transaction-row"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="transaction-row"]')).toContainText('1,500');
 
   // ── DELETE ────────────────────────────────────────────────────────────────
   await page.locator('[data-testid="transaction-row"]')
