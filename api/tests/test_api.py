@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -4600,3 +4600,73 @@ class TestFxRateEndpoint:
     def test_invalid_date_returns_400(self, client: TestClient):
         response = client.get("/fx-rates/not-a-date")
         assert response.status_code == 400
+
+
+# ── Extra coverage paths ─────────────────────────────────────────
+
+
+class TestTransactionRouterExtraPaths:
+    """Cover transactions.py lines 177-178 (UnicodeDecodeError) and 216 (type rename)."""
+
+    @staticmethod
+    def _create_portfolio(client: TestClient) -> int:
+        resp = client.post("/portfolios/", json={"name": "P"})
+        assert resp.status_code == 201
+        return resp.json()["id"]
+
+    def test_import_unicode_decode_error_returns_400(self, client: TestClient):
+        """Uploading a non-UTF-8 file triggers UnicodeDecodeError and returns 400."""
+        pid = self._create_portfolio(client)
+
+        binary_content = bytes(range(128, 200))
+        resp = client.post(
+            f"/portfolios/{pid}/transactions/import",
+            files={"file": ("data.csv", BytesIO(binary_content), "text/csv")},
+        )
+        assert resp.status_code == 400
+        assert "UTF-8" in resp.json()["detail"]
+
+    @pytest.mark.anyio
+    async def test_import_generic_read_error_raises_file_upload_exception(self):
+        """A generic exception during file.read() is wrapped in FileUploadException."""
+        from app.core.exceptions import FileUploadException
+        from app.routers.transactions import import_transactions_csv
+
+        async def bad_read(size=-1):
+            raise OSError("disk read error")
+
+        upload = MagicMock()
+        upload.filename = "data.csv"
+        upload.read = bad_read
+
+        with pytest.raises(FileUploadException, match="Error reading file"):
+            await import_transactions_csv(
+                portfolio_id=1,
+                session=MagicMock(),
+                user=MagicMock(),
+                file=upload,
+                dry_run=False,
+            )
+
+    def test_update_transaction_type_field_rename(self, client: TestClient):
+        """PUT /transactions/{id} with 'type' in payload triggers the rename (line 216)."""
+        pid = self._create_portfolio(client)
+
+        create_resp = client.post(
+            f"/portfolios/{pid}/transactions/",
+            json={
+                "date": "2024-01-15T00:00:00",
+                "type": "Deposit",
+                "total_amount": 1000.0,
+            },
+        )
+        assert create_resp.status_code == 201
+        tx_id = create_resp.json()["id"]
+
+        update_resp = client.put(
+            f"/transactions/{tx_id}",
+            json={"type": "Withdraw", "total_amount": -2000.0},
+        )
+        assert update_resp.status_code == 200
+        assert update_resp.json()["total_amount"] == pytest.approx(-2000.0)
+        assert update_resp.json()["type"] == "Withdraw"

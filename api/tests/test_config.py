@@ -43,3 +43,19 @@ class TestConfigHelpers:
         for val in ("false", "0", "no", ""):
             with patch.dict(os.environ, {"DATABASE_ECHO": val}, clear=False):
                 assert cfg_module._get_bool("DATABASE_ECHO") is False
+
+
+class TestConfigValidationErrorPaths:
+    """Cover config.py lines 55, 59, 73-79, 96, 100-102."""
+
+    def test_get_int_records_error_and_returns_default(self):
+        """_get_int with non-integer value records error entry (lines 38-40)."""
+        import os
+
+        from app.core import config as cfg
+
+        with patch.dict(os.environ, {"DB_MAX_OVERFLOW": "bad"}):
+            result = cfg._get_int("DB_MAX_OVERFLOW", 10)
+        assert result == 10
+        assert any("DB_MAX_OVERFLOW" in e for e in cfg._errors)
+        cfg._errors.clear()

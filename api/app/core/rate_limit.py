@@ -11,11 +11,15 @@ implementation (or migrate to ``slowapi`` with a Redis backend).
 """
 
 import logging
+import os
 import time
 from collections import defaultdict, deque
 from threading import Lock
 
 from fastapi import Depends, HTTPException, Request
+
+# Set DISABLE_RATE_LIMIT=true in the API env to bypass limits (e.g. for e2e tests).
+_RATE_LIMIT_DISABLED = os.getenv("DISABLE_RATE_LIMIT", "").lower() == "true"
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +106,8 @@ def rate_limit(max_requests: int, window_seconds: int):
             ...,
             dependencies=[rate_limit(5, 60)],  # 5 requests per minute
         )
+
+    Set env var DISABLE_RATE_LIMIT=true to bypass all limits (e.g. in e2e tests).
     """
     if max_requests <= 0 or window_seconds <= 0:
         raise ValueError(
@@ -110,6 +116,8 @@ def rate_limit(max_requests: int, window_seconds: int):
         )
 
     def dep(request: Request):
+        if _RATE_LIMIT_DISABLED:
+            return
         key = f"{_client_ip(request)}:{request.url.path}"
         if not _LIMITER.check(key, max_requests, window_seconds):
             raise HTTPException(

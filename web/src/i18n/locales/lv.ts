@@ -13,6 +13,7 @@ const lv: Translation = {
     actions: {
       cancel: 'Atcelt',
       delete: 'Dzēst',
+      dismiss: 'Aizvērt',
     },
   },
   errorBoundary: {

@@ -384,3 +384,69 @@ class TestCustomGoogleOAuth2:
 
         assert sub == "99999"
         assert email is None
+
+
+# ── Extra coverage paths ─────────────────────────────────────────
+
+
+class TestSyncSQLAlchemyUserDatabaseExtraPaths:
+    """Cover auth.py lines 123 (get), 155-156 (delete), 187 (update_oauth_account_by_ids no-match)."""
+
+    @pytest.mark.anyio
+    async def test_get_by_id_returns_user(self, session: Session):
+        user = User(
+            id=uuid.uuid4(),
+            email="getbyid@example.com",
+            hashed_password="x",
+            is_active=True,
+        )
+        session.add(user)
+        session.commit()
+
+        db = SyncSQLAlchemyUserDatabase(session)
+        fetched = await db.get(user.id)
+        assert fetched is not None
+        assert fetched.email == "getbyid@example.com"
+
+    @pytest.mark.anyio
+    async def test_get_by_id_returns_none_for_unknown(self, session: Session):
+        db = SyncSQLAlchemyUserDatabase(session)
+        fetched = await db.get(uuid.uuid4())
+        assert fetched is None
+
+    @pytest.mark.anyio
+    async def test_delete_user(self, session: Session):
+        user = User(
+            id=uuid.uuid4(),
+            email="todelete@example.com",
+            hashed_password="x",
+            is_active=True,
+        )
+        session.add(user)
+        session.commit()
+
+        db = SyncSQLAlchemyUserDatabase(session)
+        await db.delete(user)
+
+        fetched = await db.get(user.id)
+        assert fetched is None
+
+    @pytest.mark.anyio
+    async def test_update_oauth_account_by_ids_no_match_returns_user(
+        self, session: Session
+    ):
+        """When no matching OAuthAccount exists, return user unchanged (line 187)."""
+        user = User(
+            id=uuid.uuid4(),
+            email="nooauth@example.com",
+            hashed_password="x",
+            is_active=True,
+        )
+        session.add(user)
+        session.commit()
+
+        db = SyncSQLAlchemyUserDatabase(session)
+        returned = await db.update_oauth_account_by_ids(
+            user, "google", "nonexistent-id", {"access_token": "new_tok"}
+        )
+        assert returned.id == user.id

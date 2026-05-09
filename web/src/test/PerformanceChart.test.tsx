@@ -116,3 +116,32 @@ describe('all-null return_pct handling', () => {
     expect(screen.getByText('Portfolio Value')).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// data.length < 2 — raw insufficient data path
+// ---------------------------------------------------------------------------
+
+describe('single data point (raw data.length < 2)', () => {
+  it('shows insufficient data message when only one data point exists', () => {
+    const singlePoint: PerformanceDataPoint[] = [
+      { date: toLocalDateStr(today), principal: 10000, principal_eur: 9200, current_value: 10000, fx_rate: 0.92, return_pct: 0, sp500_return_pct: 0 },
+    ];
+
+    render(<PerformanceChart data={singlePoint} isLoading={false} />);
+    // data.length < 2 renders the simple insufficientData message without period tabs
+    expect(screen.getByText(/Not enough data/i)).toBeInTheDocument();
+    // Period tabs should NOT be visible since we short-circuit before building them
+    expect(screen.queryByRole('tab', { name: 'All' })).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// currency prop — USD mode
+// ---------------------------------------------------------------------------
+
+describe('currency prop', () => {
+  it('shows USD tab label when currency is USD', () => {
+    render(<PerformanceChart data={mockData} isLoading={false} currency="USD" />);
+    expect(screen.getByRole('tab', { name: 'USD' })).toBeInTheDocument();
+  });
+});

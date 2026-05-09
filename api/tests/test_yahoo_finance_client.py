@@ -1,11 +1,14 @@
 """Unit tests for YahooFinanceClient — retry policy and HTTP behavior."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import requests
 
-from app.services.prices.yahoo_finance_client import YahooFinanceClient
+from app.services.prices.yahoo_finance_client import (
+    YahooFinanceClient,
+    _is_transient_yahoo_failure,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -291,3 +294,28 @@ class TestCircuitBreakerIntegration:
         ):
             YahooFinanceClient.fetch_chart("AAPL", {})
         assert YahooFinanceClient.is_circuit_open() is False
+
+
+class TestIsTransientYahooFailure:
+    """Cover yahoo_finance_client.py line 59: HTTPError with resp=None is transient."""
+
+    def test_http_error_with_none_response_is_transient(self):
+        """When exc.response is None, the failure is treated as transient (line 59)."""
+        exc = requests.exceptions.HTTPError("connection reset")
+        exc.response = None
+
+        assert _is_transient_yahoo_failure(exc) is True
+
+    def test_http_error_with_5xx_is_transient(self):
+        resp = MagicMock()
+        resp.status_code = 503
+        exc = requests.exceptions.HTTPError("503", response=resp)
+
+        assert _is_transient_yahoo_failure(exc) is True
+
+    def test_http_error_with_404_is_not_transient(self):
+        resp = MagicMock()
+        resp.status_code = 404
+        exc = requests.exceptions.HTTPError("404", response=resp)
+
+        assert _is_transient_yahoo_failure(exc) is False

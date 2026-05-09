@@ -78,6 +78,9 @@ htmlcov/
 coverage/
 web/playwright-report/
 web/test-results/
+# Playwright auth state — created automatically by `npm run e2e` (via global-setup.ts).
+# Never commit: contains live session tokens.
+web/e2e/.auth/
 
 # MyPy
 .mypy_cache/

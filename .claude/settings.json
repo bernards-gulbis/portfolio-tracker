@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/format-on-edit.py",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format-on-edit.py\"",
             "timeout": 60
           }
         ]

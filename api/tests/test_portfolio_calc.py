@@ -1322,3 +1322,99 @@ class TestTwrEdgeCases:
         # is undefined for that sub-period. Must be None, not a stale prior
         # factor that would render as "no change".
         assert data_points[-1]["return_pct"] is None
+
+
+# ── Extra coverage paths ─────────────────────────────────────────
+
+
+class TestConsumeLotsFifoEdgeCases:
+    """Cover portfolio_handlers.py line 84: effective_qty <= 0 early return."""
+
+    def test_consume_lots_fifo_noop_when_qty_zero(self):
+        """_consume_lots_fifo does nothing when effective_qty is 0 (line 84)."""
+        from app.services.portfolio_handlers import _consume_lots_fifo
+
+        state = _TxState()
+        h = _Holding()
+        h.lots.append(
+            _Lot(
+                quantity=Decimal("10"),
+                cost=Decimal("1000"),
+                acquired_at=datetime(2024, 1, 1),
+            )
+        )
+
+        _consume_lots_fifo(
+            state,
+            h,
+            ticker="AAPL",
+            tx_date_str="2024-06-01T00:00:00",
+            effective_qty=Decimal("0"),
+            effective_total=Decimal("0"),
+            quantity_before=Decimal("10"),
+        )
+
+        assert len(h.lots) == 1
+        assert len(state.realized_sales) == 0
+
+    def test_consume_lots_fifo_noop_when_qty_negative(self):
+        """_consume_lots_fifo does nothing when effective_qty is negative."""
+        from app.services.portfolio_handlers import _consume_lots_fifo
+
+        state = _TxState()
+        h = _Holding()
+        h.lots.append(
+            _Lot(
+                quantity=Decimal("5"),
+                cost=Decimal("500"),
+                acquired_at=datetime(2024, 1, 1),
+            )
+        )
+
+        _consume_lots_fifo(
+            state,
+            h,
+            ticker="AAPL",
+            tx_date_str="2024-06-01T00:00:00",
+            effective_qty=Decimal("-1"),
+            effective_total=Decimal("-100"),
+            quantity_before=Decimal("5"),
+        )
+
+        assert len(h.lots) == 1
+        assert len(state.realized_sales) == 0
+
+
+class TestApplyWithdrawIncompleteAccumulator:
+    """Cover portfolio_handlers.py lines 198-199: withdraw when avg accumulator is incomplete."""
+
+    def test_withdraw_with_incomplete_eur_avg_accumulator(self):
+        """When principal > 0 but the EUR avg accumulator is incomplete,
+        eur_avg_cost and avg_delta are set to None (lines 198-199)."""
+        state = _TxState()
+
+        deposit = Transaction(
+            id=1,
+            portfolio_id=1,
+            date=datetime(2024, 1, 1),
+            type=TransactionType.DEPOSIT,
+            total_amount=Decimal("1000"),
+            eur_amount=None,
+        )
+        _apply_transaction(state, deposit, strict=False)
+        assert state.principal == Decimal("1000")
+        assert state.principal_eur_avg.is_incomplete
+
+        withdraw = Transaction(
+            id=2,
+            portfolio_id=1,
+            date=datetime(2024, 2, 1),
+            type=TransactionType.WITHDRAW,
+            total_amount=Decimal("-200"),
+            eur_amount=None,
+        )
+        _apply_transaction(state, withdraw, strict=False)
+
+        assert state.principal == Decimal("800")
+        assert len(state.realized_withdrawals) == 1
+        assert state.realized_withdrawals[0].amount_eur_avg is None

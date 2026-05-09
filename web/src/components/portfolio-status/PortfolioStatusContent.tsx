@@ -30,6 +30,8 @@ import { HoldingsTable } from '../HoldingsTable';
 import { RealizedGainsTable, DividendsReceivedTable } from '../RealizedGainsTable';
 import { WithdrawalsTable } from '../WithdrawalsTable';
 
+import { useDismissedCostBasisWarning } from '../../hooks/useDismissedCostBasisWarning';
+
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
 import { InfoBanner } from './InfoBanner';
@@ -92,6 +94,12 @@ export const PortfolioStatusContent = ({
   );
 
   const { annualizedReturn } = useDerivedReturns(performance, status, showEur);
+
+  const { shouldShow: showCostBasisWarning, dismiss: dismissCostBasisWarning } =
+    useDismissedCostBasisWarning(
+      performance?.portfolio_id ?? 0,
+      performance?.cost_basis_fallback_tickers ?? [],
+    );
 
   if (isEmptyPortfolio) {
     return (
@@ -190,12 +198,10 @@ export const PortfolioStatusContent = ({
         />
       </div>
 
-      {/* Without this the user sees a flat chart segment and assumes stable
-          performance — actually we just had no price data for those tickers. */}
-      {performance && performance.cost_basis_fallback_tickers.length > 0 && (
-        <InfoBanner>
+      {showCostBasisWarning && (
+        <InfoBanner onDismiss={dismissCostBasisWarning}>
           {t('status.chartCostBasisFallback', {
-            tickers: performance.cost_basis_fallback_tickers.join(', '),
+            tickers: (performance?.cost_basis_fallback_tickers ?? []).join(', '),
           })}
         </InfoBanner>
       )}
@@ -255,6 +261,7 @@ export const PortfolioStatusContent = ({
         <CollapsibleSection
           title={t('status.realizedGains')}
           secondary={`(${t('status.realizedGainsMethod')})`}
+          defaultOpen
         >
           <ErrorBoundary fullScreen={false}>
             <RealizedGainsTable realizedSales={status.realized_sales} locale={locale} />
@@ -263,7 +270,7 @@ export const PortfolioStatusContent = ({
       )}
 
       {status.dividends_received.length > 0 && (
-        <CollapsibleSection title={t('status.dividendsReceived')}>
+        <CollapsibleSection title={t('status.dividendsReceived')} defaultOpen>
           <ErrorBoundary fullScreen={false}>
             <DividendsReceivedTable
               dividendsReceived={status.dividends_received}
@@ -275,7 +282,7 @@ export const PortfolioStatusContent = ({
       )}
 
       {status.realized_withdrawals.length > 0 && (
-        <CollapsibleSection title={t('status.withdrawals')}>
+        <CollapsibleSection title={t('status.withdrawals')} defaultOpen>
           <ErrorBoundary fullScreen={false}>
             <WithdrawalsTable
               realizedWithdrawals={status.realized_withdrawals}
