@@ -4665,7 +4665,8 @@ class TestTransactionRouterExtraPaths:
 
         update_resp = client.put(
             f"/transactions/{tx_id}",
-            json={"type": "Deposit", "total_amount": 2000.0},
+            json={"type": "Withdraw", "total_amount": -2000.0},
         )
         assert update_resp.status_code == 200
-        assert update_resp.json()["total_amount"] == pytest.approx(2000.0)
+        assert update_resp.json()["total_amount"] == pytest.approx(-2000.0)
+        assert update_resp.json()["type"] == "Withdraw"

@@ -9,7 +9,7 @@ from app.services.health_service import (
 
 
 class TestHealthServiceExceptionPaths:
-    """Cover health_service.py lines 44-46 and 53-55."""
+    """Exception paths in cache-age queries return None instead of propagating."""
 
     def test_get_price_cache_age_seconds_returns_none_on_exception(self):
         """Exception in the query is caught and returns None (lines 44-46)."""

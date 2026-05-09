@@ -1,6 +1,6 @@
 """Tests for Pydantic schemas with non-trivial validation logic."""
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -82,7 +82,6 @@ class TestTransactionCreateTimezoneAware:
     def test_non_utc_aware_datetime_preserved(self):
         """A non-UTC aware input must not be silently converted to UTC —
         the user's offset is semantic information we must respect."""
-        from datetime import timedelta
 
         offset_plus_5 = timezone(timedelta(hours=5))
         tx = TransactionCreate(
@@ -121,7 +120,8 @@ class TestTransactionUpdateValidator:
 
     def test_coerce_naive_to_utc_already_aware_returns_unchanged(self):
         """Passing a tz-aware datetime returns it unchanged (line 185: if v.tzinfo is not None)."""
-        aware_dt = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
+        tz_plus5 = timezone(timedelta(hours=5))
+        aware_dt = datetime(2024, 6, 1, 12, 0, 0, tzinfo=tz_plus5)
         update = TransactionUpdate(date=aware_dt)
         assert update.date == aware_dt
-        assert update.date.tzinfo is not None
+        assert update.date.tzinfo == tz_plus5

@@ -45,12 +45,13 @@ describe('WarningsAlert', () => {
   it('handles non-numeric count string without throwing', () => {
     const warnings: TransactionWarning[] = [
       {
-        code: 'sellNotInHoldings',
+        code: 'fxRateMissingTicker',
         date: '2024-01-02T00:00:00',
         params: { ticker: 'ZZZ', count: 'not-a-number' },
       },
     ];
     expect(() => render(<WarningsAlert warnings={warnings} locale="en-US" />)).not.toThrow();
+    expect(screen.getByText(/ZZZ transaction/)).toBeInTheDocument();
   });
 
   it('renders multiple warnings with the same code and date without key collision', () => {

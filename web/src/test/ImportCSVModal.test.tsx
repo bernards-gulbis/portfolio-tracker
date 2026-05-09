@@ -236,7 +236,13 @@ describe('ImportCSVModal', () => {
     expect(screen.getByRole('button', { name: 'Confirm import' })).toBeDisabled();
   });
 
-  it('resets form when modal is closed via isOpen going false and then re-opened', () => {
+  it('resets form when modal is closed via isOpen going false and then re-opened', async () => {
+    mockMutateAsync.mockResolvedValueOnce({
+      imported_count: 2,
+      skipped_count: 0,
+      transactions: [],
+      dry_run: true,
+    });
     const queryClient = createTestQueryClient();
     const { rerender } = render(
       <QueryClientProvider client={queryClient}>
@@ -244,21 +250,27 @@ describe('ImportCSVModal', () => {
       </QueryClientProvider>,
     );
 
-    // Close by toggling isOpen to false
+    // Advance to step 2 (preview) by uploading a file and clicking Preview
+    const input = screen.getByLabelText('CSV File');
+    const file = new File(['date,type\n2024-01-01,Deposit'], 'data.csv', { type: 'text/csv' });
+    setFileOnInput(input, file);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Confirm import' }));
+
+    // Close by toggling isOpen to false — useEffect resets form and clears preview
     rerender(
       <QueryClientProvider client={queryClient}>
         <ImportCSVModal isOpen={false} onClose={mockOnClose} portfolioId={1} />
       </QueryClientProvider>,
     );
 
-    // Re-open and confirm the form is reset (no preview step)
+    // Re-open and confirm the form was reset back to step 1
     rerender(
       <QueryClientProvider client={queryClient}>
         <ImportCSVModal isOpen={true} onClose={mockOnClose} portfolioId={1} />
       </QueryClientProvider>,
     );
 
-    // Should be on step 1 (file selection), not preview
     expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument();
   });

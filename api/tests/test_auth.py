@@ -394,9 +394,6 @@ class TestSyncSQLAlchemyUserDatabaseExtraPaths:
 
     @pytest.mark.anyio
     async def test_get_by_id_returns_user(self, session: Session):
-        from app.core.auth import SyncSQLAlchemyUserDatabase
-        from app.models.user import User
-
         user = User(
             id=uuid.uuid4(),
             email="getbyid@example.com",
@@ -413,17 +410,12 @@ class TestSyncSQLAlchemyUserDatabaseExtraPaths:
 
     @pytest.mark.anyio
     async def test_get_by_id_returns_none_for_unknown(self, session: Session):
-        from app.core.auth import SyncSQLAlchemyUserDatabase
-
         db = SyncSQLAlchemyUserDatabase(session)
         fetched = await db.get(uuid.uuid4())
         assert fetched is None
 
     @pytest.mark.anyio
     async def test_delete_user(self, session: Session):
-        from app.core.auth import SyncSQLAlchemyUserDatabase
-        from app.models.user import User
-
         user = User(
             id=uuid.uuid4(),
             email="todelete@example.com",
@@ -444,9 +436,6 @@ class TestSyncSQLAlchemyUserDatabaseExtraPaths:
         self, session: Session
     ):
         """When no matching OAuthAccount exists, return user unchanged (line 187)."""
-        from app.core.auth import SyncSQLAlchemyUserDatabase
-        from app.models.user import User
-
         user = User(
             id=uuid.uuid4(),
             email="nooauth@example.com",

@@ -18,6 +18,7 @@ export const InfoBanner = ({ children, onDismiss }: InfoBannerProps) => {
       <AlertDescription>{children}</AlertDescription>
       {onDismiss && (
         <Button
+          type="button"
           variant="ghost"
           size="icon-xs"
           onClick={onDismiss}

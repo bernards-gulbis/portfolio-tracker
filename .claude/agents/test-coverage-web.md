@@ -48,7 +48,7 @@ For every uncovered line or branch in the coverage report, assign it exactly one
 
 After classifying every gap, emit this plan before modifying any file:
 
-```
+```markdown
 ## Gap Plan
 
 Will write:

@@ -7,17 +7,14 @@ describe('EurIncompleteBanner', () => {
     render(
       <EurIncompleteBanner missingCount={1} onGoToTransactions={() => {}} />,
     );
-    // The banner should be visible on the page
-    const alert = document.querySelector('[role="alert"]');
-    expect(alert).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
   it('renders an info banner for multiple missing transactions', () => {
     render(
       <EurIncompleteBanner missingCount={3} onGoToTransactions={() => {}} />,
     );
-    const alert = document.querySelector('[role="alert"]');
-    expect(alert).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
   it('calls onGoToTransactions when the CTA link is clicked', () => {

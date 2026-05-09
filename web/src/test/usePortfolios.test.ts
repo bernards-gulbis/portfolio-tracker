@@ -142,6 +142,9 @@ describe('useCreatePortfolio', () => {
     await result.current.mutateAsync({ name: 'New Portfolio' });
 
     expect(api.createPortfolio).toHaveBeenCalledWith({ name: 'New Portfolio' });
+    const cached = queryClient.getQueryData<Portfolio[]>(['portfolios']);
+    expect(cached).toBeDefined();
+    expect(cached?.some((p) => p.name === 'New Portfolio')).toBe(true);
   });
 });
 

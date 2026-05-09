@@ -201,7 +201,7 @@ export const PortfolioStatusContent = ({
       {showCostBasisWarning && (
         <InfoBanner onDismiss={dismissCostBasisWarning}>
           {t('status.chartCostBasisFallback', {
-            tickers: performance!.cost_basis_fallback_tickers.join(', '),
+            tickers: (performance?.cost_basis_fallback_tickers ?? []).join(', '),
           })}
         </InfoBanner>
       )}

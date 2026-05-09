@@ -57,3 +57,5 @@ class TestConfigValidationErrorPaths:
         with patch.dict(os.environ, {"DB_MAX_OVERFLOW": "bad"}):
             result = cfg._get_int("DB_MAX_OVERFLOW", 10)
         assert result == 10
+        assert any("DB_MAX_OVERFLOW" in e for e in cfg._errors)
+        cfg._errors.clear()

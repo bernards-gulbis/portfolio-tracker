@@ -951,3 +951,4 @@ class TestLogHttpErrorBranches:
             )
 
         mock_logger.error.assert_called_once()
+        mock_logger.warning.assert_not_called()

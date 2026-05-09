@@ -413,6 +413,8 @@ class TestLivePriceServiceExtraPaths:
         ):
             result = LivePriceService.get_last_known_prices_batch(["AAPL"])
         assert result == {"AAPL": None}
+        mock_session.__enter__.assert_called_once()
+        mock_session.exec.assert_called_once()
 
     def test_get_last_known_price_with_date_uses_own_session_when_none(self):
         """get_last_known_price_with_date with session=None uses its own session (lines 192-193)."""

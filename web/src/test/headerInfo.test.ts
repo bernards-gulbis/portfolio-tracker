@@ -118,7 +118,7 @@ describe('getHeaderValues — value mode null currentValue', () => {
 
     expect(result.mode).toBe('value');
     // Has a displayValue but no changeDisplay since base is null
-    expect(result.displayValue).not.toBe('-');
+    expect(result.displayValue).toBe('€50,000.00');
     expect(result.mode === 'value' && result.changeDisplay).toBeNull();
   });
 });

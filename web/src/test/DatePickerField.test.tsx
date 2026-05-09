@@ -161,14 +161,14 @@ describe('DatePickerField', () => {
     expect(dialog).toBeInTheDocument();
 
     // Click a calendar day button to trigger handleCalendarSelect
-    const dayButtons = dialog.querySelectorAll('button[name]');
-    if (dayButtons.length > 0) {
-      await user.click(dayButtons[0] as HTMLElement);
-    }
+    // CalendarDayButton renders with data-day attribute (not name)
+    const dayButtons = dialog.querySelectorAll('button[data-day]');
+    expect(dayButtons.length).toBeGreaterThan(0);
+    await user.click(dayButtons[0] as HTMLElement);
 
-    // onChange should have been called with a YYYY-MM-DD string
-    if (onChange.mock.calls.length > 0) {
-      expect(onChange.mock.calls[0][0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    }
+    // onChange must have been called with a YYYY-MM-DD string
+    expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    // Popover should close after selection
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

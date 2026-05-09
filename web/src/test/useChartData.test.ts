@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useChartData } from '../components/performance-chart/useChartData';
 import type { PerformanceDataPoint } from '../api';
+
+afterEach(() => vi.useRealTimers());
 
 const pt = (overrides: Partial<PerformanceDataPoint>): PerformanceDataPoint => ({
   date: '2026-01-01',
@@ -41,12 +43,12 @@ describe('useChartData — USD mode', () => {
   });
 
   it('filters to the specified time period', () => {
-    // Use '1month' — only points within the last month should survive.
-    // Since test data has dates in April-May 2026 and today is ~2026-05-09,
-    // '1month' cutoff is ~2026-04-09, so only the last two points pass.
+    // Freeze today to 2026-05-09 so the 1-month cutoff is deterministically 2026-04-09.
+    // Only 2026-04-15 and 2026-05-01 pass; 2026-04-01 is excluded.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-09'));
     const { result } = renderHook(() => useChartData(data, '1month', 'USD'));
-    // At least the last point should be present
-    expect(result.current.length).toBeGreaterThanOrEqual(1);
+    expect(result.current.length).toBe(2);
     expect(result.current[result.current.length - 1].date).toBe('2026-05-01');
   });
 });
