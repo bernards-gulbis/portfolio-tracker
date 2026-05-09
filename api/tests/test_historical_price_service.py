@@ -887,3 +887,65 @@ class TestCachedHistoricalPricesFloatCoercion:
         assert len(data_points) == 5
         assert data_points[-1]["current_value"] is not None
         assert data_points[-1]["fx_rate"] == pytest.approx(1.0 / 1.10)
+
+
+class TestRecordCoverageEdgeCases:
+    """Cover the early-return guard in _record_coverage (line 194)."""
+
+    def test_record_coverage_start_after_end_is_no_op(self):
+        """When start > end the method must return without writing anything."""
+        from app.services.prices import _db_helpers
+
+        with patch.object(_db_helpers, "bulk_upsert") as mock_upsert:
+            HistoricalPriceService._record_coverage(
+                "AAPL", _d("2025-01-15"), _d("2025-01-10")
+            )
+        mock_upsert.assert_not_called()
+
+
+class TestLogHttpErrorBranches:
+    """Cover the non-400/404 branch of _log_http_error (line 321)."""
+
+    def test_non_standard_http_error_uses_error_level(self):
+        """A 500-status HTTPError must be logged at ERROR level, not WARNING."""
+
+        resp_mock = Mock()
+        resp_mock.status_code = 500
+        http_err = requests.exceptions.HTTPError(response=resp_mock)
+
+        with patch.object(
+            HistoricalPriceService,
+            "_fetch_yahoo_range",
+            side_effect=http_err,
+        ), patch(
+            "app.services.prices.historical_price_service.logger"
+        ) as mock_logger:
+            HistoricalPriceService._fetch_single_range(
+                "AAPL",
+                datetime(2025, 1, 10),
+                datetime(2025, 1, 15),
+                datetime(2025, 1, 20).date(),
+            )
+
+        mock_logger.error.assert_called_once()
+        mock_logger.warning.assert_not_called()
+
+    def test_none_response_http_error_uses_error_level(self):
+        """An HTTPError with no response object (status=None) also goes to ERROR."""
+        http_err = requests.exceptions.HTTPError(response=None)
+
+        with patch.object(
+            HistoricalPriceService,
+            "_fetch_yahoo_range",
+            side_effect=http_err,
+        ), patch(
+            "app.services.prices.historical_price_service.logger"
+        ) as mock_logger:
+            HistoricalPriceService._fetch_single_range(
+                "AAPL",
+                datetime(2025, 1, 10),
+                datetime(2025, 1, 15),
+                datetime(2025, 1, 20).date(),
+            )
+
+        mock_logger.error.assert_called_once()

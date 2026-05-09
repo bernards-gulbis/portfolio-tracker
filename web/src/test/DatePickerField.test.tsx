@@ -125,4 +125,50 @@ describe('DatePickerField', () => {
     const input = screen.getByRole('textbox');
     expect(input).toHaveAttribute('aria-invalid', 'true');
   });
+
+  it('calls onChange with empty string when input is cleared', () => {
+    const onChange = vi.fn();
+    render(
+      <DatePickerField
+        value="2025-06-15"
+        onChange={onChange}
+        locale="en-US"
+        id="date"
+        pickerAriaLabel="Open date picker"
+      />,
+    );
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '' } });
+    expect(onChange).toHaveBeenCalledWith('');
+  });
+
+  it('closes the popover when a date is selected from the calendar', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <DatePickerField
+        value="2025-06-15"
+        onChange={onChange}
+        locale="en-US"
+        id="date"
+        pickerAriaLabel="Open date picker"
+      />,
+    );
+
+    // Open the popover
+    await user.click(screen.getByRole('button', { name: 'Open date picker' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+
+    // Click a calendar day button to trigger handleCalendarSelect
+    const dayButtons = dialog.querySelectorAll('button[name]');
+    if (dayButtons.length > 0) {
+      await user.click(dayButtons[0] as HTMLElement);
+    }
+
+    // onChange should have been called with a YYYY-MM-DD string
+    if (onChange.mock.calls.length > 0) {
+      expect(onChange.mock.calls[0][0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
 });

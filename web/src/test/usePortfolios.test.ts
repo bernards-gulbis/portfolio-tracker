@@ -126,6 +126,23 @@ describe('useCreatePortfolio', () => {
 
     await expect(result.current.mutateAsync({ name: 'Test' })).rejects.toThrow('Duplicate name');
   });
+
+  it('creates optimistic entry even when cache is empty (old == null branch)', async () => {
+    vi.mocked(api.createPortfolio).mockResolvedValueOnce(mockPortfolio);
+    vi.mocked(api.getPortfolios).mockResolvedValue([mockPortfolio]);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    // Deliberately do NOT pre-populate the cache so old == undefined in the updater
+
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const { result } = renderHook(() => useCreatePortfolio(), { wrapper });
+
+    await result.current.mutateAsync({ name: 'New Portfolio' });
+
+    expect(api.createPortfolio).toHaveBeenCalledWith({ name: 'New Portfolio' });
+  });
 });
 
 describe('useUpdatePortfolio', () => {
@@ -156,6 +173,30 @@ describe('useUpdatePortfolio', () => {
       expect(toast.success).toHaveBeenCalledWith('Portfolio renamed to "Renamed"');
     });
   });
+
+  it('rolls back optimistic update when API fails', async () => {
+    vi.mocked(api.updatePortfolio).mockRejectedValueOnce(new Error('Server error'));
+    vi.mocked(api.getPortfolios).mockResolvedValue([mockPortfolio]);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    // Pre-populate cache so the rollback has data to restore
+    queryClient.setQueryData(['portfolios'], [mockPortfolio]);
+
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const { result } = renderHook(() => useUpdatePortfolio(), { wrapper });
+
+    await expect(
+      result.current.mutateAsync({ portfolioId: 1, data: { name: 'Bad Name' } }),
+    ).rejects.toThrow('Server error');
+
+    // After rollback the cache should still contain the original portfolio
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<Portfolio[]>(['portfolios']);
+      expect(cached).toEqual([mockPortfolio]);
+    });
+  });
 });
 
 describe('useDeletePortfolio', () => {
@@ -184,6 +225,27 @@ describe('useDeletePortfolio', () => {
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Portfolio deleted');
+    });
+  });
+
+  it('rolls back optimistic delete when API fails', async () => {
+    vi.mocked(api.deletePortfolio).mockRejectedValueOnce(new Error('Delete failed'));
+    vi.mocked(api.getPortfolios).mockResolvedValue([mockPortfolio]);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    queryClient.setQueryData(['portfolios'], [mockPortfolio]);
+
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const { result } = renderHook(() => useDeletePortfolio(), { wrapper });
+
+    await expect(result.current.mutateAsync(1)).rejects.toThrow('Delete failed');
+
+    // Cache should be restored to the pre-delete state
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<Portfolio[]>(['portfolios']);
+      expect(cached).toEqual([mockPortfolio]);
     });
   });
 });

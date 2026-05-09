@@ -261,6 +261,7 @@ export const PortfolioStatusContent = ({
         <CollapsibleSection
           title={t('status.realizedGains')}
           secondary={`(${t('status.realizedGainsMethod')})`}
+          defaultOpen
         >
           <ErrorBoundary fullScreen={false}>
             <RealizedGainsTable realizedSales={status.realized_sales} locale={locale} />
@@ -269,7 +270,7 @@ export const PortfolioStatusContent = ({
       )}
 
       {status.dividends_received.length > 0 && (
-        <CollapsibleSection title={t('status.dividendsReceived')}>
+        <CollapsibleSection title={t('status.dividendsReceived')} defaultOpen>
           <ErrorBoundary fullScreen={false}>
             <DividendsReceivedTable
               dividendsReceived={status.dividends_received}
@@ -281,7 +282,7 @@ export const PortfolioStatusContent = ({
       )}
 
       {status.realized_withdrawals.length > 0 && (
-        <CollapsibleSection title={t('status.withdrawals')}>
+        <CollapsibleSection title={t('status.withdrawals')} defaultOpen>
           <ErrorBoundary fullScreen={false}>
             <WithdrawalsTable
               realizedWithdrawals={status.realized_withdrawals}

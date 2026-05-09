@@ -143,4 +143,36 @@ describe('useDerivedReturns annualization', () => {
     const expected = (Math.pow(1.1, 365 / 183) - 1) * 100;
     expect(result.current.annualizedReturn).toBeCloseTo(expected, 4);
   });
+
+  it('annualizes correctly in EUR mode using FX-adjusted return', () => {
+    // EUR mode: findStartIdx checks (return_pct != null && fx_rate != null)
+    const perf = makePerformance([
+      point({ date: '2024-01-01', return_pct: 0, fx_rate: 0.9 }),
+      point({ date: '2024-12-31', return_pct: 10, fx_rate: 0.95 }),
+    ]);
+    const { result } = renderHook(() =>
+      useDerivedReturns(perf, status(0.95), true),
+    );
+    // EUR-adjusted lastReturnPct = (1.1 * 0.95 / 0.9 - 1) * 100 ≈ 16.11%
+    // Over 365 days: annualized ≈ 16.11%
+    expect(result.current.annualizedReturn).not.toBeNull();
+    expect(result.current.annualizedReturn!).toBeCloseTo(
+      (Math.pow(1 + ((1.1 * 0.95) / 0.9 - 1), 365 / 365) - 1) * 100,
+      4,
+    );
+  });
+
+  it('skips points without fx_rate when finding start index in EUR mode', () => {
+    // First point has no fx_rate, so findStartIdx should skip it
+    const perf = makePerformance([
+      point({ date: '2024-01-01', return_pct: 0, fx_rate: null }),
+      point({ date: '2024-03-01', return_pct: 3, fx_rate: 0.9 }),
+      point({ date: '2024-12-31', return_pct: 10, fx_rate: 0.95 }),
+    ]);
+    const { result } = renderHook(() =>
+      useDerivedReturns(perf, status(0.95), true),
+    );
+    // Should still compute a non-null value using the second point as start
+    expect(result.current.annualizedReturn).not.toBeNull();
+  });
 });

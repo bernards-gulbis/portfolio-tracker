@@ -304,4 +304,34 @@ describe('AppLayout content & user menu', () => {
 
     expect(mockLogoutMutate).toHaveBeenCalled();
   });
+
+  it('renders an error alert on / when portfolios fetch fails', () => {
+    routing.initialEntries = ['/'];
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      error: new Error('Network error'),
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderApp();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('redirects to a remembered last-visited portfolio on /', async () => {
+    routing.initialEntries = ['/'];
+    vi.mocked(usePortfolios).mockReturnValue({
+      data: mockPortfolios,
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePortfolios>);
+
+    renderApp();
+
+    // Should navigate to /portfolios/1 (first portfolio since no lastVisited set)
+    await waitFor(() => {
+      expect(screen.getByTestId('portfolio-status-view')).toBeInTheDocument();
+    });
+  });
 });

@@ -449,4 +449,130 @@ describe('PortfolioStatusView', () => {
 
     localStorage.removeItem('pt_currency');
   });
+
+  it('renders realized gains section when realized_sales is non-empty', () => {
+    const statusWithSales: PortfolioStatus = {
+      ...mockStatus,
+      realized_sales: [
+        {
+          ticker: 'AAPL',
+          date: '2024-06-01',
+          quantity: 5,
+          quantity_before: 10,
+          proceeds: 1000,
+          cost_basis: 750,
+          realized_gain: 250,
+          first_buy_date: '2024-01-01',
+        },
+      ],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: statusWithSales,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    renderComponent(1);
+
+    expect(screen.getAllByText('Realized Gains').length).toBeGreaterThan(0);
+  });
+
+  it('renders dividends received section when dividends_received is non-empty', () => {
+    const statusWithDividends: PortfolioStatus = {
+      ...mockStatus,
+      dividends: 50,
+      dividends_received: [
+        { ticker: 'AAPL', date: '2024-03-15', amount: 50, amount_eur: 46 },
+      ],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: statusWithDividends,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    renderComponent(1);
+
+    expect(screen.getAllByText('Dividends Received').length).toBeGreaterThan(0);
+  });
+
+  it('renders withdrawals section when realized_withdrawals is non-empty', () => {
+    const statusWithWithdrawals: PortfolioStatus = {
+      ...mockStatus,
+      realized_withdrawals: [
+        {
+          date: '2024-09-01',
+          amount: 2000,
+          amount_eur_avg: 1840,
+          amount_eur: 1840,
+          realized_fx_gain: 0,
+        },
+      ],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: statusWithWithdrawals,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    renderComponent(1);
+
+    expect(screen.getAllByText('Withdrawals & Taxes').length).toBeGreaterThan(0);
+  });
+
+  it('navigates to transactions when EurIncompleteBanner "Fix transactions" is clicked', async () => {
+    const eurIncompleteStatus: PortfolioStatus = {
+      ...mockStatus,
+      eur_incomplete: true,
+      fx_missing_tx_ids: [1, 2],
+    };
+
+    vi.mocked(usePortfolioStatus).mockReturnValue({
+      data: eurIncompleteStatus,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+    } as unknown as ReturnType<typeof usePortfolioStatus>);
+
+    vi.mocked(useLivePrices).mockReturnValue({
+      data: mockLivePrices.data,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      error: null,
+    } as unknown as ReturnType<typeof useLivePrices>);
+
+    renderComponent(1);
+
+    const goToTxButton = screen.getByRole('button', { name: /fix transactions/i });
+    fireEvent.click(goToTxButton);
+
+    expect(navigateMock).toHaveBeenCalledWith('/portfolios/1/transactions');
+  });
 });
