@@ -17,6 +17,7 @@ function holding(overrides: Partial<PricedHolding> = {}): PricedHolding {
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: '2026-04-22T09:00:00Z',
+    previous_close: null,
     ...overrides,
   };
 }
@@ -134,6 +135,66 @@ describe('HoldingsTable — price source UI', () => {
     expect(
       within(aaplCell as HTMLElement).queryByLabelText(/Last known price/),
     ).toBeNull();
+  });
+
+  it('renders the Today column with day-over-day change when previous_close is set', () => {
+    render(
+      <HoldingsTable
+        holdings={[
+          holding({
+            ticker: 'AAPL',
+            current_price: 200,
+            previous_close: 195,
+            quantity: 10,
+          }),
+        ]}
+        missingPrices={[]}
+        {...defaultProps}
+      />,
+    );
+
+    // Day change = (200 − 195) × 10 = +$50, +2.56% — both should appear.
+    expect(screen.getByText(/\+\$50\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/▲2\.56%/)).toBeInTheDocument();
+  });
+
+  it('renders an em-dash in the Today column when previous_close is null', () => {
+    render(
+      <HoldingsTable
+        holdings={[
+          holding({ ticker: 'TWTR', previous_close: null }),
+        ]}
+        missingPrices={[]}
+        {...defaultProps}
+      />,
+    );
+
+    // Several "—" cells exist (Today, plus Cash row stubs); just confirm at least one.
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('renders a % of Portfolio column whose values sum to 100', () => {
+    render(
+      <HoldingsTable
+        holdings={[
+          holding({ ticker: 'AAPL', current_value: 3_000, quantity: 10 }),
+          holding({ ticker: 'MSFT', current_value: 6_000, quantity: 20 }),
+        ]}
+        cash={1_000}
+        displayCurrency="USD"
+        showEur={false}
+        eurMetrics={null}
+        locale="en-US"
+        missingPrices={[]}
+      />,
+    );
+
+    // Total market value = 1,000 (cash) + 3,000 + 6,000 = 10,000.
+    // CASH weight = 10.0%, AAPL = 30.0%, MSFT = 60.0%. Total row reads 100.0%.
+    expect(screen.getByText('10.0%')).toBeInTheDocument();
+    expect(screen.getByText('30.0%')).toBeInTheDocument();
+    expect(screen.getByText('60.0%')).toBeInTheDocument();
+    expect(screen.getByText('100.0%')).toBeInTheDocument();
   });
 
   it('still shows the destructive missing-prices banner alongside a stale banner', () => {

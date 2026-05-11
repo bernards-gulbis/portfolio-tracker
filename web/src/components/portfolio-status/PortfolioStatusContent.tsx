@@ -1,23 +1,22 @@
 import React, { useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-import {
-  formatCurrency,
-  formatSignedCurrency,
-  formatSignedPercent,
-  getValueClass,
-  formatTaxRatePercent,
-} from '../../utils/formatters';
+import { formatSignedCurrency, getValueClass } from '../../utils/formatters';
+import type { Currency } from '../../hooks/useCurrencyPreference';
 import { useLocale } from '../../hooks/useLocale';
 import { useCurrencyPreference } from '../../hooks/useCurrencyPreference';
-import { computeEurMetrics } from '../../utils/eurMetrics';
+import {
+  computeEurMetrics,
+  dayChangeFromHoldings,
+  vsSpPoints,
+} from '../../utils/eurMetrics';
 import {
   getErrorMessage,
   type PerformanceDataPoint,
@@ -34,11 +33,10 @@ import { useDismissedCostBasisWarning } from '../../hooks/useDismissedCostBasisW
 
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
+import { HeroPortfolioCard } from './HeroPortfolioCard';
 import { InfoBanner } from './InfoBanner';
-import { StatCard } from './StatCard';
 import { WarningsAlert } from './WarningsAlert';
 import { computeDisplayFigures } from './displayFigures';
-import { formatCurrencyWithPercent } from './formatCurrencyWithPercent';
 import { useDerivedReturns } from './useDerivedReturns';
 
 const PerformanceChart = lazy(() =>
@@ -50,6 +48,30 @@ const HoldingsAllocationChart = lazy(() =>
 
 const EMPTY_DATA_POINTS: PerformanceDataPoint[] = [];
 const chartFallback = <Skeleton className="h-[340px] w-full rounded-lg" />;
+
+const renderCountTotal = (
+  total: number,
+  count: number,
+  i18nKey: string,
+  t: TFunction,
+  currency: Currency,
+  locale: string,
+): React.ReactNode => {
+  // ``t`` carries the strict translation-key union from i18next's typegen, so a
+  // dynamic ``status.foo`` literal won't satisfy it. The cast trades that
+  // safety for the ability to pass interpolated section-summary keys through a
+  // shared helper — same pattern used in ``WarningsAlert``.
+  const tDynamic = t as unknown as (
+    key: string,
+    opts?: { total: string; count: number },
+  ) => string;
+  const totalText = formatSignedCurrency(total, currency, locale);
+  return (
+    <span className={getValueClass(total)}>
+      {tDynamic(i18nKey, { total: totalText, count })}
+    </span>
+  );
+};
 
 export interface PortfolioStatusContentProps {
   status: PricedPortfolioStatus;
@@ -101,6 +123,32 @@ export const PortfolioStatusContent = ({
       performance?.cost_basis_fallback_tickers ?? [],
     );
 
+  const eurRate = eur?.rate ?? null;
+
+  // Day change is computed from holdings in their native USD; convert the
+  // absolute delta to EUR when EUR is the active display, but keep the % as-is
+  // (rate cancels out).
+  const dayChange = useMemo(() => {
+    const usdDayChange = dayChangeFromHoldings(status.holdings);
+    if (usdDayChange == null) return null;
+    if (currency === 'USD' || eurRate == null) return usdDayChange;
+    return { ...usdDayChange, usd: usdDayChange.usd * eurRate };
+  }, [status.holdings, currency, eurRate]);
+
+  // Counts and totals for the collapsed-section header summaries.
+  const realizedGainsTotal = useMemo(
+    () => status.realized_sales.reduce((sum, s) => sum + s.realized_gain, 0),
+    [status.realized_sales],
+  );
+  const dividendsTotal = useMemo(
+    () => status.dividends_received.reduce((sum, d) => sum + d.amount, 0),
+    [status.dividends_received],
+  );
+  const withdrawalsTotal = useMemo(
+    () => status.realized_withdrawals.reduce((sum, w) => sum + w.amount, 0),
+    [status.realized_withdrawals],
+  );
+
   if (isEmptyPortfolio) {
     return (
       <Card>
@@ -126,43 +174,45 @@ export const PortfolioStatusContent = ({
     );
   }
 
-  const { netInvested, totalReturn, estimatedTax, afterTaxValue, fxImpact, fxImpactPct } =
-    computeDisplayFigures(status, eur, currency);
-  const eurRate = eur?.rate ?? null;
+  const {
+    totalValue,
+    netInvested,
+    totalReturn,
+    estimatedTax,
+    afterTaxValue,
+    fxImpact,
+    fxImpactPct,
+  } = computeDisplayFigures(status, eur, currency);
 
-  const fxCaption = fxImpact == null ? undefined : (
-    <p className={getValueClass(fxImpact)}>
-      {formatCurrencyWithPercent(fxImpact, fxImpactPct, 'EUR', locale)}
-      <span className="text-muted-foreground ml-1">{t('status.fxImpact')}</span>
-    </p>
+  const latestDataPoint = performance?.data_points.at(-1);
+  const vsSpPts = vsSpPoints(latestDataPoint);
+
+  // Dividends and withdrawals are tracked in USD on the backend; the EUR figure
+  // would require historical FX rates per row which the section tables already
+  // surface, so summary chips display USD totals.
+  const realizedSummary = renderCountTotal(
+    realizedGainsTotal,
+    status.realized_sales.length,
+    'status.realizedGainsSummary',
+    t,
+    'USD',
+    locale,
   );
-
-  const annualizedCaption = annualizedReturn == null ? undefined : (
-    <p className={`${getValueClass(annualizedReturn)} font-medium`}>
-      {formatSignedPercent(annualizedReturn)} {t('status.annualized').toLowerCase()}
-    </p>
+  const dividendsSummary = renderCountTotal(
+    dividendsTotal,
+    status.dividends_received.length,
+    'status.dividendsSummary',
+    t,
+    'USD',
+    locale,
   );
-
-  const taxCaption = estimatedTax == null ? undefined : (
-    <p className="text-muted-foreground inline-flex items-center gap-1">
-      <span>
-        {t('status.estTax', { rate: formatTaxRatePercent(status.capital_gains_tax_rate) })}: −
-        {formatCurrency(estimatedTax, currency, locale)}
-      </span>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <InfoIcon
-              aria-label={t('status.estTaxFlatTooltip')}
-              className="h-3.5 w-3.5 text-muted-foreground cursor-help"
-            />
-          </TooltipTrigger>
-          <TooltipContent className="max-w-72">
-            <p>{t('status.estTaxFlatTooltip')}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </p>
+  const withdrawalsSummary = renderCountTotal(
+    -Math.abs(withdrawalsTotal),
+    status.realized_withdrawals.length,
+    'status.withdrawalsSummary',
+    t,
+    'USD',
+    locale,
   );
 
   return (
@@ -180,23 +230,21 @@ export const PortfolioStatusContent = ({
 
       <WarningsAlert warnings={status.warnings} locale={locale} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          label={t('status.netInvested')}
-          value={netInvested == null ? '-' : formatCurrency(netInvested, currency, locale)}
-          caption={fxCaption}
-        />
-        <StatCard
-          label={t('status.totalReturn')}
-          value={totalReturn == null ? '-' : formatSignedCurrency(totalReturn, currency, locale)}
-          caption={annualizedCaption}
-        />
-        <StatCard
-          label={t('status.afterTaxValue')}
-          value={afterTaxValue == null ? '-' : formatCurrency(afterTaxValue, currency, locale)}
-          caption={taxCaption}
-        />
-      </div>
+      <HeroPortfolioCard
+        portfolioValue={totalValue}
+        displayCurrency={currency}
+        locale={locale}
+        dayChange={dayChange}
+        netInvested={netInvested}
+        totalReturn={totalReturn}
+        annualizedReturn={annualizedReturn}
+        vsSpPts={vsSpPts}
+        afterTaxValue={afterTaxValue}
+        estimatedTax={estimatedTax}
+        taxRate={status.capital_gains_tax_rate}
+        fxImpact={fxImpact}
+        fxImpactPct={fxImpactPct}
+      />
 
       {showCostBasisWarning && (
         <InfoBanner onDismiss={dismissCostBasisWarning}>
@@ -243,7 +291,17 @@ export const PortfolioStatusContent = ({
         </ErrorBoundary>
       </div>
 
-      <CollapsibleSection title={t('status.positions')} defaultOpen>
+      <CollapsibleSection
+        title={t('status.positions')}
+        summary={t('status.holdingsCount', {
+          count: status.holdings.length,
+          total:
+            totalValue == null
+              ? '—'
+              : formatSignedCurrency(totalValue, currency, locale).replace(/^[+]/, ''),
+        })}
+        defaultOpen
+      >
         <ErrorBoundary fullScreen={false}>
           <HoldingsTable
             holdings={status.holdings}
@@ -261,6 +319,7 @@ export const PortfolioStatusContent = ({
         <CollapsibleSection
           title={t('status.realizedGains')}
           secondary={`(${t('status.realizedGainsMethod')})`}
+          summary={realizedSummary}
           defaultOpen
         >
           <ErrorBoundary fullScreen={false}>
@@ -270,7 +329,11 @@ export const PortfolioStatusContent = ({
       )}
 
       {status.dividends_received.length > 0 && (
-        <CollapsibleSection title={t('status.dividendsReceived')} defaultOpen>
+        <CollapsibleSection
+          title={t('status.dividendsReceived')}
+          summary={dividendsSummary}
+          defaultOpen
+        >
           <ErrorBoundary fullScreen={false}>
             <DividendsReceivedTable
               dividendsReceived={status.dividends_received}
@@ -282,7 +345,11 @@ export const PortfolioStatusContent = ({
       )}
 
       {status.realized_withdrawals.length > 0 && (
-        <CollapsibleSection title={t('status.withdrawals')} defaultOpen>
+        <CollapsibleSection
+          title={t('status.withdrawals')}
+          summary={withdrawalsSummary}
+          defaultOpen
+        >
           <ErrorBoundary fullScreen={false}>
             <WithdrawalsTable
               realizedWithdrawals={status.realized_withdrawals}

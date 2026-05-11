@@ -79,33 +79,38 @@ async def get_live_prices(
             status_code=400,
             detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
         )
-    # ``LivePriceService.get_current_prices`` catches its own per-ticker
-    # exceptions and returns ``None`` for failed lookups, so the only paths
-    # that escape here are programming errors (e.g. a misconfigured
+    # ``LivePriceService.get_current_quotes`` catches its own per-ticker
+    # exceptions and returns ``Quote(None, None)`` for failed lookups, so the
+    # only paths that escape here are programming errors (e.g. a misconfigured
     # ThreadPoolExecutor). Catching ``RuntimeError`` keeps the response
     # alive for those rare cases without swallowing genuine bugs that should
     # surface as 500s during development.
     #
-    # ``LivePriceService.get_current_prices`` blocks (yfinance + thread pool);
+    # ``LivePriceService.get_current_quotes`` blocks (yfinance + thread pool);
     # offload to a worker thread so the asyncio event loop stays free for
     # other concurrent requests.
     try:
-        live_prices = (
-            await asyncio.to_thread(LivePriceService.get_current_prices, tickers)
+        live_quotes = (
+            await asyncio.to_thread(LivePriceService.get_current_quotes, tickers)
             if tickers
             else {}
         )
     except RuntimeError as e:
         logger.error("Live price fetch infrastructure error: %s", e, exc_info=True)
-        live_prices = dict.fromkeys(tickers)
+        live_quotes = {}
 
     now = datetime.now(UTC)
     prices: dict[str, LivePriceInfo] = {}
     fallback_tickers: list[str] = []
     for ticker in tickers:
-        live = live_prices.get(ticker)
-        if live is not None and live > 0:
-            prices[ticker] = LivePriceInfo(price=float(live), source="live", as_of=now)
+        quote = live_quotes.get(ticker)
+        if quote is not None and quote.price is not None and quote.price > 0:
+            prices[ticker] = LivePriceInfo(
+                price=float(quote.price),
+                source="live",
+                as_of=now,
+                previous_close=quote.previous_close,
+            )
         else:
             fallback_tickers.append(ticker)
 

@@ -1,0 +1,163 @@
+import { useTranslation } from 'react-i18next';
+
+import { Card, CardContent } from '@/components/ui/card';
+
+import type { Currency } from '../../hooks/useCurrencyPreference';
+import type { DayChange } from '../../utils/eurMetrics';
+import {
+  formatCurrency,
+  formatSignedCurrency,
+  formatSignedPercent,
+  formatTaxRatePercent,
+  getValueClass,
+} from '../../utils/formatters';
+
+import { formatCurrencyWithPercent } from './formatCurrencyWithPercent';
+import { KpiTile } from './KpiTile';
+
+export interface HeroPortfolioCardProps {
+  portfolioValue: number | null;
+  displayCurrency: Currency;
+  locale: string;
+  /** Aggregated day-over-day change from per-holding prior closes; null when unavailable. */
+  dayChange: DayChange | null;
+  netInvested: number | null;
+  totalReturn: number | null;
+  /** Annualized TWR, null when the series is too short to annualize. */
+  annualizedReturn: number | null;
+  /** Portfolio TWR minus S&P 500 return in percentage points. */
+  vsSpPts: number | null;
+  afterTaxValue: number | null;
+  estimatedTax: number | null;
+  taxRate: number;
+  /** Only set in EUR display mode. */
+  fxImpact: number | null;
+  fxImpactPct: number | null;
+}
+
+const valueOrDash = (n: number | null, fmt: (v: number) => string): string =>
+  n == null ? '—' : fmt(n);
+
+export const HeroPortfolioCard = ({
+  portfolioValue,
+  displayCurrency,
+  locale,
+  dayChange,
+  netInvested,
+  totalReturn,
+  annualizedReturn,
+  vsSpPts,
+  afterTaxValue,
+  estimatedTax,
+  taxRate,
+  fxImpact,
+  fxImpactPct,
+}: HeroPortfolioCardProps) => {
+  const { t } = useTranslation();
+
+  const valueLabel = t('status.portfolioValue');
+  const valueText = valueOrDash(portfolioValue, (v) =>
+    formatCurrency(v, displayCurrency, locale),
+  );
+
+  const dayChangeLine = (() => {
+    if (dayChange == null) return null;
+    return (
+      <div className="flex items-baseline gap-2 text-sm">
+        <span className={`font-semibold tabular-nums ${getValueClass(dayChange.usd)}`}>
+          {formatCurrencyWithPercent(dayChange.usd, dayChange.pct, displayCurrency, locale)}
+        </span>
+        <span className="text-muted-foreground">{t('status.today')}</span>
+        {dayChange.partial && (
+          <span
+            className="text-xs text-muted-foreground"
+            title={t('status.dayChangePartialNote')}
+          >
+            *
+          </span>
+        )}
+      </div>
+    );
+  })();
+
+  // FX caption (EUR display only)
+  const fxCaption =
+    fxImpact == null ? undefined : (
+      <p className={getValueClass(fxImpact)}>
+        {formatCurrencyWithPercent(fxImpact, fxImpactPct, 'EUR', locale)}
+        <span className="text-muted-foreground ml-1">{t('status.fxImpact')}</span>
+      </p>
+    );
+
+  const annualizedCaption =
+    annualizedReturn == null ? undefined : (
+      <p className={`${getValueClass(annualizedReturn)} font-medium`}>
+        {formatSignedPercent(annualizedReturn)}{' '}
+        <span className="text-muted-foreground">{t('status.annualized').toLowerCase()}</span>
+      </p>
+    );
+
+  const vsSpCaption =
+    vsSpPts == null ? undefined : (
+      <p className={`${getValueClass(vsSpPts)} font-medium`}>
+        {vsSpPts >= 0 ? t('status.outperform') : t('status.underperform')}
+      </p>
+    );
+  const vsSpValue =
+    vsSpPts == null
+      ? '—'
+      : `${vsSpPts >= 0 ? '+' : '−'}${Math.abs(vsSpPts).toFixed(2)} ${t('status.points')}`;
+
+  const taxCaption =
+    estimatedTax == null ? undefined : (
+      <p className="text-muted-foreground">
+        {t('status.estTax', { rate: formatTaxRatePercent(taxRate) })}: −
+        {formatCurrency(estimatedTax, displayCurrency, locale)}
+      </p>
+    );
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium text-muted-foreground">{valueLabel}</p>
+          <p className="text-3xl sm:text-4xl font-bold tracking-tight tabular-nums">{valueText}</p>
+          {dayChangeLine}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 border-t pt-4">
+          <KpiTile
+            label={t('status.netInvested')}
+            value={valueOrDash(netInvested, (v) =>
+              formatCurrency(v, displayCurrency, locale),
+            )}
+            caption={fxCaption}
+          />
+          <KpiTile
+            label={t('status.totalReturn')}
+            value={valueOrDash(totalReturn, (v) =>
+              formatSignedCurrency(v, displayCurrency, locale),
+            )}
+            valueClass={totalReturn == null ? undefined : getValueClass(totalReturn)}
+            caption={annualizedCaption}
+          />
+          <KpiTile
+            label={t('status.vsSp500')}
+            value={vsSpValue}
+            valueClass={vsSpPts == null ? undefined : getValueClass(vsSpPts)}
+            caption={vsSpCaption}
+          />
+          <KpiTile
+            label={t('status.afterTaxValue')}
+            value={valueOrDash(afterTaxValue, (v) =>
+              formatCurrency(v, displayCurrency, locale),
+            )}
+            caption={taxCaption}
+            tooltip={
+              <p>{t('status.afterTaxTooltip', { rate: formatTaxRatePercent(taxRate) })}</p>
+            }
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

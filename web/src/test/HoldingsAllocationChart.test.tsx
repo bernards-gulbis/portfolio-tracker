@@ -16,6 +16,7 @@ const mockHoldings: PricedHolding[] = [
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: null,
+    previous_close: null,
   },
   {
     ticker: 'MSFT',
@@ -29,6 +30,7 @@ const mockHoldings: PricedHolding[] = [
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: null,
+    previous_close: null,
   },
 ];
 
@@ -45,6 +47,7 @@ const mockHoldingsEur: PricedHolding[] = [
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: null,
+    previous_close: null,
   },
 ];
 
@@ -76,6 +79,7 @@ describe('HoldingsAllocationChart', () => {
         unrealized_gain_loss_pct: null,
         price_source: 'missing',
         price_as_of: null,
+        previous_close: null,
       },
     ];
     render(<HoldingsAllocationChart holdings={holdingsNoValue} cash={0} isLoading={false} />);

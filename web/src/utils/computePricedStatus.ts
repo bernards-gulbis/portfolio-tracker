@@ -18,6 +18,7 @@ const unpriced = (
   unrealized_gain_loss_pct: null,
   price_source: source,
   price_as_of: asOf,
+  previous_close: null,
 });
 
 /**
@@ -43,6 +44,7 @@ export const computePricedStatus = (
     const price = info?.price ?? null;
     const source = info?.source ?? 'missing';
     const asOf = info?.as_of ?? null;
+    const previousClose = info?.previous_close ?? null;
 
     if (price == null) {
       missingPrices.push(h.ticker);
@@ -60,6 +62,7 @@ export const computePricedStatus = (
         h.total_cost === 0 ? null : (unrealizedGainLoss / h.total_cost) * 100,
       price_source: source,
       price_as_of: asOf,
+      previous_close: previousClose,
     };
   });
 

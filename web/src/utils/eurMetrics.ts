@@ -1,4 +1,9 @@
-import type { PricedHolding, PricedPortfolioStatus, WithdrawalFx } from '../api';
+import type {
+  PerformanceDataPoint,
+  PricedHolding,
+  PricedPortfolioStatus,
+  WithdrawalFx,
+} from '../api';
 
 export interface EurMetrics {
   rate: number;
@@ -122,3 +127,62 @@ export const applyRateToHolding = (holding: PricedHolding, rate: number): Holdin
   unrealizedGainLossEur:
     holding.unrealized_gain_loss == null ? null : holding.unrealized_gain_loss * rate,
 });
+
+export interface DayChange {
+  /** Sum of (current_price - previous_close) × quantity across holdings with both prices. */
+  usd: number;
+  /** Day change ÷ Σ(previous_close × quantity), in percent. ``null`` when denominator is zero. */
+  pct: number | null;
+  /** True when at least one holding's previous_close was missing — UI may want to caveat. */
+  partial: boolean;
+}
+
+/**
+ * Aggregate day-over-day change from per-holding (current_price, previous_close) pairs.
+ *
+ * Holdings without a ``previous_close`` are excluded from both numerator and denominator
+ * rather than zero-substituted — a delisted ticker has no notion of "yesterday" and
+ * folding it in as a zero-change would understate the percentage. ``partial`` lets the
+ * UI surface a footnote when the result excluded some holdings.
+ *
+ * Cash is intentionally absent: cash has no day change, so adding it to the denominator
+ * would shrink the percentage artificially.
+ */
+export const dayChangeFromHoldings = (holdings: PricedHolding[]): DayChange | null => {
+  let numerator = 0;
+  let denominator = 0;
+  let counted = 0;
+  let skipped = 0;
+
+  for (const h of holdings) {
+    if (h.current_price == null || h.previous_close == null) {
+      if (h.quantity > 0) skipped += 1;
+      continue;
+    }
+    numerator += (h.current_price - h.previous_close) * h.quantity;
+    denominator += h.previous_close * h.quantity;
+    counted += 1;
+  }
+
+  if (counted === 0) return null;
+
+  return {
+    usd: numerator,
+    pct: denominator > 0 ? (numerator / denominator) * 100 : null,
+    partial: skipped > 0,
+  };
+};
+
+/**
+ * Compute the "vs S&P 500" KPI in percentage points from the latest performance point.
+ *
+ * Returns the difference between the portfolio's time-weighted return and the S&P 500's
+ * return as a points spread (e.g. ``+12.4`` means the portfolio is 12.4 pts ahead of the
+ * benchmark). Returns ``null`` when either side is missing, so the UI renders "—"
+ * instead of a misleading zero.
+ */
+export const vsSpPoints = (latest: PerformanceDataPoint | undefined): number | null => {
+  if (!latest) return null;
+  if (latest.return_pct == null || latest.sp500_return_pct == null) return null;
+  return latest.return_pct - latest.sp500_return_pct;
+};

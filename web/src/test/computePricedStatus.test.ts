@@ -29,8 +29,12 @@ const makeStatus = (overrides: Partial<PortfolioStatus> = {}): PortfolioStatus =
   ...overrides,
 });
 
-const live = (price: number | null, source: 'live' | 'last_known' | 'missing' = 'live') =>
-  ({ price, source, as_of: price == null ? null : '2026-03-03T12:00:00Z' });
+const live = (price: number | null, source: 'live' | 'last_known' | 'missing' = 'live') => ({
+  price,
+  source,
+  as_of: price == null ? null : '2026-03-03T12:00:00Z',
+  previous_close: price == null ? null : price,
+});
 
 const makeLivePrices = (overrides: Partial<LivePrices> = {}): LivePrices => ({
   prices: { AAPL: live(210), MSFT: live(420) },

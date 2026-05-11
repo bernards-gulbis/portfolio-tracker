@@ -341,6 +341,12 @@ class LivePriceInfo(BaseModel):
     from the "no data at all" case (``missing``). ``as_of`` is the timestamp
     of the price — now for live, the cached date for last_known, None for missing.
 
+    ``previous_close`` is the prior trading day's close, populated alongside
+    a fresh live fetch so the UI can render a day-over-day change. ``None``
+    for ``last_known`` (the stale row has no notion of yesterday) and
+    ``missing`` (no data at all). The frontend treats absence as "no day
+    change available" and renders a neutral dash rather than a synthetic zero.
+
     Invariants:
       * ``price is None`` iff ``source == 'missing'``.
       * ``as_of is None`` iff ``source == 'missing'``. A priced result always
@@ -350,6 +356,7 @@ class LivePriceInfo(BaseModel):
     price: float | None = None
     source: PriceSource = "missing"
     as_of: datetime | None = None
+    previous_close: float | None = None
 
     @model_validator(mode="after")
     def _source_invariants(self) -> "LivePriceInfo":
@@ -361,6 +368,10 @@ class LivePriceInfo(BaseModel):
             if self.as_of is not None:
                 raise ValueError(
                     "LivePriceInfo with source='missing' must have as_of=None"
+                )
+            if self.previous_close is not None:
+                raise ValueError(
+                    "LivePriceInfo with source='missing' must have previous_close=None"
                 )
         else:
             if self.price is None:

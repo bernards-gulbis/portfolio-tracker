@@ -8,6 +8,7 @@ const point = (over: Partial<ChartDataPoint>): ChartDataPoint => ({
   currentValue: null,
   returnPct: null,
   sp500ReturnPct: null,
+  sp500Value: null,
   ...over,
 });
 

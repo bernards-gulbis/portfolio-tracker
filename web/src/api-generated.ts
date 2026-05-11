@@ -705,6 +705,12 @@ export interface components {
          *     from the "no data at all" case (``missing``). ``as_of`` is the timestamp
          *     of the price — now for live, the cached date for last_known, None for missing.
          *
+         *     ``previous_close`` is the prior trading day's close, populated alongside
+         *     a fresh live fetch so the UI can render a day-over-day change. ``None``
+         *     for ``last_known`` (the stale row has no notion of yesterday) and
+         *     ``missing`` (no data at all). The frontend treats absence as "no day
+         *     change available" and renders a neutral dash rather than a synthetic zero.
+         *
          *     Invariants:
          *       * ``price is None`` iff ``source == 'missing'``.
          *       * ``as_of is None`` iff ``source == 'missing'``. A priced result always
@@ -713,6 +719,8 @@ export interface components {
         LivePriceInfo: {
             /** As Of */
             as_of?: string | null;
+            /** Previous Close */
+            previous_close?: number | null;
             /** Price */
             price?: number | null;
             /**

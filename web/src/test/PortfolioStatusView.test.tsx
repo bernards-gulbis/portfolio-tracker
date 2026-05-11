@@ -420,8 +420,9 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    // Null monetary values (market value, dividends, tax, after-tax) render as '-'
-    const dashes = screen.getAllByText('-');
+    // Null monetary values (market value, dividends, tax, after-tax) render as
+    // em-dash '—' from the redesigned hero card / positions table.
+    const dashes = screen.getAllByText('—');
     expect(dashes.length).toBeGreaterThanOrEqual(3);
   });
 

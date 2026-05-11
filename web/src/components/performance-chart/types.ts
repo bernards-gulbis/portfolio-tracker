@@ -22,6 +22,10 @@ export interface ChartDataPoint {
   currentValue: number | null;
   returnPct: number | null;
   sp500ReturnPct: number | null;
+  /** Synthesized S&P 500 value series (value mode): ``principal × (1 + sp500_return_pct/100)``.
+   *  Shows what the user's net deposits would be worth under a passive S&P 500 investment.
+   *  Null when ``sp500_return_pct`` or ``principal`` is missing for the point. */
+  sp500Value: number | null;
 }
 
 /** Header display values for value mode. */

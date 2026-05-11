@@ -113,6 +113,18 @@ export const PerformanceChartCanvas = ({
             connectNulls
           />
         )}
+        {viewMode === 'value' && (
+          <Line
+            type="monotone"
+            dataKey="sp500Value"
+            stroke="var(--color-sp500ReturnPct)"
+            strokeWidth={1.5}
+            strokeDasharray="5 3"
+            dot={false}
+            activeDot={ACTIVE_DOT_SP500}
+            connectNulls
+          />
+        )}
         {viewMode !== 'value' && (
           <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
         )}

@@ -110,6 +110,10 @@ export const PricedHoldingSchema = HoldingSchema.extend({
   unrealized_gain_loss_pct: z.number().nullable(),
   price_source: PriceSourceSchema,
   price_as_of: z.string().nullable(),
+  // Prior trading day's close, used to render the day-over-day change in the
+  // Positions table and aggregated for the portfolio-level "Today" KPI.
+  // Null for ``last_known``/``missing`` sources or when the upstream omits it.
+  previous_close: z.number().nullable(),
 });
 export type PricedHolding = z.infer<typeof PricedHoldingSchema>;
 
@@ -222,6 +226,9 @@ const LivePriceInfoSchema = z.object({
   price: z.number().nullable(),
   source: PriceSourceSchema,
   as_of: z.string().nullable(),
+  // Prior trading day's close, populated alongside ``source === 'live'``.
+  // Defaults to null so older backends without the field still parse.
+  previous_close: z.number().nullable().default(null),
 });
 export type LivePriceInfo = z.infer<typeof LivePriceInfoSchema>;
 
