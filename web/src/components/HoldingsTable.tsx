@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   formatCurrency,
   formatSignedCurrency,
-  formatSignedPercent,
+  formatSignedPercentPlain,
   formatQuantity,
   getValueClass,
 } from '../utils/formatters';
@@ -49,13 +49,15 @@ const renderStackedSignedPair = (
 ) => {
   if (value == null) return <span>—</span>;
   const cls = getValueClass(value);
+  const arrow = value >= 0 ? '▲' : '▼';
   return (
     <div className="flex flex-col items-end">
       <span className={`font-semibold ${cls}`}>
+        <span className="mr-1">{arrow}</span>
         {formatSignedCurrency(value, currency, locale)}
       </span>
       {pct != null && (
-        <span className={`text-sm ${cls}`}>{formatSignedPercent(pct)}</span>
+        <span className={`text-sm ${cls}`}>{formatSignedPercentPlain(pct)}</span>
       )}
     </div>
   );
@@ -191,8 +193,8 @@ export const HoldingsTable = memo(
               <TableRow>
                 <TableHead>{t('status.columns.ticker')}</TableHead>
                 <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
-                <TableHead className="text-right">{t('status.columns.cost')}</TableHead>
-                <TableHead className="text-right">{t('chart.performance.currentValue')}</TableHead>
+                <TableHead className="text-right">{t('status.columns.avgCost')}</TableHead>
+                <TableHead className="text-right">{t('status.columns.last')}</TableHead>
                 <TableHead className="text-right">
                   {t('status.columns.marketValue')}
                 </TableHead>
@@ -202,16 +204,12 @@ export const HoldingsTable = memo(
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow key="CASH">
-                <TableCell className="font-semibold">CASH</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>
+              <TableRow key="CASH" className="text-muted-foreground hover:bg-muted/30 transition-colors">
+                <TableCell colSpan={4} className="italic">{t('status.cashRow')}</TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   {formatCurrency(cashDisplay, effectiveCurrency, locale)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">—</TableCell>
+                <TableCell colSpan={2} />
                 <TableCell className="text-right tabular-nums">
                   {cashWeight == null ? '—' : `${cashWeight.toFixed(1)}%`}
                 </TableCell>
@@ -224,7 +222,7 @@ export const HoldingsTable = memo(
                     : holding.current_value;
                 const weight = rowWeight(rowValueInDisplay);
                 return (
-                  <TableRow key={holding.ticker}>
+                  <TableRow key={holding.ticker} className="hover:bg-muted/30 transition-colors">
                     <TableCell className="font-semibold">
                       <span className="inline-flex items-center gap-1">
                         {holding.ticker}
@@ -293,10 +291,13 @@ export const HoldingsTable = memo(
                     '—'
                   ) : (
                     <div className="flex flex-col items-end">
-                      <span>{formatSignedCurrency(totalUnrealizedGL, effectiveCurrency, locale)}</span>
+                      <span>
+                        <span className="mr-1">{totalUnrealizedGL >= 0 ? '▲' : '▼'}</span>
+                        {formatSignedCurrency(totalUnrealizedGL, effectiveCurrency, locale)}
+                      </span>
                       {totalUnrealizedPct != null && (
-                        <span className={`text-sm ${getValueClass(totalUnrealizedGL)}`}>
-                          {formatSignedPercent(totalUnrealizedPct)}
+                        <span className="text-sm">
+                          {formatSignedPercentPlain(totalUnrealizedPct)}
                         </span>
                       )}
                     </div>

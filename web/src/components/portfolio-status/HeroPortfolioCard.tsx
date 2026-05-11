@@ -63,11 +63,11 @@ export const HeroPortfolioCard = ({
   const dayChangeLine = (() => {
     if (dayChange == null) return null;
     return (
-      <div className="flex items-baseline gap-2 text-sm">
+      <div className="flex items-baseline gap-2 text-base sm:text-lg">
         <span className={`font-semibold tabular-nums ${getValueClass(dayChange.usd)}`}>
           {formatCurrencyWithPercent(dayChange.usd, dayChange.pct, displayCurrency, locale)}
         </span>
-        <span className="text-muted-foreground">{t('status.today')}</span>
+        <span className="text-sm text-muted-foreground">{t('status.today')}</span>
         {dayChange.partial && (
           <span
             className="text-xs text-muted-foreground"
@@ -111,8 +111,7 @@ export const HeroPortfolioCard = ({
   const taxCaption =
     estimatedTax == null ? undefined : (
       <p className="text-muted-foreground">
-        {t('status.estTax', { rate: formatTaxRatePercent(taxRate) })}: −
-        {formatCurrency(estimatedTax, displayCurrency, locale)}
+        −{formatCurrency(estimatedTax, displayCurrency, locale)} {t('status.taxCaption')}
       </p>
     );
 
@@ -131,6 +130,7 @@ export const HeroPortfolioCard = ({
               formatCurrency(v, displayCurrency, locale),
             )}
             caption={fxCaption}
+            tooltip={<p>{t('status.netInvestedTooltip')}</p>}
           />
           <KpiTile
             label={t('status.totalReturn')}
@@ -145,6 +145,7 @@ export const HeroPortfolioCard = ({
             value={vsSpValue}
             valueClass={vsSpPts == null ? undefined : getValueClass(vsSpPts)}
             caption={vsSpCaption}
+            tooltip={<p>{t('status.vsSp500Tooltip')}</p>}
           />
           <KpiTile
             label={t('status.afterTaxValue')}

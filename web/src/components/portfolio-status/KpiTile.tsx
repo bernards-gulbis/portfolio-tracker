@@ -15,7 +15,7 @@ export interface KpiTileProps {
 
 export const KpiTile = ({ label, value, caption, tooltip, valueClass }: KpiTileProps) => {
   const labelNode = (
-    <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+    <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
       <span>{label}</span>
       {tooltip != null && (
         <TooltipProvider>

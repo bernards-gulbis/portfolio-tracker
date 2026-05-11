@@ -38,10 +38,22 @@ describe('HeroPortfolioCard', () => {
         dayChange={{ usd: 11_425.64, pct: 3.33, partial: false }}
       />,
     );
-    // Composed line: signed currency + signed percent + "today"
+    // Composed line: leading ▲ glyph + signed currency + plain signed percent + "today".
     expect(screen.getByText(/\+€11,425\.64/)).toBeInTheDocument();
-    expect(screen.getByText(/▲3\.33%/)).toBeInTheDocument();
+    expect(screen.getByText(/\+3\.33%/)).toBeInTheDocument();
     expect(screen.getByText('today')).toBeInTheDocument();
+    expect(screen.getAllByText('▲').length).toBeGreaterThan(0);
+  });
+
+  it('renders a leading ▼ glyph when day change is negative', () => {
+    render(
+      <HeroPortfolioCard
+        {...baseProps}
+        portfolioValue={354_059.87}
+        dayChange={{ usd: -123.45, pct: -0.5, partial: false }}
+      />,
+    );
+    expect(screen.getAllByText('▼').length).toBeGreaterThan(0);
   });
 
   it('shows an asterisk on the today line when day change is partial', () => {

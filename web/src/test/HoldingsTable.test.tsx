@@ -153,9 +153,11 @@ describe('HoldingsTable — price source UI', () => {
       />,
     );
 
-    // Day change = (200 − 195) × 10 = +$50, +2.56% — both should appear.
+    // Day change = (200 − 195) × 10 = +$50, +2.56%.
+    // Leading ▲ glyph sits on the top line; the bottom-line percent is plain.
     expect(screen.getByText(/\+\$50\.00/)).toBeInTheDocument();
-    expect(screen.getByText(/▲2\.56%/)).toBeInTheDocument();
+    expect(screen.getByText(/\+2\.56%/)).toBeInTheDocument();
+    expect(screen.getAllByText('▲').length).toBeGreaterThan(0);
   });
 
   it('renders an em-dash in the Today column when previous_close is null', () => {

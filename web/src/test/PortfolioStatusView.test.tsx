@@ -162,7 +162,7 @@ describe('PortfolioStatusView', () => {
     expect(screen.getAllByText('After-tax Value').length).toBeGreaterThan(0);
   });
 
-  it('renders CASH row in holdings table', () => {
+  it('renders Cash row in holdings table', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: mockStatus,
       isLoading: false,
@@ -171,7 +171,7 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getAllByText('CASH').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Cash').length).toBeGreaterThan(0);
   });
 
   it('renders ticker in holdings table', () => {

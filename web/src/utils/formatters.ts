@@ -41,9 +41,9 @@ const trimTrailingZeros = (s: string): string => {
   return s.slice(0, end);
 };
 
-/** Up to 8 decimals, trailing zeros stripped. */
+/** Up to 6 decimals, trailing zeros stripped. */
 export const formatQuantity = (value: number): string => {
-  return trimTrailingZeros(value.toFixed(8));
+  return trimTrailingZeros(value.toFixed(6));
 };
 
 /** Pass the locale returned by useLocale() for reactive formatting. */
@@ -70,6 +70,14 @@ export const formatDateCompact = (date: string, locale: string = 'en-US'): strin
 export const formatSignedPercent = (value: number | null | undefined): string => {
   if (value == null) return '-';
   const sign = value >= 0 ? '▲' : '▼';
+  return `${sign}${Math.abs(value).toFixed(2)}%`;
+};
+
+/** Percent value with +/- sign and no ▲/▼ glyph; '-' for null/undefined.
+ *  Pair with a leading arrow span when the caller renders a money/percent pair. */
+export const formatSignedPercentPlain = (value: number | null | undefined): string => {
+  if (value == null) return '-';
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
   return `${sign}${Math.abs(value).toFixed(2)}%`;
 };
 

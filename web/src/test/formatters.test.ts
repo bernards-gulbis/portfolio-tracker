@@ -159,13 +159,13 @@ describe('Formatters', () => {
       expect(formatQuantity(-2.25)).toBe('-2.25');
     });
 
-    it('keeps up to 8 decimals of precision', () => {
-      expect(formatQuantity(1.23456789)).toBe('1.23456789');
-      expect(formatQuantity(0.00000001)).toBe('0.00000001');
+    it('keeps up to 6 decimals of precision', () => {
+      expect(formatQuantity(1.234567)).toBe('1.234567');
+      expect(formatQuantity(0.000001)).toBe('0.000001');
     });
 
-    it('rounds to 8 decimals when input has more', () => {
-      expect(formatQuantity(1.123456789)).toBe('1.12345679');
+    it('rounds to 6 decimals when input has more', () => {
+      expect(formatQuantity(1.123456789)).toBe('1.123457');
     });
   });
 
