@@ -3,9 +3,8 @@ import React from 'react';
 import type { Currency } from '../../hooks/useCurrencyPreference';
 import { formatSignedCurrency, formatSignedPercentPlain } from '../../utils/formatters';
 
-/** Renders `▲ +€1,234  +3.33%`: leading arrow as the dominant glyph, signed money,
- *  signed percent without its own arrow. The arrow inherits the value's color via
- *  the caller's surrounding class (or the default positive/negative class here). */
+/** Uniform `gap-1.5` between arrow, money, and percent so spacing matches the
+ *  inline pair layout used in HoldingsTable rows. Arrow inherits the caller's color. */
 export const formatCurrencyWithPercent = (
   currencyValue: number | null | undefined,
   percentValue: number | null | undefined,
@@ -15,12 +14,12 @@ export const formatCurrencyWithPercent = (
   if (currencyValue == null) return '-';
   const arrow = currencyValue >= 0 ? '▲' : '▼';
   return (
-    <>
-      <span className="mr-1">{arrow}</span>
+    <span className="inline-flex items-baseline gap-1.5">
+      <span aria-hidden>{arrow}</span>
       <span>{formatSignedCurrency(currencyValue, currency, locale)}</span>
       {percentValue != null && (
-        <span className="ml-1.5">{formatSignedPercentPlain(percentValue)}</span>
+        <span>{formatSignedPercentPlain(percentValue)}</span>
       )}
-    </>
+    </span>
   );
 };

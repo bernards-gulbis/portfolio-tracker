@@ -3,7 +3,6 @@ import {
   formatCurrency,
   formatSignedCurrency,
   formatDateTime,
-  formatSignedPercent,
   formatSignedPp,
   formatRelativeTime,
   formatDaysHeld,
@@ -60,31 +59,6 @@ describe('Formatters', () => {
       const formatted = formatDateTime(date);
       expect(formatted).toContain('Dec');
       expect(formatted).toContain('2020');
-    });
-  });
-
-  describe('formatSignedPercent', () => {
-    it('returns dash for null', () => {
-      expect(formatSignedPercent(null)).toBe('-');
-    });
-
-    it('returns dash for undefined', () => {
-      expect(formatSignedPercent(undefined)).toBe('-');
-    });
-
-    it('shows up arrow for positive', () => {
-      const result = formatSignedPercent(5.25);
-      expect(result).toBe('\u25B25.25%');
-    });
-
-    it('shows down arrow for negative', () => {
-      const result = formatSignedPercent(-3.1);
-      expect(result).toBe('\u25BC3.10%');
-    });
-
-    it('shows up arrow for zero', () => {
-      const result = formatSignedPercent(0);
-      expect(result).toBe('\u25B20.00%');
     });
   });
 

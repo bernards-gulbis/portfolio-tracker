@@ -25,8 +25,8 @@ describe('getHeaderValues — value mode', () => {
 
     expect(result.mode).toBe('value');
     expect(result.isPositive).toBe(false);
-    // Money-weighted: -21501.32 / 370957.06 ≈ -5.80%
-    expect(result.mode === 'value' && result.pctDisplay).toBe('▼5.80%');
+    // Money-weighted: -21501.32 / 370957.06 ≈ -5.80% (unicode minus from formatSignedPercentPlain)
+    expect(result.mode === 'value' && result.pctDisplay).toBe('−5.80%');
     expect(result.mode === 'value' && result.changeDisplay).toBe('-€21,501.32');
   });
 
@@ -37,7 +37,7 @@ describe('getHeaderValues — value mode', () => {
     const result = getHeaderValues(last, first, 'value', 'EUR', 'en-US', false, PP);
 
     expect(result.isPositive).toBe(true);
-    expect(result.mode === 'value' && result.pctDisplay).toBe('▲10.00%');
+    expect(result.mode === 'value' && result.pctDisplay).toBe('+10.00%');
     expect(result.mode === 'value' && result.changeDisplay).toBe('+€10,000.00');
   });
 
@@ -59,7 +59,7 @@ describe('getHeaderValues — value mode', () => {
 
     // diff = 75000 - 50000 = +25000; pct = 25000/50000 = +50%
     expect(result.isPositive).toBe(true);
-    expect(result.mode === 'value' && result.pctDisplay).toBe('▲50.00%');
+    expect(result.mode === 'value' && result.pctDisplay).toBe('+50.00%');
     expect(result.mode === 'value' && result.changeDisplay).toBe('+€25,000.00');
   });
 

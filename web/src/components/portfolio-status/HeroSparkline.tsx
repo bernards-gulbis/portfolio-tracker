@@ -11,6 +11,8 @@ interface HeroSparklineProps {
   width?: number;
   height?: number;
   ariaLabel?: string;
+  /** e.g. "30d" */
+  scopeLabel?: string;
 }
 
 const PADDING_Y = 2;
@@ -21,6 +23,7 @@ export const HeroSparkline = ({
   width = 140,
   height = 44,
   ariaLabel,
+  scopeLabel,
 }: HeroSparklineProps) => {
   const { linePath, fillPath } = useMemo(() => {
     const values = data.map((p) => p.value);
@@ -53,16 +56,22 @@ export const HeroSparkline = ({
     : 'color-mix(in oklab, var(--negative) 18%, transparent)';
 
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label={ariaLabel ?? 'Portfolio trend'}
-      className="shrink-0"
-    >
-      <path d={fillPath} fill={fillColor} />
-      <path d={linePath} stroke={strokeColor} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <div className="flex flex-col items-end shrink-0">
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={ariaLabel ?? 'Portfolio trend'}
+      >
+        <path d={fillPath} fill={fillColor} />
+        <path d={linePath} stroke={strokeColor} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {scopeLabel != null && (
+        <span className="text-[10px] text-muted-foreground tabular-nums leading-none mt-0.5">
+          {scopeLabel}
+        </span>
+      )}
+    </div>
   );
 };

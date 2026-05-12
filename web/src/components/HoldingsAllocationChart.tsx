@@ -12,6 +12,7 @@ import { useLocale } from '../hooks/useLocale';
 import type { ViewBox } from 'recharts/types/util/types';
 import { PricedHolding } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -104,19 +105,32 @@ export const HoldingsAllocationChart = ({
   const { chartData, total, chartConfig, currency } = useMemo(() => {
     const useEur = displayCurrency === 'EUR' && eurRate != null && eurRate > 0;
     const currency = useEur ? 'EUR' : 'USD';
-    const data: Array<{ name: string; value: number; fill: string }> = [];
+    const data: Array<{ name: string; value: number; fill: string; atCost: boolean }> = [];
 
     const cashValue = useEur ? cash * eurRate : cash;
     if (cashValue > 0) {
-      data.push({ name: 'CASH', value: cashValue, fill: COLORS[0] });
+      data.push({ name: 'CASH', value: cashValue, fill: COLORS[0], atCost: false });
     }
 
+    // In Current view, fall back to total_cost when current_value is missing so unpriced
+    // holdings still appear in the donut (tagged "at cost") instead of vanishing.
     holdings.forEach((holding) => {
-      const rawValue = viewMode === 'cost' ? holding.total_cost : holding.current_value;
+      let rawValue: number | null;
+      let atCost: boolean;
+      if (viewMode === 'cost') {
+        rawValue = holding.total_cost;
+        atCost = false;
+      } else if (holding.current_value != null) {
+        rawValue = holding.current_value;
+        atCost = false;
+      } else {
+        rawValue = holding.total_cost;
+        atCost = true;
+      }
       const value = useEur && rawValue != null ? rawValue * eurRate : rawValue;
       if (value && value > 0) {
         const index = data.length;
-        data.push({ name: holding.ticker, value, fill: COLORS[index % COLORS.length] });
+        data.push({ name: holding.ticker, value, fill: COLORS[index % COLORS.length], atCost });
       }
     });
 
@@ -242,6 +256,14 @@ export const HoldingsAllocationChart = ({
                     style={{ backgroundColor: entry.fill }}
                   />
                   <span className="text-muted-foreground">{entry.name}</span>
+                  {entry.atCost && (
+                    <Badge
+                      variant="secondary"
+                      className="rounded-sm px-1.5 py-0 text-[10px] text-muted-foreground"
+                    >
+                      {t('chart.allocation.atCostTag')}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-muted-foreground">{formatCurrency(entry.value, currency, locale)}</span>

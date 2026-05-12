@@ -96,6 +96,20 @@ describe('HeroPortfolioCard', () => {
     expect(screen.getByText('Outperform')).toBeInTheDocument();
   });
 
+  it('renders the "Since {year}" scope chip on both Total Return and vs S&P 500 tiles', () => {
+    render(
+      <HeroPortfolioCard
+        {...baseProps}
+        portfolioValue={354_059.87}
+        dayChange={null}
+        inceptionYear={2021}
+      />,
+    );
+    // The chip text appears twice — once next to Total Return, once next to vs S&P 500.
+    const chips = screen.getAllByText('Since 2021');
+    expect(chips.length).toBe(2);
+  });
+
   it('labels vs-S&P as "Underperform" when negative', () => {
     render(
       <HeroPortfolioCard

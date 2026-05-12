@@ -66,14 +66,7 @@ export const formatDateCompact = (date: string, locale: string = 'en-US'): strin
   });
 };
 
-/** Percent value with ▲/▼ prefix; '-' for null/undefined. */
-export const formatSignedPercent = (value: number | null | undefined): string => {
-  if (value == null) return '-';
-  const sign = value >= 0 ? '▲' : '▼';
-  return `${sign}${Math.abs(value).toFixed(2)}%`;
-};
-
-/** Percent value with +/- sign and no ▲/▼ glyph; '-' for null/undefined.
+/** Percent value with +/- sign; '-' for null/undefined.
  *  Pair with a leading arrow span when the caller renders a money/percent pair. */
 export const formatSignedPercentPlain = (value: number | null | undefined): string => {
   if (value == null) return '-';

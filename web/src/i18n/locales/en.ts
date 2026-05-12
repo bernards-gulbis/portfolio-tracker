@@ -315,6 +315,9 @@ const en = {
       stale: 'Stale',
       error: 'Offline',
     },
+    sparklineScope: {
+      thirtyDays: '30d',
+    },
     livePriceError: 'Live prices temporarily unavailable',
     missingPrices: 'Could not fetch current prices for: {{tickers}}. Market values shown may be incomplete.',
     stalePrices: 'Using last known prices for: {{tickers}}. Live quotes are temporarily unavailable.',
@@ -457,6 +460,7 @@ const en = {
       viewCostBasis: 'Cost basis',
       viewModeAria: 'Allocation view mode',
       costBasisLabel: 'Cost basis',
+      atCostTag: 'at cost',
     },
   },
   settings: {

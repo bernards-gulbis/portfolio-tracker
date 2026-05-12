@@ -173,7 +173,7 @@ export const PerformanceChart = ({
   return (
     <Card>
       <CardHeader>
-        <PerformanceChartHeader viewMode={viewMode} headerInfo={headerInfo} timePeriod={timePeriod} />
+        <PerformanceChartHeader viewMode={viewMode} headerInfo={headerInfo} />
         <CardAction>
           <div className="flex items-center gap-2">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>

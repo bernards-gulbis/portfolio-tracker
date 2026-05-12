@@ -1,4 +1,4 @@
-import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatSignedPp } from '../../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercentPlain, formatSignedPp } from '../../utils/formatters';
 import type { Currency } from '../../hooks/useCurrencyPreference';
 import type {
   ChartDataPoint,
@@ -57,7 +57,7 @@ const getValueHeaderInfo = (
     mode: 'value',
     displayValue: formatted,
     changeDisplay: formatSignedCurrency(diff, currency, locale),
-    pctDisplay: moneyWeightedPct == null ? '' : formatSignedPercent(moneyWeightedPct),
+    pctDisplay: moneyWeightedPct == null ? '' : formatSignedPercentPlain(moneyWeightedPct),
     spreadDisplay,
     isPositive: diff >= 0,
   };

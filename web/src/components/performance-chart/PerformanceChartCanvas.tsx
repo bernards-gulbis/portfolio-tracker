@@ -25,6 +25,17 @@ import { CrosshairCursor } from './CrosshairCursor';
 import { parseYMD } from './headerInfo';
 import type { ChartDataPoint, ViewMode } from './types';
 
+const VALUE_DOMAIN: [(min: number) => number, (max: number) => number] = [
+  (min) => Math.floor(min * 0.95),
+  (max) => Math.ceil(max * 1.05),
+];
+const PCT_DOMAIN: [(min: number) => number, (max: number) => number] = [
+  (min) => Math.min(0, min) - 1,
+  (max) => Math.max(0, max) + 1,
+];
+
+const formatPctTick = (v: number): string => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`;
+
 interface Props {
   chartConfig: ChartConfig;
   chartData: ChartDataPoint[];
@@ -83,10 +94,11 @@ export const PerformanceChartCanvas = ({
           axisLine={false}
           tickMargin={4}
           width={viewMode === 'value' ? 60 : 50}
+          domain={viewMode === 'value' ? VALUE_DOMAIN : PCT_DOMAIN}
           tickFormatter={
             viewMode === 'value'
               ? (v: number) => formatCompactValue(v, currency)
-              : (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`
+              : formatPctTick
           }
         />
         <Tooltip content={() => null} cursor={<CrosshairCursor />} isAnimationActive={false} />

@@ -1,29 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { CardTitle } from '@/components/ui/card';
-import { type TimePeriod } from '../../utils/chartHelpers';
 import type { HeaderInfo, ViewMode } from './types';
 
 interface Props {
   viewMode: ViewMode;
   headerInfo: (HeaderInfo & { date: string; isHovering: boolean }) | null;
-  timePeriod: TimePeriod;
 }
 
-const TIME_PERIOD_LABELS: Record<TimePeriod, string> = {
-  '1month': '1M',
-  '3month': '3M',
-  '6month': '6M',
-  'ytd': 'YTD',
-  '1year': '1Y',
-  'all': 'All',
-};
-
-export const PerformanceChartHeader = ({ viewMode, headerInfo, timePeriod }: Props) => {
+export const PerformanceChartHeader = ({ viewMode, headerInfo }: Props) => {
   const { t } = useTranslation();
   const titleText = viewMode === 'value'
     ? t('chart.performance.titleValue')
     : t('chart.performance.title');
-  const periodLabel = TIME_PERIOD_LABELS[timePeriod];
 
   if (headerInfo == null) {
     return (
@@ -34,27 +22,27 @@ export const PerformanceChartHeader = ({ viewMode, headerInfo, timePeriod }: Pro
   }
 
   const colorClass = headerInfo.isPositive ? 'text-positive' : 'text-negative';
-  const showInlineValue = headerInfo.isHovering;
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-1">
         <CardTitle className="text-sm font-semibold">{titleText}</CardTitle>
-        <span className="text-xs text-muted-foreground">
-          {headerInfo.isHovering ? headerInfo.date : periodLabel}
-        </span>
+        {headerInfo.isHovering && (
+          <span className="text-xs text-muted-foreground">{headerInfo.date}</span>
+        )}
       </div>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        {showInlineValue && (
+        {headerInfo.isHovering && (
           <span className="text-2xl font-bold tracking-tight tabular-nums">
             {headerInfo.displayValue}
           </span>
         )}
         {headerInfo.mode === 'value' && headerInfo.changeDisplay != null && (
-          <span className={`text-sm tabular-nums ${colorClass}`}>
-            {headerInfo.changeDisplay}
+          <span className={`inline-flex items-baseline gap-1.5 text-sm tabular-nums ${colorClass}`}>
+            <span aria-hidden>{headerInfo.isPositive ? '▲' : '▼'}</span>
+            <span>{headerInfo.changeDisplay}</span>
             {headerInfo.pctDisplay && (
-              <span className="font-bold ml-1">{headerInfo.pctDisplay}</span>
+              <span className="font-bold">{headerInfo.pctDisplay}</span>
             )}
           </span>
         )}

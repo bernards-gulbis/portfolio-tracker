@@ -7,7 +7,7 @@ import type { DayChange } from '../../utils/eurMetrics';
 import {
   formatCurrency,
   formatSignedCurrency,
-  formatSignedPercent,
+  formatSignedPercentPlain,
   formatSignedPp,
   formatTaxRatePercent,
   getValueClass,
@@ -96,7 +96,7 @@ export const HeroPortfolioCard = ({
   const annualizedCaption =
     annualizedReturn == null ? undefined : (
       <p className={`${getValueClass(annualizedReturn)} font-medium`}>
-        {formatSignedPercent(annualizedReturn)}{' '}
+        {formatSignedPercentPlain(annualizedReturn)}{' '}
         <span className="text-muted-foreground">{t('status.annualized').toLowerCase()}</span>
       </p>
     );
@@ -135,6 +135,7 @@ export const HeroPortfolioCard = ({
               positive={
                 sparklineData[sparklineData.length - 1].value >= sparklineData[0].value
               }
+              scopeLabel={t('status.sparklineScope.thirtyDays')}
             />
           )}
         </div>
@@ -163,6 +164,7 @@ export const HeroPortfolioCard = ({
             valueClass={vsSpPts == null ? undefined : getValueClass(vsSpPts)}
             caption={vsSpCaption}
             tooltip={<p>{t('status.vsSp500Tooltip')}</p>}
+            scopeChip={totalReturnScope}
           />
           <KpiTile
             label={t('status.afterTaxValue')}

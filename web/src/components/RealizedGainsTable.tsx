@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatSignedCurrency, formatSignedPercent, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass, MS_PER_DAY } from '../utils/formatters';
+import { formatSignedCurrency, formatSignedPercentPlain, formatDateCompact, formatCurrency, formatQuantity, formatDaysHeld, getValueClass, MS_PER_DAY } from '../utils/formatters';
 import { useDaysHeldLabels } from '../hooks/useDaysHeldLabels';
 import { dividendDisplayValue, useGainsTableData, useDividendsTableData } from '../hooks/useRealizedGainsData';
 import type { TickerGroup, DividendTickerGroup } from '../hooks/useRealizedGainsData';
@@ -207,10 +207,11 @@ const GainsSaleRow = ({ sale, locale, showTicker = false }: GainsSaleRowProps) =
         </Tooltip>
       </TableCell>
       <TableCell className={`text-right tabular-nums ${getValueClass(sale.realized_gain)}`}>
-        <span className="inline-flex items-baseline gap-1.5 font-medium">
+        <span className="inline-flex items-baseline justify-end gap-1.5 font-medium">
+          <span aria-hidden>{sale.realized_gain >= 0 ? '▲' : '▼'}</span>
           <span>{formatSignedCurrency(sale.realized_gain, 'USD', locale)}</span>
           {realizedPct != null && (
-            <span className="text-xs">{formatSignedPercent(realizedPct)}</span>
+            <span className="text-xs">{formatSignedPercentPlain(realizedPct)}</span>
           )}
         </span>
       </TableCell>

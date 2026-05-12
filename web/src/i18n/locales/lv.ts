@@ -317,6 +317,9 @@ const lv: Translation = {
       stale: 'Novecojis',
       error: 'Bezsaistē',
     },
+    sparklineScope: {
+      thirtyDays: '30 d',
+    },
     livePriceError: 'Tiešsaistes cenas īslaicīgi nav pieejamas',
     missingPrices: 'Neizdevās iegūt pašreizējās cenas: {{tickers}}. Tirgus vērtības var būt nepilnīgas.',
     stalePrices: 'Tiek izmantotas pēdējās zināmās cenas: {{tickers}}. Tiešsaistes kotējumi īslaicīgi nav pieejami.',
@@ -459,6 +462,7 @@ const lv: Translation = {
       viewCostBasis: 'Iegādes vērtība',
       viewModeAria: 'Sadalījuma skats',
       costBasisLabel: 'Iegādes vērtība',
+      atCostTag: 'iegādes vērt.',
     },
   },
   settings: {
