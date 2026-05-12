@@ -81,6 +81,48 @@ export const formatSignedPercentPlain = (value: number | null | undefined): stri
   return `${sign}${Math.abs(value).toFixed(2)}%`;
 };
 
+/** Percentage-points difference, e.g. ``-5.4 pp``; '—' for null/undefined.
+ *  Use for benchmark spreads (portfolio % − benchmark %) so the unit can't be confused
+ *  with an absolute percent. */
+export const formatSignedPp = (value: number | null | undefined, unit: string = 'pp'): string => {
+  if (value == null) return '—';
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  return `${sign}${Math.abs(value).toFixed(2)} ${unit}`;
+};
+
+export interface RelativeTimeLabels {
+  justNow: string;
+  /** "{count} min ago" */
+  minutes: (count: number) => string;
+  /** "{count} h ago" */
+  hours: (count: number) => string;
+  /** "{count} d ago" */
+  days: (count: number) => string;
+}
+
+/** Human-readable elapsed time vs ``now``. Falls back to a full date string for ≥ 7 days. */
+export const formatRelativeTime = (
+  timestamp: number,
+  now: number,
+  labels: RelativeTimeLabels,
+  locale: string = 'en-US',
+): string => {
+  const diffMs = Math.max(0, now - timestamp);
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return labels.justNow;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return labels.minutes(minutes);
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return labels.hours(hours);
+  const days = Math.floor(hours / 24);
+  if (days < 7) return labels.days(days);
+  return new Date(timestamp).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
 /** CSS class for positive (green) / negative (red) values. */
 export const getValueClass = (value: number | null | undefined): string => {
   if (value == null) return '';

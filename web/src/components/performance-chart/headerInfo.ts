@@ -1,4 +1,4 @@
-import { formatCurrency, formatSignedCurrency, formatSignedPercent } from '../../utils/formatters';
+import { formatCurrency, formatSignedCurrency, formatSignedPercent, formatSignedPp } from '../../utils/formatters';
 import type { Currency } from '../../hooks/useCurrencyPreference';
 import type {
   ChartDataPoint,
@@ -20,10 +20,17 @@ const formatPctDisplay = (pct: number): string =>
 const EMPTY_VALUE_HEADER: ValueHeaderInfo = {
   mode: 'value',
   displayValue: '-',
-  principalDisplay: null,
   changeDisplay: null,
   pctDisplay: '',
+  spreadDisplay: null,
   isPositive: true,
+};
+
+/** Pre-formatted vs-S&P spread (portfolio − benchmark) in percentage points.
+ *  Uses the rebased ``returnPct`` / ``sp500ReturnPct`` so it stays consistent with the chart line. */
+const computeSpread = (point: ChartDataPoint, ppLabel: string): string | null => {
+  if (point.returnPct == null || point.sp500ReturnPct == null) return null;
+  return formatSignedPp(point.returnPct - point.sp500ReturnPct, ppLabel);
 };
 
 const getValueHeaderInfo = (
@@ -32,35 +39,38 @@ const getValueHeaderInfo = (
   currency: Currency,
   locale: string,
   isAllTime: boolean,
+  ppLabel: string,
 ): ValueHeaderInfo => {
   const value = point.currentValue;
-  if (value == null) return EMPTY_VALUE_HEADER;
+  const spreadDisplay = computeSpread(point, ppLabel);
+  if (value == null) return { ...EMPTY_VALUE_HEADER, spreadDisplay };
 
   const formatted = formatCurrency(value, currency, locale);
-  const principalDisplay =
-    point.principal == null ? null : formatCurrency(point.principal, currency, locale);
   const base = isAllTime ? point.principal : first.currentValue;
-  if (base == null) return { ...EMPTY_VALUE_HEADER, displayValue: formatted, principalDisplay };
+  if (base == null) {
+    return { ...EMPTY_VALUE_HEADER, displayValue: formatted, spreadDisplay };
+  }
 
   const diff = value - base;
   const moneyWeightedPct = base > 0 ? (diff / base) * 100 : null;
   return {
     mode: 'value',
     displayValue: formatted,
-    principalDisplay,
     changeDisplay: formatSignedCurrency(diff, currency, locale),
     pctDisplay: moneyWeightedPct == null ? '' : formatSignedPercent(moneyWeightedPct),
+    spreadDisplay,
     isPositive: diff >= 0,
   };
 };
 
-const getPctHeaderInfo = (point: ChartDataPoint): PctHeaderInfo => {
-  const { returnPct: pct, sp500ReturnPct: sp500Pct } = point;
-  if (pct == null) return { mode: 'pct', displayValue: '-', sp500Display: null, isPositive: true };
+const getPctHeaderInfo = (point: ChartDataPoint, ppLabel: string): PctHeaderInfo => {
+  const { returnPct: pct } = point;
+  const spreadDisplay = computeSpread(point, ppLabel);
+  if (pct == null) return { mode: 'pct', displayValue: '-', spreadDisplay, isPositive: true };
   return {
     mode: 'pct',
     displayValue: formatPctDisplay(pct),
-    sp500Display: sp500Pct == null ? null : formatPctDisplay(sp500Pct),
+    spreadDisplay,
     isPositive: pct >= 0,
   };
 };
@@ -75,7 +85,8 @@ export const getHeaderValues = (
   currency: Currency,
   locale: string,
   isAllTime: boolean,
+  ppLabel: string,
 ): HeaderInfo => {
-  if (viewMode === 'value') return getValueHeaderInfo(point, first, currency, locale, isAllTime);
-  return getPctHeaderInfo(point);
+  if (viewMode === 'value') return getValueHeaderInfo(point, first, currency, locale, isAllTime, ppLabel);
+  return getPctHeaderInfo(point, ppLabel);
 };

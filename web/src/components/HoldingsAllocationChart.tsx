@@ -12,12 +12,15 @@ import { useLocale } from '../hooks/useLocale';
 import type { ViewBox } from 'recharts/types/util/types';
 import { PricedHolding } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChartContainer,
   type ChartConfig,
 } from '@/components/ui/chart';
+
+type AllocationViewMode = 'current' | 'cost';
 
 interface HoldingsAllocationChartProps {
   holdings: PricedHolding[];
@@ -95,6 +98,7 @@ export const HoldingsAllocationChart = ({
   const { t } = useTranslation();
   const locale = useLocale();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<AllocationViewMode>('current');
   const shapeRenderer = useMemo(() => createShapeRenderer(activeIndex), [activeIndex]);
 
   const { chartData, total, chartConfig, currency } = useMemo(() => {
@@ -108,7 +112,7 @@ export const HoldingsAllocationChart = ({
     }
 
     holdings.forEach((holding) => {
-      const rawValue = holding.current_value;
+      const rawValue = viewMode === 'cost' ? holding.total_cost : holding.current_value;
       const value = useEur && rawValue != null ? rawValue * eurRate : rawValue;
       if (value && value > 0) {
         const index = data.length;
@@ -127,7 +131,7 @@ export const HoldingsAllocationChart = ({
     }, {} as ChartConfig);
 
     return { chartData: data, total, chartConfig: config, currency };
-  }, [holdings, cash, eurRate, displayCurrency]);
+  }, [holdings, cash, eurRate, displayCurrency, viewMode]);
 
   const handleMouseEnter = useCallback((_: unknown, index: number) => {
     setActiveIndex(index);
@@ -171,11 +175,25 @@ export const HoldingsAllocationChart = ({
   }
 
   const activeEntry = activeIndex == null ? null : chartData[activeIndex];
+  const totalLabel =
+    viewMode === 'cost' ? t('chart.allocation.costBasisLabel') : t('chart.allocation.marketValue');
 
   return (
     <Card className="flex flex-col">
       <CardHeader>
         <CardTitle>{t('chart.allocation.title')}</CardTitle>
+        <CardAction>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as AllocationViewMode)}>
+            <TabsList aria-label={t('chart.allocation.viewModeAria')}>
+              <TabsTrigger value="current" className="text-xs">
+                {t('chart.allocation.viewCurrent')}
+              </TabsTrigger>
+              <TabsTrigger value="cost" className="text-xs">
+                {t('chart.allocation.viewCostBasis')}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardAction>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]" aria-label={t('chart.allocation.title')}>
@@ -199,7 +217,7 @@ export const HoldingsAllocationChart = ({
                     currency={currency}
                     activeEntry={activeEntry}
                     total={total}
-                    totalLabel={t('chart.allocation.marketValue')}
+                    totalLabel={totalLabel}
                   />
                 }
               />

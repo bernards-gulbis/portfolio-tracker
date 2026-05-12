@@ -107,7 +107,9 @@ export const PerformanceChartCanvas = ({
             type="monotone"
             dataKey="principal"
             stroke="var(--color-principal)"
-            strokeWidth={1.5}
+            strokeWidth={1.25}
+            strokeDasharray="2 3"
+            opacity={0.6}
             dot={false}
             activeDot={ACTIVE_DOT_PRINCIPAL}
             connectNulls

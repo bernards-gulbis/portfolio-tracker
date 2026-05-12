@@ -8,12 +8,14 @@ import {
   formatCurrency,
   formatSignedCurrency,
   formatSignedPercent,
+  formatSignedPp,
   formatTaxRatePercent,
   getValueClass,
 } from '../../utils/formatters';
 
 import { formatCurrencyWithPercent } from './formatCurrencyWithPercent';
 import { KpiTile } from './KpiTile';
+import { HeroSparkline, type SparklinePoint } from './HeroSparkline';
 
 export interface HeroPortfolioCardProps {
   portfolioValue: number | null;
@@ -33,6 +35,10 @@ export interface HeroPortfolioCardProps {
   /** Only set in EUR display mode. */
   fxImpact: number | null;
   fxImpactPct: number | null;
+  /** Year of the first transaction, used as the scope chip on Total Return. */
+  inceptionYear: number | null;
+  /** Recent-history points for the inline sparkline; sliced upstream to ~30 days. */
+  sparklineData: SparklinePoint[];
 }
 
 const valueOrDash = (n: number | null, fmt: (v: number) => string): string =>
@@ -52,6 +58,8 @@ export const HeroPortfolioCard = ({
   taxRate,
   fxImpact,
   fxImpactPct,
+  inceptionYear,
+  sparklineData,
 }: HeroPortfolioCardProps) => {
   const { t } = useTranslation();
 
@@ -99,10 +107,7 @@ export const HeroPortfolioCard = ({
         {vsSpPts >= 0 ? t('status.outperform') : t('status.underperform')}
       </p>
     );
-  const vsSpValue =
-    vsSpPts == null
-      ? '—'
-      : `${vsSpPts >= 0 ? '+' : '−'}${Math.abs(vsSpPts).toFixed(2)} ${t('status.points')}`;
+  const vsSpValue = formatSignedPp(vsSpPts, t('status.points'));
 
   const taxCaption =
     estimatedTax == null ? undefined : (
@@ -111,13 +116,27 @@ export const HeroPortfolioCard = ({
       </p>
     );
 
+  const totalReturnScope = inceptionYear == null ? null : (
+    <span>{t('status.scopeSinceYear', { year: inceptionYear })}</span>
+  );
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-muted-foreground">{valueLabel}</p>
-          <p className="text-3xl sm:text-4xl font-bold tracking-tight tabular-nums">{valueText}</p>
-          {dayChangeLine}
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-muted-foreground">{valueLabel}</p>
+            <p className="text-3xl sm:text-4xl font-bold tracking-tight tabular-nums">{valueText}</p>
+            {dayChangeLine}
+          </div>
+          {sparklineData.length >= 2 && (
+            <HeroSparkline
+              data={sparklineData}
+              positive={
+                sparklineData[sparklineData.length - 1].value >= sparklineData[0].value
+              }
+            />
+          )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 border-t pt-4">
           <KpiTile
@@ -135,6 +154,8 @@ export const HeroPortfolioCard = ({
             )}
             valueClass={totalReturn == null ? undefined : getValueClass(totalReturn)}
             caption={annualizedCaption}
+            tooltip={<p>{t('status.totalReturnTooltip')}</p>}
+            scopeChip={totalReturnScope}
           />
           <KpiTile
             label={t('status.vsSp500')}

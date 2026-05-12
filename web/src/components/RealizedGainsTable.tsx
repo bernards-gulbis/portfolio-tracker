@@ -10,7 +10,6 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableCaption, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -147,6 +146,11 @@ const GainsSaleRow = ({ sale, locale, showTicker = false }: GainsSaleRowProps) =
   const buyPrice = sale.quantity > 0 ? sale.cost_basis / sale.quantity : 0;
   const isPartialSell = sale.quantity_before - sale.quantity > 1e-6;
   const daysHeld = Math.floor((new Date(sale.date).getTime() - new Date(sale.first_buy_date).getTime()) / MS_PER_DAY);
+  const realizedPct = sale.cost_basis > 0 ? (sale.realized_gain / sale.cost_basis) * 100 : null;
+
+  const quantityTooltipText = isPartialSell
+    ? t('status.ofPurchased', { total: formatQuantity(sale.quantity_before) })
+    : t('status.allSold');
 
   return (
     <TableRow>
@@ -167,30 +171,47 @@ const GainsSaleRow = ({ sale, locale, showTicker = false }: GainsSaleRowProps) =
         </Tooltip>
       </TableCell>
       <TableCell className="text-right tabular-nums text-muted-foreground">
-        <span>{formatQuantity(sale.quantity)}</span>
-        {isPartialSell ? (
-          <span className="flex items-center justify-end gap-1.5 mt-0.5">
-            <Progress value={(sale.quantity / sale.quantity_before) * 100} className="h-1 w-16" />
-            <span className="text-xs text-muted-foreground">
-              {t('status.ofTotal', { total: formatQuantity(sale.quantity_before) })}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help border-b border-dotted border-muted-foreground">
+              {formatQuantity(sale.quantity)}
             </span>
-          </span>
-        ) : (
-          <span className="block text-xs text-muted-foreground">{t('status.allSold')}</span>
-        )}
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{quantityTooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
       </TableCell>
       <TableCell className="text-right tabular-nums text-muted-foreground">
-        <span>{formatCurrency(sale.cost_basis, 'USD', locale)}</span>
-        <span className="block text-xs text-muted-foreground">{formatCurrency(buyPrice, 'USD', locale)}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help border-b border-dotted border-muted-foreground">
+              {formatCurrency(sale.cost_basis, 'USD', locale)}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{t('status.pricePerShare', { amount: formatCurrency(buyPrice, 'USD', locale) })}</p>
+          </TooltipContent>
+        </Tooltip>
       </TableCell>
       <TableCell className="text-right tabular-nums text-muted-foreground">
-        <span>{formatCurrency(sale.proceeds, 'USD', locale)}</span>
-        <span className="block text-xs text-muted-foreground">{formatCurrency(sellPrice, 'USD', locale)}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help border-b border-dotted border-muted-foreground">
+              {formatCurrency(sale.proceeds, 'USD', locale)}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{t('status.pricePerShare', { amount: formatCurrency(sellPrice, 'USD', locale) })}</p>
+          </TooltipContent>
+        </Tooltip>
       </TableCell>
       <TableCell className={`text-right tabular-nums ${getValueClass(sale.realized_gain)}`}>
-        <span>{formatSignedCurrency(sale.realized_gain, 'USD', locale)}</span>
-        <span className={`block text-xs font-bold ${getValueClass(sale.realized_gain)}`}>
-          {formatSignedPercent(sale.cost_basis > 0 ? (sale.realized_gain / sale.cost_basis) * 100 : null)}
+        <span className="inline-flex items-baseline gap-1.5 font-medium">
+          <span>{formatSignedCurrency(sale.realized_gain, 'USD', locale)}</span>
+          {realizedPct != null && (
+            <span className="text-xs">{formatSignedPercent(realizedPct)}</span>
+          )}
         </span>
       </TableCell>
     </TableRow>
@@ -297,7 +318,7 @@ interface RealizedGainsTableProps {
 
 export const RealizedGainsTable = memo(({ realizedSales, locale }: RealizedGainsTableProps) => {
   const { t } = useTranslation();
-  const { viewMode, setViewMode } = useTableViewMode('pt_gains_view_mode', 'ungrouped');
+  const { viewMode, setViewMode } = useTableViewMode('pt_gains_view_mode', 'grouped');
   const {
     expandState, sortKey, sortAsc, filter, yearFilter,
     availableYears, filteredGains, pagedGains, gainsTotals,

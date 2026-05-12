@@ -32,9 +32,10 @@ export interface ChartDataPoint {
 export interface ValueHeaderInfo {
   mode: 'value';
   displayValue: string;
-  principalDisplay: string | null;
   changeDisplay: string | null;
   pctDisplay: string;
+  /** Pre-formatted vs-S&P spread in percentage points (e.g. "−0.6 pp"); null when unavailable. */
+  spreadDisplay: string | null;
   isPositive: boolean;
 }
 
@@ -42,7 +43,8 @@ export interface ValueHeaderInfo {
 export interface PctHeaderInfo {
   mode: 'pct';
   displayValue: string;
-  sp500Display: string | null;
+  /** Pre-formatted vs-S&P spread in percentage points; null when unavailable. */
+  spreadDisplay: string | null;
   isPositive: boolean;
 }
 

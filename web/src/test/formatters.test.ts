@@ -4,6 +4,8 @@ import {
   formatSignedCurrency,
   formatDateTime,
   formatSignedPercent,
+  formatSignedPp,
+  formatRelativeTime,
   formatDaysHeld,
   formatQuantity,
   getValueClass,
@@ -187,6 +189,70 @@ describe('Formatters', () => {
     it('rounds to two decimal places max', () => {
       expect(formatTaxRatePercent(0.255123)).toBe('25.51');
       expect(formatTaxRatePercent(0.001)).toBe('0.1');
+    });
+  });
+
+  describe('formatSignedPp', () => {
+    it('returns em dash for null/undefined', () => {
+      expect(formatSignedPp(null)).toBe('—');
+      expect(formatSignedPp(undefined)).toBe('—');
+    });
+
+    it('prefixes + for positive and unicode minus for negative', () => {
+      expect(formatSignedPp(5.4)).toBe('+5.40 pp');
+      expect(formatSignedPp(-5.4)).toBe('−5.40 pp');
+    });
+
+    it('renders zero without a sign', () => {
+      expect(formatSignedPp(0)).toBe('0.00 pp');
+    });
+
+    it('honors a custom unit label', () => {
+      expect(formatSignedPp(-1.2, 'p.p.')).toBe('−1.20 p.p.');
+    });
+  });
+
+  describe('formatRelativeTime', () => {
+    const labels = {
+      justNow: 'just now',
+      minutes: (n: number) => `${n} min ago`,
+      hours: (n: number) => `${n} h ago`,
+      days: (n: number) => `${n} d ago`,
+    };
+
+    it('returns "just now" for diffs under a minute', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 30_000, now, labels)).toBe('just now');
+      expect(formatRelativeTime(now, now, labels)).toBe('just now');
+    });
+
+    it('clamps future timestamps to "just now"', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now + 5_000, now, labels)).toBe('just now');
+    });
+
+    it('returns minutes between 1 minute and an hour', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 90_000, now, labels)).toBe('1 min ago');
+      expect(formatRelativeTime(now - 59 * 60_000, now, labels)).toBe('59 min ago');
+    });
+
+    it('returns hours between 1 hour and a day', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 3 * 60 * 60_000, now, labels)).toBe('3 h ago');
+    });
+
+    it('returns days between 1 and 7', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 2 * 24 * 60 * 60_000, now, labels)).toBe('2 d ago');
+    });
+
+    it('falls back to a locale date for ≥ 7 days', () => {
+      const now = new Date(2026, 4, 12).getTime();
+      const old = new Date(2026, 3, 1).getTime();
+      const result = formatRelativeTime(old, now, labels);
+      expect(result).toContain('Apr');
+      expect(result).toContain('2026');
     });
   });
 

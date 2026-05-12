@@ -54,6 +54,8 @@ export const PerformanceChart = ({
 
   const chartData = useChartData(data, timePeriod, currency, liveLastPoint);
 
+  const ppLabel = t('status.points');
+
   const headerInfo = useMemo(() => {
     if (chartData.length === 0) return null;
     const first = chartData[0];
@@ -68,6 +70,7 @@ export const PerformanceChart = ({
       currency,
       locale,
       timePeriod === 'all',
+      ppLabel,
     );
     const dateStr = parseYMD(displayPoint.date).toLocaleDateString(locale, {
       month: 'short',
@@ -76,7 +79,7 @@ export const PerformanceChart = ({
     });
 
     return { ...values, date: dateStr, isHovering: activeIndex != null };
-  }, [chartData, activeIndex, viewMode, currency, locale, timePeriod]);
+  }, [chartData, activeIndex, viewMode, currency, locale, timePeriod, ppLabel]);
 
   const handleMouseMove = useCallback(
     (state: { activeTooltipIndex?: number | string | null }) => {
@@ -170,7 +173,7 @@ export const PerformanceChart = ({
   return (
     <Card>
       <CardHeader>
-        <PerformanceChartHeader viewMode={viewMode} headerInfo={headerInfo} />
+        <PerformanceChartHeader viewMode={viewMode} headerInfo={headerInfo} timePeriod={timePeriod} />
         <CardAction>
           <div className="flex items-center gap-2">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>

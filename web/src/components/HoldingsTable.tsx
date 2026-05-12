@@ -41,7 +41,7 @@ const renderCurrentValue = (
     : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
 };
 
-const renderStackedSignedPair = (
+const renderInlineSignedPair = (
   value: number | null,
   pct: number | null,
   currency: Currency,
@@ -51,15 +51,13 @@ const renderStackedSignedPair = (
   const cls = getValueClass(value);
   const arrow = value >= 0 ? '▲' : '▼';
   return (
-    <div className="flex flex-col items-end">
-      <span className={`font-semibold ${cls}`}>
-        <span className="mr-1">{arrow}</span>
-        {formatSignedCurrency(value, currency, locale)}
-      </span>
+    <span className={`inline-flex items-baseline justify-end gap-1.5 font-medium tabular-nums ${cls}`}>
+      <span aria-hidden>{arrow}</span>
+      <span>{formatSignedCurrency(value, currency, locale)}</span>
       {pct != null && (
-        <span className={`text-sm ${cls}`}>{formatSignedPercentPlain(pct)}</span>
+        <span className="text-xs">{formatSignedPercentPlain(pct)}</span>
       )}
-    </div>
+    </span>
   );
 };
 
@@ -189,8 +187,8 @@ export const HoldingsTable = memo(
               <TableRow>
                 <TableHead>{t('status.columns.ticker')}</TableHead>
                 <TableHead className="text-right">{t('status.columns.quantity')}</TableHead>
-                <TableHead className="text-right">{t('status.columns.avgCost')}</TableHead>
-                <TableHead className="text-right">{t('status.columns.last')}</TableHead>
+                <TableHead className="text-right">{t('status.columns.avgCostUsd')}</TableHead>
+                <TableHead className="text-right">{t('status.columns.lastUsd')}</TableHead>
                 <TableHead className="text-right">
                   {t('status.columns.marketValue')}
                 </TableHead>
@@ -200,16 +198,18 @@ export const HoldingsTable = memo(
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow key="CASH" className="text-muted-foreground hover:bg-muted/30 transition-colors">
-                <TableCell colSpan={4} className="italic">{t('status.cashRow')}</TableCell>
-                <TableCell className="text-right font-medium tabular-nums">
-                  {formatCurrency(cashDisplay, effectiveCurrency, locale)}
-                </TableCell>
-                <TableCell colSpan={2} />
-                <TableCell className="text-right tabular-nums">
-                  {cashWeight == null ? '—' : `${cashWeight.toFixed(1)}%`}
-                </TableCell>
-              </TableRow>
+              {cashDisplay > 0.005 && (
+                <TableRow key="CASH" className="text-muted-foreground hover:bg-muted/30 transition-colors">
+                  <TableCell colSpan={4} className="italic">{t('status.cashRow')}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatCurrency(cashDisplay, effectiveCurrency, locale)}
+                  </TableCell>
+                  <TableCell colSpan={2} />
+                  <TableCell className="text-right tabular-nums">
+                    {cashWeight == null ? '—' : `${cashWeight.toFixed(1)}%`}
+                  </TableCell>
+                </TableRow>
+              )}
               {holdingsWithEur.map(({ holding, eurVals }) => {
                 const dayCh = rowDayChange(holding, eurVals);
                 const useEurGL = showEur && eurVals?.unrealizedGainLossEur != null;
@@ -248,10 +248,10 @@ export const HoldingsTable = memo(
                       {renderCurrentValue(holding, eurVals, locale)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {renderStackedSignedPair(dayCh.value, dayCh.pct, effectiveCurrency, locale)}
+                      {renderInlineSignedPair(dayCh.value, dayCh.pct, effectiveCurrency, locale)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {renderStackedSignedPair(
+                      {renderInlineSignedPair(
                         useEurGL
                           ? (eurVals.unrealizedGainLossEur as number)
                           : holding.unrealized_gain_loss,
@@ -278,7 +278,7 @@ export const HoldingsTable = memo(
                 </TableCell>
                 <TableCell />
                 <TableCell className="text-right tabular-nums">
-                  {renderStackedSignedPair(
+                  {renderInlineSignedPair(
                     totalUnrealizedGL,
                     totalUnrealizedPct,
                     effectiveCurrency,

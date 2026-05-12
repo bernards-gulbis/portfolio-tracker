@@ -15,6 +15,8 @@ const baseProps = {
   taxRate: 0.255,
   fxImpact: null,
   fxImpactPct: null,
+  inceptionYear: 2021,
+  sparklineData: [],
 };
 
 describe('HeroPortfolioCard', () => {
@@ -90,7 +92,7 @@ describe('HeroPortfolioCard', () => {
         vsSpPts={12.4}
       />,
     );
-    expect(screen.getByText(/\+12\.40 pts/)).toBeInTheDocument();
+    expect(screen.getByText(/\+12\.40 pp/)).toBeInTheDocument();
     expect(screen.getByText('Outperform')).toBeInTheDocument();
   });
 

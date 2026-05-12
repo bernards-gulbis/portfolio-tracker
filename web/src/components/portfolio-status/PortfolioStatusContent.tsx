@@ -34,10 +34,13 @@ import { useDismissedCostBasisWarning } from '../../hooks/useDismissedCostBasisW
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
 import { HeroPortfolioCard } from './HeroPortfolioCard';
+import type { SparklinePoint } from './HeroSparkline';
 import { InfoBanner } from './InfoBanner';
 import { WarningsAlert } from './WarningsAlert';
 import { computeDisplayFigures } from './displayFigures';
 import { useDerivedReturns } from './useDerivedReturns';
+
+const SPARKLINE_MAX_POINTS = 30;
 
 const PerformanceChart = lazy(() =>
   import('../PerformanceChart').then((m) => ({ default: m.PerformanceChart })),
@@ -143,6 +146,33 @@ export const PortfolioStatusContent = ({
     [status.realized_withdrawals],
   );
 
+  const inceptionYear = useMemo<number | null>(() => {
+    const points = performance?.data_points;
+    if (points && points.length > 0) return Number(points[0].date.slice(0, 4)) || null;
+    const dates = [
+      ...status.holdings.map((h) => h.first_buy_date),
+      ...status.realized_sales.map((s) => s.first_buy_date),
+    ].filter((d): d is string => typeof d === 'string' && d.length >= 4);
+    if (dates.length === 0) return null;
+    const earliest = dates.reduce((a, b) => (a < b ? a : b));
+    return Number(earliest.slice(0, 4)) || null;
+  }, [performance, status.holdings, status.realized_sales]);
+
+  const sparklineData = useMemo<SparklinePoint[]>(() => {
+    const points = performance?.data_points;
+    if (points == null || points.length === 0) return [];
+    const useEur = currency === 'EUR';
+    const trimmed = points.slice(-SPARKLINE_MAX_POINTS);
+    return trimmed
+      .map((p) => {
+        const raw = useEur && p.fx_rate != null && p.current_value != null
+          ? p.current_value * p.fx_rate
+          : p.current_value;
+        return raw == null ? null : { date: p.date, value: raw };
+      })
+      .filter((p): p is SparklinePoint => p != null);
+  }, [performance, currency]);
+
   if (isEmptyPortfolio) {
     return (
       <Card>
@@ -237,6 +267,8 @@ export const PortfolioStatusContent = ({
         taxRate={status.capital_gains_tax_rate}
         fxImpact={fxImpact}
         fxImpactPct={fxImpactPct}
+        inceptionYear={inceptionYear}
+        sparklineData={sparklineData}
       />
 
       {showCostBasisWarning && (
