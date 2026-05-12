@@ -60,27 +60,23 @@ export const HeroPortfolioCard = ({
     formatCurrency(v, displayCurrency, locale),
   );
 
-  const dayChangeLine = (() => {
-    if (dayChange == null) return null;
-    return (
-      <div className="flex items-baseline gap-2 text-base sm:text-lg">
-        <span className={`font-semibold tabular-nums ${getValueClass(dayChange.usd)}`}>
-          {formatCurrencyWithPercent(dayChange.usd, dayChange.pct, displayCurrency, locale)}
+  const dayChangeLine = dayChange == null ? null : (
+    <div className="flex items-baseline gap-2 text-base sm:text-lg">
+      <span className={`font-semibold tabular-nums ${getValueClass(dayChange.usd)}`}>
+        {formatCurrencyWithPercent(dayChange.usd, dayChange.pct, displayCurrency, locale)}
+      </span>
+      <span className="text-sm text-muted-foreground">{t('status.today')}</span>
+      {dayChange.partial && (
+        <span
+          className="text-xs text-muted-foreground"
+          title={t('status.dayChangePartialNote')}
+        >
+          *
         </span>
-        <span className="text-sm text-muted-foreground">{t('status.today')}</span>
-        {dayChange.partial && (
-          <span
-            className="text-xs text-muted-foreground"
-            title={t('status.dayChangePartialNote')}
-          >
-            *
-          </span>
-        )}
-      </div>
-    );
-  })();
+      )}
+    </div>
+  );
 
-  // FX caption (EUR display only)
   const fxCaption =
     fxImpact == null ? undefined : (
       <p className={getValueClass(fxImpact)}>

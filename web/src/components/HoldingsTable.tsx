@@ -85,8 +85,7 @@ export const HoldingsTable = memo(
   }: HoldingsTableProps) => {
     const { t } = useTranslation();
     const eurAvailable = eurMetrics !== null;
-    const effectiveCurrency: Currency =
-      showEur && eurAvailable ? ('EUR' as Currency) : displayCurrency;
+    const effectiveCurrency: Currency = showEur && eurAvailable ? 'EUR' : displayCurrency;
     const cashDisplay = showEur && eurAvailable ? eurMetrics.cashEur : cash;
 
     const holdingsWithEur = useMemo(() => {
@@ -140,10 +139,8 @@ export const HoldingsTable = memo(
       return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(locale);
     };
 
-    // Per-row Today change (in display currency) computed from previous_close.
-    // No rate-shifting hack: applying the live FX rate to both prices cancels
-    // out in the % and scales the absolute proportionally — same result as
-    // converting at the end.
+    // Applying the FX rate to both current and previous prices cancels in the %
+    // and scales the absolute proportionally — same result as converting at the end.
     const rowDayChange = (
       h: PricedHolding,
       eurVals: EurVals | null,
@@ -161,7 +158,6 @@ export const HoldingsTable = memo(
       return { value: valueDelta, pct };
     };
 
-    // % of portfolio (always relative to the total market value, including cash).
     const rowWeight = (rowValue: number | null): number | null => {
       if (rowValue == null || totalMarketValue <= 0) return null;
       return (rowValue / totalMarketValue) * 100;
@@ -216,6 +212,7 @@ export const HoldingsTable = memo(
               </TableRow>
               {holdingsWithEur.map(({ holding, eurVals }) => {
                 const dayCh = rowDayChange(holding, eurVals);
+                const useEurGL = showEur && eurVals?.unrealizedGainLossEur != null;
                 const rowValueInDisplay =
                   showEur && eurVals?.currentValueEur != null
                     ? eurVals.currentValueEur
@@ -255,13 +252,11 @@ export const HoldingsTable = memo(
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {renderStackedSignedPair(
-                        showEur && eurVals?.unrealizedGainLossEur != null
-                          ? eurVals.unrealizedGainLossEur
+                        useEurGL
+                          ? (eurVals.unrealizedGainLossEur as number)
                           : holding.unrealized_gain_loss,
                         holding.unrealized_gain_loss_pct,
-                        showEur && eurVals?.unrealizedGainLossEur != null
-                          ? ('EUR' as Currency)
-                          : ('USD' as Currency),
+                        useEurGL ? 'EUR' : 'USD',
                         locale,
                       )}
                     </TableCell>
@@ -282,25 +277,12 @@ export const HoldingsTable = memo(
                   {formatCurrency(totalMarketValue, effectiveCurrency, locale)}
                 </TableCell>
                 <TableCell />
-                <TableCell
-                  className={`text-right tabular-nums ${
-                    totalUnrealizedGL == null ? '' : getValueClass(totalUnrealizedGL)
-                  }`}
-                >
-                  {totalUnrealizedGL == null ? (
-                    '—'
-                  ) : (
-                    <div className="flex flex-col items-end">
-                      <span>
-                        <span className="mr-1">{totalUnrealizedGL >= 0 ? '▲' : '▼'}</span>
-                        {formatSignedCurrency(totalUnrealizedGL, effectiveCurrency, locale)}
-                      </span>
-                      {totalUnrealizedPct != null && (
-                        <span className="text-sm">
-                          {formatSignedPercentPlain(totalUnrealizedPct)}
-                        </span>
-                      )}
-                    </div>
+                <TableCell className="text-right tabular-nums">
+                  {renderStackedSignedPair(
+                    totalUnrealizedGL,
+                    totalUnrealizedPct,
+                    effectiveCurrency,
+                    locale,
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">100.0%</TableCell>

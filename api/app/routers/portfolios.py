@@ -79,25 +79,36 @@ async def get_live_prices(
             status_code=400,
             detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
         )
-    # ``LivePriceService.get_current_quotes`` catches its own per-ticker
-    # exceptions and returns ``Quote(None, None)`` for failed lookups, so the
-    # only paths that escape here are programming errors (e.g. a misconfigured
-    # ThreadPoolExecutor). Catching ``RuntimeError`` keeps the response
-    # alive for those rare cases without swallowing genuine bugs that should
-    # surface as 500s during development.
-    #
-    # ``LivePriceService.get_current_quotes`` blocks (yfinance + thread pool);
-    # offload to a worker thread so the asyncio event loop stays free for
-    # other concurrent requests.
-    try:
-        live_quotes = (
-            await asyncio.to_thread(LivePriceService.get_current_quotes, tickers)
-            if tickers
-            else {}
-        )
-    except RuntimeError as e:
-        logger.error("Live price fetch infrastructure error: %s", e, exc_info=True)
+    # ``get_current_quotes`` catches per-ticker errors and returns ``Quote(None,
+    # None)`` for failures, so only infrastructure ``RuntimeError`` escapes;
+    # catch it here to keep the response alive without swallowing real bugs.
+    # ``return_exceptions=True`` keeps the FX result if the quotes task fails.
+    live_quotes_coro = (
+        asyncio.to_thread(LivePriceService.get_current_quotes, tickers)
+        if tickers
+        else None
+    )
+    fx_coro = asyncio.to_thread(FxRateService.get_usd_to_eur_rate_safe)
+    if live_quotes_coro is None:
         live_quotes = {}
+        usd_to_eur_rate = await fx_coro
+    else:
+        quotes_result, usd_to_eur_rate = await asyncio.gather(
+            live_quotes_coro, fx_coro, return_exceptions=True
+        )
+        if isinstance(quotes_result, BaseException):
+            if not isinstance(quotes_result, RuntimeError):
+                raise quotes_result
+            logger.error(
+                "Live price fetch infrastructure error: %s",
+                quotes_result,
+                exc_info=quotes_result,
+            )
+            live_quotes = {}
+        else:
+            live_quotes = quotes_result
+        if isinstance(usd_to_eur_rate, BaseException):
+            raise usd_to_eur_rate
 
     now = datetime.now(UTC)
     prices: dict[str, LivePriceInfo] = {}
@@ -114,8 +125,7 @@ async def get_live_prices(
         else:
             fallback_tickers.append(ticker)
 
-    # Batch the DB fallback for every missing ticker into one offloaded
-    # query so we don't hit the event loop with N synchronous SQLite reads.
+    # One batched SQL read covers every missing ticker.
     fallbacks = (
         await asyncio.to_thread(
             LivePriceService.get_last_known_prices_batch, fallback_tickers
@@ -135,9 +145,6 @@ async def get_live_prices(
         else:
             prices[ticker] = LivePriceInfo(price=None, source="missing", as_of=None)
 
-    # FxRateService.get_usd_to_eur_rate_safe also goes to Yahoo on a cache
-    # miss; offload it for the same reason.
-    usd_to_eur_rate = await asyncio.to_thread(FxRateService.get_usd_to_eur_rate_safe)
     return LivePricesResponse(
         prices=prices,
         usd_to_eur_rate=usd_to_eur_rate,

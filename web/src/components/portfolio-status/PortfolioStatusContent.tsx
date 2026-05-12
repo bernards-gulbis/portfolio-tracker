@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { formatSignedCurrency, getValueClass } from '../../utils/formatters';
+import { formatCurrency, formatSignedCurrency, getValueClass } from '../../utils/formatters';
 import type { Currency } from '../../hooks/useCurrencyPreference';
 import { useLocale } from '../../hooks/useLocale';
 import { useCurrencyPreference } from '../../hooks/useCurrencyPreference';
@@ -57,10 +57,7 @@ const renderCountTotal = (
   currency: Currency,
   locale: string,
 ): React.ReactNode => {
-  // ``t`` carries the strict translation-key union from i18next's typegen, so a
-  // dynamic ``status.foo`` literal won't satisfy it. The cast trades that
-  // safety for the ability to pass interpolated section-summary keys through a
-  // shared helper — same pattern used in ``WarningsAlert``.
+  // Cast loses i18next typegen's key union so we can pass interpolated keys through.
   const tDynamic = t as unknown as (
     key: string,
     opts?: { total: string; count: number },
@@ -125,9 +122,7 @@ export const PortfolioStatusContent = ({
 
   const eurRate = eur?.rate ?? null;
 
-  // Day change is computed from holdings in their native USD; convert the
-  // absolute delta to EUR when EUR is the active display, but keep the % as-is
-  // (rate cancels out).
+  // % is rate-invariant; only the absolute delta is converted to EUR.
   const dayChange = useMemo(() => {
     const usdDayChange = dayChangeFromHoldings(status.holdings);
     if (usdDayChange == null) return null;
@@ -135,7 +130,6 @@ export const PortfolioStatusContent = ({
     return { ...usdDayChange, usd: usdDayChange.usd * eurRate };
   }, [status.holdings, currency, eurRate]);
 
-  // Counts and totals for the collapsed-section header summaries.
   const realizedGainsTotal = useMemo(
     () => status.realized_sales.reduce((sum, s) => sum + s.realized_gain, 0),
     [status.realized_sales],
@@ -187,9 +181,8 @@ export const PortfolioStatusContent = ({
   const latestDataPoint = performance?.data_points.at(-1);
   const vsSpPts = vsSpPoints(latestDataPoint);
 
-  // Dividends and withdrawals are tracked in USD on the backend; the EUR figure
-  // would require historical FX rates per row which the section tables already
-  // surface, so summary chips display USD totals.
+  // Summary chips stay in USD because per-row EUR conversion needs historical
+  // FX rates (already shown inside the expanded section tables).
   const realizedSummary = renderCountTotal(
     realizedGainsTotal,
     status.realized_sales.length,
@@ -295,10 +288,7 @@ export const PortfolioStatusContent = ({
         title={t('status.positions')}
         summary={t('status.holdingsCount', {
           count: status.holdings.length,
-          total:
-            totalValue == null
-              ? '—'
-              : formatSignedCurrency(totalValue, currency, locale).replace(/^[+]/, ''),
+          total: totalValue == null ? '—' : formatCurrency(totalValue, currency, locale),
         })}
         defaultOpen
       >
