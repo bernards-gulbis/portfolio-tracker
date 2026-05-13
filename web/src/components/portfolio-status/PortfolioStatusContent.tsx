@@ -29,8 +29,6 @@ import { HoldingsTable } from '../HoldingsTable';
 import { RealizedGainsTable, DividendsReceivedTable } from '../RealizedGainsTable';
 import { WithdrawalsTable } from '../WithdrawalsTable';
 
-import { useDismissedCostBasisWarning } from '../../hooks/useDismissedCostBasisWarning';
-
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
 import { HeroPortfolioCard } from './HeroPortfolioCard';
@@ -117,11 +115,11 @@ export const PortfolioStatusContent = ({
 
   const { annualizedReturn } = useDerivedReturns(performance, status, showEur);
 
-  const { shouldShow: showCostBasisWarning, dismiss: dismissCostBasisWarning } =
-    useDismissedCostBasisWarning(
-      performance?.portfolio_id ?? 0,
-      performance?.cost_basis_fallback_tickers ?? [],
-    );
+  const chartWarnings = useMemo(() => {
+    const tickers = performance?.cost_basis_fallback_tickers ?? [];
+    if (tickers.length === 0) return [];
+    return [t('status.chartCostBasisFallback', { tickers: tickers.join(', ') })];
+  }, [performance?.cost_basis_fallback_tickers, t]);
 
   const eurRate = eur?.rate ?? null;
 
@@ -271,14 +269,6 @@ export const PortfolioStatusContent = ({
         sparklineData={sparklineData}
       />
 
-      {showCostBasisWarning && (
-        <InfoBanner onDismiss={dismissCostBasisWarning}>
-          {t('status.chartCostBasisFallback', {
-            tickers: (performance?.cost_basis_fallback_tickers ?? []).join(', '),
-          })}
-        </InfoBanner>
-      )}
-
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
         {performanceError == null ? (
           <ErrorBoundary fullScreen={false}>
@@ -288,6 +278,7 @@ export const PortfolioStatusContent = ({
                 isLoading={isPerformanceLoading}
                 currency={currency}
                 liveLastPoint={liveLastPoint}
+                warnings={chartWarnings}
               />
             </Suspense>
           </ErrorBoundary>

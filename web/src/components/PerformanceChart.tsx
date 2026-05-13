@@ -22,6 +22,7 @@ export const PerformanceChart = ({
   isLoading,
   currency = 'EUR',
   liveLastPoint,
+  warnings,
 }: PerformanceChartProps) => {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -173,7 +174,7 @@ export const PerformanceChart = ({
   return (
     <Card>
       <CardHeader>
-        <PerformanceChartHeader viewMode={viewMode} headerInfo={headerInfo} />
+        <PerformanceChartHeader viewMode={viewMode} headerInfo={headerInfo} warnings={warnings} />
         <CardAction>
           <div className="flex items-center gap-2">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>

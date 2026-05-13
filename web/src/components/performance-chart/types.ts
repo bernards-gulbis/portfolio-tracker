@@ -14,6 +14,9 @@ export interface PerformanceChartProps {
   isLoading?: boolean;
   currency?: Currency;
   liveLastPoint?: LiveLastPoint;
+  /** Pre-formatted chart-level caveats (e.g. cost-basis fallback). Rendered as a
+   *  popover behind an info icon in the chart header. */
+  warnings?: string[];
 }
 
 export interface ChartDataPoint {
