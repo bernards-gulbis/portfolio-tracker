@@ -140,7 +140,6 @@ export const PortfolioStatusContent = ({
     return (
       <Card>
         <CardContent>
-          {toolbar && !isEmptyPortfolio && <div className="flex justify-end mb-4">{toolbar}</div>}
           <Alert>
             <InfoIcon className="h-4 w-4" />
             <AlertDescription>
@@ -181,7 +180,7 @@ export const PortfolioStatusContent = ({
 
   return (
     <>
-      {toolbar && !isEmptyPortfolio && <div className="flex justify-end">{toolbar}</div>}
+      {toolbar && <div className="flex justify-end">{toolbar}</div>}
 
       {status.eur_incomplete && status.fx_missing_tx_ids.length > 0 && (
         <EurIncompleteBanner

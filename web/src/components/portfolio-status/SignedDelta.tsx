@@ -16,7 +16,7 @@ export interface SignedDeltaProps {
   /** Money delta. ``null``/``undefined`` renders as a dash. */
   value: number | null | undefined;
   /** Optional companion percentage. Hidden when ``null``/``undefined``. */
-  pct?: number | null | undefined;
+  pct?: number | null;
   currency?: Currency;
   locale?: string;
   /** When true, color the whole element via ``getValueClass`` (positive/negative/neutral). */
