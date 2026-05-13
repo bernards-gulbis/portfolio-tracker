@@ -42,8 +42,8 @@ export const PerformanceChartHeader = ({ viewMode, headerInfo, warnings }: Props
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="text-sm space-y-2">
-              {warnings.map((w) => (
-                <p key={w} className="leading-relaxed">{w}</p>
+              {warnings.map((w, i) => (
+                <p key={i} className="leading-relaxed">{w}</p>
               ))}
             </PopoverContent>
           </Popover>

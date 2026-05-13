@@ -382,6 +382,13 @@ class LivePriceInfo(BaseModel):
                 raise ValueError(
                     f"LivePriceInfo with source='{self.source}' must have a non-None as_of timestamp"
                 )
+            # ``last_known`` is a stale cache row with no notion of "yesterday";
+            # the docstring pins previous_close to None for this source so the UI
+            # can't accidentally render a day-over-day delta against the stale price.
+            if self.source == "last_known" and self.previous_close is not None:
+                raise ValueError(
+                    "LivePriceInfo with source='last_known' must have previous_close=None"
+                )
         return self
 
 

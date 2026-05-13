@@ -26,6 +26,11 @@ import { AlertTriangleIcon, ClockIcon } from 'lucide-react';
 
 type EurVals = ReturnType<typeof applyRateToHolding>;
 
+// Hide the cash row when the balance rounds to zero at typical display precision.
+// Below this threshold a value like 0.0001 USD would render as "$0.00" and add
+// noise without information; using a small epsilon avoids float-drift artifacts.
+const MIN_CASH_DISPLAY_THRESHOLD = 0.005;
+
 const renderCurrentValue = (
   holding: PricedHolding,
   eurVals: EurVals | null,
@@ -198,7 +203,7 @@ export const HoldingsTable = memo(
               </TableRow>
             </TableHeader>
             <TableBody>
-              {cashDisplay > 0.005 && (
+              {cashDisplay > MIN_CASH_DISPLAY_THRESHOLD && (
                 <TableRow key="CASH" className="text-muted-foreground hover:bg-muted/30 transition-colors">
                   <TableCell colSpan={4} className="italic">{t('status.cashRow')}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">

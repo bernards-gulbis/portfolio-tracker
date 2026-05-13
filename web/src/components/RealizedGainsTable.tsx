@@ -208,7 +208,9 @@ const GainsSaleRow = ({ sale, locale, showTicker = false }: GainsSaleRowProps) =
       </TableCell>
       <TableCell className={`text-right tabular-nums ${getValueClass(sale.realized_gain)}`}>
         <span className="inline-flex items-baseline justify-end gap-1.5 font-medium">
-          <span aria-hidden>{sale.realized_gain >= 0 ? '▲' : '▼'}</span>
+          <span aria-hidden>
+            {sale.realized_gain > 0 ? '▲' : sale.realized_gain < 0 ? '▼' : '—'}
+          </span>
           <span>{formatSignedCurrency(sale.realized_gain, 'USD', locale)}</span>
           {realizedPct != null && (
             <span className="text-xs">{formatSignedPercentPlain(realizedPct)}</span>

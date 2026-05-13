@@ -199,4 +199,35 @@ describe('computePricedStatus', () => {
     expect(result.holdings_cost).toBe(status.holdings_cost);
     expect(result.warnings).toBe(status.warnings);
   });
+
+  it('propagates previous_close from live prices to priced holdings', () => {
+    // ``previous_close`` powers the day-over-day delta UI. The compute layer
+    // must pass it through verbatim for live rows and emit null for stale
+    // (last_known) and missing rows so the UI renders a neutral dash.
+    const livePrices = makeLivePrices({
+      prices: {
+        AAPL: { price: 210, source: 'live', as_of: '2026-03-03T12:00:00Z', previous_close: 205 },
+        MSFT: { price: 420, source: 'last_known', as_of: '2026-03-02T12:00:00Z', previous_close: null },
+        GOOG: live(null, 'missing'),
+      },
+    });
+    const status = makeStatus({
+      holdings: [
+        { ticker: 'AAPL', quantity: 10, average_cost: 150, total_cost: 1_500, first_buy_date: '2024-01-01' },
+        { ticker: 'MSFT', quantity: 20, average_cost: 400, total_cost: 8_000, first_buy_date: '2024-01-01' },
+        { ticker: 'GOOG', quantity: 5, average_cost: 100, total_cost: 500, first_buy_date: '2024-01-01' },
+      ],
+      holdings_cost: 10_000,
+    });
+    const result = computePricedStatus(status, livePrices);
+
+    const aapl = result.holdings.find((h) => h.ticker === 'AAPL')!;
+    expect(aapl.previous_close).toBe(205);
+
+    const msft = result.holdings.find((h) => h.ticker === 'MSFT')!;
+    expect(msft.previous_close).toBeNull();
+
+    const goog = result.holdings.find((h) => h.ticker === 'GOOG')!;
+    expect(goog.previous_close).toBeNull();
+  });
 });

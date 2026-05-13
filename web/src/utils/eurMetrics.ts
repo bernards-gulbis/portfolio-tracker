@@ -182,7 +182,7 @@ export const dayChangeFromHoldings = (holdings: PricedHolding[]): DayChange | nu
  * instead of a misleading zero.
  */
 export const vsSpPoints = (latest: PerformanceDataPoint | undefined): number | null => {
-  if (!latest) return null;
+  if (latest == null) return null;
   if (latest.return_pct == null || latest.sp500_return_pct == null) return null;
   return latest.return_pct - latest.sp500_return_pct;
 };

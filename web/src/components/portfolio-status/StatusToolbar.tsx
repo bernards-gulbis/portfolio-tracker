@@ -35,7 +35,7 @@ export const StatusToolbar = ({
   }, []);
 
   if (isEmptyPortfolio) {
-    return <div />;
+    return null;
   }
 
   const ageMs = latestUpdateAt > 0 ? now - latestUpdateAt : null;
