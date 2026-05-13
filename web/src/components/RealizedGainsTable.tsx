@@ -139,11 +139,11 @@ interface GainsSaleRowProps {
   showTicker?: boolean;
 }
 
-/** Directional indicator for a signed gain: '▲' positive, '▼' negative, '—' flat. */
+/** Directional indicator for a signed gain: '▲' positive, '▼' negative, '•' flat. */
 const gainArrow = (value: number): string => {
   if (value > 0) return '▲';
   if (value < 0) return '▼';
-  return '—';
+  return '•';
 };
 
 const GainsSaleRow = ({ sale, locale, showTicker = false }: GainsSaleRowProps) => {

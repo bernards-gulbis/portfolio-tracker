@@ -121,10 +121,12 @@ export const formatRelativeTime = (
   });
 };
 
-/** CSS class for positive (green) / negative (red) values. */
+/** CSS class for signed values: positive → green, negative → red, exactly zero
+ *  and null/undefined → muted. Treating zero as a distinct neutral state stops
+ *  flat results from being styled as positive moves. */
 export const getValueClass = (value: number | null | undefined): string => {
-  if (value == null) return '';
-  return value >= 0 ? 'text-positive' : 'text-negative';
+  if (value == null || value === 0) return 'text-muted-foreground';
+  return value > 0 ? 'text-positive' : 'text-negative';
 };
 
 const defaultDaysHeldLabels: { d: string; m: string; y: string } = { d: 'd', m: 'm', y: 'y' };

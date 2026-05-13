@@ -63,12 +63,12 @@ describe('Formatters', () => {
   });
 
   describe('getValueClass', () => {
-    it('returns empty string for null', () => {
-      expect(getValueClass(null)).toBe('');
+    it('returns muted class for null', () => {
+      expect(getValueClass(null)).toBe('text-muted-foreground');
     });
 
-    it('returns empty string for undefined', () => {
-      expect(getValueClass(undefined)).toBe('');
+    it('returns muted class for undefined', () => {
+      expect(getValueClass(undefined)).toBe('text-muted-foreground');
     });
 
     it('returns text-positive for positive value', () => {
@@ -79,8 +79,8 @@ describe('Formatters', () => {
       expect(getValueClass(-5)).toBe('text-negative');
     });
 
-    it('returns text-positive for zero', () => {
-      expect(getValueClass(0)).toBe('text-positive');
+    it('returns muted class for exactly zero (neutral)', () => {
+      expect(getValueClass(0)).toBe('text-muted-foreground');
     });
   });
 

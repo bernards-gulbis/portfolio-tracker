@@ -75,11 +75,9 @@ export const HeroPortfolioCard = ({
       </span>
       <span className="text-sm text-muted-foreground">{t('status.today')}</span>
       {dayChange.partial && (
-        <span
-          className="text-xs text-muted-foreground"
-          title={t('status.dayChangePartialNote')}
-        >
-          *
+        <span className="text-xs text-muted-foreground">
+          <span aria-hidden="true">*</span>
+          <span className="sr-only">{t('status.dayChangePartialNote')}</span>
         </span>
       )}
     </div>
@@ -97,7 +95,7 @@ export const HeroPortfolioCard = ({
     annualizedReturn == null ? undefined : (
       <p className={`${getValueClass(annualizedReturn)} font-medium`}>
         {formatSignedPercentPlain(annualizedReturn)}{' '}
-        <span className="text-muted-foreground">{t('status.annualized').toLowerCase()}</span>
+        <span className="text-muted-foreground">{t('status.annualizedLower')}</span>
       </p>
     );
 
@@ -164,7 +162,6 @@ export const HeroPortfolioCard = ({
             valueClass={vsSpPts == null ? undefined : getValueClass(vsSpPts)}
             caption={vsSpCaption}
             tooltip={<p>{t('status.vsSp500Tooltip')}</p>}
-            scopeChip={totalReturnScope}
           />
           <KpiTile
             label={t('status.afterTaxValue')}

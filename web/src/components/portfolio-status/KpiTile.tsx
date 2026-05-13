@@ -1,5 +1,6 @@
 import React from 'react';
 import { InfoIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -16,6 +17,7 @@ export interface KpiTileProps {
 }
 
 export const KpiTile = ({ label, value, caption, tooltip, valueClass, scopeChip }: KpiTileProps) => {
+  const { t } = useTranslation();
   const labelNode = (
     <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
       <span>{label}</span>
@@ -24,7 +26,7 @@ export const KpiTile = ({ label, value, caption, tooltip, valueClass, scopeChip 
           <Tooltip>
             <TooltipTrigger asChild>
               <InfoIcon
-                aria-label={label}
+                aria-label={t('common.moreInfo')}
                 className="h-3 w-3 text-muted-foreground cursor-help"
               />
             </TooltipTrigger>

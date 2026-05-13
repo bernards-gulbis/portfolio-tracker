@@ -2,10 +2,7 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   formatCurrency,
-  formatSignedCurrency,
-  formatSignedPercentPlain,
   formatQuantity,
-  getValueClass,
 } from '../utils/formatters';
 import { applyRateToHolding, type EurMetrics } from '../utils/eurMetrics';
 import type { PricedHolding } from '../api';
@@ -23,6 +20,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AlertTriangleIcon, ClockIcon } from 'lucide-react';
+
+import { SignedDelta } from './portfolio-status/SignedDelta';
 
 type EurVals = ReturnType<typeof applyRateToHolding>;
 
@@ -44,26 +43,6 @@ const renderCurrentValue = (
   return eurVals.currentValueEur == null
     ? '—'
     : formatCurrency(eurVals.currentValueEur, 'EUR', locale);
-};
-
-const renderInlineSignedPair = (
-  value: number | null,
-  pct: number | null,
-  currency: Currency,
-  locale: string,
-) => {
-  if (value == null) return <span>—</span>;
-  const cls = getValueClass(value);
-  const arrow = value >= 0 ? '▲' : '▼';
-  return (
-    <span className={`inline-flex items-baseline justify-end gap-1.5 font-medium tabular-nums ${cls}`}>
-      <span aria-hidden>{arrow}</span>
-      <span>{formatSignedCurrency(value, currency, locale)}</span>
-      {pct != null && (
-        <span className="text-xs">{formatSignedPercentPlain(pct)}</span>
-      )}
-    </span>
-  );
 };
 
 interface HoldingsTableProps {
@@ -90,6 +69,10 @@ export const HoldingsTable = memo(
     const eurAvailable = eurMetrics !== null;
     const effectiveCurrency: Currency = showEur && eurAvailable ? 'EUR' : displayCurrency;
     const cashDisplay = showEur && eurAvailable ? eurMetrics.cashEur : cash;
+    // The cash row is suppressed below this threshold; keep totals consistent so the
+    // visible row weights and the footer's 100% always reconcile.
+    const cashShown = cashDisplay > MIN_CASH_DISPLAY_THRESHOLD;
+    const cashContribution = cashShown ? cashDisplay : 0;
 
     const holdingsWithEur = useMemo(() => {
       const rate = showEur && eurAvailable ? eurMetrics.rate : null;
@@ -102,7 +85,7 @@ export const HoldingsTable = memo(
     const { totalUnrealizedGL, totalMarketValue, totalCost } = useMemo(() => {
       let glSum = 0;
       let glHasValue = false;
-      let marketSum = cashDisplay;
+      let marketSum = cashContribution;
       let costSum = 0;
       for (const { holding, eurVals } of holdingsWithEur) {
         const useEur = showEur && eurVals?.unrealizedGainLossEur != null;
@@ -126,7 +109,7 @@ export const HoldingsTable = memo(
         totalMarketValue: marketSum,
         totalCost: costSum,
       };
-    }, [holdingsWithEur, showEur, cashDisplay]);
+    }, [holdingsWithEur, showEur, cashContribution]);
 
     const totalUnrealizedPct =
       totalUnrealizedGL == null || totalCost <= 0 ? null : (totalUnrealizedGL / totalCost) * 100;
@@ -165,7 +148,7 @@ export const HoldingsTable = memo(
       if (rowValue == null || totalMarketValue <= 0) return null;
       return (rowValue / totalMarketValue) * 100;
     };
-    const cashWeight = rowWeight(cashDisplay);
+    const cashWeight = cashShown ? rowWeight(cashDisplay) : null;
 
     return (
       <div>
@@ -186,8 +169,9 @@ export const HoldingsTable = memo(
           </Alert>
         )}
         <Card>
-          <Table>
-            <TableCaption className="sr-only">{t('status.positions')}</TableCaption>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableCaption className="sr-only">{t('status.positions')}</TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('status.columns.ticker')}</TableHead>
@@ -203,7 +187,7 @@ export const HoldingsTable = memo(
               </TableRow>
             </TableHeader>
             <TableBody>
-              {cashDisplay > MIN_CASH_DISPLAY_THRESHOLD && (
+              {cashShown && (
                 <TableRow key="CASH" className="text-muted-foreground hover:bg-muted/30 transition-colors">
                   <TableCell colSpan={4} className="italic">{t('status.cashRow')}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
@@ -253,17 +237,26 @@ export const HoldingsTable = memo(
                       {renderCurrentValue(holding, eurVals, locale)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {renderInlineSignedPair(dayCh.value, dayCh.pct, effectiveCurrency, locale)}
+                      <SignedDelta
+                        value={dayCh.value}
+                        pct={dayCh.pct}
+                        currency={effectiveCurrency}
+                        locale={locale}
+                        className="justify-end font-medium"
+                      />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {renderInlineSignedPair(
-                        useEurGL
-                          ? eurVals.unrealizedGainLossEur
-                          : holding.unrealized_gain_loss,
-                        holding.unrealized_gain_loss_pct,
-                        useEurGL ? 'EUR' : 'USD',
-                        locale,
-                      )}
+                      <SignedDelta
+                        value={
+                          useEurGL
+                            ? eurVals.unrealizedGainLossEur
+                            : holding.unrealized_gain_loss
+                        }
+                        pct={holding.unrealized_gain_loss_pct}
+                        currency={useEurGL ? 'EUR' : 'USD'}
+                        locale={locale}
+                        className="justify-end font-medium"
+                      />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {weight == null ? '—' : `${weight.toFixed(1)}%`}
@@ -283,17 +276,19 @@ export const HoldingsTable = memo(
                 </TableCell>
                 <TableCell />
                 <TableCell className="text-right tabular-nums">
-                  {renderInlineSignedPair(
-                    totalUnrealizedGL,
-                    totalUnrealizedPct,
-                    effectiveCurrency,
-                    locale,
-                  )}
+                  <SignedDelta
+                    value={totalUnrealizedGL}
+                    pct={totalUnrealizedPct}
+                    currency={effectiveCurrency}
+                    locale={locale}
+                    className="justify-end font-medium"
+                  />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">100.0%</TableCell>
               </TableRow>
             </TableFooter>
-          </Table>
+            </Table>
+          </div>
         </Card>
       </div>
     );
