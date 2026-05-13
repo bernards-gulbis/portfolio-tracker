@@ -58,9 +58,7 @@ class TestLivePriceInfoInvariants:
         # The stale cache row has no notion of "yesterday"; the docstring pins
         # previous_close to None for last_known so the UI can't render a bogus
         # day-over-day delta against a stale price.
-        with pytest.raises(
-            ValidationError, match="must have previous_close=None"
-        ):
+        with pytest.raises(ValidationError, match="must have previous_close=None"):
             LivePriceInfo(
                 price=150.0,
                 source="last_known",

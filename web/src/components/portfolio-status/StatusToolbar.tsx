@@ -30,9 +30,12 @@ export const StatusToolbar = ({
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    // Only tick while the toolbar is actually visible — empty portfolios
+    // render null, so an interval there would update state for nothing.
+    if (isEmptyPortfolio) return;
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [isEmptyPortfolio]);
 
   if (isEmptyPortfolio) {
     return null;
@@ -47,10 +50,10 @@ export const StatusToolbar = ({
 
   const dotClass =
     freshness === 'live'
-      ? 'bg-[var(--positive)]'
+      ? 'bg-(--positive)'
       : freshness === 'stale'
         ? 'bg-amber-500'
-        : 'bg-[var(--negative)]';
+        : 'bg-(--negative)';
 
   const freshnessLabel = t(`status.freshness.${freshness}`);
 
