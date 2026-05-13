@@ -110,13 +110,15 @@ export const PortfolioStatusContent = ({
   const inceptionYear = useMemo<number | null>(() => {
     const points = performance?.data_points;
     if (points && points.length > 0) return Number(points[0].date.slice(0, 4)) || null;
-    const dates = [
+    const years = [
       ...status.holdings.map((h) => h.first_buy_date),
       ...status.realized_sales.map((s) => s.first_buy_date),
-    ].filter((d): d is string => typeof d === 'string' && d.length >= 4);
-    if (dates.length === 0) return null;
-    const earliest = dates.reduce((a, b) => (a < b ? a : b));
-    return Number(earliest.slice(0, 4)) || null;
+    ]
+      .filter((d): d is string => typeof d === 'string' && d.length >= 4)
+      .map((d) => Number(d.slice(0, 4)))
+      .filter((y) => Number.isFinite(y) && y > 0);
+    if (years.length === 0) return null;
+    return Math.min(...years);
   }, [performance, status.holdings, status.realized_sales]);
 
   const sparklineData = useMemo<SparklinePoint[]>(() => {

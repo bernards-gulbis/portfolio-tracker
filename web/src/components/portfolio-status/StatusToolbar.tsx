@@ -18,6 +18,21 @@ interface StatusToolbarProps {
 
 type Freshness = 'live' | 'stale' | 'error';
 
+const computeFreshness = (
+  livePricesError: boolean,
+  ageMs: number | null,
+): Freshness => {
+  if (livePricesError) return 'error';
+  if (ageMs != null && ageMs <= STALE_THRESHOLD_MS) return 'live';
+  return 'stale';
+};
+
+const freshnessDotClass = (freshness: Freshness): string => {
+  if (freshness === 'live') return 'bg-(--positive)';
+  if (freshness === 'stale') return 'bg-amber-500';
+  return 'bg-(--negative)';
+};
+
 export const StatusToolbar = ({
   isEmptyPortfolio,
   livePricesError,
@@ -42,18 +57,8 @@ export const StatusToolbar = ({
   }
 
   const ageMs = latestUpdateAt > 0 ? now - latestUpdateAt : null;
-  const freshness: Freshness = livePricesError
-    ? 'error'
-    : ageMs != null && ageMs <= STALE_THRESHOLD_MS
-      ? 'live'
-      : 'stale';
-
-  const dotClass =
-    freshness === 'live'
-      ? 'bg-(--positive)'
-      : freshness === 'stale'
-        ? 'bg-amber-500'
-        : 'bg-(--negative)';
+  const freshness = computeFreshness(livePricesError, ageMs);
+  const dotClass = freshnessDotClass(freshness);
 
   const freshnessLabel = t(`status.freshness.${freshness}`);
 

@@ -46,7 +46,7 @@ export const HeroSparkline = ({
     const line = coords
       .map((c, idx) => `${idx === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`)
       .join(' ');
-    const fill = `${line} L${coords[coords.length - 1].x.toFixed(2)},${height} L0,${height} Z`;
+    const fill = `${line} L${coords.at(-1)!.x.toFixed(2)},${height} L0,${height} Z`;
     return { linePath: line, fillPath: fill };
   }, [data, width, height]);
 

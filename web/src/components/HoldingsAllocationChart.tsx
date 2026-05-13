@@ -120,12 +120,12 @@ export const HoldingsAllocationChart = ({
       if (viewMode === 'cost') {
         rawValue = holding.total_cost;
         atCost = false;
-      } else if (holding.current_value != null) {
-        rawValue = holding.current_value;
-        atCost = false;
-      } else {
+      } else if (holding.current_value == null) {
         rawValue = holding.total_cost;
         atCost = true;
+      } else {
+        rawValue = holding.current_value;
+        atCost = false;
       }
       const value = useEur && rawValue != null ? rawValue * eurRate : rawValue;
       if (value && value > 0) {

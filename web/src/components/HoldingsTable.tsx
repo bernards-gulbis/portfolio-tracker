@@ -258,7 +258,7 @@ export const HoldingsTable = memo(
                     <TableCell className="text-right tabular-nums">
                       {renderInlineSignedPair(
                         useEurGL
-                          ? (eurVals.unrealizedGainLossEur as number)
+                          ? eurVals.unrealizedGainLossEur
                           : holding.unrealized_gain_loss,
                         holding.unrealized_gain_loss_pct,
                         useEurGL ? 'EUR' : 'USD',

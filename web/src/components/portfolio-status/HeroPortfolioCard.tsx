@@ -133,7 +133,7 @@ export const HeroPortfolioCard = ({
             <HeroSparkline
               data={sparklineData}
               positive={
-                sparklineData[sparklineData.length - 1].value >= sparklineData[0].value
+                sparklineData.at(-1)!.value >= sparklineData[0].value
               }
               scopeLabel={t('status.sparklineScope.thirtyDays')}
             />

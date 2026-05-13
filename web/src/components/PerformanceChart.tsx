@@ -61,7 +61,7 @@ export const PerformanceChart = ({
     if (chartData.length === 0) return null;
     const first = chartData[0];
     const displayPoint =
-      activeIndex == null ? chartData[chartData.length - 1] : chartData[activeIndex];
+      activeIndex == null ? chartData.at(-1) : chartData[activeIndex];
     if (!displayPoint) return null;
 
     const values = getHeaderValues(

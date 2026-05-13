@@ -98,9 +98,7 @@ class LivePriceService:
                 try:
                     quotes[ticker] = future.result()
                 except Exception as e:
-                    logger.error(
-                        "Error fetching quote for %s: %s", ticker, e, exc_info=True
-                    )
+                    logger.exception("Error fetching quote for %s: %s", ticker, e)
                     quotes[ticker] = Quote(price=None, previous_close=None)
 
         return quotes
@@ -199,11 +197,10 @@ class LivePriceService:
             logger.warning("Error parsing price data for %s: %s", ticker, e)
             return Quote(price=None, previous_close=None)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Unexpected error fetching price for %s: %s",
                 ticker,
                 e,
-                exc_info=True,
             )
             return Quote(price=None, previous_close=None)
 

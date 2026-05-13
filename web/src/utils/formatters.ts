@@ -66,12 +66,18 @@ export const formatDateCompact = (date: string, locale: string = 'en-US'): strin
   });
 };
 
+/** Sign prefix for a numeric value: '+' for positive, '−' for negative, '' for zero. */
+const signPrefix = (value: number): string => {
+  if (value > 0) return '+';
+  if (value < 0) return '−';
+  return '';
+};
+
 /** Percent value with +/- sign; '-' for null/undefined.
  *  Pair with a leading arrow span when the caller renders a money/percent pair. */
 export const formatSignedPercentPlain = (value: number | null | undefined): string => {
   if (value == null) return '-';
-  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
-  return `${sign}${Math.abs(value).toFixed(2)}%`;
+  return `${signPrefix(value)}${Math.abs(value).toFixed(2)}%`;
 };
 
 /** Percentage-points difference, e.g. ``-5.4 pp``; '—' for null/undefined.
@@ -79,8 +85,7 @@ export const formatSignedPercentPlain = (value: number | null | undefined): stri
  *  with an absolute percent. */
 export const formatSignedPp = (value: number | null | undefined, unit: string = 'pp'): string => {
   if (value == null) return '—';
-  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
-  return `${sign}${Math.abs(value).toFixed(2)} ${unit}`;
+  return `${signPrefix(value)}${Math.abs(value).toFixed(2)} ${unit}`;
 };
 
 export interface RelativeTimeLabels {
