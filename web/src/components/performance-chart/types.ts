@@ -14,6 +14,9 @@ export interface PerformanceChartProps {
   isLoading?: boolean;
   currency?: Currency;
   liveLastPoint?: LiveLastPoint;
+  /** Pre-formatted chart-level caveats (e.g. cost-basis fallback). Rendered as a
+   *  popover behind an info icon in the chart header. */
+  warnings?: string[];
 }
 
 export interface ChartDataPoint {
@@ -22,15 +25,20 @@ export interface ChartDataPoint {
   currentValue: number | null;
   returnPct: number | null;
   sp500ReturnPct: number | null;
+  /** Synthesized S&P 500 value series (value mode): ``principal × (1 + sp500_return_pct/100)``.
+   *  Shows what the user's net deposits would be worth under a passive S&P 500 investment.
+   *  Null when ``sp500_return_pct`` or ``principal`` is missing for the point. */
+  sp500Value: number | null;
 }
 
 /** Header display values for value mode. */
 export interface ValueHeaderInfo {
   mode: 'value';
   displayValue: string;
-  principalDisplay: string | null;
   changeDisplay: string | null;
   pctDisplay: string;
+  /** Pre-formatted vs-S&P spread in percentage points (e.g. "−0.6 pp"); null when unavailable. */
+  spreadDisplay: string | null;
   isPositive: boolean;
 }
 
@@ -38,7 +46,8 @@ export interface ValueHeaderInfo {
 export interface PctHeaderInfo {
   mode: 'pct';
   displayValue: string;
-  sp500Display: string | null;
+  /** Pre-formatted vs-S&P spread in percentage points; null when unavailable. */
+  spreadDisplay: string | null;
   isPositive: boolean;
 }
 

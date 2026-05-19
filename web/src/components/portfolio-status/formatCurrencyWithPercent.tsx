@@ -1,24 +1,25 @@
 import React from 'react';
 
 import type { Currency } from '../../hooks/useCurrencyPreference';
-import { formatSignedCurrency, formatSignedPercent } from '../../utils/formatters';
 
+import { SignedDelta } from './SignedDelta';
+
+/** Thin wrapper around {@link SignedDelta} preserved for legacy call sites that
+ *  embed the arrow/value/percent triple inline. The caller controls the colour
+ *  (passes ``colored={false}``) so it can sit inside a span that already carries
+ *  a value class — matches the historical behaviour of inheriting the parent's
+ *  color. New code should use {@link SignedDelta} directly. */
 export const formatCurrencyWithPercent = (
   currencyValue: number | null | undefined,
   percentValue: number | null | undefined,
   currency: Currency = 'USD',
   locale: string = 'en-US',
-): React.JSX.Element | string => {
-  if (currencyValue == null) return '-';
-  const percentClass = currencyValue >= 0 ? 'text-positive' : 'text-negative';
-  return (
-    <>
-      <span>{formatSignedCurrency(currencyValue, currency, locale)}</span>
-      {percentValue != null && (
-        <span className={`${percentClass} font-bold ml-1.5`}>
-          {formatSignedPercent(percentValue)}
-        </span>
-      )}
-    </>
-  );
-};
+): React.JSX.Element => (
+  <SignedDelta
+    value={currencyValue}
+    pct={percentValue}
+    currency={currency}
+    locale={locale}
+    colored={false}
+  />
+);

@@ -12,12 +12,16 @@ import { useLocale } from '../hooks/useLocale';
 import type { ViewBox } from 'recharts/types/util/types';
 import { PricedHolding } from '../api';
 import type { Currency } from '../hooks/useCurrencyPreference';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ChartContainer,
   type ChartConfig,
 } from '@/components/ui/chart';
+
+type AllocationViewMode = 'current' | 'cost';
 
 interface HoldingsAllocationChartProps {
   holdings: PricedHolding[];
@@ -95,24 +99,38 @@ export const HoldingsAllocationChart = ({
   const { t } = useTranslation();
   const locale = useLocale();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<AllocationViewMode>('current');
   const shapeRenderer = useMemo(() => createShapeRenderer(activeIndex), [activeIndex]);
 
   const { chartData, total, chartConfig, currency } = useMemo(() => {
     const useEur = displayCurrency === 'EUR' && eurRate != null && eurRate > 0;
     const currency = useEur ? 'EUR' : 'USD';
-    const data: Array<{ name: string; value: number; fill: string }> = [];
+    const data: Array<{ name: string; value: number; fill: string; atCost: boolean }> = [];
 
     const cashValue = useEur ? cash * eurRate : cash;
     if (cashValue > 0) {
-      data.push({ name: 'CASH', value: cashValue, fill: COLORS[0] });
+      data.push({ name: 'CASH', value: cashValue, fill: COLORS[0], atCost: false });
     }
 
+    // In Current view, fall back to total_cost when current_value is missing so unpriced
+    // holdings still appear in the donut (tagged "at cost") instead of vanishing.
     holdings.forEach((holding) => {
-      const rawValue = holding.current_value;
+      let rawValue: number | null;
+      let atCost: boolean;
+      if (viewMode === 'cost') {
+        rawValue = holding.total_cost;
+        atCost = false;
+      } else if (holding.current_value == null) {
+        rawValue = holding.total_cost;
+        atCost = true;
+      } else {
+        rawValue = holding.current_value;
+        atCost = false;
+      }
       const value = useEur && rawValue != null ? rawValue * eurRate : rawValue;
       if (value && value > 0) {
         const index = data.length;
-        data.push({ name: holding.ticker, value, fill: COLORS[index % COLORS.length] });
+        data.push({ name: holding.ticker, value, fill: COLORS[index % COLORS.length], atCost });
       }
     });
 
@@ -127,7 +145,7 @@ export const HoldingsAllocationChart = ({
     }, {} as ChartConfig);
 
     return { chartData: data, total, chartConfig: config, currency };
-  }, [holdings, cash, eurRate, displayCurrency]);
+  }, [holdings, cash, eurRate, displayCurrency, viewMode]);
 
   const handleMouseEnter = useCallback((_: unknown, index: number) => {
     setActiveIndex(index);
@@ -171,11 +189,25 @@ export const HoldingsAllocationChart = ({
   }
 
   const activeEntry = activeIndex == null ? null : chartData[activeIndex];
+  const totalLabel =
+    viewMode === 'cost' ? t('chart.allocation.costBasisLabel') : t('chart.allocation.marketValue');
 
   return (
     <Card className="flex flex-col">
       <CardHeader>
         <CardTitle>{t('chart.allocation.title')}</CardTitle>
+        <CardAction>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as AllocationViewMode)}>
+            <TabsList aria-label={t('chart.allocation.viewModeAria')}>
+              <TabsTrigger value="current" className="text-xs">
+                {t('chart.allocation.viewCurrent')}
+              </TabsTrigger>
+              <TabsTrigger value="cost" className="text-xs">
+                {t('chart.allocation.viewCostBasis')}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardAction>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[240px] w-full min-h-[200px]" aria-label={t('chart.allocation.title')}>
@@ -199,7 +231,7 @@ export const HoldingsAllocationChart = ({
                     currency={currency}
                     activeEntry={activeEntry}
                     total={total}
-                    totalLabel={t('chart.allocation.marketValue')}
+                    totalLabel={totalLabel}
                   />
                 }
               />
@@ -224,6 +256,14 @@ export const HoldingsAllocationChart = ({
                     style={{ backgroundColor: entry.fill }}
                   />
                   <span className="text-muted-foreground">{entry.name}</span>
+                  {entry.atCost && (
+                    <Badge
+                      variant="secondary"
+                      className="rounded-sm px-1.5 py-0 text-[10px] text-muted-foreground"
+                    >
+                      {t('chart.allocation.atCostTag')}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-muted-foreground">{formatCurrency(entry.value, currency, locale)}</span>

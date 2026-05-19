@@ -79,38 +79,13 @@ async def get_live_prices(
             status_code=400,
             detail=f"Too many tickers requested ({len(tickers)}). Maximum is {MAX_TICKERS}.",
         )
-    # ``LivePriceService.get_current_prices`` catches its own per-ticker
-    # exceptions and returns ``None`` for failed lookups, so the only paths
-    # that escape here are programming errors (e.g. a misconfigured
-    # ThreadPoolExecutor). Catching ``RuntimeError`` keeps the response
-    # alive for those rare cases without swallowing genuine bugs that should
-    # surface as 500s during development.
-    #
-    # ``LivePriceService.get_current_prices`` blocks (yfinance + thread pool);
-    # offload to a worker thread so the asyncio event loop stays free for
-    # other concurrent requests.
-    try:
-        live_prices = (
-            await asyncio.to_thread(LivePriceService.get_current_prices, tickers)
-            if tickers
-            else {}
-        )
-    except RuntimeError as e:
-        logger.error("Live price fetch infrastructure error: %s", e, exc_info=True)
-        live_prices = dict.fromkeys(tickers)
+
+    live_quotes, usd_to_eur_rate = await _fetch_live_quotes_and_fx(tickers)
 
     now = datetime.now(UTC)
-    prices: dict[str, LivePriceInfo] = {}
-    fallback_tickers: list[str] = []
-    for ticker in tickers:
-        live = live_prices.get(ticker)
-        if live is not None and live > 0:
-            prices[ticker] = LivePriceInfo(price=float(live), source="live", as_of=now)
-        else:
-            fallback_tickers.append(ticker)
+    prices, fallback_tickers = _build_live_entries(tickers, live_quotes, now)
 
-    # Batch the DB fallback for every missing ticker into one offloaded
-    # query so we don't hit the event loop with N synchronous SQLite reads.
+    # One batched SQL read covers every missing ticker.
     fallbacks = (
         await asyncio.to_thread(
             LivePriceService.get_last_known_prices_batch, fallback_tickers
@@ -119,25 +94,78 @@ async def get_live_prices(
         else {}
     )
     for ticker in fallback_tickers:
-        fallback = fallbacks.get(ticker)
-        if fallback is not None:
-            price, date_str = fallback
-            prices[ticker] = LivePriceInfo(
-                price=price,
-                source="last_known",
-                as_of=datetime.fromisoformat(date_str).replace(tzinfo=UTC),
-            )
-        else:
-            prices[ticker] = LivePriceInfo(price=None, source="missing", as_of=None)
+        prices[ticker] = _build_fallback_entry(fallbacks.get(ticker))
 
-    # FxRateService.get_usd_to_eur_rate_safe also goes to Yahoo on a cache
-    # miss; offload it for the same reason.
-    usd_to_eur_rate = await asyncio.to_thread(FxRateService.get_usd_to_eur_rate_safe)
     return LivePricesResponse(
         prices=prices,
         usd_to_eur_rate=usd_to_eur_rate,
         timestamp=now,
         provider_unavailable=YahooFinanceClient.is_circuit_open(),
+    )
+
+
+async def _fetch_live_quotes_and_fx(tickers: list[str]):
+    """Fetch quotes + FX concurrently.
+
+    ``get_current_quotes`` catches per-ticker errors and returns
+    ``Quote(None, None)`` for failures, so only infrastructure ``RuntimeError``
+    escapes; we catch it here to keep the response alive without swallowing
+    real bugs. Any other exception (or any FX exception) is re-raised.
+    """
+    fx_coro = asyncio.to_thread(FxRateService.get_usd_to_eur_rate_safe)
+    if not tickers:
+        return {}, await fx_coro
+
+    quotes_result, usd_to_eur_rate = await asyncio.gather(
+        asyncio.to_thread(LivePriceService.get_current_quotes, tickers),
+        fx_coro,
+        return_exceptions=True,
+    )
+    if isinstance(usd_to_eur_rate, BaseException):
+        raise usd_to_eur_rate
+    if isinstance(quotes_result, BaseException):
+        if not isinstance(quotes_result, RuntimeError):
+            raise quotes_result
+        logger.error(
+            "Live price fetch infrastructure error: %s",
+            quotes_result,
+            exc_info=quotes_result,
+        )
+        return {}, usd_to_eur_rate
+    return quotes_result, usd_to_eur_rate
+
+
+def _build_live_entries(
+    tickers: list[str],
+    live_quotes: dict,
+    now: datetime,
+) -> tuple[dict[str, LivePriceInfo], list[str]]:
+    """Split tickers into freshly-priced entries and ones needing DB fallback."""
+    prices: dict[str, LivePriceInfo] = {}
+    fallback_tickers: list[str] = []
+    for ticker in tickers:
+        quote = live_quotes.get(ticker)
+        if quote is not None and quote.price is not None and quote.price > 0:
+            prices[ticker] = LivePriceInfo(
+                price=float(quote.price),
+                source="live",
+                as_of=now,
+                previous_close=quote.previous_close,
+            )
+        else:
+            fallback_tickers.append(ticker)
+    return prices, fallback_tickers
+
+
+def _build_fallback_entry(fallback: tuple[float, str] | None) -> LivePriceInfo:
+    """Map a DB-cache hit (price, ISO date) to ``last_known``; absence to ``missing``."""
+    if fallback is None:
+        return LivePriceInfo(price=None, source="missing", as_of=None)
+    price, date_str = fallback
+    return LivePriceInfo(
+        price=price,
+        source="last_known",
+        as_of=datetime.fromisoformat(date_str).replace(tzinfo=UTC),
     )
 
 

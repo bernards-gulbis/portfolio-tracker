@@ -14,7 +14,7 @@ test('portfolio dashboard — allocation chart and holdings visible after import
 
   await page.goto(`/portfolios/${portfolio.id}`);
 
-  await expect(page.getByLabel('Allocation')).toBeVisible();
+  await expect(page.getByLabel('Allocation', { exact: true })).toBeVisible();
   await expect(page.locator('main')).toContainText('AAPL');
 });
 

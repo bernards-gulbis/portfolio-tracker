@@ -162,7 +162,7 @@ describe('PortfolioStatusView', () => {
     expect(screen.getAllByText('After-tax Value').length).toBeGreaterThan(0);
   });
 
-  it('renders CASH row in holdings table', () => {
+  it('renders Cash row in holdings table', () => {
     vi.mocked(usePortfolioStatus).mockReturnValue({
       data: mockStatus,
       isLoading: false,
@@ -171,7 +171,7 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getAllByText('CASH').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Cash').length).toBeGreaterThan(0);
   });
 
   it('renders ticker in holdings table', () => {
@@ -420,8 +420,9 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    // Null monetary values (market value, dividends, tax, after-tax) render as '-'
-    const dashes = screen.getAllByText('-');
+    // Null monetary values (market value, dividends, tax, after-tax) render as
+    // em-dash '—' from the redesigned hero card / positions table.
+    const dashes = screen.getAllByText('—');
     expect(dashes.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -450,7 +451,7 @@ describe('PortfolioStatusView', () => {
     localStorage.removeItem('pt_currency');
   });
 
-  it('renders realized gains section when realized_sales is non-empty', () => {
+  it('renders history section with Realized Gains tab when realized_sales is non-empty', () => {
     const statusWithSales: PortfolioStatus = {
       ...mockStatus,
       realized_sales: [
@@ -483,10 +484,11 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getAllByText('Realized Gains').length).toBeGreaterThan(0);
+    expect(screen.getByText('History')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /realized gains/i })).toBeInTheDocument();
   });
 
-  it('renders dividends received section when dividends_received is non-empty', () => {
+  it('renders history section with Dividends tab when dividends_received is non-empty', () => {
     const statusWithDividends: PortfolioStatus = {
       ...mockStatus,
       dividends: 50,
@@ -511,10 +513,11 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getAllByText('Dividends Received').length).toBeGreaterThan(0);
+    expect(screen.getByText('History')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^dividends/i })).toBeInTheDocument();
   });
 
-  it('renders withdrawals section when realized_withdrawals is non-empty', () => {
+  it('renders history section with Withdrawals tab when realized_withdrawals is non-empty', () => {
     const statusWithWithdrawals: PortfolioStatus = {
       ...mockStatus,
       realized_withdrawals: [
@@ -544,7 +547,8 @@ describe('PortfolioStatusView', () => {
 
     renderComponent(1);
 
-    expect(screen.getAllByText('Withdrawals & Taxes').length).toBeGreaterThan(0);
+    expect(screen.getByText('History')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^withdrawals/i })).toBeInTheDocument();
   });
 
   it('navigates to transactions when EurIncompleteBanner "Fix transactions" is clicked', async () => {

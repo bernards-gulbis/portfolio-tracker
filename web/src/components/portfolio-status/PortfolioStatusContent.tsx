@@ -6,18 +6,15 @@ import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-import {
-  formatCurrency,
-  formatSignedCurrency,
-  formatSignedPercent,
-  getValueClass,
-  formatTaxRatePercent,
-} from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 import { useLocale } from '../../hooks/useLocale';
 import { useCurrencyPreference } from '../../hooks/useCurrencyPreference';
-import { computeEurMetrics } from '../../utils/eurMetrics';
+import {
+  computeEurMetrics,
+  dayChangeFromHoldings,
+  vsSpPoints,
+} from '../../utils/eurMetrics';
 import {
   getErrorMessage,
   type PerformanceDataPoint,
@@ -27,19 +24,18 @@ import {
 
 import { ErrorBoundary } from '../ErrorBoundary';
 import { HoldingsTable } from '../HoldingsTable';
-import { RealizedGainsTable, DividendsReceivedTable } from '../RealizedGainsTable';
-import { WithdrawalsTable } from '../WithdrawalsTable';
-
-import { useDismissedCostBasisWarning } from '../../hooks/useDismissedCostBasisWarning';
 
 import { CollapsibleSection } from './CollapsibleSection';
 import { EurIncompleteBanner } from './EurIncompleteBanner';
+import { HeroPortfolioCard } from './HeroPortfolioCard';
+import type { SparklinePoint } from './HeroSparkline';
+import { HistorySection } from './HistorySection';
 import { InfoBanner } from './InfoBanner';
-import { StatCard } from './StatCard';
 import { WarningsAlert } from './WarningsAlert';
 import { computeDisplayFigures } from './displayFigures';
-import { formatCurrencyWithPercent } from './formatCurrencyWithPercent';
 import { useDerivedReturns } from './useDerivedReturns';
+
+const SPARKLINE_MAX_POINTS = 30;
 
 const PerformanceChart = lazy(() =>
   import('../PerformanceChart').then((m) => ({ default: m.PerformanceChart })),
@@ -95,17 +91,55 @@ export const PortfolioStatusContent = ({
 
   const { annualizedReturn } = useDerivedReturns(performance, status, showEur);
 
-  const { shouldShow: showCostBasisWarning, dismiss: dismissCostBasisWarning } =
-    useDismissedCostBasisWarning(
-      performance?.portfolio_id ?? 0,
-      performance?.cost_basis_fallback_tickers ?? [],
-    );
+  const chartWarnings = useMemo(() => {
+    const tickers = performance?.cost_basis_fallback_tickers ?? [];
+    if (tickers.length === 0) return [];
+    return [t('status.chartCostBasisFallback', { tickers: tickers.join(', ') })];
+  }, [performance?.cost_basis_fallback_tickers, t]);
+
+  const eurRate = eur?.rate ?? null;
+
+  // % is rate-invariant; only the absolute delta is converted to EUR.
+  const dayChange = useMemo(() => {
+    const usdDayChange = dayChangeFromHoldings(status.holdings);
+    if (usdDayChange == null) return null;
+    if (currency === 'USD' || eurRate == null) return usdDayChange;
+    return { ...usdDayChange, usd: usdDayChange.usd * eurRate };
+  }, [status.holdings, currency, eurRate]);
+
+  const inceptionYear = useMemo<number | null>(() => {
+    const points = performance?.data_points;
+    if (points && points.length > 0) return Number(points[0].date.slice(0, 4)) || null;
+    const years = [
+      ...status.holdings.map((h) => h.first_buy_date),
+      ...status.realized_sales.map((s) => s.first_buy_date),
+    ]
+      .filter((d): d is string => typeof d === 'string' && d.length >= 4)
+      .map((d) => Number(d.slice(0, 4)))
+      .filter((y) => Number.isFinite(y) && y > 0);
+    if (years.length === 0) return null;
+    return Math.min(...years);
+  }, [performance, status.holdings, status.realized_sales]);
+
+  const sparklineData = useMemo<SparklinePoint[]>(() => {
+    const points = performance?.data_points;
+    if (points == null || points.length === 0) return [];
+    const useEur = currency === 'EUR';
+    const trimmed = points.slice(-SPARKLINE_MAX_POINTS);
+    return trimmed
+      .map((p) => {
+        const raw = useEur && p.fx_rate != null && p.current_value != null
+          ? p.current_value * p.fx_rate
+          : p.current_value;
+        return raw == null ? null : { date: p.date, value: raw };
+      })
+      .filter((p): p is SparklinePoint => p != null);
+  }, [performance, currency]);
 
   if (isEmptyPortfolio) {
     return (
       <Card>
         <CardContent>
-          {toolbar && <div className="flex justify-end mb-4">{toolbar}</div>}
           <Alert>
             <InfoIcon className="h-4 w-4" />
             <AlertDescription>
@@ -126,44 +160,23 @@ export const PortfolioStatusContent = ({
     );
   }
 
-  const { netInvested, totalReturn, estimatedTax, afterTaxValue, fxImpact, fxImpactPct } =
-    computeDisplayFigures(status, eur, currency);
-  const eurRate = eur?.rate ?? null;
+  const {
+    totalValue,
+    netInvested,
+    totalReturn,
+    estimatedTax,
+    afterTaxValue,
+    fxImpact,
+    fxImpactPct,
+  } = computeDisplayFigures(status, eur, currency);
 
-  const fxCaption = fxImpact == null ? undefined : (
-    <p className={getValueClass(fxImpact)}>
-      {formatCurrencyWithPercent(fxImpact, fxImpactPct, 'EUR', locale)}
-      <span className="text-muted-foreground ml-1">{t('status.fxImpact')}</span>
-    </p>
-  );
+  const latestDataPoint = performance?.data_points.at(-1);
+  const vsSpPts = vsSpPoints(latestDataPoint);
 
-  const annualizedCaption = annualizedReturn == null ? undefined : (
-    <p className={`${getValueClass(annualizedReturn)} font-medium`}>
-      {formatSignedPercent(annualizedReturn)} {t('status.annualized').toLowerCase()}
-    </p>
-  );
-
-  const taxCaption = estimatedTax == null ? undefined : (
-    <p className="text-muted-foreground inline-flex items-center gap-1">
-      <span>
-        {t('status.estTax', { rate: formatTaxRatePercent(status.capital_gains_tax_rate) })}: −
-        {formatCurrency(estimatedTax, currency, locale)}
-      </span>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <InfoIcon
-              aria-label={t('status.estTaxFlatTooltip')}
-              className="h-3.5 w-3.5 text-muted-foreground cursor-help"
-            />
-          </TooltipTrigger>
-          <TooltipContent className="max-w-72">
-            <p>{t('status.estTaxFlatTooltip')}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </p>
-  );
+  const hasHistory =
+    status.realized_sales.length > 0 ||
+    status.dividends_received.length > 0 ||
+    status.realized_withdrawals.length > 0;
 
   return (
     <>
@@ -180,31 +193,23 @@ export const PortfolioStatusContent = ({
 
       <WarningsAlert warnings={status.warnings} locale={locale} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          label={t('status.netInvested')}
-          value={netInvested == null ? '-' : formatCurrency(netInvested, currency, locale)}
-          caption={fxCaption}
-        />
-        <StatCard
-          label={t('status.totalReturn')}
-          value={totalReturn == null ? '-' : formatSignedCurrency(totalReturn, currency, locale)}
-          caption={annualizedCaption}
-        />
-        <StatCard
-          label={t('status.afterTaxValue')}
-          value={afterTaxValue == null ? '-' : formatCurrency(afterTaxValue, currency, locale)}
-          caption={taxCaption}
-        />
-      </div>
-
-      {showCostBasisWarning && (
-        <InfoBanner onDismiss={dismissCostBasisWarning}>
-          {t('status.chartCostBasisFallback', {
-            tickers: (performance?.cost_basis_fallback_tickers ?? []).join(', '),
-          })}
-        </InfoBanner>
-      )}
+      <HeroPortfolioCard
+        portfolioValue={totalValue}
+        displayCurrency={currency}
+        locale={locale}
+        dayChange={dayChange}
+        netInvested={netInvested}
+        totalReturn={totalReturn}
+        annualizedReturn={annualizedReturn}
+        vsSpPts={vsSpPts}
+        afterTaxValue={afterTaxValue}
+        estimatedTax={estimatedTax}
+        taxRate={status.capital_gains_tax_rate}
+        fxImpact={fxImpact}
+        fxImpactPct={fxImpactPct}
+        inceptionYear={inceptionYear}
+        sparklineData={sparklineData}
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4">
         {performanceError == null ? (
@@ -215,6 +220,7 @@ export const PortfolioStatusContent = ({
                 isLoading={isPerformanceLoading}
                 currency={currency}
                 liveLastPoint={liveLastPoint}
+                warnings={chartWarnings}
               />
             </Suspense>
           </ErrorBoundary>
@@ -243,7 +249,14 @@ export const PortfolioStatusContent = ({
         </ErrorBoundary>
       </div>
 
-      <CollapsibleSection title={t('status.positions')} defaultOpen>
+      <CollapsibleSection
+        title={t('status.positions')}
+        summary={t('status.holdingsCount', {
+          count: status.holdings.length,
+          total: totalValue == null ? '—' : formatCurrency(totalValue, currency, locale),
+        })}
+        defaultOpen
+      >
         <ErrorBoundary fullScreen={false}>
           <HoldingsTable
             holdings={status.holdings}
@@ -257,42 +270,17 @@ export const PortfolioStatusContent = ({
         </ErrorBoundary>
       </CollapsibleSection>
 
-      {status.realized_sales.length > 0 && (
-        <CollapsibleSection
-          title={t('status.realizedGains')}
-          secondary={`(${t('status.realizedGainsMethod')})`}
-          defaultOpen
-        >
-          <ErrorBoundary fullScreen={false}>
-            <RealizedGainsTable realizedSales={status.realized_sales} locale={locale} />
-          </ErrorBoundary>
-        </CollapsibleSection>
-      )}
-
-      {status.dividends_received.length > 0 && (
-        <CollapsibleSection title={t('status.dividendsReceived')} defaultOpen>
-          <ErrorBoundary fullScreen={false}>
-            <DividendsReceivedTable
-              dividendsReceived={status.dividends_received}
-              displayCurrency={currency}
-              locale={locale}
-            />
-          </ErrorBoundary>
-        </CollapsibleSection>
-      )}
-
-      {status.realized_withdrawals.length > 0 && (
-        <CollapsibleSection title={t('status.withdrawals')} defaultOpen>
-          <ErrorBoundary fullScreen={false}>
-            <WithdrawalsTable
-              realizedWithdrawals={status.realized_withdrawals}
-              locale={locale}
-              principalEur={status.principal_eur}
-              dividendsEur={status.dividends_eur}
-              taxRate={status.capital_gains_tax_rate}
-            />
-          </ErrorBoundary>
-        </CollapsibleSection>
+      {hasHistory && (
+        <HistorySection
+          realizedSales={status.realized_sales}
+          dividendsReceived={status.dividends_received}
+          realizedWithdrawals={status.realized_withdrawals}
+          displayCurrency={currency}
+          locale={locale}
+          principalEur={status.principal_eur}
+          dividendsEur={status.dividends_eur}
+          taxRate={status.capital_gains_tax_rate}
+        />
       )}
     </>
   );

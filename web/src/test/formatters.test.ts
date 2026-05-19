@@ -3,7 +3,8 @@ import {
   formatCurrency,
   formatSignedCurrency,
   formatDateTime,
-  formatSignedPercent,
+  formatSignedPp,
+  formatRelativeTime,
   formatDaysHeld,
   formatQuantity,
   getValueClass,
@@ -61,38 +62,13 @@ describe('Formatters', () => {
     });
   });
 
-  describe('formatSignedPercent', () => {
-    it('returns dash for null', () => {
-      expect(formatSignedPercent(null)).toBe('-');
-    });
-
-    it('returns dash for undefined', () => {
-      expect(formatSignedPercent(undefined)).toBe('-');
-    });
-
-    it('shows up arrow for positive', () => {
-      const result = formatSignedPercent(5.25);
-      expect(result).toBe('\u25B25.25%');
-    });
-
-    it('shows down arrow for negative', () => {
-      const result = formatSignedPercent(-3.1);
-      expect(result).toBe('\u25BC3.10%');
-    });
-
-    it('shows up arrow for zero', () => {
-      const result = formatSignedPercent(0);
-      expect(result).toBe('\u25B20.00%');
-    });
-  });
-
   describe('getValueClass', () => {
-    it('returns empty string for null', () => {
-      expect(getValueClass(null)).toBe('');
+    it('returns muted class for null', () => {
+      expect(getValueClass(null)).toBe('text-muted-foreground');
     });
 
-    it('returns empty string for undefined', () => {
-      expect(getValueClass(undefined)).toBe('');
+    it('returns muted class for undefined', () => {
+      expect(getValueClass(undefined)).toBe('text-muted-foreground');
     });
 
     it('returns text-positive for positive value', () => {
@@ -103,8 +79,8 @@ describe('Formatters', () => {
       expect(getValueClass(-5)).toBe('text-negative');
     });
 
-    it('returns text-positive for zero', () => {
-      expect(getValueClass(0)).toBe('text-positive');
+    it('returns muted class for exactly zero (neutral)', () => {
+      expect(getValueClass(0)).toBe('text-muted-foreground');
     });
   });
 
@@ -159,13 +135,13 @@ describe('Formatters', () => {
       expect(formatQuantity(-2.25)).toBe('-2.25');
     });
 
-    it('keeps up to 8 decimals of precision', () => {
-      expect(formatQuantity(1.23456789)).toBe('1.23456789');
-      expect(formatQuantity(0.00000001)).toBe('0.00000001');
+    it('keeps up to 6 decimals of precision', () => {
+      expect(formatQuantity(1.234567)).toBe('1.234567');
+      expect(formatQuantity(0.000001)).toBe('0.000001');
     });
 
-    it('rounds to 8 decimals when input has more', () => {
-      expect(formatQuantity(1.123456789)).toBe('1.12345679');
+    it('rounds to 6 decimals when input has more', () => {
+      expect(formatQuantity(1.123456789)).toBe('1.123457');
     });
   });
 
@@ -187,6 +163,70 @@ describe('Formatters', () => {
     it('rounds to two decimal places max', () => {
       expect(formatTaxRatePercent(0.255123)).toBe('25.51');
       expect(formatTaxRatePercent(0.001)).toBe('0.1');
+    });
+  });
+
+  describe('formatSignedPp', () => {
+    it('returns em dash for null/undefined', () => {
+      expect(formatSignedPp(null)).toBe('—');
+      expect(formatSignedPp(undefined)).toBe('—');
+    });
+
+    it('prefixes + for positive and unicode minus for negative', () => {
+      expect(formatSignedPp(5.4)).toBe('+5.40 pp');
+      expect(formatSignedPp(-5.4)).toBe('−5.40 pp');
+    });
+
+    it('renders zero without a sign', () => {
+      expect(formatSignedPp(0)).toBe('0.00 pp');
+    });
+
+    it('honors a custom unit label', () => {
+      expect(formatSignedPp(-1.2, 'p.p.')).toBe('−1.20 p.p.');
+    });
+  });
+
+  describe('formatRelativeTime', () => {
+    const labels = {
+      justNow: 'just now',
+      minutes: (n: number) => `${n} min ago`,
+      hours: (n: number) => `${n} h ago`,
+      days: (n: number) => `${n} d ago`,
+    };
+
+    it('returns "just now" for diffs under a minute', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 30_000, now, labels)).toBe('just now');
+      expect(formatRelativeTime(now, now, labels)).toBe('just now');
+    });
+
+    it('clamps future timestamps to "just now"', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now + 5_000, now, labels)).toBe('just now');
+    });
+
+    it('returns minutes between 1 minute and an hour', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 90_000, now, labels)).toBe('1 min ago');
+      expect(formatRelativeTime(now - 59 * 60_000, now, labels)).toBe('59 min ago');
+    });
+
+    it('returns hours between 1 hour and a day', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 3 * 60 * 60_000, now, labels)).toBe('3 h ago');
+    });
+
+    it('returns days between 1 and 7', () => {
+      const now = 1_700_000_000_000;
+      expect(formatRelativeTime(now - 2 * 24 * 60 * 60_000, now, labels)).toBe('2 d ago');
+    });
+
+    it('falls back to a locale date for ≥ 7 days', () => {
+      const now = new Date(2026, 4, 12).getTime();
+      const old = new Date(2026, 3, 1).getTime();
+      const result = formatRelativeTime(old, now, labels);
+      expect(result).toContain('Apr');
+      expect(result).toContain('2026');
     });
   });
 

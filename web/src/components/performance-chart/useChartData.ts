@@ -38,17 +38,26 @@ export const useChartData = (
           ? null
           : rawCurrentValue * effectiveFxRate;
 
+      const principal = useEurMode ? point.principal_eur ?? null : point.principal;
+      const sp500Pct = rebasePct(
+        point.sp500_return_pct,
+        effectiveFxRate,
+        baseSp500Factor,
+        useEurMode,
+      );
+      // Synthesize an S&P 500 value series only when both principal and S&P return are
+      // present. Treats principal as a lump-sum invested in the benchmark — close enough
+      // for a visual comparison without overstating precision when deposits are uneven.
+      const sp500Value =
+        principal == null || sp500Pct == null ? null : principal * (1 + sp500Pct / 100);
+
       return {
         date: point.date,
-        principal: useEurMode ? point.principal_eur ?? null : point.principal,
+        principal,
         currentValue: useEurMode ? eurCurrentValue : rawCurrentValue,
         returnPct: rebasePct(point.return_pct, effectiveFxRate, baseReturnFactor, useEurMode),
-        sp500ReturnPct: rebasePct(
-          point.sp500_return_pct,
-          effectiveFxRate,
-          baseSp500Factor,
-          useEurMode,
-        ),
+        sp500ReturnPct: sp500Pct,
+        sp500Value,
       };
     });
   }, [data, timePeriod, currency, liveLastPoint]);

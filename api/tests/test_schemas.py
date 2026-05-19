@@ -54,6 +54,18 @@ class TestLivePriceInfoInvariants:
         ):
             LivePriceInfo(price=150.0, source="last_known", as_of=None)
 
+    def test_last_known_with_previous_close_rejected(self):
+        # The stale cache row has no notion of "yesterday"; the docstring pins
+        # previous_close to None for last_known so the UI can't render a bogus
+        # day-over-day delta against a stale price.
+        with pytest.raises(ValidationError, match="must have previous_close=None"):
+            LivePriceInfo(
+                price=150.0,
+                source="last_known",
+                as_of=self.NOW,
+                previous_close=148.0,
+            )
+
 
 class TestTransactionCreateTimezoneAware:
     """``TransactionCreate.date`` must carry explicit timezone info so

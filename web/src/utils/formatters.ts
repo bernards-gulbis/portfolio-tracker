@@ -41,9 +41,9 @@ const trimTrailingZeros = (s: string): string => {
   return s.slice(0, end);
 };
 
-/** Up to 8 decimals, trailing zeros stripped. */
+/** Up to 6 decimals, trailing zeros stripped. */
 export const formatQuantity = (value: number): string => {
-  return trimTrailingZeros(value.toFixed(8));
+  return trimTrailingZeros(value.toFixed(6));
 };
 
 /** Pass the locale returned by useLocale() for reactive formatting. */
@@ -66,17 +66,67 @@ export const formatDateCompact = (date: string, locale: string = 'en-US'): strin
   });
 };
 
-/** Percent value with ▲/▼ prefix; '-' for null/undefined. */
-export const formatSignedPercent = (value: number | null | undefined): string => {
-  if (value == null) return '-';
-  const sign = value >= 0 ? '▲' : '▼';
-  return `${sign}${Math.abs(value).toFixed(2)}%`;
+/** Sign prefix for a numeric value: '+' for positive, '−' for negative, '' for zero. */
+const signPrefix = (value: number): string => {
+  if (value > 0) return '+';
+  if (value < 0) return '−';
+  return '';
 };
 
-/** CSS class for positive (green) / negative (red) values. */
+/** Percent value with +/- sign; '-' for null/undefined.
+ *  Pair with a leading arrow span when the caller renders a money/percent pair. */
+export const formatSignedPercentPlain = (value: number | null | undefined): string => {
+  if (value == null) return '-';
+  return `${signPrefix(value)}${Math.abs(value).toFixed(2)}%`;
+};
+
+/** Percentage-points difference, e.g. ``-5.4 pp``; '—' for null/undefined.
+ *  Use for benchmark spreads (portfolio % − benchmark %) so the unit can't be confused
+ *  with an absolute percent. */
+export const formatSignedPp = (value: number | null | undefined, unit: string = 'pp'): string => {
+  if (value == null) return '—';
+  return `${signPrefix(value)}${Math.abs(value).toFixed(2)} ${unit}`;
+};
+
+export interface RelativeTimeLabels {
+  justNow: string;
+  /** "{count} min ago" */
+  minutes: (count: number) => string;
+  /** "{count} h ago" */
+  hours: (count: number) => string;
+  /** "{count} d ago" */
+  days: (count: number) => string;
+}
+
+/** Human-readable elapsed time vs ``now``. Falls back to a full date string for ≥ 7 days. */
+export const formatRelativeTime = (
+  timestamp: number,
+  now: number,
+  labels: RelativeTimeLabels,
+  locale: string = 'en-US',
+): string => {
+  const diffMs = Math.max(0, now - timestamp);
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return labels.justNow;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return labels.minutes(minutes);
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return labels.hours(hours);
+  const days = Math.floor(hours / 24);
+  if (days < 7) return labels.days(days);
+  return new Date(timestamp).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+/** CSS class for signed values: positive → green, negative → red, exactly zero
+ *  and null/undefined → muted. Treating zero as a distinct neutral state stops
+ *  flat results from being styled as positive moves. */
 export const getValueClass = (value: number | null | undefined): string => {
-  if (value == null) return '';
-  return value >= 0 ? 'text-positive' : 'text-negative';
+  if (value == null || value === 0) return 'text-muted-foreground';
+  return value > 0 ? 'text-positive' : 'text-negative';
 };
 
 const defaultDaysHeldLabels: { d: string; m: string; y: string } = { d: 'd', m: 'm', y: 'y' };

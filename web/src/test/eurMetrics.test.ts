@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { computeEurMetrics, applyRateToHolding } from '../utils/eurMetrics';
-import type { PricedPortfolioStatus, PricedHolding } from '../api';
+import {
+  applyRateToHolding,
+  computeEurMetrics,
+  dayChangeFromHoldings,
+  vsSpPoints,
+} from '../utils/eurMetrics';
+import type { PerformanceDataPoint, PricedHolding, PricedPortfolioStatus } from '../api';
 
 const baseStatus: PricedPortfolioStatus = {
   portfolio_id: 1,
@@ -181,6 +186,7 @@ describe('applyRateToHolding', () => {
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: null,
+    previous_close: null,
   };
 
   it('converts all fields correctly', () => {
@@ -217,5 +223,99 @@ describe('applyRateToHolding', () => {
     expect(result.currentPriceEur).toBeNull();
     expect(result.currentValueEur).toBeNull();
     expect(result.unrealizedGainLossEur).toBeNull();
+  });
+});
+
+describe('dayChangeFromHoldings', () => {
+  const baseHolding: PricedHolding = {
+    ticker: 'AAPL',
+    quantity: 10,
+    average_cost: 150,
+    total_cost: 1500,
+    first_buy_date: '2024-01-01',
+    current_price: 200,
+    current_value: 2000,
+    unrealized_gain_loss: 500,
+    unrealized_gain_loss_pct: 33.33,
+    price_source: 'live',
+    price_as_of: null,
+    previous_close: 195,
+  };
+
+  it('aggregates change across multiple holdings', () => {
+    const result = dayChangeFromHoldings([
+      // (200 - 195) * 10 = 50
+      baseHolding,
+      // (50 - 48) * 100 = 200
+      { ...baseHolding, ticker: 'MSFT', quantity: 100, current_price: 50, previous_close: 48 },
+    ]);
+    expect(result).not.toBeNull();
+    expect(result!.usd).toBeCloseTo(250);
+    // denominator = 195*10 + 48*100 = 1950 + 4800 = 6750
+    expect(result!.pct).toBeCloseTo((250 / 6750) * 100);
+    expect(result!.partial).toBe(false);
+  });
+
+  it('excludes holdings missing previous_close from the aggregate', () => {
+    const result = dayChangeFromHoldings([
+      baseHolding,
+      { ...baseHolding, ticker: 'TWTR', previous_close: null },
+    ]);
+    expect(result).not.toBeNull();
+    expect(result!.usd).toBeCloseTo(50);
+    // partial=true so the UI can footnote that some holdings were excluded.
+    expect(result!.partial).toBe(true);
+  });
+
+  it('returns null when no holding has a previous_close', () => {
+    const result = dayChangeFromHoldings([
+      { ...baseHolding, previous_close: null },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('returns null for empty holdings list', () => {
+    expect(dayChangeFromHoldings([])).toBeNull();
+  });
+
+  it('returns null pct when prior-day basis sums to zero', () => {
+    // Defensive: previous_close=0 is implausible from Yahoo but guarded against.
+    const result = dayChangeFromHoldings([
+      { ...baseHolding, current_price: 1, previous_close: 0 },
+    ]);
+    // counted > 0 so a result is returned, but pct is null since the denominator
+    // sum can be 0 (or below) and we don't fabricate "infinite %" displays.
+    expect(result).not.toBeNull();
+    expect(result!.pct).toBeNull();
+  });
+});
+
+describe('vsSpPoints', () => {
+  const point = (return_pct: number | null, sp500_return_pct: number | null): PerformanceDataPoint =>
+    ({
+      date: '2026-05-09',
+      principal: 100,
+      principal_eur: null,
+      current_value: 110,
+      fx_rate: null,
+      return_pct,
+      sp500_return_pct,
+    });
+
+  it('returns the difference in percentage points (portfolio - benchmark)', () => {
+    expect(vsSpPoints(point(21.14, 8.74))).toBeCloseTo(12.4);
+  });
+
+  it('handles underperformance (negative spread)', () => {
+    expect(vsSpPoints(point(5, 10))).toBeCloseTo(-5);
+  });
+
+  it('returns null when the latest point is undefined', () => {
+    expect(vsSpPoints(undefined)).toBeNull();
+  });
+
+  it('returns null when either return_pct or sp500_return_pct is missing', () => {
+    expect(vsSpPoints(point(null, 5))).toBeNull();
+    expect(vsSpPoints(point(5, null))).toBeNull();
   });
 });

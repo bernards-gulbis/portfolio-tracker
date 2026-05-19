@@ -16,6 +16,7 @@ const mockHoldings: PricedHolding[] = [
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: null,
+    previous_close: null,
   },
   {
     ticker: 'MSFT',
@@ -29,6 +30,7 @@ const mockHoldings: PricedHolding[] = [
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: null,
+    previous_close: null,
   },
 ];
 
@@ -45,6 +47,7 @@ const mockHoldingsEur: PricedHolding[] = [
     unrealized_gain_loss_pct: 33.33,
     price_source: 'live',
     price_as_of: null,
+    previous_close: null,
   },
 ];
 
@@ -62,13 +65,14 @@ describe('HoldingsAllocationChart', () => {
     expect(screen.getByText('No allocation data available')).toBeInTheDocument();
   });
 
-  it('shows "No allocation data available" when holdings have no current_value', () => {
-    const holdingsNoValue: PricedHolding[] = [
+  it('shows "No allocation data available" only when there is nothing to plot', () => {
+    // Holding with neither current_value nor a positive total_cost — nothing to render.
+    const emptyHolding: PricedHolding[] = [
       {
         ticker: 'AAPL',
-        quantity: 10,
-        average_cost: 150,
-        total_cost: 1500,
+        quantity: 0,
+        average_cost: 0,
+        total_cost: 0,
         first_buy_date: '2024-01-01',
         current_price: null,
         current_value: null,
@@ -76,9 +80,10 @@ describe('HoldingsAllocationChart', () => {
         unrealized_gain_loss_pct: null,
         price_source: 'missing',
         price_as_of: null,
+        previous_close: null,
       },
     ];
-    render(<HoldingsAllocationChart holdings={holdingsNoValue} cash={0} isLoading={false} />);
+    render(<HoldingsAllocationChart holdings={emptyHolding} cash={0} isLoading={false} />);
 
     expect(screen.getByText('No allocation data available')).toBeInTheDocument();
   });
@@ -162,5 +167,45 @@ describe('HoldingsAllocationChart', () => {
     render(<HoldingsAllocationChart holdings={[]} cash={0} isLoading={false} />);
     // Empty chart shows no data message
     expect(screen.getByText('No allocation data available')).toBeInTheDocument();
+  });
+
+  it('includes unpriced holdings at cost basis with an "at cost" tag in Current view', () => {
+    const unpricedHolding: PricedHolding = {
+      ticker: 'TWTR',
+      quantity: 100,
+      average_cost: 50,
+      total_cost: 5000,
+      first_buy_date: '2020-01-01',
+      current_price: null,
+      current_value: null,
+      unrealized_gain_loss: null,
+      unrealized_gain_loss_pct: null,
+      price_source: 'missing',
+      price_as_of: null,
+      previous_close: null,
+    };
+    render(
+      <HoldingsAllocationChart
+        holdings={[unpricedHolding]}
+        cash={0}
+        isLoading={false}
+      />,
+    );
+
+    // The ticker still appears in the legend...
+    expect(screen.getByText('TWTR')).toBeInTheDocument();
+    // ...with an "at cost" tag (the fallback used total_cost).
+    expect(screen.getByText('at cost')).toBeInTheDocument();
+    // Donut total reflects the cost basis since no other slices exist.
+    expect(screen.getByText('$5,000.00')).toBeInTheDocument();
+    // 100% of the donut.
+    expect(screen.getByText('100.0%')).toBeInTheDocument();
+  });
+
+  it('does not render the "at cost" tag for holdings with a live current_value', () => {
+    render(
+      <HoldingsAllocationChart holdings={mockHoldings} cash={0} isLoading={false} />,
+    );
+    expect(screen.queryByText('at cost')).toBeNull();
   });
 });

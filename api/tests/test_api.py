@@ -23,6 +23,7 @@ from app.models.historical_price import (
 from app.models.user import User
 from app.services.portfolio_handlers import _apply_transaction
 from app.services.portfolio_types import _Holding, _Lot, _TxState
+from app.services.prices.live_price_service import Quote
 from main import app
 
 
@@ -4090,12 +4091,15 @@ def test_strict_only_warnings_suppressed_in_non_strict_mode():
 
 
 def test_live_prices_with_tickers(client: TestClient):
-    """Test /prices/live returns prices and FX rate for given tickers"""
+    """Test /prices/live returns prices, previous closes and FX rate"""
     with (
         patch("app.routers.portfolios.LivePriceService") as mock_live,
         patch("app.routers.portfolios.FxRateService") as mock_fx,
     ):
-        mock_live.get_current_prices.return_value = {"AAPL": 192.5, "MSFT": 410.0}
+        mock_live.get_current_quotes.return_value = {
+            "AAPL": Quote(192.5, 190.0),
+            "MSFT": Quote(410.0, 405.0),
+        }
         mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
         response = client.get(
@@ -4107,11 +4111,13 @@ def test_live_prices_with_tickers(client: TestClient):
     assert data["prices"]["AAPL"]["price"] == 192.5
     assert data["prices"]["AAPL"]["source"] == "live"
     assert data["prices"]["AAPL"]["as_of"] is not None
+    assert data["prices"]["AAPL"]["previous_close"] == 190.0
     assert data["prices"]["MSFT"]["price"] == 410.0
     assert data["prices"]["MSFT"]["source"] == "live"
+    assert data["prices"]["MSFT"]["previous_close"] == 405.0
     assert data["usd_to_eur_rate"] == 0.91
     assert "timestamp" in data
-    mock_live.get_current_prices.assert_called_once_with(["AAPL", "MSFT"])
+    mock_live.get_current_quotes.assert_called_once_with(["AAPL", "MSFT"])
 
 
 def test_live_prices_empty_tickers(client: TestClient):
@@ -4128,7 +4134,7 @@ def test_live_prices_empty_tickers(client: TestClient):
     data = response.json()
     assert data["prices"] == {}
     assert data["usd_to_eur_rate"] == 0.92
-    mock_live.get_current_prices.assert_not_called()
+    mock_live.get_current_quotes.assert_not_called()
 
 
 def test_live_prices_fx_rate_failure(client: TestClient):
@@ -4137,7 +4143,7 @@ def test_live_prices_fx_rate_failure(client: TestClient):
         patch("app.routers.portfolios.LivePriceService") as mock_live,
         patch("app.routers.portfolios.FxRateService") as mock_fx,
     ):
-        mock_live.get_current_prices.return_value = {"AAPL": 192.5}
+        mock_live.get_current_quotes.return_value = {"AAPL": Quote(192.5, 190.0)}
         mock_fx.get_usd_to_eur_rate_safe.return_value = None
 
         response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
@@ -4163,7 +4169,7 @@ def test_live_prices_price_fetch_error_returns_none_prices(client: TestClient):
         patch("app.routers.portfolios.LivePriceService") as mock_live,
         patch("app.routers.portfolios.FxRateService") as mock_fx,
     ):
-        mock_live.get_current_prices.side_effect = RuntimeError("yfinance down")
+        mock_live.get_current_quotes.side_effect = RuntimeError("yfinance down")
         mock_live.get_last_known_prices_batch.return_value = {"AAPL": None}
         mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
@@ -4175,6 +4181,7 @@ def test_live_prices_price_fetch_error_returns_none_prices(client: TestClient):
     assert data["prices"]["AAPL"]["price"] is None
     assert data["prices"]["AAPL"]["source"] == "missing"
     assert data["prices"]["AAPL"]["as_of"] is None
+    assert data["prices"]["AAPL"]["previous_close"] is None
 
 
 def test_live_prices_provider_unavailable_flag(client: TestClient):
@@ -4187,7 +4194,7 @@ def test_live_prices_provider_unavailable_flag(client: TestClient):
             return_value=True,
         ),
     ):
-        mock_live.get_current_prices.return_value = {"AAPL": None}
+        mock_live.get_current_quotes.return_value = {"AAPL": Quote(None, None)}
         mock_live.get_last_known_prices_batch.return_value = {"AAPL": None}
         mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
@@ -4208,7 +4215,7 @@ def test_live_prices_provider_available_by_default(client: TestClient):
             return_value=False,
         ),
     ):
-        mock_live.get_current_prices.return_value = {"AAPL": 192.5}
+        mock_live.get_current_quotes.return_value = {"AAPL": Quote(192.5, 190.0)}
         mock_fx.get_usd_to_eur_rate_safe.return_value = 0.91
 
         response = client.get("/portfolios/prices/live", params={"tickers": ["AAPL"]})
@@ -4432,7 +4439,7 @@ class TestLivePricesEndpoint:
     def test_price_fetch_error_falls_back_to_none(self, client: TestClient):
         with (
             patch(
-                "app.routers.portfolios.LivePriceService.get_current_prices",
+                "app.routers.portfolios.LivePriceService.get_current_quotes",
                 side_effect=RuntimeError("yahoo down"),
             ),
             patch(
@@ -4449,12 +4456,13 @@ class TestLivePricesEndpoint:
         info = r.json()["prices"]["AAPL"]
         assert info["price"] is None
         assert info["source"] == "missing"
+        assert info["previous_close"] is None
 
     def test_price_fetch_error_falls_back_to_last_known(self, client: TestClient):
         """When live fails, serve last-known from DB with source=last_known."""
         with (
             patch(
-                "app.routers.portfolios.LivePriceService.get_current_prices",
+                "app.routers.portfolios.LivePriceService.get_current_quotes",
                 side_effect=RuntimeError("yahoo down"),
             ),
             patch(
@@ -4472,6 +4480,8 @@ class TestLivePricesEndpoint:
         assert info["price"] == 150.25
         assert info["source"] == "last_known"
         assert info["as_of"].startswith("2026-04-10")
+        # last_known has no notion of "yesterday" — previous_close stays None.
+        assert info["previous_close"] is None
 
 
 class TestTransactionUpdateTickerValidator:

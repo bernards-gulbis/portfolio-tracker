@@ -12,7 +12,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
 import app.models  # noqa: F401
-from app.services.prices.live_price_service import LivePriceService
+from app.services.prices.live_price_service import LivePriceService, Quote
 
 
 def _ok_response(payload: dict) -> Mock:
@@ -58,6 +58,47 @@ class TestGetCurrentPrice:
             price = LivePriceService.get_current_price("AAPL")
 
         assert price == pytest.approx(150.25)
+
+    def test_get_current_quote_includes_previous_close(self):
+        """``chartPreviousClose`` from the Yahoo meta payload powers the
+        day-over-day change in the UI; it should land on Quote.previous_close.
+        """
+        with patch(
+            "app.services.prices.yahoo_finance_client.requests.get",
+            return_value=_ok_response(
+                {
+                    "chart": {
+                        "result": [
+                            {
+                                "meta": {
+                                    "regularMarketPrice": 150.25,
+                                    "chartPreviousClose": 148.10,
+                                }
+                            }
+                        ]
+                    }
+                }
+            ),
+        ):
+            quote = LivePriceService.get_current_quote("AAPL")
+
+        assert quote.price == pytest.approx(150.25)
+        assert quote.previous_close == pytest.approx(148.10)
+
+    def test_get_current_quote_missing_previous_close(self):
+        """When Yahoo omits chartPreviousClose (new listing, etc.) Quote
+        carries previous_close=None — we never synthesize a substitute.
+        """
+        with patch(
+            "app.services.prices.yahoo_finance_client.requests.get",
+            return_value=_ok_response(
+                {"chart": {"result": [{"meta": {"regularMarketPrice": 150.25}}]}}
+            ),
+        ):
+            quote = LivePriceService.get_current_quote("NEWIPO")
+
+        assert quote.price == pytest.approx(150.25)
+        assert quote.previous_close is None
 
     def test_get_current_price_missing_data(self):
         with patch(
@@ -158,9 +199,13 @@ class TestGetCurrentPrices:
 
     def test_success_multiple(self):
         def fake(ticker):
-            return {"AAPL": 150.25, "GOOGL": 2800.50, "MSFT": 320.00}.get(ticker)
+            return {
+                "AAPL": Quote(150.25, 148.0),
+                "GOOGL": Quote(2800.50, 2780.0),
+                "MSFT": Quote(320.00, 318.0),
+            }.get(ticker, Quote(None, None))
 
-        with patch.object(LivePriceService, "get_current_price", side_effect=fake):
+        with patch.object(LivePriceService, "get_current_quote", side_effect=fake):
             prices = LivePriceService.get_current_prices(["AAPL", "GOOGL", "MSFT"])
 
         assert prices == {"AAPL": 150.25, "GOOGL": 2800.50, "MSFT": 320.00}
@@ -171,12 +216,12 @@ class TestGetCurrentPrices:
     def test_with_failures(self):
         def fake(ticker):
             if ticker == "AAPL":
-                return 150.25
+                return Quote(150.25, 148.0)
             if ticker == "INVALID":
                 raise Exception("boom")
-            return None
+            return Quote(None, None)
 
-        with patch.object(LivePriceService, "get_current_price", side_effect=fake):
+        with patch.object(LivePriceService, "get_current_quote", side_effect=fake):
             prices = LivePriceService.get_current_prices(
                 ["AAPL", "INVALID", "NOTFOUND"]
             )
@@ -190,9 +235,9 @@ class TestGetCurrentPrices:
 
         def fake(ticker):
             call_count["count"] += 1
-            return 100.0 + call_count["count"]
+            return Quote(100.0 + call_count["count"], None)
 
-        with patch.object(LivePriceService, "get_current_price", side_effect=fake):
+        with patch.object(LivePriceService, "get_current_quote", side_effect=fake):
             prices = LivePriceService.get_current_prices(
                 ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"]
             )
@@ -201,7 +246,9 @@ class TestGetCurrentPrices:
         assert call_count["count"] == 5
 
     def test_custom_max_workers(self):
-        with patch.object(LivePriceService, "get_current_price", return_value=100.0):
+        with patch.object(
+            LivePriceService, "get_current_quote", return_value=Quote(100.0, 99.0)
+        ):
             prices = LivePriceService.get_current_prices(
                 ["AAPL", "GOOGL"], max_workers=2
             )
@@ -218,7 +265,7 @@ class TestCaching:
 
     def test_cache_hit_returns_cached_price(self):
         now = datetime.now(UTC)
-        LivePriceService._price_cache["AAPL"] = (150.0, now)
+        LivePriceService._price_cache["AAPL"] = (Quote(150.0, 148.0), now)
 
         with patch("app.services.prices.yahoo_finance_client.requests.get") as mock_get:
             price = LivePriceService.get_current_price("AAPL")
@@ -228,7 +275,7 @@ class TestCaching:
 
     def test_cache_expired_fetches_new_price(self):
         expired = datetime.now(UTC) - LivePriceService._cache_ttl - timedelta(seconds=1)
-        LivePriceService._price_cache["AAPL"] = (100.0, expired)
+        LivePriceService._price_cache["AAPL"] = (Quote(100.0, 99.0), expired)
 
         with patch(
             "app.services.prices.yahoo_finance_client.requests.get",
@@ -241,9 +288,9 @@ class TestCaching:
         assert price == pytest.approx(200.0)
 
     def test_cache_hit_returns_none_price(self):
-        """A previously-cached None remains a cache hit (no re-fetch)."""
+        """A previously-cached failure remains a cache hit (no re-fetch)."""
         now = datetime.now(UTC)
-        LivePriceService._price_cache["BAD"] = (None, now)
+        LivePriceService._price_cache["BAD"] = (Quote(None, None), now)
 
         with patch("app.services.prices.yahoo_finance_client.requests.get") as mock_get:
             price = LivePriceService.get_current_price("BAD")
@@ -349,16 +396,17 @@ class TestLivePriceServiceExtraPaths:
 
     def test_in_flight_deduplication(self):
         """Second caller for same ticker shares the in-flight Future (lines 101-102, 111-112)."""
-        f: Future[float | None] = Future()
-        f.set_result(99.5)
+        f: Future[Quote] = Future()
+        f.set_result(Quote(99.5, 98.0))
         LivePriceService._in_flight["DEDUP"] = f
 
         price = LivePriceService.get_current_price("DEDUP")
         assert price == pytest.approx(99.5)
 
     def test_in_flight_deduplication_exception_returns_none(self):
-        """If the shared Future raised, the waiter returns None (lines 111-114)."""
-        f: Future[float | None] = Future()
+        """If the shared Future raised, the waiter returns Quote(None, None)
+        — and the price wrapper extracts None."""
+        f: Future[Quote] = Future()
         f.set_exception(RuntimeError("fetch failed"))
         LivePriceService._in_flight["ERRDUP"] = f
 
@@ -366,13 +414,13 @@ class TestLivePriceServiceExtraPaths:
         assert price is None
 
     def test_fetch_from_yahoo_unexpected_exception_returns_none(self):
-        """An unexpected exception in _fetch_from_yahoo returns None (lines 153-160)."""
+        """An unexpected exception in _fetch_from_yahoo returns Quote(None, None)."""
         with patch(
             "app.services.prices.live_price_service.YahooFinanceClient.fetch_chart",
             side_effect=RuntimeError("unexpected boom"),
         ):
             result = LivePriceService._fetch_from_yahoo("BOOM")
-        assert result is None
+        assert result == Quote(None, None)
 
     def test_get_last_known_price_returns_none_when_no_data(self, mem_session: Session):
         """get_last_known_price returns None when no data exists (lines 167-168)."""

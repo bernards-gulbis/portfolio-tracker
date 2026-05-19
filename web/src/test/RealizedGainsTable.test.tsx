@@ -51,15 +51,15 @@ describe('RealizedGainsTable', () => {
     expect(screen.getAllByText('1 sell').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('defaults to flat view when no preference is stored', () => {
+  it('defaults to grouped view when no preference is stored', () => {
     const sales: RealizedSale[] = [
       makeSale({ ticker: 'AAPL', realized_gain: 200 }),
       makeSale({ ticker: 'MSFT', realized_gain: -50 }),
     ];
     render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
 
-    expect(screen.getByRole('tab', { name: 'Flat', selected: true })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Grouped', selected: false })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Grouped', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Flat', selected: false })).toBeInTheDocument();
   });
 
   it('shows empty state message when no results after filter', async () => {
@@ -183,10 +183,14 @@ describe('RealizedGainsTable', () => {
     expect(screen.getAllByText('AAPL').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('persists the grouped view choice to localStorage', async () => {
+  it('persists the view-mode toggle to localStorage', async () => {
     const sales: RealizedSale[] = [makeSale({ ticker: 'AAPL' })];
     const user = userEvent.setup();
     render(<RealizedGainsTable realizedSales={sales} {...defaultProps} />);
+
+    // Default is grouped — toggle to Flat first, then back to Grouped, to exercise persistence.
+    await user.click(screen.getByRole('tab', { name: 'Flat' }));
+    expect(localStorage.getItem('pt_gains_view_mode')).toBe('ungrouped');
 
     await user.click(screen.getByRole('tab', { name: 'Grouped' }));
     expect(localStorage.getItem('pt_gains_view_mode')).toBe('grouped');
