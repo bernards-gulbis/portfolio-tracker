@@ -51,7 +51,7 @@ import {
   useMatch,
   useNavigate,
   useParams,
-} from 'react-router-dom';
+} from 'react-router';
 import { SUPPORTED_LANGUAGES, getCurrentLanguage } from './i18n/index';
 import { useCurrencyPreference, CurrencyProvider } from './hooks/useCurrencyPreference';
 import { useLastVisitedPortfolio } from './hooks/useLastVisitedPortfolio';

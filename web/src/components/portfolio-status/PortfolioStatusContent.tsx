@@ -1,6 +1,6 @@
 import React, { useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';

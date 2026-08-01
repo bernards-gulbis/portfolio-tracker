@@ -38,7 +38,7 @@ export default defineConfig({
           if (pkg === 'recharts' || pkg.startsWith('d3-') || pkg === 'victory-vendor') {
             return 'vendor-recharts';
           }
-          if (pkg === 'react-router-dom' || pkg === 'react-router') {
+          if (pkg === 'react-router') {
             return 'vendor-router';
           }
           if (pkg === 'i18next' || pkg === 'react-i18next' || pkg === 'i18next-browser-languagedetector') {

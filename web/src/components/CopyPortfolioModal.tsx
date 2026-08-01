@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useCopyPortfolio } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import { portfolioNameSchema, PortfolioNameValues } from '../utils/portfolioNameSchema';

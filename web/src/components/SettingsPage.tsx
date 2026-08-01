@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useLastVisitedPortfolio } from '../hooks/useLastVisitedPortfolio';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
