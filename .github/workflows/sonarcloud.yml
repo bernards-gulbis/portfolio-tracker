@@ -18,10 +18,13 @@ jobs:
           fetch-depth: 0
 
       # --- Frontend ---
+      # Node 24 is the floor for the current toolchain: jsdom 30 requires
+      # ``^22.22.2 || ^24.15.0 || >=26`` and react-router 8 requires
+      # ``>=22.22``. On Node 20 every vitest forks worker dies at startup.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -102,7 +105,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
 
