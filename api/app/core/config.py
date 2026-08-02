@@ -42,10 +42,18 @@ def _get_int(name: str, default: int) -> int:
 
 # ── Database ──────────────────────────────────────────────
 
-DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./portfolio_tracker.db")
+_DEFAULT_DATABASE_URL = "sqlite:///./portfolio_tracker.db"
+DATABASE_URL: str = os.getenv("DATABASE_URL", _DEFAULT_DATABASE_URL)
 DB_POOL_SIZE: int = _get_int("DB_POOL_SIZE", 5)
 DB_MAX_OVERFLOW: int = _get_int("DB_MAX_OVERFLOW", 10)
 DATABASE_ECHO: bool = _get_bool("DATABASE_ECHO")
+
+# Apply Alembic migrations from the app's startup hook. True is right for local
+# dev and e2e, where the app owns its database. Set false on hosts that scale
+# horizontally — there ``alembic upgrade head`` would run on every cold start,
+# unlocked, with concurrent starts racing on the same schema. Those deployments
+# run ``python -m scripts.migrate`` as a build step instead.
+RUN_MIGRATIONS_ON_STARTUP: bool = _get_bool("RUN_MIGRATIONS_ON_STARTUP", True)
 
 # ── Auth ──────────────────────────────────────────────────
 
@@ -65,6 +73,21 @@ GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
+# Absolute URL Google redirects the browser back to after consent. Empty means
+# "derive it from the incoming request", which is correct when the API is
+# reached at its own root. Set it explicitly when a proxy strips a path prefix
+# before the app sees the request — the app cannot reconstruct the public URL
+# on its own, and a wrong redirect_uri fails the OAuth exchange outright.
+OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "")
+
+# Path prefix the API is publicly mounted under, when a proxy strips it before
+# routing. Only affects generated URLs (``/docs``, the OpenAPI ``servers``
+# entry) — never route matching.
+API_ROOT_PATH: str = os.getenv("API_ROOT_PATH", "")
+if API_ROOT_PATH and not API_ROOT_PATH.startswith("/"):
+    _errors.append(f"API_ROOT_PATH={API_ROOT_PATH!r} must start with '/'")
+API_ROOT_PATH = API_ROOT_PATH.rstrip("/")
+
 for _name, _val in [
     ("SECRET_KEY", SECRET_KEY),
     ("OAUTH_STATE_SECRET", OAUTH_STATE_SECRET),
@@ -79,6 +102,15 @@ for _name, _val in [
             _warnings.append(
                 f"{_name} is using insecure default — set it in .env before deploying"
             )
+
+# COOKIE_SECURE=true is the production posture. Falling back to the local SQLite
+# file there would yield a *working* API silently backed by ephemeral disk, and
+# every deploy would drop the data. Fail at import instead.
+if COOKIE_SECURE and DATABASE_URL == _DEFAULT_DATABASE_URL:
+    _errors.append(
+        "DATABASE_URL must be set when COOKIE_SECURE=true — refusing to run a "
+        f"production deployment against the local default ({_DEFAULT_DATABASE_URL})"
+    )
 
 # ── CORS ──────────────────────────────────────────────────
 

@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const API = 'http://127.0.0.1:8000';
+import { API } from './fixtures/api';
 
 // Profile and tax tests use the shared test user.
 test.use({ storageState: 'e2e/.auth/user.json' });

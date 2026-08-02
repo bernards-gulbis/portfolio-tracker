@@ -280,7 +280,12 @@ export interface RegisterCredentials {
 
 // ================== API Configuration ==================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Relative by default: the API is served from the same origin under /api — by
+// the Vite dev proxy locally, by Vercel's service routing in production. Both
+// strip the prefix, so the backend still sees /portfolios, /auth/... at its
+// root. Keeping this same-origin is what lets the pt_auth cookie stay
+// SameSite=Lax instead of None. Override only to point at a detached backend.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

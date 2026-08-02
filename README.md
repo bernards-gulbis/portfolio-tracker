@@ -35,6 +35,43 @@ npm ci
 npm run dev                  # http://localhost:3000 (proxies /api to :8000)
 ```
 
+## Deployment
+
+Frontend and backend deploy together as one Vercel project. The root
+`vercel.json` declares two services — `web/` (static Vite build) and `api/`
+(FastAPI on the Python runtime) — and routes `/api/*` to the backend, everything
+else to the SPA. Set the Vercel project's Root Directory to the repository root.
+
+Because both are served from one origin, there is no CORS in production and the
+`pt_auth` cookie stays `SameSite=Lax`. The frontend calls `/api` relatively, so
+no backend URL is baked into the bundle.
+
+The edge strips the `/api` prefix before the backend sees a request, so routes
+stay mounted at their own root (`/portfolios`, `/auth/...`). Two consequences:
+
+- `API_ROOT_PATH=/api` so `/api/docs` and the OpenAPI `servers` entry resolve.
+- `OAUTH_REDIRECT_URL` must be set explicitly — the app cannot reconstruct the
+  public callback URL, and the value must also be registered as an Authorized
+  redirect URI in the Google Cloud Console.
+
+Migrations run once per build (`python -m scripts.migrate`) rather than on
+startup, so no request-serving instance issues DDL. Set
+`RUN_MIGRATIONS_ON_STARTUP=false` in the deployed environment; leave it at its
+default locally, where startup migrations are what create the dev and e2e
+schemas.
+
+Functions run in `fra1` to sit next to the Neon database — the `iad1` default
+would add a transatlantic round trip to every query.
+
+Required Vercel environment variables: `DATABASE_URL`, `SECRET_KEY`,
+`OAUTH_STATE_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`FRONTEND_URL`, `OAUTH_REDIRECT_URL`, `API_ROOT_PATH=/api`, `COOKIE_SECURE=true`,
+`COOKIE_SAMESITE=lax`, `RUN_MIGRATIONS_ON_STARTUP=false`, `DB_POOL_SIZE=2`,
+`DB_MAX_OVERFLOW=3`. All are documented in `api/.env.example`.
+
+Preview deployments run the build command too. Give the Preview environment its
+own `DATABASE_URL` (a Neon branch) if previews should not migrate production.
+
 ## Tests & Linting
 
 ```bash

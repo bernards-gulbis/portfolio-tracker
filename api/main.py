@@ -34,12 +34,15 @@ from app.core.auth import (
     oauth_auth_backend,
 )
 from app.core.config import (
+    API_ROOT_PATH,
     COOKIE_SAMESITE,
     COOKIE_SECURE,
     CORS_ORIGINS,
     FRONTEND_URL,
     LOG_LEVEL,
+    OAUTH_REDIRECT_URL,
     OAUTH_STATE_SECRET,
+    RUN_MIGRATIONS_ON_STARTUP,
 )
 from app.core.database import (
     get_session,
@@ -89,11 +92,16 @@ async def lifespan(app: FastAPI):
         logger.error("Failed to connect to database")
         raise RuntimeError("Database connection failed")
 
-    run_migrations()
-    # Defense-in-depth: after migrations, assert money columns are Decimal,
-    # not Float. Catches bypassed-migration paths before any write happens.
-    verify_money_columns_are_decimal()
-    logger.info("Database initialized successfully")
+    if RUN_MIGRATIONS_ON_STARTUP:
+        run_migrations()
+        # Defense-in-depth: after migrations, assert money columns are Decimal,
+        # not Float. Catches bypassed-migration paths before any write happens.
+        verify_money_columns_are_decimal()
+        logger.info("Database initialized successfully")
+    else:
+        # Migrations ran as a deploy step (``python -m scripts.migrate``). Doing
+        # them here too would mean DDL on every cold start, unlocked.
+        logger.info("Skipping startup migrations (RUN_MIGRATIONS_ON_STARTUP=false)")
     yield
     # Shutdown (cleanup if needed)
     logger.info("Shutting down Portfolio Tracker API...")
@@ -104,6 +112,9 @@ app = FastAPI(
     description="API for tracking investment portfolios and transactions",
     version="1.0.0",
     lifespan=lifespan,
+    # Set when a proxy mounts the API under a prefix and strips it before
+    # routing, so /docs and the OpenAPI servers entry resolve publicly.
+    root_path=API_ROOT_PATH,
 )
 
 
@@ -299,6 +310,10 @@ app.include_router(
         oauth_client=google_oauth_client,
         backend=oauth_auth_backend,
         state_secret=OAUTH_STATE_SECRET,
+        # None means "derive the callback from the incoming request", which is
+        # wrong whenever a proxy strips a path prefix — the app would hand
+        # Google a redirect_uri missing that prefix and the exchange would fail.
+        redirect_url=OAUTH_REDIRECT_URL or None,
         associate_by_email=True,
         is_verified_by_default=True,
         csrf_token_cookie_secure=COOKIE_SECURE,

@@ -1,10 +1,15 @@
 import type { APIRequestContext, APIResponse } from '@playwright/test';
 import * as fs from 'node:fs';
 
-// Must be localhost (not 127.0.0.1): the pt_auth cookie domain is 'localhost'
-// (set by the browser during UI login in global-setup). Mismatching the host
-// causes the request fixture to omit the cookie, returning 401 on every call.
-const API = 'http://localhost:8000';
+// Single base URL for every e2e entry point, matching how the app itself
+// reaches the API: through the Vite dev proxy, which strips /api before
+// forwarding to uvicorn on :8000.
+//
+// Must be localhost, not 127.0.0.1: the pt_auth cookie is scoped to the host
+// 'localhost' (set by the browser during UI login in global-setup). Cookies
+// ignore the port, so :3000 and :8000 both receive it — but a different host
+// does not, and the request fixture would then 401 on every call.
+export const API = 'http://localhost:3000/api';
 
 export interface Portfolio {
   id: number;
