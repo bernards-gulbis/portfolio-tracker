@@ -8,7 +8,9 @@ See [api/](api/README.md) and [web/](web/README.md) READMEs for architecture det
 
 ## Getting Started
 
-**Prerequisites:** Python 3.12+, Node.js 20+
+**Prerequisites:** Python 3.12+, Node.js `^22.22.2 || ^24.15.0 || >=26` (see `web/package.json` `engines`)
+
+Node.js 20 is not supported — jsdom 30 and react-router 8 both require newer. CI builds and tests on Node.js 24.
 
 ### Backend
 
