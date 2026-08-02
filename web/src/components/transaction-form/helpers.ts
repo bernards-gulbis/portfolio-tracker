@@ -111,6 +111,12 @@ export const buildTransactionData = (values: FormValues): TransactionCreate => {
     case TransactionType.FEE:
       base.total_amount = -Math.abs(Number.parseFloat(values.totalAmount || '0'));
       break;
+    case TransactionType.REWARD:
+      // Broker refund/credit — money in, and nothing else. No ticker,
+      // quantity, price or EUR amount; the FX rate is applied above for
+      // every type.
+      base.total_amount = Math.abs(Number.parseFloat(values.totalAmount || '0'));
+      break;
     case TransactionType.BUY:
       base.ticker = values.ticker;
       base.quantity = Number.parseFloat(values.quantity || '0');

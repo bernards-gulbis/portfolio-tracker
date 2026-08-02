@@ -265,6 +265,7 @@ const en = {
         Buy: 'Buy',
         Sell: 'Sell',
         Dividend: 'Dividend',
+        Reward: 'Reward',
         Fee: 'Fee',
         Split: 'Split',
       },

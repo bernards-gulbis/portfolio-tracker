@@ -17,6 +17,7 @@ export enum TransactionType {
   WITHDRAW = 'Withdraw',
   SPLIT = 'Split',
   DIVIDEND = 'Dividend',
+  REWARD = 'Reward',
 }
 
 const TransactionTypeSchema = z.enum(TransactionType);

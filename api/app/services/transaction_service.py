@@ -68,7 +68,12 @@ _NEGATIVE_TX_TYPES = frozenset(
     {TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE}
 )
 _POSITIVE_TX_TYPES = frozenset(
-    {TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND}
+    {
+        TransactionType.DEPOSIT,
+        TransactionType.SELL,
+        TransactionType.DIVIDEND,
+        TransactionType.REWARD,
+    }
 )
 
 
@@ -408,7 +413,11 @@ class TransactionService:
                 transaction_type, ticker, quantity, price_per_share, total_amount, fee
             )
 
-        elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):
+        elif transaction_type in (
+            TransactionType.DEPOSIT,
+            TransactionType.WITHDRAW,
+            TransactionType.REWARD,
+        ):
             if ticker or quantity is not None or price_per_share is not None:
                 raise InvalidTransactionDataException(
                     f"{transaction_type.value} transactions should not have ticker, quantity, or price"

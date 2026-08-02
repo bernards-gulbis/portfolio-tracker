@@ -242,7 +242,7 @@ class TestDatabaseUtilities:
             session.refresh(portfolio)
             pid = portfolio.id
 
-        # Valid row must insert fine (baseline — guards against a false-positive
+        # Valid rows must insert fine (baseline — guards against a false-positive
         # constraint that rejects everything).
         with Session(engine) as session:
             session.add(
@@ -251,6 +251,14 @@ class TestDatabaseUtilities:
                     date=datetime(2025, 1, 1),
                     type=TransactionType.DEPOSIT,
                     total_amount=Decimal("100.00"),
+                )
+            )
+            session.add(
+                Transaction(
+                    portfolio_id=pid,
+                    date=datetime(2025, 1, 1),
+                    type=TransactionType.REWARD,
+                    total_amount=Decimal("12.34"),
                 )
             )
             session.commit()
@@ -264,6 +272,7 @@ class TestDatabaseUtilities:
             (TransactionType.DIVIDEND, Decimal("-1.00")),  # dividend must be > 0
             (TransactionType.FEE, Decimal("1.00")),  # fee must be < 0
             (TransactionType.SPLIT, Decimal("1.00")),  # split must be exactly 0
+            (TransactionType.REWARD, Decimal("-1.00")),  # reward must be > 0
         ]
         for tx_type, bad_amount in violations:
             with Session(engine) as session, pytest.raises(IntegrityError):

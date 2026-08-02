@@ -104,6 +104,29 @@ class TestTransactionCreateTimezoneAware:
         assert tx.date.utcoffset() == timedelta(hours=5)
 
 
+class TestTransactionCreateRewardSign:
+    """``REWARD`` is money entering the account (a broker refund/credit), so it
+    sits on the positive side of ``validate_total_amount_sign`` alongside
+    DEPOSIT / SELL / DIVIDEND."""
+
+    def test_positive_reward_accepted(self):
+        tx = TransactionCreate(
+            date=datetime(2025, 1, 1, 10, 30, tzinfo=UTC),
+            type=TransactionType.REWARD,
+            total_amount=25.0,
+        )
+        assert tx.total_amount == 25.0
+
+    @pytest.mark.parametrize("amount", [-25.0, 0.0])
+    def test_non_positive_reward_rejected(self, amount):
+        with pytest.raises(ValidationError, match="must have positive total_amount"):
+            TransactionCreate(
+                date=datetime(2025, 1, 1, 10, 30, tzinfo=UTC),
+                type=TransactionType.REWARD,
+                total_amount=amount,
+            )
+
+
 class TestTransactionUpdateTimezoneAware:
     """``TransactionUpdate`` is a separate class from ``TransactionBase``
     (partial-update semantics — every field optional), so its ``date``

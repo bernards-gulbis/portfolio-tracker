@@ -430,6 +430,20 @@ describe('TransactionModal — edit mode', () => {
     expect(screen.queryByLabelText('Total Amount')).not.toBeInTheDocument();
   });
 
+  it('shows only the amount field for Reward type', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Reward');
+
+    expect(screen.getByLabelText('Total Amount')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Asset')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Quantity')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Price per Share')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Amount in EUR')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Split Ratio')).not.toBeInTheDocument();
+  });
+
   it('shows EUR amount field for Withdraw type', async () => {
     const user = userEvent.setup();
     renderModal();
@@ -586,6 +600,31 @@ describe('TransactionModal — validation & create', () => {
     });
   });
 
+  it('sends positive total_amount for REWARD', async () => {
+    mockCreateMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderModal();
+
+    await selectType(user, 'Reward');
+
+    const totalInput = screen.getByLabelText('Total Amount');
+    await user.type(totalInput, '25.50');
+
+    const submitBtn = screen.getByRole('button', { name: 'Save Transaction' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'Reward',
+            total_amount: 25.5,
+          }),
+        })
+      );
+    });
+  });
+
   it('shows root error alert when mutation rejects', async () => {
     mockCreateMutateAsync.mockRejectedValueOnce(new Error('Server error'));
     const user = userEvent.setup();
@@ -703,6 +742,7 @@ describe('TransactionModal — validation & create', () => {
     'Sell',
     'Fee',
     'Dividend',
+    'Reward',
     'Split',
   ])('shows FX Rate field for %s (inside Advanced)', async (typeLabel) => {
     const user = userEvent.setup();

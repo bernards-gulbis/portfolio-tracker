@@ -313,6 +313,41 @@ describe('TransactionTable', () => {
     expect(screen.getByText('Split 1:4')).toBeInTheDocument();
   });
 
+  it('renders the Reward badge for reward transactions', () => {
+    const rewardTx: Transaction[] = [
+      {
+        id: 11,
+        portfolio_id: 1,
+        date: '2021-06-01T10:00:00',
+        type: TransactionType.REWARD,
+        ticker: null,
+        quantity: null,
+        price_per_share: null,
+        fee: null,
+        total_amount: 25.5,
+        eur_amount: null,
+        split_ratio: null,
+      },
+    ];
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TransactionTable
+          transactions={rewardTx}
+          portfolioId={1}
+          onEdit={mockOnEdit}
+          {...defaultProps}
+          total={1}
+        />
+      </QueryClientProvider>
+    );
+
+    const badge = screen.getByText('Reward');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('bg-badge-reward-bg');
+  });
+
   it('toggles sort order when date header is clicked', async () => {
     const onSortOrderChange = vi.fn();
     const queryClient = createTestQueryClient();

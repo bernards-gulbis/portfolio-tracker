@@ -267,6 +267,7 @@ const lv: Translation = {
         Buy: 'Pirkt',
         Sell: 'Pārdot',
         Dividend: 'Dividende',
+        Reward: 'Atlīdzība',
         Fee: 'Komisija',
         Split: 'Sadalīšana',
       },

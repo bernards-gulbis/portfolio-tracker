@@ -337,6 +337,23 @@ def _apply_fee(state: _TxState, tx: Transaction, strict: bool) -> None:
     state.cash += _to_decimal(tx.total_amount)  # total is negative
 
 
+def _apply_reward(state: _TxState, tx: Transaction, strict: bool) -> None:
+    """Broker refund/credit (e.g. a mispriced trade being made good) — cash only.
+
+    Deliberately does not touch ``principal``: the money is not capital the user
+    contributed, so it must land in portfolio value with no matching cash flow.
+    Status then reports it as unexplained value growth, and TWR
+    (``cf = state.principal - twr.prev_principal``) books it as return rather
+    than a contribution.
+
+    It also has no dedicated aggregate, which is why ``REWARD`` is absent from
+    ``_FX_AWARE_TX_TYPES`` — no EUR accumulator consumes it, so there is nothing
+    for a historical FX lookup to feed. ``tx.fx_rate`` is still persisted on the
+    row for the record.
+    """
+    state.cash += _to_decimal(tx.total_amount)  # total is positive
+
+
 def _apply_split(state: _TxState, tx: Transaction, strict: bool) -> None:
     split_ratio = _to_decimal(tx.split_ratio) if tx.split_ratio is not None else _ONE
     if split_ratio <= 0:
@@ -364,6 +381,7 @@ _TX_HANDLERS = {
     TransactionType.DIVIDEND: _apply_dividend,
     TransactionType.FEE: _apply_fee,
     TransactionType.SPLIT: _apply_split,
+    TransactionType.REWARD: _apply_reward,
 }
 
 

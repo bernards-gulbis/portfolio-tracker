@@ -13,3 +13,4 @@ class TransactionType(StrEnum):
     WITHDRAW = "Withdraw"
     SPLIT = "Split"
     DIVIDEND = "Dividend"
+    REWARD = "Reward"

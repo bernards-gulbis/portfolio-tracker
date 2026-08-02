@@ -1000,7 +1000,7 @@ export interface components {
          * @description Transaction type enumeration
          * @enum {string}
          */
-        TransactionType: "Deposit" | "Buy" | "Fee" | "Sell" | "Withdraw" | "Split" | "Dividend";
+        TransactionType: "Deposit" | "Buy" | "Fee" | "Sell" | "Withdraw" | "Split" | "Dividend" | "Reward";
         /**
          * TransactionUpdate
          * @description Schema for updating a transaction (all fields optional)

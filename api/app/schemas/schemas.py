@@ -150,7 +150,12 @@ class TransactionCreate(TransactionBase):
                 )
         elif (
             tx_type
-            in (TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND)
+            in (
+                TransactionType.DEPOSIT,
+                TransactionType.SELL,
+                TransactionType.DIVIDEND,
+                TransactionType.REWARD,
+            )
             and amount <= 0
         ):
             raise ValueError(
