@@ -44,6 +44,80 @@ class TestMigrateScript:
             migrate.main()
 
 
+class TestDeployEnvironmentGuard:
+    """Vercel runs the build command per environment; preview inherits vars.
+
+    Every case here must fail *before* ``run_migrations`` is reached — a build
+    that has already touched the schema cannot be un-run.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clean_env(self, monkeypatch):
+        for var in ("VERCEL_ENV", "DATABASE_URL", "PREVIEW_DATABASE_URL"):
+            monkeypatch.delenv(var, raising=False)
+
+    @staticmethod
+    def _run_main():
+        """Run main() with the migration primitives stubbed out."""
+        with (
+            patch.object(migrate, "verify_connection", return_value=True),
+            patch.object(migrate, "run_migrations") as mock_run,
+            patch.object(migrate, "verify_money_columns_are_decimal"),
+        ):
+            return migrate.main(), mock_run
+
+    def test_allows_local_run_without_vercel_env(self):
+        assert migrate._blocked_reason() is None
+
+    def test_rejects_unknown_vercel_env(self, monkeypatch):
+        monkeypatch.setenv("VERCEL_ENV", "staging")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://host/db")
+        assert "VERCEL_ENV" in (migrate._blocked_reason() or "")
+
+    def test_rejects_missing_database_url_on_vercel(self, monkeypatch):
+        """Unset means the SQLite default — an ephemeral file on Vercel."""
+        monkeypatch.setenv("VERCEL_ENV", "production")
+        assert "DATABASE_URL" in (migrate._blocked_reason() or "")
+
+    def test_allows_production_with_explicit_database_url(self, monkeypatch):
+        monkeypatch.setenv("VERCEL_ENV", "production")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://host/prod")
+        assert migrate._blocked_reason() is None
+
+    def test_rejects_preview_without_preview_database_url(self, monkeypatch):
+        monkeypatch.setenv("VERCEL_ENV", "preview")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://host/prod")
+        assert "PREVIEW_DATABASE_URL" in (migrate._blocked_reason() or "")
+
+    def test_rejects_preview_pointed_at_another_database(self, monkeypatch):
+        """The inherited-production case: the two URLs disagree."""
+        monkeypatch.setenv("VERCEL_ENV", "preview")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://host/prod")
+        monkeypatch.setenv("PREVIEW_DATABASE_URL", "postgresql://host/branch")
+        assert "does not match" in (migrate._blocked_reason() or "")
+
+    def test_allows_preview_on_its_own_database(self, monkeypatch):
+        monkeypatch.setenv("VERCEL_ENV", "preview")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://host/branch")
+        monkeypatch.setenv("PREVIEW_DATABASE_URL", "postgresql://host/branch")
+        assert migrate._blocked_reason() is None
+
+    def test_main_exits_one_without_migrating_when_blocked(self, monkeypatch):
+        monkeypatch.setenv("VERCEL_ENV", "preview")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://host/prod")
+        exit_code, mock_run = self._run_main()
+        assert exit_code == 1
+        mock_run.assert_not_called()
+
+    def test_main_migrates_when_preview_owns_its_database(self, monkeypatch):
+        monkeypatch.setenv("VERCEL_ENV", "preview")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://host/branch")
+        monkeypatch.setenv("PREVIEW_DATABASE_URL", "postgresql://host/branch")
+        exit_code, mock_run = self._run_main()
+        assert exit_code == 0
+        mock_run.assert_called_once_with()
+
+
 class TestLifespanMigrationGate:
     """``main.lifespan`` owns the startup half of the same decision."""
 

@@ -15,7 +15,12 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        // 127.0.0.1, not localhost: uvicorn binds 127.0.0.1 by default (and
+        // explicitly in playwright.config.ts), while Node resolves 'localhost'
+        // verbatim — it can hand back ::1 first and the proxy then fails to
+        // connect. The browser still talks to the dev server on localhost:3000,
+        // which is what keeps the pt_auth cookie in scope.
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

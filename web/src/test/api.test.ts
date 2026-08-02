@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
 import type { AxiosHeaders } from 'axios';
 import {
@@ -480,5 +480,31 @@ describe('Auth API functions', () => {
     const result = await getGoogleAuthorizeUrl();
     expect(spy).toHaveBeenCalledWith('/auth/google/authorize');
     expect(result).toBe('https://accounts.google.com/o/oauth2/auth?...');
+  });
+});
+
+describe('Axios client configuration', () => {
+  // baseURL is read once, at module evaluation — each case resets the module
+  // registry so the fresh import sees the env it just stubbed.
+  const importFreshClient = async (): Promise<typeof apiInstance> => {
+    vi.resetModules();
+    return (await import('../api')).default;
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('falls back to the same-origin /api prefix when VITE_API_BASE_URL is unset', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', undefined);
+    const client = await importFreshClient();
+    expect(client.defaults.baseURL).toBe('/api');
+  });
+
+  it('uses VITE_API_BASE_URL when set, for a detached backend', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test');
+    const client = await importFreshClient();
+    expect(client.defaults.baseURL).toBe('https://api.example.test');
   });
 });
