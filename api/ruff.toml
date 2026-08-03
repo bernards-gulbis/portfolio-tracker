@@ -1,8 +1,10 @@
-[tool.ruff]
+# Ruff config lives here, not in pyproject.toml: Vercel's Python builder prefers a
+# pyproject.toml over requirements.txt and fails the build when it has no [project] table.
+
 target-version = "py312"
 line-length = 88
 
-[tool.ruff.lint]
+[lint]
 select = [
     "E",     # pycodestyle errors
     "W",     # pycodestyle warnings
@@ -22,5 +24,5 @@ ignore = [
     "N818",   # exception names use "Exception" suffix by project convention
 ]
 
-[tool.ruff.lint.isort]
+[lint.isort]
 known-first-party = ["app"]
