@@ -17,8 +17,8 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-# Enforces the ledger's sign semantics on total_amount: DEPOSIT/SELL/DIVIDEND
-# are money IN (> 0); WITHDRAW/BUY/FEE are money OUT (< 0); SPLIT is a
+# Enforces the ledger's sign semantics on total_amount: DEPOSIT/SELL/DIVIDEND/
+# REWARD are money IN (> 0); WITHDRAW/BUY/FEE are money OUT (< 0); SPLIT is a
 # share-count-only event with no cash flow. Any new transaction type added
 # must extend this expression. Mirrored by Alembic migration
 # ``a7b9c2e1f8d4_transaction_sign_checks`` for databases that predate the
@@ -34,7 +34,8 @@ _TRANSACTION_SIGN_CHECK = (
     "(type = 'SELL' AND total_amount > 0) OR "
     "(type = 'DIVIDEND' AND total_amount > 0) OR "
     "(type = 'FEE' AND total_amount < 0) OR "
-    "(type = 'SPLIT' AND total_amount = 0)"
+    "(type = 'SPLIT' AND total_amount = 0) OR "
+    "(type = 'REWARD' AND total_amount > 0)"
 )
 
 

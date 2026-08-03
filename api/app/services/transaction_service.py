@@ -68,7 +68,12 @@ _NEGATIVE_TX_TYPES = frozenset(
     {TransactionType.BUY, TransactionType.WITHDRAW, TransactionType.FEE}
 )
 _POSITIVE_TX_TYPES = frozenset(
-    {TransactionType.DEPOSIT, TransactionType.SELL, TransactionType.DIVIDEND}
+    {
+        TransactionType.DEPOSIT,
+        TransactionType.SELL,
+        TransactionType.DIVIDEND,
+        TransactionType.REWARD,
+    }
 )
 
 
@@ -236,17 +241,17 @@ class TransactionService:
         self,
         transaction_id: int,
         user_id: uuid.UUID,
-        date: datetime | None | _UnsetType = _UNSET,
-        transaction_type: TransactionType | None | _UnsetType = _UNSET,
-        ticker: str | None | _UnsetType = _UNSET,
-        quantity: float | None | _UnsetType = _UNSET,
-        price_per_share: float | None | _UnsetType = _UNSET,
-        fee: float | None | _UnsetType = _UNSET,
-        total_amount: float | None | _UnsetType = _UNSET,
-        eur_amount: float | None | _UnsetType = _UNSET,
-        split_ratio: float | None | _UnsetType = _UNSET,
-        currency: str | None | _UnsetType = _UNSET,
-        fx_rate: float | None | _UnsetType = _UNSET,
+        date: datetime | _UnsetType | None = _UNSET,
+        transaction_type: TransactionType | _UnsetType | None = _UNSET,
+        ticker: str | _UnsetType | None = _UNSET,
+        quantity: float | _UnsetType | None = _UNSET,
+        price_per_share: float | _UnsetType | None = _UNSET,
+        fee: float | _UnsetType | None = _UNSET,
+        total_amount: float | _UnsetType | None = _UNSET,
+        eur_amount: float | _UnsetType | None = _UNSET,
+        split_ratio: float | _UnsetType | None = _UNSET,
+        currency: str | _UnsetType | None = _UNSET,
+        fx_rate: float | _UnsetType | None = _UNSET,
     ) -> Transaction:
         """Update a transaction (user-scoped via portfolio ownership).
 
@@ -408,7 +413,11 @@ class TransactionService:
                 transaction_type, ticker, quantity, price_per_share, total_amount, fee
             )
 
-        elif transaction_type in (TransactionType.DEPOSIT, TransactionType.WITHDRAW):
+        elif transaction_type in (
+            TransactionType.DEPOSIT,
+            TransactionType.WITHDRAW,
+            TransactionType.REWARD,
+        ):
             if ticker or quantity is not None or price_per_share is not None:
                 raise InvalidTransactionDataException(
                     f"{transaction_type.value} transactions should not have ticker, quantity, or price"

@@ -18,10 +18,15 @@ jobs:
           fetch-depth: 0
 
       # --- Frontend ---
+      # CI standardizes on Node 24; it is not the minimum. The supported
+      # range is declared in web/package.json ``engines``:
+      # ``^22.22.2 || ^24.15.0 || >=26`` — the intersection of jsdom 30
+      # (``^22.22.2 || ^24.15.0 || >=26``) and react-router 8 (``>=22.22``).
+      # Node 20 is below that range: every vitest forks worker dies at startup.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -102,7 +107,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
 

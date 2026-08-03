@@ -16,8 +16,8 @@ const navigateMock = routing.navigateMock.fn;
 // Substitute BrowserRouter with MemoryRouter so initialEntries drives the URL.
 // useNavigate is mocked so we can assert tab clicks etc. without observing the
 // in-memory history. All other react-router exports pass through.
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   const { MemoryRouter } = actual;
   return {
     ...actual,

@@ -122,6 +122,7 @@ describe('transaction-form schema — numeric validation', () => {
     [TransactionType.BUY, { ticker: 'AAPL', quantity: '5', pricePerShare: '100', totalAmount: '500' }],
     [TransactionType.SELL, { ticker: 'AAPL', quantity: '5', pricePerShare: '100', totalAmount: '500' }],
     [TransactionType.DIVIDEND, { ticker: 'AAPL', quantity: '', pricePerShare: '', totalAmount: '500' }],
+    [TransactionType.REWARD, { ticker: '', quantity: '', pricePerShare: '', totalAmount: '500' }],
     [TransactionType.SPLIT, { ticker: 'AAPL', quantity: '', pricePerShare: '', fee: '', totalAmount: '0', splitRatio: '4' }],
   ];
 

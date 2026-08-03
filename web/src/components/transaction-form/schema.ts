@@ -10,6 +10,7 @@ export const TRANSACTION_TYPE_ORDER: TransactionType[] = [
   TransactionType.BUY,
   TransactionType.SELL,
   TransactionType.DIVIDEND,
+  TransactionType.REWARD,
   TransactionType.FEE,
   TransactionType.SPLIT,
 ];

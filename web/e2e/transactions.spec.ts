@@ -77,6 +77,29 @@ test('Buy transaction — form shows ticker, quantity, price-per-share fields', 
   await expect(page.locator('[data-testid="transaction-row"]')).toContainText('Buy');
 });
 
+test('Reward transaction — amount only, no instrument fields', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add Transaction' }).click();
+  await page.getByRole('dialog', { name: 'Add Transaction' }).waitFor();
+
+  await page.locator('#tx-type').click();
+  await page.getByRole('option', { name: 'Reward' }).click();
+
+  // A reward is a bare cash credit — no ticker, quantity, price or EUR field.
+  await expect(page.locator('#tx-ticker')).toHaveCount(0);
+  await expect(page.locator('#tx-quantity')).toHaveCount(0);
+  await expect(page.locator('#tx-price')).toHaveCount(0);
+  await expect(page.locator('#tx-eur')).toHaveCount(0);
+
+  await page.locator('#tx-date').fill('2025-03-01');
+  await page.locator('#tx-total').fill('25.50');
+
+  await page.getByRole('button', { name: 'Save Transaction' }).click();
+  await page.getByRole('dialog', { name: 'Add Transaction' }).waitFor({ state: 'hidden' });
+
+  await expect(page.locator('[data-testid="transaction-row"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="transaction-row"]')).toContainText('Reward');
+});
+
 test('Dividend transaction — appears in table', async ({ page }) => {
   await page.getByRole('button', { name: 'Add Transaction' }).click();
   await page.getByRole('dialog', { name: 'Add Transaction' }).waitFor();

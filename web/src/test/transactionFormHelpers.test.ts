@@ -266,6 +266,39 @@ describe('buildTransactionData', () => {
     expect(data.total_amount).toBe(-12.5);
   });
 
+  it('builds REWARD data with positive total_amount and no instrument fields', () => {
+    const data = buildTransactionData({
+      ...baseValues,
+      type: TransactionType.REWARD,
+      totalAmount: '25.50',
+    });
+    expect(data.type).toBe(TransactionType.REWARD);
+    expect(data.total_amount).toBe(25.5);
+    expect(data.ticker).toBeUndefined();
+    expect(data.quantity).toBeUndefined();
+    expect(data.price_per_share).toBeUndefined();
+    expect(data.eur_amount).toBeUndefined();
+  });
+
+  it('normalizes a negative REWARD amount to positive', () => {
+    const data = buildTransactionData({
+      ...baseValues,
+      type: TransactionType.REWARD,
+      totalAmount: '-25.50',
+    });
+    expect(data.total_amount).toBe(25.5);
+  });
+
+  it('keeps the fxRate on a REWARD', () => {
+    const data = buildTransactionData({
+      ...baseValues,
+      type: TransactionType.REWARD,
+      totalAmount: '25.50',
+      fxRate: '1.0871',
+    });
+    expect(data.fx_rate).toBe(1.0871);
+  });
+
   it('builds BUY data with ticker, quantity, price, fee and negative total_amount', () => {
     const data = buildTransactionData({
       ...baseValues,

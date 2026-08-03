@@ -233,6 +233,48 @@ class TestCreateTransaction:
                 price_per_share=10,
             )
 
+    def test_reward_created_with_fx_rate(self, svc, user_id, portfolio_id):
+        """A reward is a bare positive cash credit: amount plus an optional FX
+        rate, no instrument fields."""
+        tx = svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 1, 1),
+            transaction_type=TransactionType.REWARD,
+            total_amount=25.50,
+            fx_rate=1.0871,
+        )
+        assert tx.type == TransactionType.REWARD
+        assert tx.total_amount == Decimal("25.50")
+        assert tx.fx_rate == Decimal("1.087100")
+        assert tx.ticker is None
+
+    def test_reward_with_ticker_rejected(self, svc, user_id, portfolio_id):
+        with pytest.raises(
+            InvalidTransactionDataException, match="should not have ticker"
+        ):
+            svc.create_transaction(
+                portfolio_id=portfolio_id,
+                user_id=user_id,
+                date=datetime(2024, 1, 1),
+                transaction_type=TransactionType.REWARD,
+                total_amount=25,
+                ticker="AAPL",
+            )
+
+    def test_reward_with_quantity_rejected(self, svc, user_id, portfolio_id):
+        with pytest.raises(
+            InvalidTransactionDataException, match="should not have ticker"
+        ):
+            svc.create_transaction(
+                portfolio_id=portfolio_id,
+                user_id=user_id,
+                date=datetime(2024, 1, 1),
+                transaction_type=TransactionType.REWARD,
+                total_amount=25,
+                quantity=10,
+            )
+
     def test_dividend_without_ticker_rejected(self, svc, user_id, portfolio_id):
         with pytest.raises(InvalidTransactionDataException, match="require a ticker"):
             svc.create_transaction(
@@ -667,6 +709,32 @@ class TestExportCSV:
         assert "03/15/2024 10:30:00" in lines[1]
         assert "Deposit" in lines[1]
 
+    def test_reward_round_trips_through_csv(self, svc, session, user_id, portfolio_id):
+        """Export writes the StrEnum *value* ("Reward"), and re-importing it into
+        a fresh portfolio must reproduce the same amount and FX rate."""
+        svc.create_transaction(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            date=datetime(2024, 3, 15, 10, 30, 0),
+            transaction_type=TransactionType.REWARD,
+            total_amount=25.50,
+            fx_rate=1.087,
+        )
+        csv_out = svc.export_transactions_to_csv(portfolio_id, user_id)
+        assert "Reward" in csv_out
+
+        other = Portfolio(name="RT", user_id=user_id)
+        session.add(other)
+        session.commit()
+        session.refresh(other)
+
+        txs, skipped = svc.import_from_csv(csv_out, other.id, user_id)
+        assert skipped == 0
+        assert len(txs) == 1
+        assert txs[0].type == TransactionType.REWARD
+        assert txs[0].total_amount == Decimal("25.5000")
+        assert txs[0].fx_rate == Decimal("1.087000")
+
     def test_export_none_fields_become_empty(self, svc, user_id, portfolio_id):
         svc.create_transaction(
             portfolio_id=portfolio_id,
@@ -824,6 +892,16 @@ class TestApplyCSVTotalAmountSign:
         csv = "date,type,total_amount,ticker\n01/01/2024 00:00:00,Dividend,50,AAPL\n"
         txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
         assert txs[0].total_amount == 50
+
+    def test_reward_negative_corrected(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Reward,-25\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 25
+
+    def test_reward_positive_unchanged(self, svc, user_id, portfolio_id):
+        csv = "date,type,total_amount\n01/01/2024 00:00:00,Reward,25\n"
+        txs, _ = svc.import_from_csv(csv, portfolio_id, user_id)
+        assert txs[0].total_amount == 25
 
     def test_split_nonzero_rejected(self, svc, user_id, portfolio_id):
         csv = "date,type,total_amount,ticker,split_ratio\n01/01/2024 00:00:00,Split,100,AAPL,2\n"

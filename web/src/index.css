@@ -51,6 +51,8 @@
   --color-badge-fee-fg: var(--badge-fee-fg);
   --color-badge-split-bg: var(--badge-split-bg);
   --color-badge-split-fg: var(--badge-split-fg);
+  --color-badge-reward-bg: var(--badge-reward-bg);
+  --color-badge-reward-fg: var(--badge-reward-fg);
 }
 
 :root {
@@ -94,6 +96,8 @@
   --badge-fee-fg: oklch(0.4 0 0);
   --badge-split-bg: oklch(0.95 0.05 85);
   --badge-split-fg: oklch(0.4 0.15 85);
+  --badge-reward-bg: oklch(0.95 0.04 180);
+  --badge-reward-fg: oklch(0.4 0.12 180);
 }
 
 .dark {
@@ -136,6 +140,8 @@
   --badge-fee-fg: oklch(0.7 0 0);
   --badge-split-bg: oklch(0.3 0.05 85);
   --badge-split-fg: oklch(0.75 0.15 85);
+  --badge-reward-bg: oklch(0.3 0.04 180);
+  --badge-reward-fg: oklch(0.75 0.12 180);
 }
 
 @layer base {

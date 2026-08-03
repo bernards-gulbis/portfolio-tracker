@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTransactions } from '../hooks/useTransactions';
 import { useDebounce } from '../hooks/useDebounce';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { usePortfolioStatus } from '../hooks/usePortfolioStatus';
 import { Transaction, exportTransactionsCSV, getErrorMessage } from '../api';
 import { TransactionTable } from './TransactionTable';

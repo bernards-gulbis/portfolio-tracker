@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronsUpDown, Plus, BriefcaseBusiness } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { usePortfolios } from '../hooks/usePortfolios';
 import { getErrorMessage } from '../api';
 import { Skeleton } from '@/components/ui/skeleton';

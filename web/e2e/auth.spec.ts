@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const API = 'http://127.0.0.1:8000';
+import { API } from './fixtures/api';
 
 // Logout requires an authenticated session — use the shared storageState.
 test.describe('auth — logout', () => {

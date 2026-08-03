@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { TransactionView } from '../components/TransactionView';
 import { useTransactions } from '../hooks/useTransactions';
 import { TransactionType, exportTransactionsCSV } from '../api';
@@ -327,7 +327,7 @@ describe('TransactionView', () => {
     } as unknown as ReturnType<typeof useTransactions>);
 
     // Capture useNavigate so we can switch portfolios imperatively.
-    const { useNavigate } = await import('react-router-dom');
+    const { useNavigate } = await import('react-router');
     let navigateFn: ((path: string) => void) | null = null;
     const NavigationCapture = () => {
       navigateFn = useNavigate();

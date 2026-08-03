@@ -2,10 +2,10 @@ import { chromium, type FullConfig } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { API as API_BASE } from './fixtures/api';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_FILE = path.join(__dirname, '.auth', 'user.json');
-const API_BASE = 'http://127.0.0.1:8000';
 
 export const E2E_EMAIL = 'testuser@e2e-tests.com';
 export const E2E_PASSWORD = 'Password123!';

@@ -235,6 +235,41 @@ class TestTransactionHandlers:
         _apply_transaction(state, tx, strict=True)
         assert state.cash == Decimal("990")
 
+    def test_reward_increases_cash(self):
+        state = _TxState()
+        state.cash = Decimal("1000")
+        tx = _make_tx(type=TransactionType.REWARD, total_amount=25.0)
+        _apply_transaction(state, tx, strict=True)
+        assert state.cash == Decimal("1025")
+
+    def test_reward_leaves_principal_and_aggregates_untouched(self):
+        """A reward is a broker credit, not contributed capital — it must not
+        move ``principal`` (which would hide it from returns) or land in the
+        dividend/realized-gain aggregates."""
+        state = _TxState()
+        state.principal = Decimal("1000")
+        state.principal_eur.add(Decimal("900"))
+        state.principal_eur_avg.add(Decimal("900"))
+        tx = _make_tx(type=TransactionType.REWARD, total_amount=25.0)
+        _apply_transaction(state, tx, strict=True)
+        assert state.principal == Decimal("1000")
+        assert state.principal_eur.value == Decimal("900")
+        assert state.principal_eur_avg.value == Decimal("900")
+        assert state.dividends == _ZERO
+        assert state.dividends_received == []
+        assert state.realized_gains == _ZERO
+        assert state.holdings == {}
+
+    def test_reward_without_fx_rate_emits_no_warning(self):
+        """REWARD is deliberately outside ``_FX_AWARE_TX_TYPES`` — no EUR
+        aggregate consumes it, so a missing rate is not a data-quality problem
+        and must not produce ``fxRateMissing`` noise."""
+        state = _TxState()
+        tx = _make_tx(type=TransactionType.REWARD, total_amount=25.0, fx_rate=None)
+        _apply_transaction(state, tx, strict=True)
+        assert state.warnings == []
+        assert state.fx_missing_tx_ids == []
+
     def test_sell_removes_holding_when_fully_sold(self):
         state = _TxState()
         state.holdings["AAPL"] = _holding_from_aggregate(10, 1000, datetime(2025, 1, 1))
@@ -354,6 +389,27 @@ class TestCalculateStatus:
         assert len(result.holdings) == 1
         assert result.holdings[0].ticker == "AAPL"
         assert result.holdings[0].quantity == 10.0
+
+    def test_deposit_then_reward(self):
+        """A reward raises cash but not principal, so the extra money reads as
+        return rather than as capital the user put in."""
+        txs = [
+            _make_tx(
+                type=TransactionType.DEPOSIT, total_amount=5000.0, eur_amount=4500.0
+            ),
+            _make_tx(
+                type=TransactionType.REWARD,
+                total_amount=25.0,
+                date=datetime(2025, 1, 16),
+            ),
+        ]
+        result = calculate_status(txs, 0.92, Decimal("0.20"), 1, "Test")
+        assert result.cash == 5025.0
+        assert result.principal == 5000.0
+        assert result.dividends == 0.0
+        assert result.dividends_received == []
+        assert result.warnings == []
+        assert result.eur_incomplete is False
 
     def test_out_of_order_transactions(self):
         """Transactions passed out of chronological order should produce the same result."""

@@ -15,8 +15,8 @@ const mutableState = vi.hoisted(() => ({
   initialRoute: '/portfolios/1' as string,
 }));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   const { MemoryRouter } = actual;
   return {
     ...actual,

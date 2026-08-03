@@ -58,6 +58,7 @@ const TYPE_BADGE_CLASSES: Record<TransactionType, string> = {
   [TransactionType.DIVIDEND]: 'bg-badge-dividend-bg text-badge-dividend-fg',
   [TransactionType.FEE]: 'bg-badge-fee-bg text-badge-fee-fg',
   [TransactionType.SPLIT]: 'bg-badge-split-bg text-badge-split-fg',
+  [TransactionType.REWARD]: 'bg-badge-reward-bg text-badge-reward-fg',
 };
 
 interface TransactionTableProps {
@@ -117,6 +118,7 @@ export const TransactionTable = ({
     [TransactionType.BUY]: t('transaction.modal.types.Buy'),
     [TransactionType.SELL]: t('transaction.modal.types.Sell'),
     [TransactionType.DIVIDEND]: t('transaction.modal.types.Dividend'),
+    [TransactionType.REWARD]: t('transaction.modal.types.Reward'),
     [TransactionType.FEE]: t('transaction.modal.types.Fee'),
     [TransactionType.SPLIT]: t('transaction.modal.types.Split'),
   }), [t]);

@@ -1204,6 +1204,75 @@ def test_portfolio_status_with_deposit(client: TestClient):
     assert data["holdings"] == []
 
 
+def test_portfolio_status_with_reward(client: TestClient):
+    """A reward credits cash without inflating principal, so the refunded money
+    reads as portfolio gain rather than as capital the user contributed."""
+    portfolio_response = client.post("/portfolios/", json={"name": "Reward Portfolio"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Deposit",
+            "total_amount": 1000.0,
+        },
+    )
+    reward_response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-02T10:00:00",
+            "type": "Reward",
+            "total_amount": 25.0,
+            "fx_rate": 1.087,
+        },
+    )
+    assert reward_response.status_code == 201
+    assert reward_response.json()["type"] == "Reward"
+
+    response = client.get(f"/portfolios/{portfolio_id}/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["cash"] == pytest.approx(1025.0)
+    assert data["principal"] == pytest.approx(1000.0)
+    assert data["dividends"] == pytest.approx(0.0)
+    assert data["holdings"] == []
+    assert data["warnings"] == []
+
+
+def test_create_reward_with_ticker_rejected(client: TestClient):
+    """Reward is a bare cash credit — instrument fields must be refused."""
+    portfolio_response = client.post("/portfolios/", json={"name": "Reward Reject"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Reward",
+            "total_amount": 25.0,
+            "ticker": "AAPL",
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_create_reward_with_negative_amount_rejected(client: TestClient):
+    portfolio_response = client.post("/portfolios/", json={"name": "Reward Sign"})
+    portfolio_id = portfolio_response.json()["id"]
+
+    response = client.post(
+        f"/portfolios/{portfolio_id}/transactions/",
+        json={
+            "date": "2024-01-01T10:00:00",
+            "type": "Reward",
+            "total_amount": -25.0,
+        },
+    )
+    assert response.status_code == 422
+
+
 def test_portfolio_status_with_buy_transactions(client: TestClient):
     """Test portfolio status with stock purchases"""
     portfolio_response = client.post(
