@@ -1,12 +1,12 @@
 fastapi~=0.141.1
-uvicorn~=0.52.1
-sqlmodel~=0.0.39
-alembic~=1.18.5
+uvicorn~=0.52.4
+sqlmodel~=0.0.42
+alembic~=1.19.1
 psycopg2-binary~=2.9.12
 pytest~=9.1.1
 pytest-cov~=7.1.0
 httpx~=0.28.1
 requests~=2.34.2
-python-dotenv~=1.2.2
+python-dotenv~=1.2.3
 fastapi-users[sqlalchemy]~=15.0.5
 httpx-oauth~=0.17.0

@@ -349,8 +349,11 @@ function getPayloadConfigFromPayload(
 
 export {
   ChartContainer,
+  // Aliases of Recharts components; the rule cannot see through the re-export.
+  // eslint-disable-next-line react-refresh/only-export-components
   ChartTooltip,
   ChartTooltipContent,
+  // eslint-disable-next-line react-refresh/only-export-components
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
