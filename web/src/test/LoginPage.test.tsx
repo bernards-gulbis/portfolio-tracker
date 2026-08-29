@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import * as api from '../api';
 import { useLogin, useRegister } from '../hooks/useAuth';
 import { LoginPage } from '../components/LoginPage';
+import en from '../i18n/locales/en';
 
 vi.mock('../hooks/useAuth', () => ({
   useLogin: vi.fn(),
@@ -67,6 +68,25 @@ describe('LoginPage', () => {
   it('renders theme toggle button', () => {
     renderPage();
     expect(screen.getByRole('button', { name: /toggle theme/i })).toBeInTheDocument();
+  });
+
+  it('explains what the app is for first-time visitors', () => {
+    renderPage();
+    expect(screen.getByText(en.auth.intro.headline)).toBeInTheDocument();
+    expect(screen.getByText(en.auth.intro.tagline)).toBeInTheDocument();
+  });
+
+  it('tells visitors the app is free to use', () => {
+    renderPage();
+    expect(screen.getByText(en.auth.intro.freeBadge)).toBeInTheDocument();
+  });
+
+  it('keeps the intro panel visible in register mode', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Sign up' }));
+    expect(screen.getByText('Create Account', { selector: '[data-slot="card-title"]' })).toBeInTheDocument();
+    expect(screen.getByText(en.auth.intro.headline)).toBeInTheDocument();
   });
 
   // ── Mode switching ────────────────────────────────────────────

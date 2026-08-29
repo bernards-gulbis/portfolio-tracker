@@ -37,6 +37,25 @@ const en = {
     },
   },
   auth: {
+    intro: {
+      headline: 'Know what your portfolio is really worth',
+      tagline: 'A free portfolio tracker for European investors. Live prices, real returns and tax estimates — all converted to EUR.',
+      features: {
+        valuations: {
+          title: 'Live valuations',
+          description: 'Prices straight from Yahoo Finance, converted to EUR automatically.',
+        },
+        returns: {
+          title: 'Real returns',
+          description: 'Gains, dividends and fees included, benchmarked against the S&P 500.',
+        },
+        tax: {
+          title: 'Tax estimates',
+          description: 'See what is actually left after tax at your own rate.',
+        },
+      },
+      freeBadge: 'Free to use',
+    },
     validation: {
       invalidEmail: 'Invalid email address',
       passwordRequired: 'Password is required',
