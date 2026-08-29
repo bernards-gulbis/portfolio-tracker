@@ -3,27 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-// Keys are spelled out rather than built from a template so they stay
-// checkable against the Translation type in i18n/i18next.d.ts.
 const FEATURES = [
-  {
-    id: 'valuations',
-    Icon: TrendingUp,
-    titleKey: 'auth.intro.features.valuations.title',
-    descriptionKey: 'auth.intro.features.valuations.description',
-  },
-  {
-    id: 'returns',
-    Icon: Coins,
-    titleKey: 'auth.intro.features.returns.title',
-    descriptionKey: 'auth.intro.features.returns.description',
-  },
-  {
-    id: 'tax',
-    Icon: Receipt,
-    titleKey: 'auth.intro.features.tax.title',
-    descriptionKey: 'auth.intro.features.tax.description',
-  },
+  { id: 'valuations', Icon: TrendingUp },
+  { id: 'returns', Icon: Coins },
+  { id: 'tax', Icon: Receipt },
 ] as const;
 
 /**
@@ -43,20 +26,24 @@ export function AuthIntroPanel({ className }: Readonly<{ className?: string }>) 
         <p className="text-balance text-sm text-muted-foreground">{t('auth.intro.tagline')}</p>
       </div>
 
-      <ul className="hidden md:flex md:flex-col md:gap-4">
-        {FEATURES.map(({ id, Icon, titleKey, descriptionKey }) => (
+      <ul className="hidden flex-col gap-4 md:flex">
+        {FEATURES.map(({ id, Icon }) => (
           <li key={id} className="flex gap-3">
             <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div className="flex flex-col gap-0.5">
-              <p className="text-sm font-medium leading-none">{t(titleKey)}</p>
-              <p className="text-xs leading-snug text-muted-foreground">{t(descriptionKey)}</p>
+              <p className="text-sm font-medium leading-none">
+                {t(`auth.intro.features.${id}.title`)}
+              </p>
+              <p className="text-xs leading-snug text-muted-foreground">
+                {t(`auth.intro.features.${id}.description`)}
+              </p>
             </div>
           </li>
         ))}
       </ul>
 
       {/* Not `secondary`: that sits on top of the panel's own bg-muted and disappears. */}
-      <Badge className="w-fit">{t('auth.intro.freeBadge')}</Badge>
+      <Badge>{t('auth.intro.freeBadge')}</Badge>
     </div>
   );
 }

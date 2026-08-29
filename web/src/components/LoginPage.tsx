@@ -10,7 +10,7 @@ import { getGoogleAuthorizeUrl, getErrorMessage } from '../api';
 import { useLogin, useRegister } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -134,12 +134,12 @@ export const LoginPage = () => {
           <AuthIntroPanel />
 
           <div className="flex flex-col gap-4 p-6 md:p-8">
-            <div className="flex flex-col gap-1.5 text-center">
+            <CardHeader className="gap-1.5 p-0 text-center">
               <CardTitle>{mode === 'login' ? t('auth.signIn.title') : t('auth.register.title')}</CardTitle>
               <CardDescription>
                 {mode === 'login' ? t('auth.signIn.description') : t('auth.register.description')}
               </CardDescription>
-            </div>
+            </CardHeader>
             <Button
               variant="outline"
               onClick={handleGoogleLogin}
