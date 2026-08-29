@@ -18,6 +18,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { AppFooter } from './AppFooter';
+import { AuthIntroPanel } from './AuthIntroPanel';
 
 const emailValidator = z.email();
 
@@ -128,176 +129,179 @@ export const LoginPage = () => {
         </Button>
       </div>
       <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle>{mode === 'login' ? t('auth.signIn.title') : t('auth.register.title')}</CardTitle>
-          <CardDescription>
-            {mode === 'login' ? t('auth.signIn.description') : t('auth.register.description')}
-          </CardDescription>
-        </CardHeader>
+        <Card className="w-full max-w-sm overflow-hidden p-0 md:max-w-4xl">
+        <CardContent className="grid p-0 md:grid-cols-2">
+          <AuthIntroPanel />
 
-        <CardContent className="flex flex-col gap-4">
-          <Button
-            variant="outline"
-            onClick={handleGoogleLogin}
-            disabled={googleLoading}
-            className="w-full"
-          >
-            {googleLoading ? t('auth.google.redirecting') : t('auth.google.continue')}
-          </Button>
+          <div className="flex flex-col gap-4 p-6 md:p-8">
+            <CardHeader className="gap-1.5 p-0 text-center">
+              <CardTitle>{mode === 'login' ? t('auth.signIn.title') : t('auth.register.title')}</CardTitle>
+              <CardDescription>
+                {mode === 'login' ? t('auth.signIn.description') : t('auth.register.description')}
+              </CardDescription>
+            </CardHeader>
+            <Button
+              variant="outline"
+              onClick={handleGoogleLogin}
+              disabled={googleLoading}
+              className="w-full"
+            >
+              {googleLoading ? t('auth.google.redirecting') : t('auth.google.continue')}
+            </Button>
 
-          <div className="flex items-center gap-2">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">{t('auth.separator')}</span>
-            <Separator className="flex-1" />
-          </div>
+            <div className="flex items-center gap-2">
+              <Separator className="flex-1" />
+              <span className="text-xs text-muted-foreground">{t('auth.separator')}</span>
+              <Separator className="flex-1" />
+            </div>
 
-          {mode === 'login' ? (
-            <form key="login" noValidate onSubmit={loginForm.handleSubmit(handleLogin)} className="flex flex-col gap-3">
-              <FieldGroup>
-                <Controller
-                  name="email"
-                  control={loginForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="login-email">{t('auth.fields.email')}</FieldLabel>
-                      <Input
-                        {...field}
-                        id="login-email"
-                        type="email"
-                        placeholder={t('auth.fields.emailPlaceholder')}
-                        autoComplete="email"
-                        autoFocus
-                      />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="password"
-                  control={loginForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="login-password">{t('auth.fields.password')}</FieldLabel>
-                      <Input
-                        {...field}
-                        id="login-password"
-                        type="password"
-                        placeholder={t('auth.fields.passwordPlaceholder')}
-                        autoComplete="current-password"
-                      />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                {loginForm.formState.errors.root && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{loginForm.formState.errors.root.message}</AlertDescription>
-                  </Alert>
-                )}
-              </FieldGroup>
-
-              <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
-                {loginMutation.isPending && <Spinner />}
-                {t('auth.signIn.submit')}
-              </Button>
-            </form>
-          ) : (
-            <form key="register" noValidate onSubmit={registerForm.handleSubmit(handleRegister)} className="flex flex-col gap-3">
-              <FieldGroup>
-                <Controller
-                  name="name"
-                  control={registerForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="register-name">{t('auth.fields.name')}</FieldLabel>
-                      <Input
-                        {...field}
-                        id="register-name"
-                        type="text"
-                        placeholder={t('auth.fields.namePlaceholder')}
-                        autoComplete="name"
-                        autoFocus
-                      />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="email"
-                  control={registerForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="register-email">{t('auth.fields.email')}</FieldLabel>
-                      <Input
-                        {...field}
-                        id="register-email"
-                        type="email"
-                        placeholder={t('auth.fields.emailPlaceholder')}
-                        autoComplete="email"
-                      />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="password"
-                  control={registerForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid || undefined}>
-                      <FieldLabel htmlFor="register-password">{t('auth.fields.password')}</FieldLabel>
-                      <Input
-                        {...field}
-                        id="register-password"
-                        type="password"
-                        placeholder={t('auth.fields.passwordPlaceholder')}
-                        autoComplete="new-password"
-                      />
-                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                    </Field>
-                  )}
-                />
-                {registerForm.formState.errors.root && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{registerForm.formState.errors.root.message}</AlertDescription>
-                  </Alert>
-                )}
-              </FieldGroup>
-
-              <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
-                {registerMutation.isPending && <Spinner />}
-                {t('auth.register.submit')}
-              </Button>
-            </form>
-          )}
-
-          <p className="text-center text-sm text-muted-foreground">
             {mode === 'login' ? (
-              <>
-                {t('auth.signIn.switchPrompt')}{' '}
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={switchToRegister}
-                  className="h-auto p-0 underline underline-offset-4"
-                >
-                  {t('auth.signIn.switchLink')}
+              <form key="login" noValidate onSubmit={loginForm.handleSubmit(handleLogin)} className="flex flex-col gap-3">
+                <FieldGroup>
+                  <Controller
+                    name="email"
+                    control={loginForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid || undefined}>
+                        <FieldLabel htmlFor="login-email">{t('auth.fields.email')}</FieldLabel>
+                        <Input
+                          {...field}
+                          id="login-email"
+                          type="email"
+                          placeholder={t('auth.fields.emailPlaceholder')}
+                          autoComplete="email"
+                          autoFocus
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    name="password"
+                    control={loginForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid || undefined}>
+                        <FieldLabel htmlFor="login-password">{t('auth.fields.password')}</FieldLabel>
+                        <Input
+                          {...field}
+                          id="login-password"
+                          type="password"
+                          placeholder={t('auth.fields.passwordPlaceholder')}
+                          autoComplete="current-password"
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                  {loginForm.formState.errors.root && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{loginForm.formState.errors.root.message}</AlertDescription>
+                    </Alert>
+                  )}
+                </FieldGroup>
+
+                <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                  {loginMutation.isPending && <Spinner />}
+                  {t('auth.signIn.submit')}
                 </Button>
-              </>
+              </form>
             ) : (
-              <>
-                {t('auth.register.switchPrompt')}{' '}
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={switchToLogin}
-                  className="h-auto p-0 underline underline-offset-4"
-                >
-                  {t('auth.register.switchLink')}
+              <form key="register" noValidate onSubmit={registerForm.handleSubmit(handleRegister)} className="flex flex-col gap-3">
+                <FieldGroup>
+                  <Controller
+                    name="name"
+                    control={registerForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid || undefined}>
+                        <FieldLabel htmlFor="register-name">{t('auth.fields.name')}</FieldLabel>
+                        <Input
+                          {...field}
+                          id="register-name"
+                          type="text"
+                          placeholder={t('auth.fields.namePlaceholder')}
+                          autoComplete="name"
+                          autoFocus
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    name="email"
+                    control={registerForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid || undefined}>
+                        <FieldLabel htmlFor="register-email">{t('auth.fields.email')}</FieldLabel>
+                        <Input
+                          {...field}
+                          id="register-email"
+                          type="email"
+                          placeholder={t('auth.fields.emailPlaceholder')}
+                          autoComplete="email"
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    name="password"
+                    control={registerForm.control}
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={fieldState.invalid || undefined}>
+                        <FieldLabel htmlFor="register-password">{t('auth.fields.password')}</FieldLabel>
+                        <Input
+                          {...field}
+                          id="register-password"
+                          type="password"
+                          placeholder={t('auth.fields.passwordPlaceholder')}
+                          autoComplete="new-password"
+                        />
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                      </Field>
+                    )}
+                  />
+                  {registerForm.formState.errors.root && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{registerForm.formState.errors.root.message}</AlertDescription>
+                    </Alert>
+                  )}
+                </FieldGroup>
+
+                <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
+                  {registerMutation.isPending && <Spinner />}
+                  {t('auth.register.submit')}
                 </Button>
-              </>
+              </form>
             )}
-          </p>
+
+            <p className="text-center text-sm text-muted-foreground">
+              {mode === 'login' ? (
+                <>
+                  {t('auth.signIn.switchPrompt')}{' '}
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={switchToRegister}
+                    className="h-auto p-0 underline underline-offset-4"
+                  >
+                    {t('auth.signIn.switchLink')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {t('auth.register.switchPrompt')}{' '}
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={switchToLogin}
+                    className="h-auto p-0 underline underline-offset-4"
+                  >
+                    {t('auth.register.switchLink')}
+                  </Button>
+                </>
+              )}
+            </p>
+          </div>
         </CardContent>
         </Card>
       </div>

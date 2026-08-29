@@ -39,6 +39,25 @@ const lv: Translation = {
     },
   },
   auth: {
+    intro: {
+      headline: 'Uzziniet, cik patiesībā vērts jūsu portfelis',
+      tagline: 'Bezmaksas ieguldījumu portfeļa pārskats Eiropas investoriem. Reāllaika cenas, patiesā atdeve un nodokļu aplēses — viss pārrēķināts eiro.',
+      features: {
+        valuations: {
+          title: 'Reāllaika vērtējums',
+          description: 'Cenas no Yahoo Finance, automātiski pārrēķinātas eiro.',
+        },
+        returns: {
+          title: 'Patiesā atdeve',
+          description: 'Ieskaitot peļņu, dividendes un komisijas, salīdzinot ar S&P 500.',
+        },
+        tax: {
+          title: 'Nodokļu aplēses',
+          description: 'Redziet, cik paliek pāri pēc nodokļiem pēc jūsu likmes.',
+        },
+      },
+      freeBadge: 'Bezmaksas',
+    },
     validation: {
       invalidEmail: 'Nederīga e-pasta adrese',
       passwordRequired: 'Parole ir obligāta',
