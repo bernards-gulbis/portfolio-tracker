@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { InfoIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { CardTitle } from '@/components/ui/card';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { HeaderInfo, ViewMode } from './types';
 
 interface Props {
@@ -30,23 +29,21 @@ export const PerformanceChartHeader = ({ viewMode, headerInfo, warnings }: Props
           <span className="text-xs text-muted-foreground">{headerInfo.date}</span>
         )}
         {hasWarnings && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                aria-label={t('status.chartWarningsButton')}
-              >
-                <InfoIcon className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="text-sm space-y-2">
-              {warnings.map((w, i) => (
-                <p key={`${i}-${w}`} className="leading-relaxed">{w}</p>
-              ))}
-            </PopoverContent>
-          </Popover>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <InfoIcon
+                  aria-label={t('common.moreInfo')}
+                  className="h-3 w-3 text-muted-foreground cursor-help"
+                />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-72 space-y-2">
+                {warnings.map((w, i) => (
+                  <p key={`${i}-${w}`} className="leading-relaxed">{w}</p>
+                ))}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
       {headerInfo != null && (
