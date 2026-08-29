@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { InfoIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { HeaderInfo, ViewMode } from './types';
@@ -32,10 +33,15 @@ export const PerformanceChartHeader = ({ viewMode, headerInfo, warnings }: Props
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <InfoIcon
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label={t('common.moreInfo')}
-                  className="h-3 w-3 text-muted-foreground cursor-help"
-                />
+                  className="text-muted-foreground cursor-help"
+                >
+                  <InfoIcon aria-hidden="true" className="h-3 w-3" />
+                </Button>
               </TooltipTrigger>
               <TooltipContent className="max-w-72 space-y-2">
                 {warnings.map((w, i) => (
